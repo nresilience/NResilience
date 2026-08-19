@@ -12,13 +12,14 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
 
 jobs:
-  # Hard gate - allocation assertions.
+  # Behaviour, then the hard allocation gate. Both in one job because both want the same
+  # Release build of the same solution.
   #
   # Release only. The budgets were measured against tier-1 code, and a Debug run measures
   # something else entirely: it would fail loudly rather than pass falsely, but the failure
   # would be meaningless. Both target TFMs run, because "no cliff on net8" is a claim.
   gates:
-    name: Allocation gates (${{ matrix.os }})
+    name: Tests and allocation gates (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -36,6 +37,9 @@ jobs:
       - run: dotnet restore NResilience.slnx
 
       - run: dotnet build NResilience.slnx -c Release --no-restore
+
+      - name: Run the behavioural suite
+        run: dotnet test tests/NResilience.Tests/NResilience.Tests.csproj -c Release --no-build
 
       - name: Run gates
         run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build --logger "console;verbosity=detailed"

@@ -27,6 +27,7 @@ internal static class Program
         int failures = 0;
 
         failures += await CorrectnessAsync().ConfigureAwait(false);
+        failures += await ShippingLibraryAsync().ConfigureAwait(false);
         failures += await BudgetsAsync().ConfigureAwait(false);
 
         Console.WriteLine();
@@ -77,6 +78,80 @@ internal static class Program
         }
 
         failures += Check("caller cancellation propagates untouched", cancelledCorrectly);
+
+        return failures;
+    }
+
+    /// <summary>
+    /// The shipping library, published Native AOT.
+    ///
+    /// "No reflection anywhere in core" is a claim, and the only thing that can check it is a
+    /// trimmed, AOT-compiled binary running the real executor. Publishing with the trim and AOT
+    /// analysers on and warnings as errors proves the code is clean; running it proves the
+    /// per-result-type judge cache and the generic-struct invoker survive whole-program
+    /// compilation, which is where an implementation that reached for reflection would break.
+    /// </summary>
+    private static async Task<int> ShippingLibraryAsync()
+    {
+        Console.WriteLine();
+        int failures = 0;
+
+        int value = await Resilience.Default.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
+        failures += Check("library: a suspending call returns the callback's value", value == Gate.Value);
+
+        value = await Resilience.Default.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0).ConfigureAwait(false);
+        failures += Check("library: the stateful overload returns the callback's value", value == Gate.Value);
+
+        Resilience instant = Resilience.Default with { Backoff = Backoff.None, Attempts = 3 };
+        var counter = new Gate.FailCounter(failures: 2);
+        value = await instant.RunAsync(Gate.SuspendThenFailAsync, counter).ConfigureAwait(false);
+        failures += Check("library: two transient failures are retried to success", value == Gate.Value);
+
+        bool threw = false;
+        try
+        {
+            await instant.RunAsync(static _ => Task.FromException<int>(new InvalidOperationException("permanent"))).ConfigureAwait(false);
+        }
+        catch (InvalidOperationException)
+        {
+            threw = true;
+        }
+
+        failures += Check("library: an unrecognised exception is not retried and propagates", threw);
+
+        // The result-classification cache is the one place a naive implementation would reach for
+        // reflection, so it is exercised over two distinct result types in one process.
+        Resilience classified = instant with
+        {
+            Classify = Classifier.Default.OnResult<int>(static v => v == 503 ? Verdict.Transient : Verdict.Ok),
+        };
+
+        CallResult<int> failing = await classified.TryRunAsync(static ct => Task.FromResult(503)).ConfigureAwait(false);
+        failures += Check("library: a result rule fires under AOT", !failing.IsSuccess && failing.Attempts.Count == 3);
+
+        CallResult<string> unjudged = await classified.TryRunAsync(static ct => Task.FromResult("fine")).ConfigureAwait(false);
+        failures += Check("library: an unjudged result type is a success under AOT", unjudged.IsSuccess);
+
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync().ConfigureAwait(false);
+        bool cancelledCorrectly = false;
+        try
+        {
+            await Resilience.Default.RunAsync(Gate.SuspendAsync, cancelled.Token).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            cancelledCorrectly = true;
+        }
+
+        failures += Check("library: caller cancellation propagates untouched", cancelledCorrectly);
+
+        double raw = await MeasureAsync("library: raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        double none = await MeasureAsync("library: None (suspending)", static () => Resilience.None.RunAsync(Gate.SuspendAsync), AllocationCounter.ProcessWide).ConfigureAwait(false);
+        double full = await MeasureAsync("library: Default (suspending)", static () => Resilience.Default.RunAsync(Gate.SuspendAsync), AllocationCounter.ProcessWide).ConfigureAwait(false);
+
+        failures += Check("library: no AOT cliff on passthrough", none - raw <= 8);
+        failures += Check("library: no AOT cliff on the real loop", full - raw <= 384 + 8);
 
         return failures;
     }

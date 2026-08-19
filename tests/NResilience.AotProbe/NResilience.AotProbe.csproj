@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../bench/NResilience.Probes/NResilience.Probes.csproj" />
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
   </ItemGroup>
 
 </Project>

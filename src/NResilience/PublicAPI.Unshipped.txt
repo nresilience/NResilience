@@ -1,0 +1,166 @@
+#nullable enable
+NResilience.Attempt
+NResilience.Attempt.Attempt() -> void
+NResilience.Attempt.DelayBefore.get -> System.TimeSpan
+NResilience.Attempt.Duration.get -> System.TimeSpan
+NResilience.Attempt.Exception.get -> System.Exception?
+NResilience.Attempt.Number.get -> int
+NResilience.Attempt.Remaining.get -> System.TimeSpan
+NResilience.Attempt.Verdict.get -> NResilience.Verdict
+NResilience.AttemptLog
+NResilience.AttemptLog.Count.get -> int
+NResilience.AttemptLog.Elapsed.get -> System.TimeSpan
+NResilience.AttemptLog.GetEnumerator() -> System.Collections.Generic.IEnumerator<NResilience.Attempt>!
+NResilience.AttemptLog.this[int index].get -> NResilience.Attempt
+NResilience.AttemptTimeoutException
+NResilience.AttemptTimeoutException.AttemptTimeoutException() -> void
+NResilience.AttemptTimeoutException.AttemptTimeoutException(System.TimeSpan timeout) -> void
+NResilience.AttemptTimeoutException.AttemptTimeoutException(System.TimeSpan timeout, System.Exception? innerException) -> void
+NResilience.AttemptTimeoutException.AttemptTimeoutException(string! message) -> void
+NResilience.AttemptTimeoutException.AttemptTimeoutException(string! message, System.Exception! innerException) -> void
+NResilience.AttemptTimeoutException.Attempts.get -> NResilience.AttemptLog!
+NResilience.AttemptTimeoutException.Timeout.get -> System.TimeSpan
+NResilience.Backoff
+NResilience.Backoff.Backoff() -> void
+NResilience.Backoff.Compute(in NResilience.NextAttempt next) -> System.TimeSpan
+NResilience.Backoff.Equals(NResilience.Backoff other) -> bool
+NResilience.Backoff.Jitter.get -> NResilience.Jitter
+NResilience.Backoff.Jitter.init -> void
+NResilience.Backoff.Max.get -> System.TimeSpan
+NResilience.CallRejectedException
+NResilience.CallRejectedException.Attempts.get -> NResilience.AttemptLog!
+NResilience.CallRejectedException.CallRejectedException() -> void
+NResilience.CallRejectedException.CallRejectedException(NResilience.StopReason reason, NResilience.AttemptLog! attempts, System.TimeSpan? retryAfter = null) -> void
+NResilience.CallRejectedException.CallRejectedException(string! message) -> void
+NResilience.CallRejectedException.CallRejectedException(string! message, System.Exception! innerException) -> void
+NResilience.CallRejectedException.Reason.get -> NResilience.StopReason
+NResilience.CallRejectedException.RetryAfter.get -> System.TimeSpan?
+NResilience.CallResult
+NResilience.CallResult.Attempts.get -> NResilience.AttemptLog!
+NResilience.CallResult.CallResult() -> void
+NResilience.CallResult.Exception.get -> System.Exception?
+NResilience.CallResult.IsSuccess.get -> bool
+NResilience.CallResult.StopReason.get -> NResilience.StopReason
+NResilience.CallResult.ThrowIfFailed() -> void
+NResilience.CallResult<T>
+NResilience.CallResult<T>.Attempts.get -> NResilience.AttemptLog!
+NResilience.CallResult<T>.CallResult() -> void
+NResilience.CallResult<T>.Exception.get -> System.Exception?
+NResilience.CallResult<T>.HasValue.get -> bool
+NResilience.CallResult<T>.IsSuccess.get -> bool
+NResilience.CallResult<T>.StopReason.get -> NResilience.StopReason
+NResilience.CallResult<T>.TryGetValue(out T value) -> bool
+NResilience.CallResult<T>.Value.get -> T?
+NResilience.CallResult<T>.ValueOrThrow() -> T
+NResilience.Classifier
+NResilience.Classifier.ClassifyException(System.Exception! exception) -> NResilience.Verdict
+NResilience.Classifier.ClassifyResult<T>(T value) -> NResilience.Verdict
+NResilience.Classifier.On<TException>(NResilience.Verdict verdict) -> NResilience.Classifier!
+NResilience.Classifier.On<TException>(System.Func<TException!, NResilience.Verdict>! judge) -> NResilience.Classifier!
+NResilience.Classifier.OnResult<T>(System.Func<T, NResilience.Verdict>! judge) -> NResilience.Classifier!
+NResilience.DeadlineExceededException
+NResilience.DeadlineExceededException.Attempts.get -> NResilience.AttemptLog!
+NResilience.DeadlineExceededException.Deadline.get -> System.TimeSpan
+NResilience.DeadlineExceededException.DeadlineExceededException() -> void
+NResilience.DeadlineExceededException.DeadlineExceededException(System.TimeSpan deadline, NResilience.AttemptLog! attempts, System.Exception? innerException = null) -> void
+NResilience.DeadlineExceededException.DeadlineExceededException(string! message) -> void
+NResilience.DeadlineExceededException.DeadlineExceededException(string! message, System.Exception! innerException) -> void
+NResilience.Jitter
+NResilience.Jitter.Equal = 1 -> NResilience.Jitter
+NResilience.Jitter.Full = 0 -> NResilience.Jitter
+NResilience.Jitter.None = 2 -> NResilience.Jitter
+NResilience.NextAttempt
+NResilience.NextAttempt.CancellationToken.get -> System.Threading.CancellationToken
+NResilience.NextAttempt.NextAttempt() -> void
+NResilience.NextAttempt.Number.get -> int
+NResilience.NextAttempt.PreviousException.get -> System.Exception?
+NResilience.NextAttempt.PreviousVerdict.get -> NResilience.Verdict
+NResilience.NextAttempt.Remaining.get -> System.TimeSpan
+NResilience.Resilience
+NResilience.Resilience.<Clone>$() -> NResilience.Resilience!
+NResilience.Resilience.AttemptTimeout.get -> System.TimeSpan
+NResilience.Resilience.AttemptTimeout.init -> void
+NResilience.Resilience.Attempts.get -> int
+NResilience.Resilience.Attempts.init -> void
+NResilience.Resilience.Backoff.get -> NResilience.Backoff
+NResilience.Resilience.Backoff.init -> void
+NResilience.Resilience.BeforeAttempt.get -> System.Func<NResilience.NextAttempt, System.Threading.Tasks.Task!>?
+NResilience.Resilience.BeforeAttempt.init -> void
+NResilience.Resilience.Classify.get -> NResilience.Classifier!
+NResilience.Resilience.Classify.init -> void
+NResilience.Resilience.Deadline.get -> System.TimeSpan
+NResilience.Resilience.Deadline.init -> void
+NResilience.Resilience.Equals(NResilience.Resilience? other) -> bool
+NResilience.Resilience.Name.get -> string?
+NResilience.Resilience.Name.init -> void
+NResilience.Resilience.Resilience() -> void
+NResilience.Resilience.RunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NResilience.Resilience.RunAsync<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+NResilience.Resilience.RunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+NResilience.Resilience.RunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NResilience.Resilience.Time.get -> System.TimeProvider!
+NResilience.Resilience.Time.init -> void
+NResilience.Resilience.TryRunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
+NResilience.Resilience.TryRunAsync<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
+NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
+NResilience.Resilience.TryRunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
+NResilience.Resilience.Validate() -> void
+NResilience.ResilienceConfigurationException
+NResilience.ResilienceConfigurationException.Problems.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NResilience.ResilienceConfigurationException.ResilienceConfigurationException() -> void
+NResilience.ResilienceConfigurationException.ResilienceConfigurationException(System.Collections.Generic.IReadOnlyList<string!>! problems) -> void
+NResilience.ResilienceConfigurationException.ResilienceConfigurationException(string! message) -> void
+NResilience.ResilienceConfigurationException.ResilienceConfigurationException(string! message, System.Exception! innerException) -> void
+NResilience.StopReason
+NResilience.StopReason.AttemptsExhausted = 2 -> NResilience.StopReason
+NResilience.StopReason.BudgetExhausted = 4 -> NResilience.StopReason
+NResilience.StopReason.DeadlineExceeded = 3 -> NResilience.StopReason
+NResilience.StopReason.DependencyUnavailable = 5 -> NResilience.StopReason
+NResilience.StopReason.Permanent = 1 -> NResilience.StopReason
+NResilience.StopReason.Succeeded = 0 -> NResilience.StopReason
+NResilience.Verdict
+NResilience.Verdict.Equals(NResilience.Verdict other) -> bool
+NResilience.Verdict.Kind.get -> NResilience.VerdictKind
+NResilience.Verdict.RetryAfter.get -> System.TimeSpan?
+NResilience.Verdict.Verdict() -> void
+NResilience.VerdictKind
+NResilience.VerdictKind.Ok = 0 -> NResilience.VerdictKind
+NResilience.VerdictKind.Permanent = 3 -> NResilience.VerdictKind
+NResilience.VerdictKind.Throttled = 2 -> NResilience.VerdictKind
+NResilience.VerdictKind.Transient = 1 -> NResilience.VerdictKind
+const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
+override NResilience.Attempt.ToString() -> string!
+override NResilience.AttemptLog.ToString() -> string!
+override NResilience.Backoff.GetHashCode() -> int
+override NResilience.Classifier.ToString() -> string!
+override NResilience.Resilience.Equals(object? obj) -> bool
+override NResilience.Resilience.GetHashCode() -> int
+override NResilience.Resilience.ToString() -> string!
+override NResilience.Verdict.Equals(object? obj) -> bool
+override NResilience.Verdict.GetHashCode() -> int
+override NResilience.Verdict.ToString() -> string!
+static NResilience.AttemptLog.Empty.get -> NResilience.AttemptLog!
+static NResilience.AttemptLog.Of(System.Exception! exception) -> NResilience.AttemptLog?
+static NResilience.Backoff.Constant(System.TimeSpan delay) -> NResilience.Backoff
+static NResilience.Backoff.Custom(System.Func<NResilience.NextAttempt, System.TimeSpan>! compute) -> NResilience.Backoff
+static NResilience.Backoff.Default.get -> NResilience.Backoff
+static NResilience.Backoff.Exponential(System.TimeSpan? transientBase = null, System.TimeSpan? throttledBase = null, double factor = 2, System.TimeSpan? max = null) -> NResilience.Backoff
+static NResilience.Backoff.None.get -> NResilience.Backoff
+static NResilience.Backoff.operator !=(NResilience.Backoff left, NResilience.Backoff right) -> bool
+static NResilience.Backoff.operator ==(NResilience.Backoff left, NResilience.Backoff right) -> bool
+static NResilience.Classifier.Default.get -> NResilience.Classifier!
+static NResilience.Classifier.Http.get -> NResilience.Classifier!
+static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
+static NResilience.Resilience.Default.get -> NResilience.Resilience!
+static NResilience.Resilience.Http.get -> NResilience.Resilience!
+static NResilience.Resilience.None.get -> NResilience.Resilience!
+static NResilience.Resilience.operator !=(NResilience.Resilience? left, NResilience.Resilience? right) -> bool
+static NResilience.Resilience.operator ==(NResilience.Resilience? left, NResilience.Resilience? right) -> bool
+static NResilience.Verdict.Ok.get -> NResilience.Verdict
+static NResilience.Verdict.Permanent.get -> NResilience.Verdict
+static NResilience.Verdict.Throttled(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
+static NResilience.Verdict.Transient.get -> NResilience.Verdict
+static NResilience.Verdict.operator !=(NResilience.Verdict left, NResilience.Verdict right) -> bool
+static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Verdict right) -> bool
+~override NResilience.Backoff.Equals(object obj) -> bool
+~override NResilience.Backoff.ToString() -> string

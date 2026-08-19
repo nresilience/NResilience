@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>NResilience</RootNamespace>
+
+    <!--
+      Turns on the public API gate declared in Directory.Build.props. This is the first
+      shipping project, so this is where PublicAPI.Shipped.txt / PublicAPI.Unshipped.txt
+      start being reviewed diffs rather than an inert idea.
+    -->
+    <IsShippingLibrary>true</IsShippingLibrary>
+
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <!-- The AOT claim is CI-enforced from Phase 0; the analysers have to be on at the source. -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+
+    <PackageId>NResilience</PackageId>
+    <Description>A .NET resilience library built around one flat execution engine, a declarative policy value, and defaults that are correct without configuration.</Description>
+    <PackageTags>resilience;retry;timeout;circuit-breaker;http;polly</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!--
+      RS0026 forbids overload sets that each carry an optional parameter. The whole execution
+      surface is exactly that on purpose - eight overloads whose last parameter is
+      `CancellationToken cancellationToken = default` - because the alternative is sixteen
+      overloads for one concept. The rule exists to protect source compatibility when overloads
+      are added later; the public API manifest is what protects that here, and it is reviewed.
+    -->
+    <NoWarn>$(NoWarn);RS0026</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The behavioural suite constructs NextAttempt and reads the inline log directly. -->
+    <InternalsVisibleTo Include="NResilience.Tests" />
+  </ItemGroup>
+
+</Project>
