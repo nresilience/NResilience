@@ -7,8 +7,10 @@ order: 4
 # HTTP
 
 ```bash
-dotnet add package NResilience.Http
+dotnet add package NResilience
 ```
+
+The handler ships in the core package - there is no separate HTTP install.
 
 `ResilienceHandler` runs a [policy](../reference/resilience.md) around the send and does the five
 things a policy on its own cannot:

@@ -7,7 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/NResilience.Http/NResilience.Http.csproj" />
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
   </ItemGroup>
 
 </Project>

@@ -37,7 +37,6 @@
 
   <ItemGroup>
     <ProjectReference Include="../NResilience/NResilience.csproj" />
-    <ProjectReference Include="../NResilience.Http/NResilience.Http.csproj" />
   </ItemGroup>
 
   <ItemGroup>

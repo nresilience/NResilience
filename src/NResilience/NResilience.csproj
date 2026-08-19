@@ -21,8 +21,8 @@
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
 
     <PackageId>NResilience</PackageId>
-    <Description>A .NET resilience library built around one flat execution engine, a declarative policy value, and defaults that are correct without configuration.</Description>
-    <PackageTags>resilience;retry;timeout;circuit-breaker;http;polly</PackageTags>
+    <Description>A .NET resilience library built around one flat execution engine, a declarative policy value, and defaults that are correct without configuration. Includes the HTTP integration: a delegating handler that clones the request per attempt, refuses to retry unsafe methods by default, scopes breakers and budgets per host, owns the transport timeout, and reports nested retries. No package dependencies.</Description>
+    <PackageTags>resilience;retry;timeout;circuit-breaker;http;httpclient;polly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <!--
@@ -38,13 +38,6 @@
   <ItemGroup>
     <!-- The behavioural suite constructs NextAttempt and reads the inline log directly. -->
     <InternalsVisibleTo Include="NResilience.Tests" />
-
-    <!--
-      The HTTP handler raises CallEventKind.NestedRetry, which nothing else can detect. CallEvent's
-      constructor stays internal because it is the executor's to populate; the handler is the one
-      documented exception, rather than a public constructor everyone could invent events with.
-    -->
-    <InternalsVisibleTo Include="NResilience.Http" />
 
     <!--
       The allocation gate asserts the inline attempt log's layout - capacity times record size -

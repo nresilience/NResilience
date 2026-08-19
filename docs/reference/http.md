@@ -6,7 +6,7 @@ order: 9
 
 # HTTP reference
 
-Namespace `NResilience.Http`, package `NResilience.Http`.
+Namespace `NResilience.Http`, package `NResilience`.
 
 ## `ResilienceHandler`
 

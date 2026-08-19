@@ -3,10 +3,12 @@
 A .NET resilience library built around one flat execution engine, a declarative policy value, and
 defaults that are correct without configuration.
 
-**Status: Phase 7 complete - all seven build phases are done.** The four packages ship:
-`NResilience` (the policy value and the fused executor), `NResilience.Http` (the handler),
+**Status: Phase 7 complete - all seven build phases are done.** Three packages ship:
+`NResilience` (the policy value, the fused executor and the `HttpClient` handler),
 `NResilience.Extensions` (DI, configuration, metrics and traces) and `NResilience.Testing` (scripted
-callbacks and a recording listener). Every allocation gate measures the shipping executor, every
+callbacks and a recording listener). HTTP lives in the core package because the core already
+classifies `HttpResponseMessage` and reads `Retry-After`, and because the handler needs nothing
+outside the shared framework - so folding it in costs a consumer no dependency at all. Every allocation gate measures the shipping executor, every
 documentation snippet is compiled and executed in CI, and Native AOT publishes clean on both target
 frameworks.
 
@@ -80,8 +82,7 @@ its own state-machine box, and no library-side trick removes it.
 
 | Path | What it is |
 |---|---|
-| `src/NResilience` | The library. Zero dependencies, `net8.0;net10.0`, AOT-clean, public API manifest checked in. |
-| `src/NResilience.Http` | The `HttpClient` handler: request cloning, idempotency, per-host scope. |
+| `src/NResilience` | The library, including `Http/` - the `HttpClient` handler: request cloning, idempotency, per-host scope. Zero dependencies, `net8.0;net10.0`, AOT-clean, public API manifest checked in. |
 | `src/NResilience.Extensions` | `AddResilience()`, configuration binding, the meter and the activity source. |
 | `src/NResilience.Testing` | Scripted callbacks and a recording listener. |
 | `bench/NResilience.Probes` | The shared suspension gate, the allocation instrument, the cancellation probes, the shipping-executor arms, and Phase 0a's hand-written fused loop — still measured, as the floor the real executor has to beat. |
