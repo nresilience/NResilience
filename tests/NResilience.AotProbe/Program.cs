@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using NResilience.Probes;
+using NResilience.Testing;
 
 namespace NResilience.AotProbe;
 
@@ -148,6 +149,37 @@ internal static class Program
 
         failures += await GuardsAsync().ConfigureAwait(false);
         failures += await TelemetryAsync().ConfigureAwait(false);
+        failures += await TestingPackageAsync().ConfigureAwait(false);
+
+        return failures;
+    }
+
+    /// <summary>
+    /// Phase 4 under AOT. The testing package ships, so it is gated like everything else that
+    /// ships: a scripted sequence driving a real policy, and a recorder reading the events back.
+    /// </summary>
+    private static async Task<int> TestingPackageAsync()
+    {
+        Console.WriteLine();
+        int failures = 0;
+
+        var events = new EventRecorder();
+        Resilience instant = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
+
+        var calls = Sequence.For<int>()
+            .Throws(new TimeoutException())
+            .Returns(Gate.Value);
+
+        CallResult<int> result = await instant.TryRunAsync(ct => calls.NextAsync(ct)).ConfigureAwait(false);
+
+        failures += Check("testing: a scripted sequence retries to success", result.IsSuccess && result.Value == Gate.Value);
+        failures += Check("testing: the sequence served every scripted step", calls.CallCount == 2 && calls.Remaining == 0);
+        failures += Check(
+            "testing: the recorder captured the whole event sequence",
+            events.Kinds is [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded]);
+        failures += Check(
+            "testing: the recorder reads the boxed result back",
+            Equals(events.Single(CallEventKind.Succeeded).Result, Gate.Value));
 
         return failures;
     }

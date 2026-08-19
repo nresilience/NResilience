@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+    <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj" />
   </ItemGroup>
 
 </Project>

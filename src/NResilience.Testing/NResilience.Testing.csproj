@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>NResilience.Testing</RootNamespace>
+
+    <IsShippingLibrary>true</IsShippingLibrary>
+
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+
+    <PackageId>NResilience.Testing</PackageId>
+    <Description>Test helpers for NResilience: a scripted callback and a recording telemetry listener. Deliberately small - the core was designed to be testable, so a fake clock and the attempt log already do most of the work.</Description>
+    <PackageTags>resilience;retry;testing;polly</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience/NResilience.csproj" />
+  </ItemGroup>
+
+</Project>
