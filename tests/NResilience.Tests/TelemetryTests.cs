@@ -200,12 +200,16 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Running out of attempts has no event of its own, and that is deliberate: the
-    /// <c>Attempt</c> event for the last attempt already carried the failure, and there is no
-    /// <c>AttemptsExhausted</c> kind to invent one from.
+    /// Running out of attempts is terminal and says so.
+    /// <para>
+    /// This is the ordinary way a retried call fails, and the event exists so that
+    /// <i>every</i> call ends with exactly one terminal event. A listener counting logical
+    /// operations that skipped this kind would count only the calls that succeeded — which is the
+    /// denominator of the retry fraction, and the one number the metric set exists to produce.
+    /// </para>
     /// </summary>
     [Fact]
-    public async Task Exhausting_the_attempts_ends_the_sequence_with_the_last_attempt()
+    public async Task Exhausting_the_attempts_is_a_terminal_event()
     {
         var recorder = new Recorder();
 
@@ -213,8 +217,82 @@ public sealed class TelemetryTests
             .TryRunAsync(static ct => Task.FromException<int>(new IOException("flaky")));
 
         Assert.Equal(
-            [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt],
+            [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Exhausted],
             recorder.Kinds);
+
+        CallEvent exhausted = recorder.Single(CallEventKind.Exhausted);
+        Assert.Equal(StopReason.AttemptsExhausted, exhausted.Reason);
+        Assert.Equal(2, exhausted.AttemptNumber);
+        Assert.IsType<IOException>(exhausted.Exception);
+    }
+
+    /// <summary>
+    /// Every call ends with exactly one terminal event, whatever it did on the way — the invariant
+    /// a stateless listener needs in order to count logical operations at all.
+    /// </summary>
+    [Theory]
+    [InlineData(0, CallEventKind.Succeeded, StopReason.Succeeded)]
+    [InlineData(1, CallEventKind.NotRetried, StopReason.Permanent)]
+    [InlineData(2, CallEventKind.Exhausted, StopReason.AttemptsExhausted)]
+    public async Task Every_call_ends_with_exactly_one_terminal_event(int shape, CallEventKind kind, StopReason reason)
+    {
+        var recorder = new Recorder();
+
+        Func<CancellationToken, Task<int>> work = shape switch
+        {
+            0 => static ct => Task.FromResult(1),
+            1 => static ct => Task.FromException<int>(new InvalidOperationException("unrecognised")),
+            _ => static ct => Task.FromException<int>(new IOException("flaky")),
+        };
+
+        await (Instant(recorder) with { Attempts = 2 }).TryRunAsync(work);
+
+        CallEventKind[] terminals =
+        [
+            CallEventKind.Succeeded,
+            CallEventKind.NotRetried,
+            CallEventKind.Rejected,
+            CallEventKind.DeadlineExceeded,
+            CallEventKind.Exhausted,
+        ];
+
+        CallEvent terminal = Assert.Single(recorder.Events, e => terminals.Contains(e.Kind));
+        Assert.Equal(kind, terminal.Kind);
+        Assert.Equal(reason, terminal.Reason);
+        Assert.Equal(terminal, recorder.Events[^1]);
+    }
+
+    /// <summary>
+    /// The two refusals a <see cref="CallEventKind.Rejected"/> event covers are the difference
+    /// between "the dependency is down" and "we are retrying too hard" — two facts that call for
+    /// opposite responses, and that a stateless listener cannot tell apart from any other field on
+    /// the event.
+    /// </summary>
+    [Fact]
+    public async Task A_rejection_says_which_guard_refused_the_call()
+    {
+        var recorder = new Recorder();
+        var breaker = new Breaker();
+        breaker.Isolate();
+
+        await (Instant(recorder) with { Breaker = breaker })
+            .TryRunAsync(static ct => Task.FromResult(1));
+
+        Assert.Equal(StopReason.DependencyUnavailable, recorder.Single(CallEventKind.Rejected).Reason);
+    }
+
+    /// <summary>Non-terminal events carry no stop reason, because nothing has stopped.</summary>
+    [Fact]
+    public async Task A_non_terminal_event_carries_no_reason()
+    {
+        var recorder = new Recorder();
+
+        await (Instant(recorder) with { Attempts = 2 })
+            .TryRunAsync(static ct => Task.FromException<int>(new IOException("flaky")));
+
+        Assert.All(
+            recorder.Events.Where(e => e.Kind is CallEventKind.Attempt or CallEventKind.Retrying),
+            e => Assert.Null(e.Reason));
     }
 
     // ---- Not retried ----
@@ -341,8 +419,9 @@ public sealed class TelemetryTests
 
         Assert.Equal(
             [
-                CallEventKind.Attempt, CallEventKind.BreakerOpened,
+                CallEventKind.Attempt, CallEventKind.BreakerOpened, CallEventKind.Exhausted,
                 CallEventKind.BreakerHalfOpened, CallEventKind.Attempt, CallEventKind.BreakerOpened,
+                CallEventKind.Exhausted,
             ],
             recorder.Kinds);
     }

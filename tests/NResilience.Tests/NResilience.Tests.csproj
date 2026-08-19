@@ -19,10 +19,14 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj" />
     <ProjectReference Include="../../src/NResilience.Http/NResilience.Http.csproj" />
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj" />
   </ItemGroup>

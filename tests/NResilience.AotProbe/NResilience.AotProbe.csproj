@@ -23,8 +23,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../bench/NResilience.Probes/NResilience.Probes.csproj" />
     <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj" />
     <ProjectReference Include="../../src/NResilience.Http/NResilience.Http.csproj" />
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj" />
   </ItemGroup>

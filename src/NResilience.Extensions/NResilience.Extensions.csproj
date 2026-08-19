@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>NResilience.Extensions</RootNamespace>
+
+    <IsShippingLibrary>true</IsShippingLibrary>
+
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+
+    <!--
+      The design's claim about ResilienceOptions is that every property on it is something the
+      platform's AOT-safe binding source generator handles. The generator is what makes that
+      claim testable: with it on, a reflection-based bind would raise a trim warning here, and
+      warnings are errors.
+    -->
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+
+    <PackageId>NResilience.Extensions</PackageId>
+    <Description>Dependency injection, configuration binding with hot reload, and OpenTelemetry-shaped metrics and traces for NResilience. Binds through a mutable DTO because the configuration binder silently ignores init-only properties.</Description>
+    <PackageTags>resilience;retry;dependencyinjection;configuration;opentelemetry;polly</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!--
+      RS0026 forbids overload sets that each carry an optional parameter. Every registration here
+      takes an optional configure callback, which is the shape the whole ecosystem uses; the
+      public API manifest is what protects source compatibility, and it is reviewed.
+    -->
+    <NoWarn>$(NoWarn);RS0026</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience/NResilience.csproj" />
+    <ProjectReference Include="../NResilience.Http/NResilience.Http.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NResilience.Tests" />
+  </ItemGroup>
+
+</Project>

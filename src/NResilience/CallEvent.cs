@@ -69,6 +69,18 @@ public enum CallEventKind
     /// on the dependency. Raised by the HTTP handler; nothing else can detect it.
     /// </summary>
     NestedRetry,
+
+    /// <summary>
+    /// The last attempt failed and there were no attempts left. Terminal.
+    /// <para>
+    /// This is the ordinary way a retried call gives up, and it exists so that <i>every</i> call
+    /// ends with exactly one terminal event — <see cref="Succeeded"/>, <see cref="NotRetried"/>,
+    /// <see cref="Rejected"/>, <see cref="DeadlineExceeded"/> or this. A listener counting logical
+    /// operations can only be trusted if the count includes the failures, and those are the calls
+    /// worth counting.
+    /// </para>
+    /// </summary>
+    Exhausted,
 }
 
 /// <summary>
@@ -100,7 +112,8 @@ public readonly struct CallEvent
         TimeSpan duration,
         TimeSpan? delay,
         Exception? exception,
-        object? result)
+        object? result,
+        StopReason? reason)
     {
         Kind = kind;
         PolicyName = policyName;
@@ -110,6 +123,7 @@ public readonly struct CallEvent
         Delay = delay;
         Exception = exception;
         Result = result;
+        Reason = reason;
     }
 
     /// <summary>What happened.</summary>
@@ -162,6 +176,21 @@ public readonly struct CallEvent
     /// </para>
     /// </summary>
     public object? Result { get; }
+
+    /// <summary>
+    /// Why the call stopped, on the four terminal kinds — <see cref="CallEventKind.Succeeded"/>,
+    /// <see cref="CallEventKind.NotRetried"/>, <see cref="CallEventKind.Rejected"/> and
+    /// <see cref="CallEventKind.DeadlineExceeded"/>. Null on every other kind, because nothing has
+    /// stopped yet.
+    /// <para>
+    /// <see cref="CallEventKind.Rejected"/> covers two different refusals — an open breaker
+    /// (<see cref="StopReason.DependencyUnavailable"/>) and an exhausted retry budget
+    /// (<see cref="StopReason.BudgetExhausted"/>) — and telling them apart is the difference
+    /// between "the dependency is down" and "we are retrying too hard". A stateless listener
+    /// cannot infer it from the other fields, so the executor states it.
+    /// </para>
+    /// </summary>
+    public StopReason? Reason { get; }
 
     /// <inheritdoc/>
     public override string ToString()

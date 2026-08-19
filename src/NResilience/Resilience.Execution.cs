@@ -260,7 +260,7 @@ public sealed partial record Resilience
 
                     if (OnEvent is not null)
                     {
-                        Notify(CallEventKind.Rejected, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null);
+                        Notify(CallEventKind.Rejected, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null, StopReason.DependencyUnavailable);
                     }
 
                     await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
@@ -418,7 +418,7 @@ public sealed partial record Resilience
                 // nobody.
                 if (OnEvent is not null)
                 {
-                    Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue));
+                    Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue), StopReason.Succeeded);
                 }
 
                 AttemptLog succeeded = shaper.WantsLogOnSuccess
@@ -438,7 +438,7 @@ public sealed partial record Resilience
                 {
                     // The event that makes "Classifier.Default did not recognise your exception
                     // type" visible rather than mysterious: the type is right there on it.
-                    Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue));
+                    Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue), StopReason.Permanent);
                 }
 
                 break;
@@ -447,6 +447,12 @@ public sealed partial record Resilience
             if (log.Count >= Attempts)
             {
                 reason = StopReason.AttemptsExhausted;
+
+                if (OnEvent is not null)
+                {
+                    Notify(CallEventKind.Exhausted, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue), StopReason.AttemptsExhausted);
+                }
+
                 break;
             }
 
@@ -469,7 +475,7 @@ public sealed partial record Resilience
 
                 if (OnEvent is not null)
                 {
-                    Notify(CallEventKind.Rejected, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue));
+                    Notify(CallEventKind.Rejected, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue), StopReason.BudgetExhausted);
                 }
 
                 await Delay(Time, refused, cancellationToken).ConfigureAwait(false);
@@ -563,7 +569,7 @@ public sealed partial record Resilience
     /// dereference.
     /// </para>
     /// </summary>
-    private void Notify(CallEventKind kind, int attemptNumber, Verdict verdict, TimeSpan duration, TimeSpan? delay, Exception? error, object? result)
+    private void Notify(CallEventKind kind, int attemptNumber, Verdict verdict, TimeSpan duration, TimeSpan? delay, Exception? error, object? result, StopReason? reason = null)
     {
         Action<CallEvent>? listener = OnEvent;
         if (listener is null)
@@ -573,7 +579,7 @@ public sealed partial record Resilience
 
         try
         {
-            listener(new CallEvent(kind, Name, attemptNumber, verdict, duration, delay, error, result));
+            listener(new CallEvent(kind, Name, attemptNumber, verdict, duration, delay, error, result, reason));
         }
         catch (Exception)
         {
@@ -605,7 +611,7 @@ public sealed partial record Resilience
     {
         if (OnEvent is not null)
         {
-            Notify(CallEventKind.DeadlineExceeded, attemptNumber, verdict, elapsed, null, error, null);
+            Notify(CallEventKind.DeadlineExceeded, attemptNumber, verdict, elapsed, null, error, null, StopReason.DeadlineExceeded);
         }
     }
 

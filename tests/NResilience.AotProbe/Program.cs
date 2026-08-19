@@ -1,7 +1,12 @@
+using System.Diagnostics.Metrics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Net;
 using System.Net.Http;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
+using NResilience.Extensions;
 using NResilience.Http;
 using NResilience.Probes;
 using NResilience.Testing;
@@ -32,6 +37,7 @@ internal static class Program
 
         failures += await CorrectnessAsync().ConfigureAwait(false);
         failures += await ShippingLibraryAsync().ConfigureAwait(false);
+        failures += await ExtensionsAsync().ConfigureAwait(false);
         failures += await BudgetsAsync().ConfigureAwait(false);
 
         Console.WriteLine();
@@ -346,6 +352,94 @@ internal static class Program
     /// the test project, and because an AOT-specific divergence is exactly what this gate exists to
     /// surface.
     /// </summary>
+    /// <summary>
+    /// The DI, configuration and telemetry surface, in the published binary.
+    /// <para>
+    /// This is the phase most entitled to break under whole-program compilation, because
+    /// configuration binding is reflection by default and a container resolves types by
+    /// <c>Type</c>. The binding source generator is what makes it trim-safe, and a generator that
+    /// silently declined to run would show up here as a policy full of defaults rather than as a
+    /// build warning — which is why the assertion is on the projected values.
+    /// </para>
+    /// </summary>
+    private static async Task<int> ExtensionsAsync()
+    {
+        Console.WriteLine();
+        int failures = 0;
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Resilience:api:Preset"] = "Http",
+                ["Resilience:api:Attempts"] = "4",
+                ["Resilience:api:Deadline"] = "00:00:20",
+                ["Resilience:api:MaxDelay"] = "00:00:01",
+                ["Resilience:api:Breaker:ConsecutiveFailures"] = "2",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddResilience(configuration.GetSection("Resilience"));
+        services.AddHttpClient("probe").AddResilience("api", o => o.OwnTransportTimeout = true);
+
+        using ServiceProvider provider = services.BuildServiceProvider();
+        IResiliencePolicies policies = provider.GetRequiredService<IResiliencePolicies>();
+
+        Resilience api = policies["api"];
+
+        failures += Check("configuration binds under AOT (attempts)", api.Attempts == 4);
+        failures += Check("configuration binds under AOT (deadline)", api.Deadline == TimeSpan.FromSeconds(20));
+        failures += Check("configuration binds under AOT (backoff cap)", api.Backoff.Max == TimeSpan.FromSeconds(1));
+        failures += Check("the preset resolves under AOT", ReferenceEquals(api.Classify, Classifier.Http));
+        failures += Check("a configured breaker is live under AOT", api.Breaker is { Settings.ConsecutiveFailures: 2 });
+        failures += Check("the policy is named after its registration", api.Name == "api");
+
+        int result = await api.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
+        failures += Check("a resolved policy executes under AOT", result == Gate.Value);
+
+        // The instruments have to actually record, not merely exist: a MeterListener is the only
+        // way to tell a working instrument from a silently inert one.
+        long calls = 0;
+        using var meterListener = new MeterListener
+        {
+            InstrumentPublished = (instrument, listener) =>
+            {
+                if (instrument.Name == "nresilience.calls")
+                {
+                    listener.EnableMeasurementEvents(instrument);
+                }
+            },
+        };
+
+        meterListener.SetMeasurementEventCallback<long>((_, value, _, _) => Interlocked.Add(ref calls, value));
+        meterListener.Start();
+
+        await policies["api"].RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
+        meterListener.Dispose();
+
+        failures += Check("the meter records under AOT", calls == 1);
+
+        var transport = new SequencedTransport(HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK);
+        var clientServices = new ServiceCollection();
+        clientServices.AddResilience("client", Resilience.Http with { Backoff = Backoff.None });
+        clientServices.AddHttpClient("probe").AddResilience("client");
+        clientServices.ConfigureAll<HttpClientFactoryOptions>(o =>
+            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = transport));
+
+        using ServiceProvider clientProvider = clientServices.BuildServiceProvider();
+        using HttpClient client = clientProvider.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
+
+        failures += Check("the registration owns the transport timeout", client.Timeout == Timeout.InfiniteTimeSpan);
+
+        using HttpResponseMessage response = await client
+            .GetAsync(new Uri("https://api.test/thing"))
+            .ConfigureAwait(false);
+
+        failures += Check("a registered client retries under AOT", response.StatusCode == HttpStatusCode.OK && transport.Sent == 2);
+
+        return failures;
+    }
+
     private static async Task<int> BudgetsAsync()
     {
         Console.WriteLine();

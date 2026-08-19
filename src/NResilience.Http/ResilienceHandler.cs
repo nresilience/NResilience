@@ -137,7 +137,7 @@ public sealed class ResilienceHandler : DelegatingHandler
             nesting = InsideRetryingClient.Value || request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
             if (nesting && policy.OnEvent is { } listener)
             {
-                listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null));
+                listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
             }
 
             if (!nesting)

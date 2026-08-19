@@ -1,0 +1,271 @@
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
+
+namespace NResilience.Extensions;
+
+/// <summary>
+/// The metrics and traces. One <see cref="System.Diagnostics.Metrics.Meter"/>, one
+/// <see cref="System.Diagnostics.ActivitySource"/>, and a listener that turns
+/// <see cref="CallEvent"/>s into both.
+/// <para>
+/// The instrument set is chosen around one number. <c>nresilience.attempts ÷ nresilience.calls</c>
+/// is the <b>retry fraction</b> — the characteristic metric of a retry feedback loop, and the one
+/// that tells you whether you are approaching a storm rather than merely serving errors. You cannot
+/// compute it unless the library distinguishes logical operations from wire-level attempts, which
+/// is Finagle's distinction and is why the counters are split.
+/// </para>
+/// </summary>
+/// <example>
+/// <code>
+/// builder.Services.AddOpenTelemetry()
+///     .WithMetrics(m => m.AddMeter(ResilienceTelemetry.MeterName))
+///     .WithTracing(t => t.AddSource(ResilienceTelemetry.ActivitySourceName));
+/// </code>
+/// </example>
+/// <remarks>
+/// Metric names, tag names and event names deliberately share nothing with Polly's
+/// <c>resilience.polly.*</c> vocabulary, so a process running both is legible.
+/// </remarks>
+public static class ResilienceTelemetry
+{
+    /// <summary>The meter's name, for <c>AddMeter</c>.</summary>
+    public const string MeterName = "NResilience";
+
+    /// <summary>The activity source's name, for <c>AddSource</c>.</summary>
+    public const string ActivitySourceName = "NResilience";
+
+    private static readonly Meter TheMeter = new(MeterName);
+
+    private static readonly Counter<long> CallCounter = TheMeter.CreateCounter<long>(
+        "nresilience.calls",
+        unit: "{call}",
+        description: "Logical operations — one per call, whatever happened inside it.");
+
+    private static readonly Counter<long> AttemptCounter = TheMeter.CreateCounter<long>(
+        "nresilience.attempts",
+        unit: "{attempt}",
+        description: "Wire-level attempts. Divided by nresilience.calls, this is the retry fraction.");
+
+    private static readonly Counter<long> RejectionCounter = TheMeter.CreateCounter<long>(
+        "nresilience.rejections",
+        unit: "{rejection}",
+        description: "Calls a guard refused to make: an open breaker, or an exhausted retry budget.");
+
+    private static readonly Histogram<double> CallDuration = TheMeter.CreateHistogram<double>(
+        "nresilience.call.duration",
+        unit: "s",
+        description: "End-to-end duration of a logical operation, retries and backoff included.");
+
+    private static readonly Histogram<double> AttemptDuration = TheMeter.CreateHistogram<double>(
+        "nresilience.attempt.duration",
+        unit: "s",
+        description: "Duration of one attempt.");
+
+    private static readonly ActivitySource TheActivitySource = new(ActivitySourceName);
+
+    /// <summary>The meter every instrument is created on.</summary>
+    public static Meter Meter => TheMeter;
+
+    /// <summary>
+    /// The activity source. Used by the HTTP registration to give a logical operation — the whole
+    /// retry sequence — a span of its own, which is the boundary a per-attempt HTTP span cannot
+    /// show you.
+    /// </summary>
+    public static ActivitySource ActivitySource => TheActivitySource;
+
+    /// <summary>
+    /// The listener: records every event to the instruments above, and annotates the current
+    /// <see cref="Activity"/> if there is one.
+    /// <para>
+    /// Stateless and allocation-free, so attaching it to a hot policy costs the 48 bytes the
+    /// executor pays for having a listener at all and nothing more. Safe to attach to any number of
+    /// policies — <see cref="CallEvent.PolicyName"/> is what separates them in the tag set.
+    /// </para>
+    /// </summary>
+    public static Action<CallEvent> Listener { get; } = Record;
+
+    /// <summary>
+    /// Returns the policy with <see cref="Listener"/> attached, chained after whatever
+    /// <see cref="Resilience.OnEvent"/> already held.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <returns>The instrumented policy, or the same policy if it is already instrumented.</returns>
+    /// <remarks>
+    /// Chained rather than assigned, because a policy that reached here through a <c>configure</c>
+    /// callback may already carry the caller's own listener, and silently dropping it to install
+    /// metrics would be the library choosing its own telemetry over the user's.
+    /// </remarks>
+    public static Resilience WithTelemetry(this Resilience policy)
+    {
+        ArgumentNullException.ThrowIfNull(policy);
+
+        Action<CallEvent>? existing = policy.OnEvent;
+        if (existing is null)
+        {
+            return policy with { OnEvent = Listener };
+        }
+
+        // Reference equality is enough: Listener is a singleton, and a chained combination
+        // containing it reports it in GetInvocationList.
+        if (existing == Listener || Array.IndexOf(existing.GetInvocationList(), (Delegate)Listener) >= 0)
+        {
+            return policy;
+        }
+
+        return policy with { OnEvent = existing + Listener };
+    }
+
+    /// <summary>
+    /// Starts a span covering one logical operation. Returns null when nobody is listening, which
+    /// is what makes an always-registered telemetry handler free.
+    /// </summary>
+    internal static Activity? StartCall(string policyName) =>
+        TheActivitySource.StartActivity($"resilience {policyName}", ActivityKind.Internal);
+
+    private static void Record(CallEvent e)
+    {
+        string policy = e.PolicyName ?? "(unnamed)";
+
+        switch (e.Kind)
+        {
+            case CallEventKind.Attempt:
+                AttemptCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Verdict(e));
+                AttemptDuration.Record(e.Duration.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy), Verdict(e));
+                Annotate(e, "nresilience.attempt");
+                break;
+
+            case CallEventKind.Retrying:
+                Annotate(e, "nresilience.retrying");
+                break;
+
+            case CallEventKind.Rejected:
+                RejectionCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Reason(e));
+                Terminal(e, policy);
+                break;
+
+            case CallEventKind.Succeeded:
+            case CallEventKind.NotRetried:
+            case CallEventKind.DeadlineExceeded:
+            case CallEventKind.Exhausted:
+                Terminal(e, policy);
+                break;
+
+            case CallEventKind.BreakerOpened:
+            case CallEventKind.BreakerClosed:
+            case CallEventKind.BreakerHalfOpened:
+            case CallEventKind.OrphanedWork:
+            case CallEventKind.NestedRetry:
+                // Transitions and warnings are span events rather than instruments. A breaker
+                // opening is a thing that happened at a moment, and the state it left behind is
+                // readable off the Breaker object by whatever health endpoint wants it; a counter
+                // of transitions is the shape that answers neither question well.
+                Annotate(e, EventName(e.Kind));
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    /// <summary>
+    /// The five terminal kinds close the logical operation, and the call counter and the call
+    /// duration histogram are recorded exactly once here — which is what makes
+    /// <c>attempts ÷ calls</c> a fraction rather than a coincidence.
+    /// </summary>
+    private static void Terminal(CallEvent e, string policy)
+    {
+        var policyTag = new KeyValuePair<string, object?>("nresilience.policy", policy);
+        KeyValuePair<string, object?> outcome = Outcome(e);
+
+        CallCounter.Add(1, policyTag, outcome);
+        CallDuration.Record(e.Duration.TotalSeconds, policyTag, outcome);
+
+        if (Activity.Current is { } activity && activity.IsAllDataRequested)
+        {
+            activity.SetTag("nresilience.policy", policy);
+            activity.SetTag("nresilience.outcome", outcome.Value);
+            activity.SetTag("nresilience.attempts", e.AttemptNumber);
+
+            if (e.Kind != CallEventKind.Succeeded)
+            {
+                activity.SetStatus(ActivityStatusCode.Error, e.Exception?.Message);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Span-event names as constants rather than <c>ToString()</c>, for the reason
+    /// <see cref="Name(VerdictKind)"/> gives.
+    /// </summary>
+    private static string EventName(CallEventKind kind) => kind switch
+    {
+        CallEventKind.BreakerOpened => "nresilience.breaker_opened",
+        CallEventKind.BreakerClosed => "nresilience.breaker_closed",
+        CallEventKind.BreakerHalfOpened => "nresilience.breaker_half_opened",
+        CallEventKind.OrphanedWork => "nresilience.orphaned_work",
+        _ => "nresilience.nested_retry",
+    };
+
+    private static void Annotate(CallEvent e, string name)
+    {
+        if (Activity.Current is { IsAllDataRequested: true } activity)
+        {
+            var tags = new ActivityTagsCollection
+            {
+                { "nresilience.attempt", e.AttemptNumber },
+                { "nresilience.verdict", Name(e.Verdict.Kind) },
+            };
+
+            if (e.Delay is { } delay)
+            {
+                tags["nresilience.delay"] = delay.TotalSeconds;
+            }
+
+            if (e.Exception is { } error)
+            {
+                tags["exception.type"] = error.GetType().FullName;
+            }
+
+            activity.AddEvent(new ActivityEvent(name, tags: tags));
+        }
+    }
+
+    private static KeyValuePair<string, object?> Verdict(CallEvent e) =>
+        new("nresilience.verdict", Name(e.Verdict.Kind));
+
+    /// <summary>
+    /// The rejection's cause, which is the difference between "the dependency is down" and "we are
+    /// retrying too hard" — two facts that call for opposite responses and that only
+    /// <see cref="CallEvent.Reason"/> can tell apart.
+    /// </summary>
+    private static KeyValuePair<string, object?> Reason(CallEvent e) =>
+        new("nresilience.reason", e.Reason switch
+        {
+            StopReason.DependencyUnavailable => "dependency_unavailable",
+            StopReason.BudgetExhausted => "budget_exhausted",
+            _ => "rejected",
+        });
+
+    private static KeyValuePair<string, object?> Outcome(CallEvent e) =>
+        new("nresilience.outcome", e.Reason switch
+        {
+            StopReason.Succeeded => "succeeded",
+            StopReason.Permanent => "permanent",
+            StopReason.DeadlineExceeded => "deadline_exceeded",
+            StopReason.DependencyUnavailable => "dependency_unavailable",
+            StopReason.BudgetExhausted => "budget_exhausted",
+            _ => "attempts_exhausted",
+        });
+
+    /// <summary>
+    /// Verdict names as constants rather than <c>ToString()</c>, because a tag value is recorded
+    /// on every attempt and <c>Enum.ToString</c> allocates a string each time.
+    /// </summary>
+    private static string Name(VerdictKind kind) => kind switch
+    {
+        VerdictKind.Ok => "ok",
+        VerdictKind.Transient => "transient",
+        VerdictKind.Throttled => "throttled",
+        _ => "permanent",
+    };
+}
