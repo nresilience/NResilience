@@ -4,13 +4,21 @@ namespace NResilience.Extensions;
 /// The bindable shape of a policy: flat, mutable, and made of primitives, <see cref="TimeSpan"/>s
 /// and enums.
 /// <para>
-/// This type exists because <c>Microsoft.Extensions.Configuration.Binder</c> <b>does not set
-/// <c>init</c>-only properties</b> — with the source generator on or off, with no exception and no
-/// warning. Binding a configuration section straight onto <see cref="Resilience"/> would therefore
-/// silently yield the record's defaults, so a configured <c>Deadline</c> of ten seconds would
-/// quietly become thirty. That is precisely the class of silent-wrong-behaviour this library exists
-/// to remove, so the binding target is a DTO and <see cref="ToPolicy(Resilience?)"/> does the
-/// projection by hand.
+/// This type exists because binding a configuration section straight onto <see cref="Resilience"/>
+/// is <b>silently partial</b>. Measured against
+/// <c>Microsoft.Extensions.Configuration.Binder</c> 10.0.0 on both target frameworks: simple
+/// <c>init</c> scalars such as <c>Attempts</c> and <c>Deadline</c> do bind, <c>Backoff:Max</c> is
+/// dropped because the cap is a computed property, <c>Classify</c> is ignored — leaving a policy
+/// that does not retry a 503 — and <c>Breaker:ConsecutiveFailures</c> constructs a live circuit
+/// breaker with default settings while ignoring the configured value.
+/// </para>
+/// <para>
+/// The middle case is the dangerous one: a section where <c>Backoff:Jitter</c> works and
+/// <c>Backoff:Max</c> beside it does not is not a bug people find, because the half that worked is
+/// the evidence they use to conclude the other half did too. That is precisely the class of
+/// silent-wrong-behaviour this library exists to remove, so the binding target is a DTO and
+/// <see cref="ToPolicy(Resilience?)"/> does the projection by hand. All three failures are gated by
+/// <c>Binding_onto_the_record_is_silently_partial</c>.
 /// </para>
 /// <para>
 /// Everything here is nullable, and null means "say nothing" rather than "set the default". A
@@ -218,8 +226,9 @@ public sealed class ResilienceOptions
 
 /// <summary>
 /// The bindable shape of a <see cref="NResilience.BreakerSettings"/>, for the same reason
-/// <see cref="ResilienceOptions"/> exists: the settings record is <c>init</c>-only and the binder
-/// would set nothing.
+/// <see cref="ResilienceOptions"/> exists: binding a section onto the settings record itself is
+/// silently partial, and worse, binding one onto <see cref="Resilience.Breaker"/> constructs a live
+/// breaker with default settings while ignoring what the section said.
 /// </summary>
 /// <remarks>
 /// A configured breaker is created per policy and lives as long as the policy does. It is

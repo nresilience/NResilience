@@ -10,8 +10,17 @@
     <Project Path="bench/NResilience.Probes/NResilience.Probes.csproj" />
     <Project Path="bench/NResilience.Probes.Polly/NResilience.Probes.Polly.csproj" />
   </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Samples.Http/Samples.Http.csproj" />
+    <Project Path="samples/Samples.QuickStart/Samples.QuickStart.csproj" />
+    <Project Path="samples/Samples.Worker/Samples.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/NResilience.DocSnippets/NResilience.DocSnippets.csproj" />
+  </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/NResilience.AotProbe/NResilience.AotProbe.csproj" />
+    <Project Path="tests/NResilience.Docs/NResilience.Docs.csproj" />
     <Project Path="tests/NResilience.Gates/NResilience.Gates.csproj" />
     <Project Path="tests/NResilience.Tests/NResilience.Tests.csproj" />
   </Folder>

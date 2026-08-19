@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The docs gate. Every C# and JSON sample in the README and under docs/ lives here as compiled,
+    executing code under nullable reference types and warnings-as-errors, and is inlined into the
+    markdown by tools/NResilience.DocSnippets. A sample that stops compiling, stops passing, or
+    drifts from the page fails the build.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NResilience.Docs</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+
+    <!--
+      The samples are written the way a reader should write them, which means passing the caller's
+      own token to the policy rather than threading the test's token into every helper.
+    -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj" />
+    <ProjectReference Include="../../src/NResilience.Http/NResilience.Http.csproj" />
+    <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- A configuration sample that is bound and asserted on, not just printed. -->
+    <None Include="appsettings.resilience.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The inliner's own logic, so the drift check is a test rather than only a CI step. -->
+    <Compile Include="../../tools/NResilience.DocSnippets/SnippetEngine.cs" Link="SnippetEngine.cs" />
+  </ItemGroup>
+
+</Project>

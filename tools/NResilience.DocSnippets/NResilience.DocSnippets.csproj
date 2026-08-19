@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The docs gate (CI gates, "Docs gate"): every snippet in the README and the docs lives in a
+    compiled, executing test project, and this inlines it into the markdown. the check mode fails the
+    build when a page and its source have drifted apart.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NResilience.DocSnippets</RootNamespace>
+    <AssemblyName>NResilience.DocSnippets</AssemblyName>
+  </PropertyGroup>
+
+</Project>

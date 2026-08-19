@@ -44,6 +44,37 @@ jobs:
       - name: Run gates
         run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build --logger "console;verbosity=detailed"
 
+  # Docs gate.
+  #
+  # Every snippet in the README and under docs/ lives in tests/NResilience.Docs as compiled,
+  # executing code, and is inlined into the markdown by tools/NResilience.DocSnippets. The test run
+  # proves the samples still work; the check run proves the pages still show what the samples say.
+  # Given that the most-copied .NET retry snippet is on Microsoft Learn and is actively harmful,
+  # this is a correctness gate rather than tidiness.
+  docs:
+    name: Docs gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Run the documentation snippets
+        run: dotnet test tests/NResilience.Docs/NResilience.Docs.csproj -c Release
+
+      - name: Check the pages against them
+        run: dotnet run --project tools/NResilience.DocSnippets -c Release -- --check
+
+      - name: Build and run the samples
+        run: |
+          for sample in samples/*/; do
+            dotnet run --project "$sample" -c Release
+          done
+
   # Hard gate - Native AOT.
   #
   # Publishing without warnings proves the code is AOT-clean; running the published binary
