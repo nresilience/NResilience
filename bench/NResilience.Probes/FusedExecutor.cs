@@ -1,0 +1,233 @@
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
+
+namespace NResilience.Probes;
+
+/// <summary>
+/// The Phase 0a stand-in for the shipping executor: admission, deadline, attempt loop,
+/// per-attempt timeout, classification, breaker, budget, backoff and the inline attempt log,
+/// all in <b>one</b> <c>async</c> method.
+///
+/// This is deliberately not a sketch. Open question 1 in plans/nresilience-design-v3.md asks
+/// whether the fused-frame advantage survives contact with a realistic loop, and it can only
+/// be answered by a loop that hoists a realistic amount of state across the attempt
+/// <c>await</c>. Every local below is live across that await and is therefore paid for in the
+/// state-machine box.
+/// </summary>
+public sealed class FusedExecutor
+{
+    private readonly FusedPolicy _policy;
+    private readonly bool _passthrough;
+    private readonly bool _recordAttempts;
+
+    /// <param name="policy">The policy the loop enforces.</param>
+    /// <param name="recordAttempts">
+    /// Whether the loop keeps the inline attempt log. Always true in the shipping design; false
+    /// exists only so Phase 0a can price the log against the same loop without it.
+    /// </param>
+    public FusedExecutor(FusedPolicy policy, bool recordAttempts = true)
+    {
+        _policy = policy;
+        _passthrough = policy.IsPassthrough;
+        _recordAttempts = recordAttempts;
+    }
+
+    public FusedPolicy Policy => _policy;
+
+    public ValueTask<T> RunAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default)
+    {
+        // Resilience.None is a single branch and returns the callback's own task. No frame, no box.
+        if (_passthrough)
+        {
+            return new ValueTask<T>(work(cancellationToken));
+        }
+
+        var invoker = new StatelessInvoker<VoidResult, T>(work);
+        return _recordAttempts
+            ? RunCoreAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, InlineAttemptSink>(invoker, default, cancellationToken)
+            : RunCoreAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, NoAttemptSink>(invoker, default, cancellationToken);
+    }
+
+    public ValueTask<T> RunAsync<TState, T>(Func<TState, CancellationToken, Task<T>> work, TState state, CancellationToken cancellationToken = default)
+    {
+        if (_passthrough)
+        {
+            return new ValueTask<T>(work(state, cancellationToken));
+        }
+
+        var invoker = new StatefulInvoker<TState, T>(work);
+        return _recordAttempts
+            ? RunCoreAsync<TState, T, StatefulInvoker<TState, T>, InlineAttemptSink>(invoker, state, cancellationToken)
+            : RunCoreAsync<TState, T, StatefulInvoker<TState, T>, NoAttemptSink>(invoker, state, cancellationToken);
+    }
+
+    private async ValueTask<T> RunCoreAsync<TState, T, TInvoker, TSink>(TInvoker invoker, TState state, CancellationToken cancellationToken)
+        where TInvoker : struct, IInvoker<TState, T>
+        where TSink : struct, IAttemptSink
+    {
+        FusedPolicy policy = _policy;
+        TimeProvider time = policy.Time;
+        ProbeBreaker? breaker = policy.Breaker;
+        ProbeBudget? budget = policy.Budget;
+        bool bounded = policy.Deadline != Timeout.InfiniteTimeSpan;
+        long startTimestamp = bounded ? time.GetTimestamp() : 0L;
+
+        TSink log = default;
+        int attempts = 0;
+        ExceptionDispatchInfo? lastError = null;
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        while (true)
+        {
+            if (breaker is not null && !breaker.TryEnter(time))
+            {
+                throw new ProbeBreakerOpenException();
+            }
+
+            TimeSpan remaining = Remaining(policy, time, startTimestamp, bounded);
+            if (remaining == TimeSpan.Zero)
+            {
+                throw new ProbeDeadlineException();
+            }
+
+            TimeSpan effective = Effective(policy.AttemptTimeout, remaining);
+
+            CancellationTokenSource? timer = null;
+            CancellationTokenSource? linked = null;
+            CancellationToken attemptToken = cancellationToken;
+
+            if (effective != Timeout.InfiniteTimeSpan)
+            {
+                timer = CtsPool.Rent(time);
+                timer.CancelAfter(effective);
+
+                // The pooled source's token is never handed to user code: TryReset preserves token
+                // identity, so a callback that outlived its attempt would observe the next
+                // operation's cancellation.
+                linked = cancellationToken.CanBeCanceled
+                    ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
+                    : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
+                attemptToken = linked.Token;
+            }
+
+            long attemptStart = time.GetTimestamp();
+            Verdict verdict;
+            T result = default!;
+            bool succeeded = false;
+
+            try
+            {
+                result = await invoker.Invoke(state, attemptToken).ConfigureAwait(false);
+                verdict = Verdict.Ok;
+                succeeded = true;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Caller cancellation is never a failure: never retried, never counted, never
+                // converted into a timeout.
+                throw;
+            }
+            catch (OperationCanceledException) when (timer is not null && timer.IsCancellationRequested)
+            {
+                // Our own attempt timeout. It never reaches the classifier, because the executor
+                // knows which source fired and a user predicate must not be able to get that wrong.
+                verdict = Verdict.Transient;
+                lastError = ExceptionDispatchInfo.Capture(new TimeoutException("The attempt timed out."));
+            }
+            catch (Exception exception)
+            {
+                verdict = ProbeClassifier.Classify(exception);
+                lastError = ExceptionDispatchInfo.Capture(exception);
+            }
+            finally
+            {
+                linked?.Dispose();
+                if (timer is not null)
+                {
+                    CtsPool.Return(timer, time);
+                }
+            }
+
+            log.Record(attempts, attemptStart, time.GetTimestamp() - attemptStart, verdict.Kind);
+            attempts++;
+
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (succeeded)
+            {
+                breaker?.RecordSuccess();
+                budget?.Refund();
+                return result;
+            }
+
+            // Only Transient is evidence about the dependency's health.
+            if (verdict.Kind == VerdictKind.Transient)
+            {
+                breaker?.RecordFailure(time);
+            }
+
+            bool retryable = verdict.Kind is VerdictKind.Transient or VerdictKind.Throttled;
+            if (!retryable || attempts >= policy.Attempts)
+            {
+                break;
+            }
+
+            if (budget is not null && !budget.TrySpend())
+            {
+                break;
+            }
+
+            TimeSpan delay = ProbeBackoff.Compute(policy, verdict, attempts);
+            if (bounded)
+            {
+                TimeSpan left = Remaining(policy, time, startTimestamp, bounded: true);
+                if (left == TimeSpan.Zero || delay >= left)
+                {
+                    break;
+                }
+            }
+
+            if (delay > TimeSpan.Zero)
+            {
+                await Task.Delay(delay, time, cancellationToken).ConfigureAwait(false);
+
+                // A token cancelled 400 ms into a backoff must abort the operation, not start
+                // another attempt.
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+        }
+
+        lastError?.Throw();
+        throw new ProbeExhaustedException(attempts);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static TimeSpan Remaining(FusedPolicy policy, TimeProvider time, long startTimestamp, bool bounded)
+    {
+        if (!bounded)
+        {
+            return Timeout.InfiniteTimeSpan;
+        }
+
+        TimeSpan elapsed = time.GetElapsedTime(startTimestamp);
+        TimeSpan left = policy.Deadline - elapsed;
+        return left > TimeSpan.Zero ? left : TimeSpan.Zero;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static TimeSpan Effective(TimeSpan attemptTimeout, TimeSpan remaining)
+    {
+        if (attemptTimeout == Timeout.InfiniteTimeSpan)
+        {
+            return remaining;
+        }
+
+        if (remaining == Timeout.InfiniteTimeSpan)
+        {
+            return attemptTimeout;
+        }
+
+        return attemptTimeout < remaining ? attemptTimeout : remaining;
+    }
+}

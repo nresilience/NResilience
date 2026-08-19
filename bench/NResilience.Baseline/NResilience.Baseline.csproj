@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NResilience.Baseline</RootNamespace>
+    <AssemblyName>NResilience.Baseline</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NBenchmark" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience.Probes/NResilience.Probes.csproj" />
+    <ProjectReference Include="../NResilience.Probes.Polly/NResilience.Probes.Polly.csproj" />
+  </ItemGroup>
+
+</Project>

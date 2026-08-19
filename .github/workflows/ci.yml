@@ -1,0 +1,109 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  # Hard gate - allocation assertions.
+  #
+  # Release only. The budgets were measured against tier-1 code, and a Debug run measures
+  # something else entirely: it would fail loudly rather than pass falsely, but the failure
+  # would be meaningless. Both target TFMs run, because "no cliff on net8" is a claim.
+  gates:
+    name: Allocation gates (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - run: dotnet restore NResilience.slnx
+
+      - run: dotnet build NResilience.slnx -c Release --no-restore
+
+      - name: Run gates
+        run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build --logger "console;verbosity=detailed"
+
+  # Hard gate - Native AOT.
+  #
+  # Publishing without warnings proves the code is AOT-clean; running the published binary
+  # proves there is no AOT allocation cliff, which is the claim actually worth defending.
+  aot:
+    name: Native AOT (${{ matrix.os }}, ${{ matrix.tfm }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        tfm: [net8.0, net10.0]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Install the native toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish
+        run: dotnet publish tests/NResilience.AotProbe/NResilience.AotProbe.csproj -c Release -f ${{ matrix.tfm }} -warnaserror
+
+      - name: Execute the published binary
+        shell: bash
+        run: |
+          binary=$(find tests/NResilience.AotProbe/bin/Release/${{ matrix.tfm }} -type f \
+                     \( -name 'NResilience.AotProbe' -o -name 'NResilience.AotProbe.exe' \) \
+                     -path '*/publish/*' | head -1)
+          if [ -z "$binary" ]; then
+            echo "No published binary found - the AOT gate cannot pass without one." >&2
+            exit 1
+          fi
+          "$binary"
+
+  # Trend only - latency. Published, never gated.
+  #
+  # Shared runners are noisy enough that a latency gate is either loose enough to catch nothing
+  # or tight enough to flake weekly, and a flaky gate gets disabled within a month. Allocations
+  # are deterministic; those are what the build enforces.
+  trend:
+    name: Latency trend
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Run the baseline harness
+        run: >
+          dotnet run -c Release -f net10.0 --project bench/NResilience.Baseline --
+          --exclude-category socket --launch-count 1 --reporter json --output ./artifacts
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: baseline
+          path: ./artifacts
+          if-no-files-found: warn

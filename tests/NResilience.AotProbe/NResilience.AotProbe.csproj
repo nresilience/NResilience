@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NResilience.AotProbe</RootNamespace>
+
+    <PublishAot>true</PublishAot>
+    <StripSymbols>true</StripSymbols>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!--
+      The AOT gate is only a gate if a warning fails the build. TreatWarningsAsErrors covers the
+      C# compiler; these three cover the trimmer, the single-file analyser and ILCompiler, which
+      report through a different channel and are silent by default.
+    -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <IsTrimmable>true</IsTrimmable>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <ILLinkTreatWarningsAsErrors>true</ILLinkTreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../bench/NResilience.Probes/NResilience.Probes.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>NResilience.Probes.Polly</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Polly.Core" />
+    <ProjectReference Include="../NResilience.Probes/NResilience.Probes.csproj" />
+  </ItemGroup>
+
+</Project>

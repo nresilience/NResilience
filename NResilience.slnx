@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/bench/">
+    <Project Path="bench/NResilience.Baseline/NResilience.Baseline.csproj" />
+    <Project Path="bench/NResilience.Probes/NResilience.Probes.csproj" />
+    <Project Path="bench/NResilience.Probes.Polly/NResilience.Probes.Polly.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/NResilience.AotProbe/NResilience.AotProbe.csproj" />
+    <Project Path="tests/NResilience.Gates/NResilience.Gates.csproj" />
+  </Folder>
+</Solution>
