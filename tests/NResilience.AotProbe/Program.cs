@@ -1,5 +1,8 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Net;
+using System.Net.Http;
+using NResilience.Http;
 using NResilience.Probes;
 using NResilience.Testing;
 
@@ -150,6 +153,51 @@ internal static class Program
         failures += await GuardsAsync().ConfigureAwait(false);
         failures += await TelemetryAsync().ConfigureAwait(false);
         failures += await TestingPackageAsync().ConfigureAwait(false);
+        failures += await HttpPackageAsync().ConfigureAwait(false);
+
+        return failures;
+    }
+
+    /// <summary>
+    /// Phase 5 under AOT. The HTTP handler ships, so it is published and run rather than merely
+    /// compiled — and the request clone is the part worth running, because building a fresh
+    /// message and copying its headers is the closest the library gets to the kind of dynamic work
+    /// whole-program compilation is entitled to break.
+    /// </summary>
+    private static async Task<int> HttpPackageAsync()
+    {
+        Console.WriteLine();
+        int failures = 0;
+
+        var events = new EventRecorder();
+        var transport = new SequencedTransport(HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK);
+
+        Resilience policy = Resilience.Http with
+        {
+            Backoff = Backoff.None,
+            AttemptTimeout = Timeout.InfiniteTimeSpan,
+            OnEvent = events.Record,
+        };
+
+        using var handler = new ResilienceHandler(transport, policy);
+        using var client = new HttpClient(handler);
+
+        using var request = new HttpRequestMessage(HttpMethod.Put, new Uri("https://api.invalid/thing"))
+        {
+            Content = new StringContent("body"),
+        };
+        request.Headers.Add("X-Trace", "abc");
+
+        using HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
+
+        failures += Check("http: a 503 is retried to a 200", response.StatusCode == HttpStatusCode.OK);
+        failures += Check("http: each attempt got its own request", transport.Sent == 2);
+        failures += Check("http: the clone carried the headers and the body", transport.LastTrace == "abc" && transport.LastBody == "body");
+        failures += Check("http: the breaker was scoped to the host", handler.BreakersByHost().ContainsKey("api.invalid"));
+        failures += Check("http: the nested-retry header was stamped", transport.LastStamped);
+        failures += Check(
+            "http: the events came back in order",
+            events.Kinds is [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded]);
 
         return failures;
     }
@@ -371,4 +419,25 @@ internal static class Program
         => Console.WriteLine(string.Create(CultureInfo.InvariantCulture, ref message));
 
     private static void Log(string message) => Console.WriteLine(message);
+
+    /// <summary>An inner handler serving one status per attempt, recording what reached it.</summary>
+    private sealed class SequencedTransport(params HttpStatusCode[] statuses) : HttpMessageHandler
+    {
+        internal int Sent { get; private set; }
+
+        internal string? LastTrace { get; private set; }
+
+        internal string? LastBody { get; private set; }
+
+        internal bool LastStamped { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            LastTrace = request.Headers.TryGetValues("X-Trace", out IEnumerable<string>? trace) ? trace.FirstOrDefault() : null;
+            LastStamped = request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
+            LastBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+            return new HttpResponseMessage(statuses[Math.Min(Sent++, statuses.Length - 1)]);
+        }
+    }
 }

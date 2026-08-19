@@ -1,0 +1,27 @@
+#nullable enable
+NResilience.Http.HttpResilienceOptions
+NResilience.Http.HttpResilienceOptions.BreakerPerHost.get -> bool
+NResilience.Http.HttpResilienceOptions.BreakerPerHost.set -> void
+NResilience.Http.HttpResilienceOptions.BreakerSettings.get -> NResilience.BreakerSettings?
+NResilience.Http.HttpResilienceOptions.BreakerSettings.set -> void
+NResilience.Http.HttpResilienceOptions.BudgetPerHost.get -> bool
+NResilience.Http.HttpResilienceOptions.BudgetPerHost.set -> void
+NResilience.Http.HttpResilienceOptions.DetectNestedRetries.get -> bool
+NResilience.Http.HttpResilienceOptions.DetectNestedRetries.set -> void
+NResilience.Http.HttpResilienceOptions.HttpResilienceOptions() -> void
+NResilience.Http.HttpResilienceOptions.OwnTransportTimeout.get -> bool
+NResilience.Http.HttpResilienceOptions.OwnTransportTimeout.set -> void
+NResilience.Http.HttpResilienceOptions.RetryUnsafeMethods.get -> bool
+NResilience.Http.HttpResilienceOptions.RetryUnsafeMethods.set -> void
+NResilience.Http.ResilienceHandler
+NResilience.Http.ResilienceHandler.BreakersByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.Breaker!>!
+NResilience.Http.ResilienceHandler.BudgetsByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.RetryBudget!>!
+NResilience.Http.ResilienceHandler.Options.get -> NResilience.Http.HttpResilienceOptions!
+NResilience.Http.ResilienceHandler.Policy.get -> NResilience.Resilience!
+NResilience.Http.ResilienceHandler.ResilienceHandler(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
+NResilience.Http.ResilienceHandler.ResilienceHandler(System.Net.Http.HttpMessageHandler! innerHandler, NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
+NResilience.Http.ResilienceHandler.WillRetry(System.Net.Http.HttpRequestMessage! request) -> bool
+NResilience.Http.ResilienceHttp
+static NResilience.Http.ResilienceHttp.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
+static NResilience.Http.ResilienceHttp.NestedRetryHeader.get -> string!
+static NResilience.Http.ResilienceHttp.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>

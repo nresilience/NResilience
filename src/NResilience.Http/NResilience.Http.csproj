@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>NResilience.Http</RootNamespace>
+
+    <IsShippingLibrary>true</IsShippingLibrary>
+
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+
+    <PackageId>NResilience.Http</PackageId>
+    <Description>The HTTP integration for NResilience: a delegating handler that clones the request per attempt, refuses to retry unsafe methods by default, scopes breakers and budgets per host, owns the transport timeout, and reports nested retries.</Description>
+    <PackageTags>resilience;retry;http;httpclient;circuit-breaker;polly</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!--
+      RS0026 forbids overload sets that each carry an optional parameter. The handler has two
+      constructors - with and without an inner handler - and both take the same optional policy and
+      options. The rule protects source compatibility when overloads are added later; the public
+      API manifest is what protects that here, and it is reviewed.
+    -->
+    <NoWarn>$(NoWarn);RS0026</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience/NResilience.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The behavioural suite drives the request clone and the host registry directly. -->
+    <InternalsVisibleTo Include="NResilience.Tests" />
+  </ItemGroup>
+
+</Project>

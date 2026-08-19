@@ -40,6 +40,13 @@
     <InternalsVisibleTo Include="NResilience.Tests" />
 
     <!--
+      The HTTP handler raises CallEventKind.NestedRetry, which nothing else can detect. CallEvent's
+      constructor stays internal because it is the executor's to populate; the handler is the one
+      documented exception, rather than a public constructor everyone could invent events with.
+    -->
+    <InternalsVisibleTo Include="NResilience.Http" />
+
+    <!--
       The allocation gate asserts the inline attempt log's layout - capacity times record size -
       because the shipping executor has no log-less variant to difference against. Both are
       internal, and both are load-bearing for the suspending-path budget.

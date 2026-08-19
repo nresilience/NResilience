@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/NResilience/NResilience.csproj" />
+    <Project Path="src/NResilience.Http/NResilience.Http.csproj" />
     <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
   </Folder>
   <Folder Name="/bench/">
