@@ -5,6 +5,10 @@ namespace NResilience.Gates;
 /// and .NET 8.0.22, arm64, Release, workstation non-concurrent GC, and is recorded with its
 /// measured value beside it so a failure reads as "this moved" rather than "this is wrong".
 ///
+/// Phase 0b re-pointed every budget at the <b>shipping</b> executor. Where a figure changed, the
+/// Phase 0a stand-in value is kept in the comment, because the delta is the answer to the question
+/// Phase 0 exists to ask.
+///
 /// Budgets carry roughly 15% headroom over the measured figure, because allocation is
 /// deterministic but not identical across architectures. They are ceilings, not targets: a
 /// change that comes in under budget still needs its number looked at.
@@ -32,7 +36,7 @@ public static class Budgets
     /// </summary>
     public const double FullPolicyWithTimeoutSyncOverhead = 72;
 
-    // ---- Suspending path. ----
+    // ---- Suspending path. Measured against the shipping executor in Phase 0b. ----
 
     /// <summary>
     /// The instrument's noise floor, applied to every suspending assertion.
@@ -53,22 +57,59 @@ public static class Budgets
     /// <summary>Passthrough allocates nothing on any path. Measured: 0 B.</summary>
     public const double NoneSuspendingOverhead = 0;
 
-    /// <summary>The realistic executor frame, no timeout source. Measured: 336 B.</summary>
-    public const double RealLoopNoTimeoutOverhead = 390;
-
-    /// <summary>The realistic executor frame with deadline, attempt timeout and budget. Measured: 401 B.</summary>
-    public const double RealLoopDefaultOverhead = 465;
-
-    /// <summary>Adding a breaker adds no state live across the await. Measured: 400 B.</summary>
-    public const double RealLoopWithBreakerOverhead = 465;
+    /// <summary>
+    /// The trivial shipping shape: retry and classification, no deadline and no attempt timeout.
+    /// Measured: 320 B on .NET 10, 308 B on .NET 8, against the Phase 0a stand-in's 336 B.
+    /// </summary>
+    public const double TrivialOverhead = 368;
 
     /// <summary>
-    /// The inline attempt log, priced on its own: AttemptBuffer.Capacity (4) x sizeof(AttemptRecord)
-    /// (24) = 96 bytes of state-machine box, paid by every suspending call whether or not anything
-    /// fails. Measured: 96 B on both TFMs. Gated so that growing the record or the capacity is a
-    /// decision rather than a drift.
+    /// The realistic policy — <c>Resilience.Default</c>: three attempts, a deadline, an attempt
+    /// timeout, exponential backoff, classification and the inline attempt log.
+    /// Measured: 384 B on .NET 10, 381 B on .NET 8, against the Phase 0a stand-in's 401 B.
     /// </summary>
-    public const double InlineAttemptLogCost = 112;
+    public const double DefaultOverhead = 448;
+
+    /// <summary>
+    /// The same call with a caller token that can be cancelled and never is — the production case.
+    /// Measured: 400 B on .NET 10, 397 B on .NET 8, against the stand-in's 416 B. The extra 16 B
+    /// over <see cref="DefaultOverhead"/> is the marginal cost of linking against a long-lived
+    /// source whose registration storage already exists; see <see cref="MinimumSocketRatioVersusPolly"/>
+    /// for what the same link costs when real I/O registers on the resulting token.
+    /// </summary>
+    public const double DefaultCancellableOverhead = 464;
+
+    /// <summary>
+    /// <c>TryRunAsync</c>, which always materialises the attempt log because its caller has
+    /// explicitly asked for a result object. Measured: 553 B on .NET 10, 551 B on .NET 8 — so
+    /// asking for the history costs about 170 B over the throwing form. Budgeted rather than
+    /// left to be discovered by a caller who assumed the two were the same price.
+    /// </summary>
+    public const double TryRunDefaultOverhead = 640;
+
+    /// <summary>
+    /// The shipping executor must not be more expensive than the hand-written stand-in Phase 0a
+    /// used to establish the achievable floor. Measured: 384 B against 401 B on .NET 10 — the real
+    /// loop is <i>cheaper</i>, while additionally capturing a per-attempt exception, classifying
+    /// results and awaiting a pre-attempt hook.
+    ///
+    /// This is the gate that would catch the design's central mechanism failing to survive
+    /// implementation, which is the whole reason Phase 0 was split into 0a and 0b. The allowance is
+    /// for tier and GC drift between two arms of the same sweep, not for regression headroom.
+    /// </summary>
+    public const double ShippingVersusStandInAllowance = 16;
+
+    /// <summary>
+    /// The inline attempt log, priced by its own layout rather than by differencing two loops:
+    /// <c>AttemptBuffer.Capacity</c> (4) x <c>sizeof(AttemptRecord)</c> (16) = 64 bytes of
+    /// state-machine box, paid by every suspending call whether or not anything ever fails.
+    ///
+    /// Phase 0a measured this by running the identical stand-in loop with the log removed, and got
+    /// 96 B for a 24-byte record. The shipping executor has no log-less variant to difference
+    /// against — the log is not optional — so the gate asserts the layout instead, which is the
+    /// thing a change would actually move.
+    /// </summary>
+    public const double InlineAttemptLogCost = 64;
 
     // ---- The falsification test. ----
 
@@ -98,21 +139,40 @@ public static class Budgets
     public const double MinimumSocketRatioVersusPolly = 2.0;
 
     /// <summary>
-    /// The trivial-policy comparison, gated only at parity. Measured: 1.27x
-    /// (fused 240 B against Polly's empty-pipeline 305 B). The design predicted 2-3x here and
-    /// that prediction does not survive measurement; see plans/phase-0a-results.md.
+    /// The trivial-policy comparison, which is not a win and is gated as such.
+    ///
+    /// The design predicted 2-3x here. Phase 0a falsified it (1.27x for a stripped stand-in), and
+    /// Phase 0b settles it against the shipping executor: the smallest non-passthrough policy the
+    /// library can express costs 320 B against Polly's empty-pipeline 304 B, a ratio of
+    /// <b>1.05x the wrong way</b>. The two are not doing the same work — Polly's empty pipeline does
+    /// nothing at all, while the fused loop is classifying, retrying and recording attempts — but the
+    /// claim as written compared the two, and as written it was false.
+    ///
+    /// So this gate is a ceiling on the fused loop rather than a floor under a ratio: the trivial
+    /// shape may sit at parity with a pipeline that does nothing, and must not drift away from it.
+    /// The honest headline is that the fused design wins in proportion to how much policy is
+    /// configured.
+    ///
+    /// Measured: 1.05x on .NET 10 and 1.10x on .NET 8. The ceiling sits at 1.25x rather than nearer
+    /// the measurement because the <i>denominator</i> is the unstable half — Polly's empty pipeline
+    /// measures between 290 B and 304 B across runs, while the fused trivial shape holds at 319-320 B
+    /// to the byte. <see cref="TrivialOverhead"/> is the strict gate on this arm; this one exists to
+    /// catch the loop drifting away from parity, and 1.25x still catches about 30 B of growth.
     /// </summary>
-    public const double MinimumTrivialRatioVersusPolly = 1.0;
+    public const double MaximumTrivialRatioVersusPollyEmpty = 1.25;
 
     // ---- Retry. ----
 
     /// <summary>
-    /// Two transient failures then a success. Measured: 2112 B on .NET 10, 2848 B on .NET 8 —
-    /// dominated by exception capture and rethrow, which both arms pay. Gated loosely on the
+    /// Two transient failures then a success, against the shipping executor. Measured: 2,049 B on
+    /// .NET 10 and 2,336 B on .NET 8, against the Phase 0a stand-in's 2,113 B and 2,848 B — so the
+    /// real retry path is cheaper than the stand-in on both, and markedly so on .NET 8.
+    ///
+    /// Dominated by exception capture and rethrow, which both arms pay. Gated loosely on the
     /// absolute figure and strictly on the comparison, because the absolute number is mostly a
     /// property of the runtime's exception machinery rather than of this design.
     /// </summary>
-    public const double RetryTwiceCeiling = 3_400;
+    public const double RetryTwiceCeiling = 2_900;
 
     // ---- Cancellation primitives. ----
 

@@ -6,4 +6,13 @@
     <RootNamespace>NResilience.Probes</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!--
+      Phase 0b measures the shipping executor on Phase 0a's harness, so the arms that drive the
+      gates, the trend benchmarks and the Native AOT probe all live here beside the stand-in ones
+      they replaced.
+    -->
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+  </ItemGroup>
+
 </Project>

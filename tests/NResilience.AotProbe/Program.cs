@@ -146,49 +146,66 @@ internal static class Program
 
         failures += Check("library: caller cancellation propagates untouched", cancelledCorrectly);
 
-        double raw = await MeasureAsync("library: raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double none = await MeasureAsync("library: None (suspending)", static () => Resilience.None.RunAsync(Gate.SuspendAsync), AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double full = await MeasureAsync("library: Default (suspending)", static () => Resilience.Default.RunAsync(Gate.SuspendAsync), AllocationCounter.ProcessWide).ConfigureAwait(false);
-
-        failures += Check("library: no AOT cliff on passthrough", none - raw <= 8);
-        failures += Check("library: no AOT cliff on the real loop", full - raw <= 384 + 8);
-
         return failures;
     }
 
     /// <summary>
-    /// The same budgets the JIT gate enforces. The numbers are duplicated here rather than shared,
-    /// because this project must not reference the test project, and because an AOT-specific
-    /// divergence is exactly what this gate exists to surface.
+    /// The same budgets the JIT gate enforces, against the same shipping executor. Phase 0b
+    /// re-pointed these from the Phase 0a stand-in loop; the stand-in arms stay in the correctness
+    /// section above, where what they prove is that the harness itself survives AOT.
+    ///
+    /// The numbers are duplicated here rather than shared, because this project must not reference
+    /// the test project, and because an AOT-specific divergence is exactly what this gate exists to
+    /// surface.
     /// </summary>
     private static async Task<int> BudgetsAsync()
     {
         Console.WriteLine();
         int failures = 0;
 
+        // Phase 0b, .NET 10 / .NET 8, arm64: bytes above an identical un-wrapped callback.
+        const double NoiseFloor = 8;
+        const double TrivialSuspendingBudget = 368;      // measured 320
+        const double DefaultSuspendingBudget = 448;      // measured 384
+        const double TryRunSuspendingBudget = 640;       // measured 553
+
         double rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
-        double noneSync = await MeasureAsync("None (sync)", Scenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
-        double stateSync = await MeasureAsync("no timeout, static+state (sync)", Scenarios.FusedNoTimeoutSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+        double noneSync = await MeasureAsync("None (sync)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+        double trivialSync = await MeasureAsync("trivial, static+state (sync)", ShippingScenarios.TrivialSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+        double defaultSync = await MeasureAsync("Default, static+state (sync)", ShippingScenarios.DefaultSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
 
         failures += Check("no AOT cliff: passthrough is free on the synchronous path", noneSync - rawSync <= 0);
-        failures += Check("no AOT cliff: static lambda + state is free on the synchronous path", stateSync - rawSync <= 0);
+        failures += Check("no AOT cliff: static lambda + state is free on the synchronous path", trivialSync - rawSync <= 0);
+
+        // 64 B, and a floor rather than an implementation failure: one linked source per attempt,
+        // because the callback needs a token the attempt timeout can cancel and the pooled source's
+        // own token must never be handed to user code. See plans/phase-0a-results.md.
+        failures += Check("no AOT cliff: an attempt timeout still costs exactly one linked source", defaultSync - rawSync <= 72);
 
         double rawSuspending = await MeasureAsync("raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double noneSuspending = await MeasureAsync("None (suspending)", Scenarios.NoneSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double defaultSuspending = await MeasureAsync("Default (suspending)", Scenarios.FusedDefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-
-        const double NoiseFloor = 8;
-        const double DefaultSuspendingBudget = 465;
+        double noneSuspending = await MeasureAsync("None (suspending)", ShippingScenarios.NoneSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        double trivialSuspending = await MeasureAsync("trivial (suspending)", ShippingScenarios.TrivialSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        double defaultSuspending = await MeasureAsync("Default (suspending)", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        double tryRunSuspending = await MeasureAsync("TryRunAsync, Default (suspending)", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
 
         failures += Check("no AOT cliff: passthrough is free on the suspending path", noneSuspending - rawSuspending <= NoiseFloor);
+        failures += Check(
+            "no AOT cliff: the trivial policy stays within its suspending budget",
+            trivialSuspending - rawSuspending <= TrivialSuspendingBudget + NoiseFloor);
         failures += Check(
             "no AOT cliff: the real loop stays within its suspending budget",
             defaultSuspending - rawSuspending <= DefaultSuspendingBudget + NoiseFloor);
 
+        // TryRunAsync always materialises the attempt log, and the log is where an AOT-specific
+        // divergence would surface: it is the one part of the frame that reaches the heap.
+        failures += Check(
+            "no AOT cliff: reporting the outcome stays within its suspending budget",
+            tryRunSuspending - rawSuspending <= TryRunSuspendingBudget + NoiseFloor);
+
         return failures;
     }
 
-    private static async Task<double> MeasureAsync(string name, Func<ValueTask<int>> body, AllocationCounter counter)
+    private static async Task<double> MeasureAsync<T>(string name, Func<ValueTask<T>> body, AllocationCounter counter)
     {
         AllocationMeasurement measurement = await AllocationProbe.MeasureAsync(name, body, counter).ConfigureAwait(false);
         Log($"  {name,-36} {measurement.BytesPerOperation,9:0.0} B/op");

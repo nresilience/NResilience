@@ -3,14 +3,16 @@
 A .NET resilience library built around one flat execution engine, a declarative policy value, and
 defaults that are correct without configuration.
 
-**Status: Phase 1.** The core ships: `Resilience`, `Verdict`, `Classifier`, `Backoff`,
+**Status: Phase 0b complete.** The core ships: `Resilience`, `Verdict`, `Classifier`, `Backoff`,
 `CallResult<T>`, `AttemptLog`, the exception types and the fused executor — deadline, attempt
-timeout, retry, classification and the cancellation contract. Circuit breaking and the retry budget
+timeout, retry, classification and the cancellation contract — and every allocation gate now measures
+that shipping executor rather than the pre-Phase-1 stand-in. Circuit breaking and the retry budget
 are Phase 2; telemetry is Phase 3.
 
 - Design: [`plans/nresilience-design-v3.md`](plans/nresilience-design-v3.md)
 - Phase 0a — the baseline, taken before any library code existed: [`plans/phase-0a-results.md`](plans/phase-0a-results.md)
 - Phase 1 — what shipped, and the decisions Phase 0a deferred: [`plans/phase-1-results.md`](plans/phase-1-results.md)
+- Phase 0b — the same harness, re-run against the real executor: [`plans/phase-0b-results.md`](plans/phase-0b-results.md)
 
 ## The whole API, in thirty seconds
 
@@ -37,7 +39,7 @@ There is no pipeline, no builder, no strategy, no context, no property bag and n
 
 Bytes above an identical un-wrapped callback, measured in one process on .NET 8 and .NET 10.
 Conditions and the full arm list are in
-[`plans/phase-1-results.md`](plans/phase-1-results.md).
+[`plans/phase-0b-results.md`](plans/phase-0b-results.md).
 
 | Scenario | Overhead |
 |---|---:|
@@ -45,12 +47,16 @@ Conditions and the full arm list are in
 | Sync-completing, no attempt timeout, static lambda + state | **0** |
 | Sync-completing, full policy, static lambda + state | 64 B — one linked cancellation source |
 | Suspending, full policy | **384 B** — one state-machine box plus the linked source |
-| Suspending, Polly retry + timeout, same harness | 1,292 B |
+| Suspending, Polly retry + timeout, same harness | 1,291 B |
+| Suspending, full policy, over a real loopback socket | 528 B |
+| Suspending, Polly retry + timeout, same socket | 1,296 B |
 
-**3.4× lower overhead than Polly for a realistic policy, and none at all for a trivial one.** The
-fused design wins in proportion to how much policy is configured, because composition overhead
-scales with layer count and a flat loop's does not. That is the whole claim, and it is measured
-rather than asserted.
+**3.4× lower overhead than Polly for a realistic policy on the yield gate, and 2.5× over a real
+socket.** The fused design wins in proportion to how much policy is configured, because composition
+overhead scales with layer count and a flat loop's does not. At the other end that cuts the other way,
+and the number is published rather than buried: the smallest policy this library can express costs
+320 B against 304 B for a Polly pipeline with no strategies in it — the two are not doing the same work,
+but at the trivial end there is nothing to win. Every figure here is a test that fails the build.
 
 "Zero allocation" is never claimed unqualified: every `async` frame that *suspends* heap-allocates
 its own state-machine box, and no library-side trick removes it.
@@ -60,7 +66,7 @@ its own state-machine box, and no library-side trick removes it.
 | Path | What it is |
 |---|---|
 | `src/NResilience` | The library. Zero dependencies, `net8.0;net10.0`, AOT-clean, public API manifest checked in. |
-| `bench/NResilience.Probes` | Phase 0a's hand-written fused loop, the shared suspension gate, the allocation instrument and the cancellation probes. |
+| `bench/NResilience.Probes` | The shared suspension gate, the allocation instrument, the cancellation probes, the shipping-executor arms, and Phase 0a's hand-written fused loop — still measured, as the floor the real executor has to beat. |
 | `bench/NResilience.Probes.Polly` | The competitive arms, in Polly's native callback shape. |
 | `bench/NResilience.Baseline` | Latency trend harness (NBenchmark). Published, never gated. |
 | `tests/NResilience.Tests` | The behavioural suite: what the loop does, and when. |

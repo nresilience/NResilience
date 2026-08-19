@@ -46,8 +46,11 @@ public sealed record AllocationMeasurement(string Name, double BytesPerOperation
 ///   closest to the noise-free truth.</item>
 /// </list>
 ///
-/// Every arm is a <c>Func&lt;ValueTask&lt;int&gt;&gt;</c> and is awaited directly by the loop, so no
-/// arm pays for a wrapper frame that another arm avoids.
+/// It is generic in the arm's result type, and that is load-bearing rather than tidy: an arm that
+/// returns something other than the shared gate's <c>int</c> — <c>TryRunAsync</c> returns a
+/// <c>CallResult&lt;T&gt;</c> — would otherwise need a conversion wrapper, and a wrapper that
+/// suspends allocates a state-machine box the other arms do not pay. Every arm is awaited directly
+/// by the loop in its own natural shape.
 /// </summary>
 public static class AllocationProbe
 {
@@ -58,9 +61,9 @@ public static class AllocationProbe
     /// <summary>Milliseconds to let tiered compilation promote warmed methods before measuring.</summary>
     public const int TierUpSettleMs = 300;
 
-    public static async Task<AllocationMeasurement> MeasureAsync(
+    public static async Task<AllocationMeasurement> MeasureAsync<TResult>(
         string name,
-        Func<ValueTask<int>> body,
+        Func<ValueTask<TResult>> body,
         AllocationCounter counter,
         int warmup = DefaultWarmup,
         int iterations = DefaultIterations,
@@ -99,7 +102,7 @@ public static class AllocationProbe
     /// Warms in two passes separated by a settle delay, so the second pass runs against tier-1
     /// code and the measurement that follows sees the same code production would.
     /// </summary>
-    public static async Task WarmAsync(Func<ValueTask<int>> body, int warmup, Action? betweenOperations = null)
+    public static async Task WarmAsync<TResult>(Func<ValueTask<TResult>> body, int warmup, Action? betweenOperations = null)
     {
         for (int i = 0; i < warmup; i++)
         {

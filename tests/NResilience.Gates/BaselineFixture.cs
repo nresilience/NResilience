@@ -41,6 +41,16 @@ public sealed class BaselineFixture : IAsyncLifetime
 public static class Baseline
 {
     public const string RawSuspending = "raw callback (baseline)";
+
+    // The shipping executor (Phase 0b). Every gate asserts against these.
+    public const string LibNone = "lib: None (passthrough)";
+    public const string LibTrivial = "lib: trivial (no bounds)";
+    public const string LibDefault = "lib: Default";
+    public const string LibDefaultCancellable = "lib: Default, cancellable token";
+    public const string LibTryRunDefault = "lib: TryRunAsync, Default";
+    public const string LibRetry = "lib: retry x2 -> success";
+
+    // The Phase 0a stand-in, kept as reference rows.
     public const string NonePassthrough = "fused: None (passthrough)";
     public const string LeanLoop = "fused: lean loop";
     public const string RealNoLogNoTimeout = "fused: real loop, no log, no timeout";
@@ -56,6 +66,12 @@ public static class Baseline
     public const string PollyRetry = "polly: retry x2 -> success";
 
     public const string RawSync = "raw callback (baseline)";
+
+    public const string LibNoneSync = "lib: None (passthrough)";
+    public const string LibTrivialSyncState = "lib: trivial, static+state";
+    public const string LibTrivialSyncCallback = "lib: trivial, callback";
+    public const string LibDefaultSyncState = "lib: Default, static+state";
+
     public const string NoneSync = "fused: None (passthrough)";
     public const string NoTimeoutSyncState = "fused: no timeout, static+state";
     public const string NoTimeoutSyncCallback = "fused: no timeout, callback";

@@ -13,6 +13,9 @@ namespace NResilience.Baseline;
 /// is either loose enough to catch nothing or tight enough to flake weekly, and a flaky gate
 /// gets disabled within a month. The allocation numbers are what the build enforces; these are
 /// for spotting trends.
+///
+/// Phase 0b re-pointed the trend lines at the shipping executor. Two Phase 0a stand-in arms are
+/// kept for continuity of the series, marked as such.
 /// </summary>
 [BenchmarkCategory("suspending")]
 public class SuspendingPathBenchmarks
@@ -20,23 +23,23 @@ public class SuspendingPathBenchmarks
     [Benchmark(Baseline = true, Description = "raw callback, no wrapper")]
     public ValueTask<int> Raw() => Scenarios.RawSuspending();
 
-    [Benchmark(Description = "fused: None (passthrough)")]
-    public ValueTask<int> FusedNone() => Scenarios.NoneSuspending();
+    [Benchmark(Description = "lib: None (passthrough)")]
+    public ValueTask<int> LibNone() => ShippingScenarios.NoneSuspending();
 
-    [Benchmark(Description = "fused: lean loop (toy)")]
+    [Benchmark(Description = "lib: trivial (no bounds)")]
+    public ValueTask<int> LibTrivial() => ShippingScenarios.TrivialSuspending();
+
+    [Benchmark(Description = "lib: Default")]
+    public ValueTask<int> LibDefault() => ShippingScenarios.DefaultSuspending();
+
+    [Benchmark(Description = "lib: TryRunAsync, Default")]
+    public ValueTask<CallResult<int>> LibTryRun() => ShippingScenarios.TryRunDefaultSuspending();
+
+    [Benchmark(Description = "fused: lean loop (toy, Phase 0a)")]
     public ValueTask<int> FusedLean() => Scenarios.LeanSuspending();
 
-    [Benchmark(Description = "fused: real loop, no attempt log")]
-    public ValueTask<int> FusedNoLog() => Scenarios.FusedNoTimeoutNoLogSuspending();
-
-    [Benchmark(Description = "fused: real loop, no timeout")]
-    public ValueTask<int> FusedNoTimeout() => Scenarios.FusedNoTimeoutSuspending();
-
-    [Benchmark(Description = "fused: real loop, Default")]
+    [Benchmark(Description = "fused: real loop, Default (Phase 0a)")]
     public ValueTask<int> FusedDefault() => Scenarios.FusedDefaultSuspending();
-
-    [Benchmark(Description = "fused: real loop, +breaker")]
-    public ValueTask<int> FusedFull() => Scenarios.FusedFullSuspending();
 
     [Benchmark(Description = "polly: empty pipeline")]
     public ValueTask<int> PollyEmpty() => PollyScenarios.EmptySuspending();
@@ -55,14 +58,14 @@ public class SynchronousPathBenchmarks
     [Benchmark(Baseline = true, Description = "raw callback, no wrapper")]
     public ValueTask<int> Raw() => Scenarios.RawSync();
 
-    [Benchmark(Description = "fused: None (passthrough)")]
-    public ValueTask<int> FusedNone() => Scenarios.NoneSync();
+    [Benchmark(Description = "lib: None (passthrough)")]
+    public ValueTask<int> LibNone() => ShippingScenarios.NoneSync();
 
-    [Benchmark(Description = "fused: no timeout, static+state")]
-    public ValueTask<int> FusedStatic() => Scenarios.FusedNoTimeoutSyncState();
+    [Benchmark(Description = "lib: trivial, static+state")]
+    public ValueTask<int> LibTrivialStatic() => ShippingScenarios.TrivialSyncState();
 
-    [Benchmark(Description = "fused: Default, static+state")]
-    public ValueTask<int> FusedDefaultStatic() => Scenarios.FusedDefaultSyncState();
+    [Benchmark(Description = "lib: Default, static+state")]
+    public ValueTask<int> LibDefaultStatic() => ShippingScenarios.DefaultSyncState();
 
     [Benchmark(Description = "polly: empty pipeline")]
     public ValueTask<int> PollyEmpty() => PollyScenarios.EmptySync();
@@ -78,18 +81,18 @@ public class SynchronousPathBenchmarks
 [BenchmarkCategory("retry")]
 public class RetryBenchmarks
 {
-    private readonly Scenarios.RetryArm _fused = Scenarios.BuildFusedRetry();
+    private readonly ShippingScenarios.RetryArm _lib = ShippingScenarios.BuildRetry();
     private readonly PollyScenarios.PollyRetryArm _polly = PollyScenarios.BuildRetryArm();
 
     [BenchmarkIterationSetup]
     public void Reset()
     {
-        _fused.Reset();
+        _lib.Reset();
         _polly.Reset();
     }
 
-    [Benchmark(Baseline = true, Description = "fused: retry x2 -> success")]
-    public ValueTask<int> Fused() => _fused.RunAsync();
+    [Benchmark(Baseline = true, Description = "lib: retry x2 -> success")]
+    public ValueTask<int> Lib() => _lib.RunAsync();
 
     [Benchmark(Description = "polly: retry x2 -> success")]
     public ValueTask<int> Polly() => _polly.RunAsync();

@@ -14,7 +14,6 @@ namespace NResilience.Baseline;
 public class SocketBenchmarks
 {
     private LoopbackEcho _echo = null!;
-    private FusedExecutor _fused = null!;
     private ResiliencePipeline _polly = null!;
     private Func<CancellationToken, Task<int>> _callback = null!;
     private Func<CancellationToken, ValueTask<int>> _pollyCallback = null!;
@@ -25,7 +24,6 @@ public class SocketBenchmarks
     public void Setup()
     {
         _echo = LoopbackEcho.StartAsync().GetAwaiter().GetResult();
-        _fused = new FusedExecutor(FusedPolicy.Default);
         _polly = PollyScenarios.BuildRetryTimeout();
         _callback = _echo.RoundTripAsync;
         _pollyCallback = ct => new ValueTask<int>(_echo.RoundTripAsync(ct));
@@ -37,11 +35,11 @@ public class SocketBenchmarks
     [Benchmark(Baseline = true, Description = "socket: raw round trip")]
     public Task<int> Raw() => _echo.RoundTripAsync(CancellationToken.None);
 
-    [Benchmark(Description = "socket: fused, no timeout")]
-    public ValueTask<int> FusedNoTimeout() => Scenarios.NoTimeout.RunAsync(_callback);
+    [Benchmark(Description = "socket: lib, no timeout")]
+    public ValueTask<int> LibNoTimeout() => ShippingScenarios.Trivial.RunAsync(_callback);
 
-    [Benchmark(Description = "socket: fused, Default")]
-    public ValueTask<int> FusedDefault() => _fused.RunAsync(_callback);
+    [Benchmark(Description = "socket: lib, Default")]
+    public ValueTask<int> LibDefault() => Resilience.Default.RunAsync(_callback);
 
     [Benchmark(Description = "socket: polly, retry + timeout")]
     public ValueTask<int> PollyRetryTimeout() => _polly.ExecuteAsync(_pollyCallback, CancellationToken.None);

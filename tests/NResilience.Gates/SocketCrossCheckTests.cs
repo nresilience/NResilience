@@ -18,6 +18,11 @@ namespace NResilience.Gates;
 ///
 /// If this ever disagrees with the gate, the gate is measuring an artefact and the design's
 /// central number is not trustworthy. That is worth one slow test.
+///
+/// Phase 0b re-points it at the shipping executor. Phase 0a found the one thing the yield gate
+/// structurally cannot see — that giving the callback a <i>cancellable</i> token costs 208 B over
+/// real I/O against 65 B over <c>Task.Yield</c> — and that finding is the reason this test exists
+/// rather than being a formality.
 /// </summary>
 [Collection(BaselineCollection.Name)]
 public sealed class SocketCrossCheckTests
@@ -34,8 +39,8 @@ public sealed class SocketCrossCheckTests
         Func<CancellationToken, Task<int>> callback = echo.RoundTripAsync;
         Func<CancellationToken, ValueTask<int>> pollyCallback = ct => new ValueTask<int>(echo.RoundTripAsync(ct));
 
-        var fusedNoTimeout = new FusedExecutor(FusedPolicy.NoTimeout);
-        var fusedDefault = new FusedExecutor(FusedPolicy.Default);
+        Resilience trivial = ShippingScenarios.Trivial;
+        Resilience full = Resilience.Default;
         ResiliencePipeline pollyRetryTimeout = PollyScenarios.BuildRetryTimeout();
 
         // A socket round trip is slower and noisier than a yield, so fewer iterations and more
@@ -52,13 +57,15 @@ public sealed class SocketCrossCheckTests
         // Decomposition. The no-timeout arm hands the callback the caller's own (non-cancellable)
         // token, so the socket registers on nothing; the Default arm hands it a linked token that
         // both socket calls must register on. The gap between them is a cost the Task.Yield gate
-        // structurally cannot see, because Task.Yield ignores the token it is given.
+        // structurally cannot see, because Task.Yield ignores the token it is given, and it is the
+        // price of never handing user code a pooled source's token — see plans/phase-1-results.md
+        // for the arrangement that tried to avoid it and measured worse.
         AllocationMeasurement fusedNoTimeoutResult = await AllocationProbe.MeasureAsync(
-            "socket: fused, no timeout", () => fusedNoTimeout.RunAsync(callback),
+            "socket: lib, no timeout", () => trivial.RunAsync(callback),
             AllocationCounter.ProcessWide, Warmup, Iterations, Repeats);
 
         AllocationMeasurement fused = await AllocationProbe.MeasureAsync(
-            "socket: fused, Default", () => fusedDefault.RunAsync(callback),
+            "socket: lib, Default", () => full.RunAsync(callback),
             AllocationCounter.ProcessWide, Warmup, Iterations, Repeats);
 
         AllocationMeasurement polly = await AllocationProbe.MeasureAsync(
