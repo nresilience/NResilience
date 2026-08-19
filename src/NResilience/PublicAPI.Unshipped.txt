@@ -68,6 +68,28 @@ NResilience.BreakerState.Closed = 0 -> NResilience.BreakerState
 NResilience.BreakerState.HalfOpen = 2 -> NResilience.BreakerState
 NResilience.BreakerState.Isolated = 3 -> NResilience.BreakerState
 NResilience.BreakerState.Open = 1 -> NResilience.BreakerState
+NResilience.CallEvent
+NResilience.CallEvent.AttemptNumber.get -> int
+NResilience.CallEvent.CallEvent() -> void
+NResilience.CallEvent.Delay.get -> System.TimeSpan?
+NResilience.CallEvent.Duration.get -> System.TimeSpan
+NResilience.CallEvent.Exception.get -> System.Exception?
+NResilience.CallEvent.Kind.get -> NResilience.CallEventKind
+NResilience.CallEvent.PolicyName.get -> string?
+NResilience.CallEvent.Result.get -> object?
+NResilience.CallEvent.Verdict.get -> NResilience.Verdict
+NResilience.CallEventKind
+NResilience.CallEventKind.Attempt = 0 -> NResilience.CallEventKind
+NResilience.CallEventKind.BreakerClosed = 8 -> NResilience.CallEventKind
+NResilience.CallEventKind.BreakerHalfOpened = 9 -> NResilience.CallEventKind
+NResilience.CallEventKind.BreakerOpened = 7 -> NResilience.CallEventKind
+NResilience.CallEventKind.DeadlineExceeded = 5 -> NResilience.CallEventKind
+NResilience.CallEventKind.NestedRetry = 10 -> NResilience.CallEventKind
+NResilience.CallEventKind.NotRetried = 3 -> NResilience.CallEventKind
+NResilience.CallEventKind.OrphanedWork = 6 -> NResilience.CallEventKind
+NResilience.CallEventKind.Rejected = 4 -> NResilience.CallEventKind
+NResilience.CallEventKind.Retrying = 1 -> NResilience.CallEventKind
+NResilience.CallEventKind.Succeeded = 2 -> NResilience.CallEventKind
 NResilience.CallRejectedException
 NResilience.CallRejectedException.Attempts.get -> NResilience.AttemptLog!
 NResilience.CallRejectedException.CallRejectedException() -> void
@@ -138,6 +160,8 @@ NResilience.Resilience.Deadline.init -> void
 NResilience.Resilience.Equals(NResilience.Resilience? other) -> bool
 NResilience.Resilience.Name.get -> string?
 NResilience.Resilience.Name.init -> void
+NResilience.Resilience.OnEvent.get -> System.Action<NResilience.CallEvent>?
+NResilience.Resilience.OnEvent.init -> void
 NResilience.Resilience.Resilience() -> void
 NResilience.Resilience.RunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 NResilience.Resilience.RunAsync<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
@@ -183,6 +207,7 @@ override NResilience.Backoff.GetHashCode() -> int
 override NResilience.BreakerSettings.Equals(object? obj) -> bool
 override NResilience.BreakerSettings.GetHashCode() -> int
 override NResilience.BreakerSettings.ToString() -> string!
+override NResilience.CallEvent.ToString() -> string!
 override NResilience.Classifier.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
 override NResilience.Resilience.GetHashCode() -> int

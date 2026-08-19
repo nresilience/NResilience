@@ -20,6 +20,32 @@ public enum BreakerState
 }
 
 /// <summary>
+/// A state change a call caused, handed back to the executor so it can raise the matching
+/// <see cref="CallEvent"/> after the breaker's lock has been released.
+/// <para>
+/// Internal, and deliberately not a public "the breaker changed state" callback on
+/// <see cref="Breaker"/> itself. A breaker is shared and a listener is per-policy: the transition
+/// belongs to the call that caused it, which is the only context in which "which policy saw this?"
+/// has an answer. <see cref="Breaker.Isolate"/> and <see cref="Breaker.Reset"/> are administrative
+/// and raise nothing, because there is no call to attribute them to.
+/// </para>
+/// </summary>
+internal enum BreakerTransition : byte
+{
+    /// <summary>Nothing changed.</summary>
+    None,
+
+    /// <summary>The breaker tripped.</summary>
+    Opened,
+
+    /// <summary>The breaker recovered.</summary>
+    Closed,
+
+    /// <summary>The break duration elapsed and this call became the breaker's probe.</summary>
+    HalfOpened,
+}
+
+/// <summary>
 /// How a <see cref="Breaker"/> decides to trip, how long it stays tripped, and what it takes to
 /// close it again.
 /// </summary>
@@ -239,6 +265,14 @@ public sealed class Breaker
     private int _probesInFlight;
     private int _probeSuccesses;
 
+    /// <summary>
+    /// Set by <see cref="OpenCore"/> and <see cref="CloseCore"/> under the lock, and drained by
+    /// <see cref="Record"/> on the way out. The transitions happen at four separate points inside
+    /// the state machine, and threading a return value out of each of them would mean touching
+    /// every one of those paths to carry a value only telemetry reads.
+    /// </summary>
+    private BreakerTransition _transition;
+
     /// <summary>Creates a breaker.</summary>
     /// <param name="settings">How it trips. Null means <see cref="BreakerSettings"/>'s defaults.</param>
     /// <exception cref="ResilienceConfigurationException">The settings cannot be used.</exception>
@@ -333,8 +367,16 @@ public sealed class Breaker
     /// Admission. True means the call may proceed, and in the half-open state consumes one of the
     /// probe slots — so every true must be followed by exactly one <see cref="Record"/>.
     /// </summary>
-    internal bool TryEnter()
+    /// <param name="transition">
+    /// The state change this admission caused, for the caller to report. Reported by the caller
+    /// rather than raised here because the transition happens under the breaker's lock and a
+    /// listener is arbitrary user code: raising inside the lock would let one slow listener
+    /// serialise every call through the breaker.
+    /// </param>
+    internal bool TryEnter(out BreakerTransition transition)
     {
+        transition = BreakerTransition.None;
+
         lock (_gate)
         {
             switch (_state)
@@ -356,6 +398,7 @@ public sealed class Breaker
                     _state = BreakerState.HalfOpen;
                     _probeSuccesses = 0;
                     _probesInFlight = 1;
+                    transition = BreakerTransition.HalfOpened;
                     return true;
 
                 default:
@@ -373,9 +416,23 @@ public sealed class Breaker
     /// <summary>One attempt's outcome.</summary>
     /// <param name="kind">How the executor classified it.</param>
     /// <param name="duration">How long the attempt took, for the slow-call trip.</param>
-    internal void Record(VerdictKind kind, TimeSpan duration)
+    /// <returns>
+    /// The state change this outcome caused, for the caller to report. See
+    /// <see cref="TryEnter"/> for why the breaker does not raise it itself.
+    /// </returns>
+    internal BreakerTransition Record(VerdictKind kind, TimeSpan duration)
     {
         lock (_gate)
+        {
+            _transition = BreakerTransition.None;
+            RecordCore(kind, duration);
+            return _transition;
+        }
+    }
+
+    /// <summary>The state machine itself, always called with the lock held.</summary>
+    private void RecordCore(VerdictKind kind, TimeSpan duration)
+    {
         {
             if (_state == BreakerState.Isolated)
             {
@@ -507,6 +564,7 @@ public sealed class Breaker
 
     private void OpenCore(long now)
     {
+        _transition = BreakerTransition.Opened;
         _state = BreakerState.Open;
         _openedAt = _time.GetUtcNow();
 
@@ -525,6 +583,7 @@ public sealed class Breaker
 
     private void CloseCore()
     {
+        _transition = BreakerTransition.Closed;
         _state = BreakerState.Closed;
         _openedAt = default;
         _breakUntil = 0;

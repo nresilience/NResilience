@@ -119,6 +119,19 @@ public sealed partial record Resilience
     /// </summary>
     public Func<NextAttempt, Task>? BeforeAttempt { get; init; }
 
+    /// <summary>
+    /// Told about everything that happens during a call. Null — the default — means the executor
+    /// raises nothing and pays nothing, which is what "pay-for-play telemetry" has to mean if it
+    /// is to mean anything.
+    /// <para>
+    /// Synchronous, and called on the thread the executor is running on, so a listener that blocks
+    /// blocks the call. Log, count, enqueue; do not do I/O. An exception thrown by a listener is
+    /// swallowed: telemetry that can fail the operation it is observing is worse than no
+    /// telemetry.
+    /// </para>
+    /// </summary>
+    public Action<CallEvent>? OnEvent { get; init; }
+
     /// <summary>A name for this policy, used in diagnostics.</summary>
     public string? Name { get; init; }
 
@@ -185,6 +198,12 @@ public sealed partial record Resilience
         && Deadline == Timeout.InfiniteTimeSpan
         && AttemptTimeout == Timeout.InfiniteTimeSpan
         && BeforeAttempt is null
+
+        // A listener takes a policy out of passthrough even though it imposes no bound. Handing
+        // back the callback's own task would be cheaper and would silently raise nothing, and a
+        // listener that never fires is a worse surprise than a policy that stopped being free the
+        // moment it was explicitly instrumented.
+        && OnEvent is null
         && Breaker is null
 
         // A budget on a policy that cannot retry still needs its deposits, because a *shared* budget

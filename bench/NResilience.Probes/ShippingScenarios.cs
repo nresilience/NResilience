@@ -62,6 +62,25 @@ public static class ShippingScenarios
     /// </summary>
     public static ValueTask<Lib.CallResult<int>> TryRunDefaultSuspending() => Lib.Resilience.Default.TryRunAsync(SuspendCallback);
 
+    /// <summary>
+    /// <see cref="Lib.Resilience.Default"/> with a listener attached: the price of telemetry when
+    /// somebody is actually listening.
+    ///
+    /// <para>
+    /// The listener does nothing, on purpose. What is being priced is the executor's side of the
+    /// contract — raising the events and boxing each attempt's result for a cross-cutting listener
+    /// that has no <c>T</c> to be generic over — not whatever a real listener would then do with
+    /// them. The delegate is a cached static, because a lambda written inline at the call site
+    /// would allocate a delegate per operation and charge telemetry for the caller's own style.
+    /// </para>
+    /// </summary>
+    public static readonly Lib.Resilience DefaultWithListener = Lib.Resilience.Default with
+    {
+        OnEvent = static _ => { },
+    };
+
+    public static ValueTask<int> DefaultListenerSuspending() => DefaultWithListener.RunAsync(SuspendCallback);
+
     // ---- Synchronous fast path: where the 0-byte budgets live. ----
 
     public static ValueTask<int> NoneSync() => Lib.Resilience.None.RunAsync(CompleteCallback);

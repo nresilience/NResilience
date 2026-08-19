@@ -79,6 +79,73 @@ public sealed class AllocationGateTests
         => AssertSuspendingOverhead(Baseline.LibTryRunDefault, Budgets.TryRunDefaultOverhead);
 
     /// <summary>
+    /// Telemetry with a listener attached, budgeted rather than described. The design's stated
+    /// reason for having its own event type at all is that Polly's costs 6.9x when enabled — the
+    /// configuration production actually runs — so what this costs when it is on is the number
+    /// that matters.
+    /// </summary>
+    [Fact]
+    public void A_listener_stays_within_budget()
+        => AssertSuspendingOverhead(Baseline.LibDefaultListener, Budgets.DefaultWithListenerOverhead);
+
+    /// <summary>
+    /// "Pay-for-play" as a gate rather than a claim: attaching a listener may cost the boxes the
+    /// listener asked for and must not cost anything else.
+    ///
+    /// Both arms are measured in this sweep, so the difference is a measurement rather than a
+    /// subtraction across two harnesses — which is the failure mode this whole harness exists to
+    /// avoid.
+    /// </summary>
+    [Fact]
+    public void A_listener_costs_only_the_results_it_asked_to_be_boxed()
+    {
+        double listening = _baseline.SuspendingOverhead(Baseline.LibDefaultListener);
+        double silent = _baseline.SuspendingOverhead(Baseline.LibDefault);
+
+        _output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"listener {listening:0.0} B/op vs no listener {silent:0.0} B/op, delta {listening - silent:0.0} B (allowance {Budgets.ListenerAllowance:0} B)"));
+
+        Assert.True(
+            listening - silent <= Budgets.ListenerAllowance,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"""
+                 Attaching a listener now costs {listening - silent:0.0} B/op, against the {Budgets.ListenerAllowance:0} B
+                 that two boxed results plus drift can account for. Something in the event path is
+                 allocating per event — a captured closure, an event object, or a result boxed on a
+                 path that has no listener to hand it to.
+                 """));
+    }
+
+    /// <summary>
+    /// The other half of pay-for-play, and the half that everyone pays: a policy with no listener
+    /// must cost exactly what it cost before telemetry existed.
+    ///
+    /// <see cref="The_default_policy_stays_within_budget_on_the_suspending_path"/> already gates the
+    /// absolute figure, and Phase 3 moved it by zero bytes — the delegate is a field on a record the
+    /// state-machine box already holds a reference to, so reading it is free, and every event site
+    /// is behind a null test. This asserts the comparison the budget cannot: that the silent path
+    /// has not drifted toward the listening one.
+    /// </summary>
+    [Fact]
+    public void A_policy_with_no_listener_pays_nothing_for_telemetry()
+    {
+        double silent = _baseline.SuspendingOverhead(Baseline.LibDefault);
+        double listening = _baseline.SuspendingOverhead(Baseline.LibDefaultListener);
+
+        Assert.True(
+            silent < listening - Budgets.SuspendingNoiseFloor,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"""
+                 A policy with no listener measured {silent:0.0} B/op against {listening:0.0} B/op with one.
+                 The two are indistinguishable, which means either the null-listener path is doing the
+                 work anyway or the listening arm has stopped raising events at all.
+                 """));
+    }
+
+    /// <summary>
     /// Phase 0b's own falsification test. Phase 0a measured a hand-written fused loop to establish
     /// what was achievable before any library existed; the shipping executor has to match it while
     /// doing strictly more — capturing a per-attempt exception, classifying results, and awaiting a

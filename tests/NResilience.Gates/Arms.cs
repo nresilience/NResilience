@@ -69,6 +69,7 @@ public static class Arms
             Arm.Of("lib: Default", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: Default, cancellable token", ShippingScenarios.DefaultSuspendingCancellable, AllocationCounter.ProcessWide),
             Arm.Of("lib: TryRunAsync, Default", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide),
+            Arm.Of("lib: Default + listener", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: retry x2 -> success", shippingRetry.RunAsync, AllocationCounter.ProcessWide, shippingRetry.Reset),
 
             // Phase 0a stand-in: reference rows for the 0a-versus-0b delta.

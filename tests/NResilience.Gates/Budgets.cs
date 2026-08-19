@@ -98,6 +98,31 @@ public static class Budgets
     public const double TryRunDefaultOverhead = 640;
 
     /// <summary>
+    /// <c>Resilience.Default</c> with a listener attached. Measured: 440 B on .NET 10, 439 B on
+    /// .NET 8 — 48 B over <see cref="DefaultOverhead"/>, which is two boxed <c>int</c> results,
+    /// one for the attempt and one for the success.
+    ///
+    /// Phase 3's whole claim is in that number: raising the events themselves is free, because
+    /// <c>CallEvent</c> is a struct passed by value to an <see cref="System.Action{T}"/> and the
+    /// delegate is a field on a policy the state-machine box already holds. What a listener costs
+    /// is the one thing it asked for that cannot be given away — the attempt's result, boxed,
+    /// because a cross-cutting listener has no <c>T</c> to be generic over.
+    /// </summary>
+    public const double DefaultWithListenerOverhead = 512;
+
+    /// <summary>
+    /// The pay-for-play gate, expressed as the thing it actually claims: what a listener adds must
+    /// be accounted for by the boxes it asked for, and nothing else.
+    ///
+    /// Two events on a successful call carry a result — <c>Attempt</c> and <c>Succeeded</c> — and a
+    /// boxed <c>int</c> is 24 B on both target frameworks, so 48 B is the whole of it. The ceiling
+    /// allows one further box for measurement drift; anything beyond that means the executor grew
+    /// a per-event allocation, which is exactly the failure mode that makes telemetry something
+    /// people turn off in production.
+    /// </summary>
+    public const double ListenerAllowance = 72;
+
+    /// <summary>
     /// The shipping executor must not be more expensive than the hand-written stand-in Phase 0a
     /// used to establish the achievable floor. Measured: 393 B against 401 B on .NET 10 — the real
     /// loop is <i>cheaper</i>, while additionally capturing a per-attempt exception, classifying

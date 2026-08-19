@@ -48,6 +48,7 @@ public static class Baseline
     public const string LibDefault = "lib: Default";
     public const string LibDefaultCancellable = "lib: Default, cancellable token";
     public const string LibTryRunDefault = "lib: TryRunAsync, Default";
+    public const string LibDefaultListener = "lib: Default + listener";
     public const string LibRetry = "lib: retry x2 -> success";
 
     // The Phase 0a stand-in, kept as reference rows.

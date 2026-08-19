@@ -3,16 +3,19 @@
 A .NET resilience library built around one flat execution engine, a declarative policy value, and
 defaults that are correct without configuration.
 
-**Status: Phase 0b complete.** The core ships: `Resilience`, `Verdict`, `Classifier`, `Backoff`,
+**Status: Phase 3 complete.** The core ships: `Resilience`, `Verdict`, `Classifier`, `Backoff`,
 `CallResult<T>`, `AttemptLog`, the exception types and the fused executor — deadline, attempt
-timeout, retry, classification and the cancellation contract — and every allocation gate now measures
-that shipping executor rather than the pre-Phase-1 stand-in. Circuit breaking and the retry budget
-are Phase 2; telemetry is Phase 3.
+timeout, retry, classification and the cancellation contract — alongside `Breaker`, `RetryBudget`
+and the `CallEvent` / `OnEvent` telemetry surface. Every allocation gate measures that shipping
+executor rather than the pre-Phase-1 stand-in. The `Meter` and `ActivitySource`, the HTTP handler,
+DI and the testing package are Phases 4–7.
 
 - Design: [`plans/nresilience-design-v3.md`](plans/nresilience-design-v3.md)
 - Phase 0a — the baseline, taken before any library code existed: [`plans/phase-0a-results.md`](plans/phase-0a-results.md)
 - Phase 1 — what shipped, and the decisions Phase 0a deferred: [`plans/phase-1-results.md`](plans/phase-1-results.md)
 - Phase 0b — the same harness, re-run against the real executor: [`plans/phase-0b-results.md`](plans/phase-0b-results.md)
+- Phase 2 — the breaker and the retry budget: [`plans/phase-2-results.md`](plans/phase-2-results.md)
+- Phase 3 — telemetry, and what a listener costs: [`plans/phase-3-results.md`](plans/phase-3-results.md)
 
 ## The whole API, in thirty seconds
 

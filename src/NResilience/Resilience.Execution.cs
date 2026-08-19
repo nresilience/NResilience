@@ -177,7 +177,7 @@ public sealed partial record Resilience
         pending.IsCompletedSuccessfully ? default : new ValueTask(pending.AsTask());
 
     /// <summary>
-    /// How long a refused call pauses before it is reported. See <see cref="Guard"/> for why it
+    /// How long a refused call pauses before it is reported. See <see cref="GuardDelay"/> for why it
     /// pauses at all.
     /// <para>
     /// Not configurable, and short enough that no caller needs it to be: it exists to put a floor
@@ -186,6 +186,18 @@ public sealed partial record Resilience
     /// </para>
     /// </summary>
     private static readonly TimeSpan RejectionDelay = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    /// How far past its own attempt timeout a callback has to run before the overrun is reported
+    /// as <see cref="CallEventKind.OrphanedWork"/> rather than as ordinary scheduling noise.
+    /// <para>
+    /// Not configurable. It is a threshold for a diagnostic, not a bound on behaviour, and a
+    /// second is far beyond any delay the thread pool or a cancellation registration can account
+    /// for while being short enough that a callback which genuinely ignored its token always
+    /// crosses it.
+    /// </para>
+    /// </summary>
+    private static readonly TimeSpan OrphanGrace = TimeSpan.FromSeconds(1);
 
     private async ValueTask<TOut> ExecuteAsync<TState, T, TInvoker, TOut, TShaper>(
         TInvoker invoker,
@@ -229,17 +241,38 @@ public sealed partial record Resilience
             //    samples attempts - so a first attempt that trips it must stop the second, which is
             //    the whole point of having tripped. It is also why "does the breaker see attempts or
             //    whole operations?" has one answer here instead of depending on composition order.
-            if (Breaker is { } breaker && !breaker.TryEnter())
+            if (Breaker is { } breaker)
             {
-                reason = StopReason.DependencyUnavailable;
-                await Guard(Time, Remaining(Time, start, Deadline, bounded), cancellationToken).ConfigureAwait(false);
-                break;
+                bool admitted = breaker.TryEnter(out BreakerTransition admission);
+
+                // Raised outside the breaker's lock, on purpose: a listener is arbitrary user code
+                // and one slow listener holding that lock would serialise every call through the
+                // breaker.
+                if (admission != BreakerTransition.None && OnEvent is not null)
+                {
+                    NotifyBreaker(admission, log.Count + 1, Time.GetElapsedTime(start));
+                }
+
+                if (!admitted)
+                {
+                    reason = StopReason.DependencyUnavailable;
+                    TimeSpan pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
+
+                    if (OnEvent is not null)
+                    {
+                        Notify(CallEventKind.Rejected, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null);
+                    }
+
+                    await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
             }
 
             TimeSpan remaining = Remaining(Time, start, Deadline, bounded);
             if (remaining == TimeSpan.Zero)
             {
                 reason = StopReason.DeadlineExceeded;
+                NotifyDeadline(log.Count + 1, verdict, Time.GetElapsedTime(start), error);
                 break;
             }
 
@@ -256,6 +289,7 @@ public sealed partial record Resilience
                 if (remaining == TimeSpan.Zero)
                 {
                     reason = StopReason.DeadlineExceeded;
+                    NotifyDeadline(log.Count + 1, verdict, Time.GetElapsedTime(start), error);
                     break;
                 }
             }
@@ -342,10 +376,33 @@ public sealed partial record Resilience
                 verdict.Kind,
                 error);
 
+            if (OnEvent is not null)
+            {
+                object? observed = ResultOf(value, hasValue);
+                Notify(CallEventKind.Attempt, log.Count, verdict, duration, null, error, observed);
+
+                // A callback that kept running well past the timeout that was supposed to stop it
+                // is the ecosystem's most-hit footgun, and it is invisible from inside: the
+                // executor is blocked on the very task that ignored its token. So it is reported
+                // retrospectively, the moment the work finally does return, by comparing what the
+                // attempt was allowed against what it actually took.
+                if (attemptSource is not null && duration >= effective + OrphanGrace)
+                {
+                    Notify(CallEventKind.OrphanedWork, log.Count, verdict, duration, null, error, observed);
+                }
+            }
+
             // The duration goes with it because the breaker trips on brownouts as well as errors:
             // a dependency returning 200s at 30x normal latency is the most common real degradation,
             // and an error-rate breaker sits closed through the entire incident.
-            Breaker?.Record(verdict.Kind, duration);
+            if (Breaker is { } sampled)
+            {
+                BreakerTransition outcome = sampled.Record(verdict.Kind, duration);
+                if (outcome != BreakerTransition.None && OnEvent is not null)
+                {
+                    NotifyBreaker(outcome, log.Count, Time.GetElapsedTime(start));
+                }
+            }
 
             if (verdict.Kind == VerdictKind.Ok)
             {
@@ -359,6 +416,11 @@ public sealed partial record Resilience
                 // a caller who cancelled while an attempt was already succeeding has waited for
                 // that attempt either way, and throwing away work that is done and paid for helps
                 // nobody.
+                if (OnEvent is not null)
+                {
+                    Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue));
+                }
+
                 AttemptLog succeeded = shaper.WantsLogOnSuccess
                     ? log.Materialise(Time.GetElapsedTime(start), Deadline, bounded)
                     : AttemptLog.Empty;
@@ -371,6 +433,14 @@ public sealed partial record Resilience
             if (verdict.Kind == VerdictKind.Permanent)
             {
                 reason = StopReason.Permanent;
+
+                if (OnEvent is not null)
+                {
+                    // The event that makes "Classifier.Default did not recognise your exception
+                    // type" visible rather than mysterious: the type is right there on it.
+                    Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue));
+                }
+
                 break;
             }
 
@@ -384,6 +454,7 @@ public sealed partial record Resilience
             if (left == TimeSpan.Zero)
             {
                 reason = StopReason.DeadlineExceeded;
+                NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
                 break;
             }
 
@@ -394,7 +465,14 @@ public sealed partial record Resilience
             if (budget is not null && !budget.TrySpend())
             {
                 reason = StopReason.BudgetExhausted;
-                await Guard(Time, left, cancellationToken).ConfigureAwait(false);
+                TimeSpan refused = GuardDelay(left);
+
+                if (OnEvent is not null)
+                {
+                    Notify(CallEventKind.Rejected, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue));
+                }
+
+                await Delay(Time, refused, cancellationToken).ConfigureAwait(false);
                 break;
             }
 
@@ -405,7 +483,15 @@ public sealed partial record Resilience
             if (bounded && delay >= left)
             {
                 reason = StopReason.DeadlineExceeded;
+                NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
                 break;
+            }
+
+            if (OnEvent is not null)
+            {
+                // Raised before the backoff is served rather than after it, so a listener sees the
+                // retry coming and can report how long the call is about to sit idle.
+                Notify(CallEventKind.Retrying, log.Count + 1, verdict, Time.GetElapsedTime(start), delay, error, ResultOf(value, hasValue));
             }
 
             if (delay > TimeSpan.Zero)
@@ -445,13 +531,82 @@ public sealed partial record Resilience
     /// field the attempt and the backoff delay already need.
     /// </para>
     /// </summary>
-    private static Task Guard(TimeProvider time, TimeSpan remaining, CancellationToken cancellationToken)
-    {
-        TimeSpan delay = remaining == Timeout.InfiniteTimeSpan || remaining > RejectionDelay
-            ? RejectionDelay
-            : remaining;
+    private static TimeSpan GuardDelay(TimeSpan remaining) =>
+        remaining == Timeout.InfiniteTimeSpan || remaining > RejectionDelay ? RejectionDelay : remaining;
 
-        return delay > TimeSpan.Zero ? Task.Delay(delay, time, cancellationToken) : Task.CompletedTask;
+    /// <summary>
+    /// The pause itself, split from <see cref="GuardDelay"/> so a listener can be told how long a
+    /// refusal is about to sit before it sits there. Returns <see cref="Task"/> so the await shares
+    /// the hoisted awaiter field the attempt and the backoff delay already need.
+    /// </summary>
+    private static Task Delay(TimeProvider time, TimeSpan delay, CancellationToken cancellationToken) =>
+        delay > TimeSpan.Zero ? Task.Delay(delay, time, cancellationToken) : Task.CompletedTask;
+
+    /// <summary>
+    /// Boxes an attempt's result for a listener, and only for a listener.
+    /// <para>
+    /// <c>typeof(T)</c> is a JIT constant in each closed instantiation, so the void entry points
+    /// fold this to a constant null rather than handing out a meaningless box of the internal
+    /// no-result type.
+    /// </para>
+    /// </summary>
+    private static object? ResultOf<T>(T value, bool hasValue) =>
+        hasValue && typeof(T) != typeof(VoidResult) ? value : null;
+
+    /// <summary>
+    /// Raises one event.
+    /// <para>
+    /// Every call site is already guarded by a <c>OnEvent is not null</c> test, because the
+    /// arguments — a boxed result, an elapsed-time read — are themselves work not worth doing for
+    /// a policy nobody is listening to. The delegate is read once here rather than twice, so a
+    /// listener detached by another thread between the guard and the raise cannot produce a null
+    /// dereference.
+    /// </para>
+    /// </summary>
+    private void Notify(CallEventKind kind, int attemptNumber, Verdict verdict, TimeSpan duration, TimeSpan? delay, Exception? error, object? result)
+    {
+        Action<CallEvent>? listener = OnEvent;
+        if (listener is null)
+        {
+            return;
+        }
+
+        try
+        {
+            listener(new CallEvent(kind, Name, attemptNumber, verdict, duration, delay, error, result));
+        }
+        catch (Exception)
+        {
+            // Telemetry that can fail the operation it is observing is worse than no telemetry.
+            // There is nowhere honest to report this to — a logger is exactly the thing that just
+            // threw — so it is swallowed, and that is documented on OnEvent rather than hidden.
+        }
+    }
+
+    /// <summary>Raises a breaker transition, which carries no verdict and no result of its own.</summary>
+    private void NotifyBreaker(BreakerTransition transition, int attemptNumber, TimeSpan elapsed)
+    {
+        CallEventKind kind = transition switch
+        {
+            BreakerTransition.Opened => CallEventKind.BreakerOpened,
+            BreakerTransition.Closed => CallEventKind.BreakerClosed,
+            _ => CallEventKind.BreakerHalfOpened,
+        };
+
+        Notify(kind, attemptNumber, Verdict.Ok, elapsed, null, null, null);
+    }
+
+    /// <summary>
+    /// Raises <see cref="CallEventKind.DeadlineExceeded"/>. Unlike the other helpers this checks
+    /// the listener itself, because it is called from four places whose only other work is to set
+    /// the stop reason and leave.
+    /// </summary>
+    private void NotifyDeadline(int attemptNumber, Verdict verdict, TimeSpan elapsed, Exception? error)
+    {
+        if (OnEvent is not null)
+        {
+            Notify(CallEventKind.DeadlineExceeded, attemptNumber, verdict, elapsed, null, error, null);
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

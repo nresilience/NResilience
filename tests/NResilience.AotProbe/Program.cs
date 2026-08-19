@@ -147,6 +147,53 @@ internal static class Program
         failures += Check("library: caller cancellation propagates untouched", cancelledCorrectly);
 
         failures += await GuardsAsync().ConfigureAwait(false);
+        failures += await TelemetryAsync().ConfigureAwait(false);
+
+        return failures;
+    }
+
+    /// <summary>
+    /// Phase 3 under AOT. The one thing here that whole-program compilation could plausibly break
+    /// is the boxed result on <see cref="CallEvent.Result"/>: it is the only place the executor
+    /// converts a generic <c>T</c> to <see cref="object"/>, and the <c>typeof(T)</c> test that
+    /// keeps the void entry points from handing out a box of an internal type is folded by the
+    /// compiler rather than evaluated.
+    /// </summary>
+    private static async Task<int> TelemetryAsync()
+    {
+        int failures = 0;
+
+        var kinds = new List<CallEventKind>();
+        var results = new List<object?>();
+
+        Resilience watched = Resilience.Default with
+        {
+            Attempts = 2,
+            Backoff = Backoff.None,
+            Deadline = Timeout.InfiniteTimeSpan,
+            AttemptTimeout = Timeout.InfiniteTimeSpan,
+            Name = "aot",
+            OnEvent = e =>
+            {
+                kinds.Add(e.Kind);
+                results.Add(e.Result);
+            },
+        };
+
+        int value = await watched.RunAsync(static _ => Task.FromResult(41)).ConfigureAwait(false);
+
+        failures += Check("library: a successful call raises Attempt then Succeeded under AOT",
+            value == 41 && kinds is [CallEventKind.Attempt, CallEventKind.Succeeded]);
+        failures += Check("library: the boxed result survives AOT", results is [41, 41]);
+
+        kinds.Clear();
+        await watched.TryRunAsync(static _ => Task.FromException<int>(new IOException("aot"))).ConfigureAwait(false);
+        failures += Check("library: a retried call raises Retrying under AOT", kinds.Contains(CallEventKind.Retrying));
+
+        kinds.Clear();
+        results.Clear();
+        await watched.TryRunAsync(static _ => Task.CompletedTask).ConfigureAwait(false);
+        failures += Check("library: a void call reports no result under AOT", results.TrueForAll(static r => r is null));
 
         return failures;
     }
@@ -229,6 +276,7 @@ internal static class Program
         const double TrivialSuspendingBudget = 368;      // measured 328 (320 before Phase 2)
         const double DefaultSuspendingBudget = 448;      // measured 393 (384 before Phase 2)
         const double TryRunSuspendingBudget = 640;       // measured 561 (553 before Phase 2)
+        const double ListenerAllowance = 72;             // measured 48: two boxed int results
 
         double rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
         double noneSync = await MeasureAsync("None (sync)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
@@ -248,6 +296,7 @@ internal static class Program
         double trivialSuspending = await MeasureAsync("trivial (suspending)", ShippingScenarios.TrivialSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
         double defaultSuspending = await MeasureAsync("Default (suspending)", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
         double tryRunSuspending = await MeasureAsync("TryRunAsync, Default (suspending)", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        double listenerSuspending = await MeasureAsync("Default + listener (suspending)", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
 
         failures += Check("no AOT cliff: passthrough is free on the suspending path", noneSuspending - rawSuspending <= NoiseFloor);
         failures += Check(
@@ -262,6 +311,13 @@ internal static class Program
         failures += Check(
             "no AOT cliff: reporting the outcome stays within its suspending budget",
             tryRunSuspending - rawSuspending <= TryRunSuspendingBudget + NoiseFloor);
+
+        // Pay-for-play, under AOT. A listener may cost the results it asked to have boxed and
+        // nothing else - 48 B on both target frameworks under the JIT, for the two events on a
+        // successful call that carry one.
+        failures += Check(
+            "no AOT cliff: a listener costs only the results it asked to be boxed",
+            listenerSuspending - defaultSuspending <= ListenerAllowance);
 
         return failures;
     }
