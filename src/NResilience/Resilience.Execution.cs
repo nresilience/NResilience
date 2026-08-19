@@ -176,6 +176,17 @@ public sealed partial record Resilience
     private static ValueTask Discard(ValueTask<VoidResult> pending) =>
         pending.IsCompletedSuccessfully ? default : new ValueTask(pending.AsTask());
 
+    /// <summary>
+    /// How long a refused call pauses before it is reported. See <see cref="Guard"/> for why it
+    /// pauses at all.
+    /// <para>
+    /// Not configurable, and short enough that no caller needs it to be: it exists to put a floor
+    /// under the rate of a rejection loop, not to be tuned. A static field on a record does not
+    /// participate in the synthesized equality.
+    /// </para>
+    /// </summary>
+    private static readonly TimeSpan RejectionDelay = TimeSpan.FromMilliseconds(100);
+
     private async ValueTask<TOut> ExecuteAsync<TState, T, TInvoker, TOut, TShaper>(
         TInvoker invoker,
         TState state,
@@ -190,6 +201,12 @@ public sealed partial record Resilience
         // `this` is already a field of the box, so reading a property off it is free.
         bool bounded = Deadline != Timeout.InfiniteTimeSpan;
         TShaper shaper = default;
+
+        // The one local Phase 2 adds to the box, at 8 bytes: either the policy's own budget or the
+        // automatic one private to this policy instance. Resolved once here rather than at each of
+        // the two points that need it, because re-resolving after the attempt await would miss the
+        // per-thread cache - a continuation resumes on whichever pool thread is free.
+        RetryBudget? budget = ExecutionState.BudgetFor(this);
 
         long start = Time.GetTimestamp();
         AttemptSink log = default;
@@ -208,6 +225,17 @@ public sealed partial record Resilience
 
         while (true)
         {
+            // 1. Admission. Checked per attempt rather than once per operation, because the breaker
+            //    samples attempts - so a first attempt that trips it must stop the second, which is
+            //    the whole point of having tripped. It is also why "does the breaker see attempts or
+            //    whole operations?" has one answer here instead of depending on composition order.
+            if (Breaker is { } breaker && !breaker.TryEnter())
+            {
+                reason = StopReason.DependencyUnavailable;
+                await Guard(Time, Remaining(Time, start, Deadline, bounded), cancellationToken).ConfigureAwait(false);
+                break;
+            }
+
             TimeSpan remaining = Remaining(Time, start, Deadline, bounded);
             if (remaining == TimeSpan.Zero)
             {
@@ -306,14 +334,26 @@ public sealed partial record Resilience
                 }
             }
 
+            TimeSpan duration = Time.GetElapsedTime(attemptStart);
+
             log.Record(
                 Time.GetElapsedTime(start, attemptStart).Ticks,
-                Time.GetElapsedTime(attemptStart).Ticks,
+                duration.Ticks,
                 verdict.Kind,
                 error);
 
+            // The duration goes with it because the breaker trips on brownouts as well as errors:
+            // a dependency returning 200s at 30x normal latency is the most common real degradation,
+            // and an error-rate breaker sits closed through the entire incident.
+            Breaker?.Record(verdict.Kind, duration);
+
             if (verdict.Kind == VerdictKind.Ok)
             {
+                // A success is what funds future retries. Deposits and withdrawals are both on the
+                // budget rather than split across it and the breaker, so the fraction the budget
+                // enforces is a fraction of the traffic that actually reached the dependency.
+                budget?.Deposit();
+
                 // Deliberately checked *after* the success return rather than before it. The
                 // post-attempt cancellation check exists to stop the loop starting another attempt;
                 // a caller who cancelled while an attempt was already succeeding has waited for
@@ -347,6 +387,17 @@ public sealed partial record Resilience
                 break;
             }
 
+            // 3i. Throttle, after the deadline check so a retry there is no time for is never
+            //     charged for. The per-attempt limit above cannot prevent a retry storm on its own,
+            //     because every caller independently believes it is being reasonable; only a budget
+            //     expressed as a fraction of traffic bounds the aggregate.
+            if (budget is not null && !budget.TrySpend())
+            {
+                reason = StopReason.BudgetExhausted;
+                await Guard(Time, left, cancellationToken).ConfigureAwait(false);
+                break;
+            }
+
             TimeSpan delay = Backoff.Compute(new NextAttempt(log.Count + 1, verdict, error, left, cancellationToken));
 
             // A delay that would consume the rest of the budget leaves nothing for the attempt
@@ -365,7 +416,42 @@ public sealed partial record Resilience
         }
 
         AttemptLog attempts = log.Materialise(Time.GetElapsedTime(start), Deadline, bounded);
-        return shaper.Failure(value, hasValue, error, reason, Deadline, attempts);
+
+        // Read after the guarded delay rather than before it, which is both more accurate - the
+        // hint is that much shorter by the time the caller sees it - and keeps a TimeSpan? out of
+        // the state-machine box.
+        TimeSpan? retryAfter = reason switch
+        {
+            StopReason.DependencyUnavailable => Breaker?.RetryAfterHint(),
+            StopReason.BudgetExhausted => budget?.RetryAfterHint(),
+            _ => null,
+        };
+
+        return shaper.Failure(value, hasValue, error, reason, Deadline, attempts, retryAfter);
+    }
+
+    /// <summary>
+    /// The pause a refused call serves before it is reported.
+    /// <para>
+    /// <b>Guarded rejection is not fail-fast.</b> A cheap rejection inside a caller's
+    /// <c>while (true)</c> polling loop is a CPU spin: without a forced pause, a tripped breaker or a
+    /// depleted budget turns into errors returned with no delay, spiking client CPU and generating
+    /// more traffic than the call it refused would have. AWS carves out an explicit exception for
+    /// exactly this on its long-polling operations.
+    /// </para>
+    /// <para>
+    /// Bounded by the time left on the deadline, so a refusal can never make a call overrun the
+    /// budget its caller set. Returns <see cref="Task"/> so the await shares the hoisted awaiter
+    /// field the attempt and the backoff delay already need.
+    /// </para>
+    /// </summary>
+    private static Task Guard(TimeProvider time, TimeSpan remaining, CancellationToken cancellationToken)
+    {
+        TimeSpan delay = remaining == Timeout.InfiniteTimeSpan || remaining > RejectionDelay
+            ? RejectionDelay
+            : remaining;
+
+        return delay > TimeSpan.Zero ? Task.Delay(delay, time, cancellationToken) : Task.CompletedTask;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

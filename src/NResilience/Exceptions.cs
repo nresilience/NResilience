@@ -1,11 +1,13 @@
 namespace NResilience;
 
 /// <summary>
-/// A call that was never attempted, or that a guard stopped part-way through.
+/// A call that was never attempted, or that a guard stopped part-way through: a tripped
+/// <see cref="NResilience.Breaker"/> (<see cref="StopReason.DependencyUnavailable"/>) or an
+/// exhausted <see cref="RetryBudget"/> (<see cref="StopReason.BudgetExhausted"/>).
 /// <para>
-/// From Phase 2 this is what a tripped breaker and an exhausted retry budget throw. In Phase 1
-/// it is reachable only through <see cref="CallResult{T}.ValueOrThrow"/> on a failure that
-/// carried no exception of its own.
+/// It arrives no sooner than the guarded-rejection pause, which is deliberate: a cheap rejection
+/// inside a caller's polling loop is a CPU spin. <see cref="RetryAfter"/> is there so a caller that
+/// schedules its own polling does not have to guess.
 /// </para>
 /// </summary>
 public sealed class CallRejectedException : Exception
@@ -14,8 +16,13 @@ public sealed class CallRejectedException : Exception
     /// <param name="reason">Why the call was refused.</param>
     /// <param name="attempts">Whatever had already happened.</param>
     /// <param name="retryAfter">A hint for callers that schedule their own polling.</param>
-    public CallRejectedException(StopReason reason, AttemptLog attempts, TimeSpan? retryAfter = null)
-        : base($"The call was rejected: {reason}.")
+    /// <param name="innerException">
+    /// What the last attempt threw before the guard stopped the operation, when there was an earlier
+    /// attempt at all. A rejection reports itself rather than that exception, because the call this
+    /// one describes was never made.
+    /// </param>
+    public CallRejectedException(StopReason reason, AttemptLog attempts, TimeSpan? retryAfter = null, Exception? innerException = null)
+        : base($"The call was rejected: {reason}.", innerException)
     {
         Reason = reason;
         Attempts = attempts;

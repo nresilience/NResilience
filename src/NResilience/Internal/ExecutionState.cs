@@ -12,7 +12,9 @@ namespace NResilience.Internal;
 /// identity, which the record's equality cannot see.
 /// </para>
 /// <para>
-/// Phase 2's automatic per-policy retry budget lives here too, for the same reason.
+/// The automatic per-policy retry budget lives here for the same reason, and the table's lifetime
+/// gives it exactly the scope the design asks for: it is created on the policy's first execution and
+/// collected with the policy, so it is private to that instance without a field ever holding it.
 /// </para>
 /// </summary>
 internal sealed class ExecutionState
@@ -23,24 +25,65 @@ internal sealed class ExecutionState
         static policy =>
         {
             policy.Validate();
-            return new ExecutionState();
+            return new ExecutionState(policy);
         };
 
     /// <summary>
-    /// The last policy this thread validated. Steady state is one reference comparison; the table
-    /// is only consulted when a call site changes policy, and only the first such call validates.
+    /// The last policy this thread executed, and its state. Steady state is one reference
+    /// comparison; the table is only consulted when a call site changes policy, and only the first
+    /// such call validates.
     /// </summary>
     [ThreadStatic]
-    private static Resilience? t_lastValidated;
+    private static Resilience? t_lastPolicy;
 
+    [ThreadStatic]
+    private static ExecutionState? t_lastState;
+
+    private readonly RetryBudget? _automaticBudget;
+
+    private ExecutionState(Resilience policy) =>
+
+        // A policy that cannot retry has nothing to spend and nobody to fund, so it gets no budget
+        // at all rather than one that is never consulted. An *explicit* budget on such a policy is
+        // still honoured, because a shared one is funded by its successful traffic.
+        _automaticBudget = policy.Attempts > 1 ? RetryBudget.Automatic(policy.Time) : null;
+
+    /// <summary>Validates the policy on its first execution, and caches the result per thread.</summary>
     public static void EnsureValidated(Resilience policy)
     {
-        if (ReferenceEquals(t_lastValidated, policy))
+        if (ReferenceEquals(t_lastPolicy, policy))
         {
             return;
         }
 
-        Table.GetValue(policy, Create);
-        t_lastValidated = policy;
+        t_lastState = Table.GetValue(policy, Create);
+        t_lastPolicy = policy;
+    }
+
+    /// <summary>
+    /// The budget this call should charge: the policy's own, or the automatic one private to this
+    /// policy instance. Null when there is no budget to consult, which is the only case the executor
+    /// pays nothing for.
+    /// </summary>
+    /// <remarks>
+    /// Read once per execution into a local rather than at each of the two points that need it. The
+    /// local costs 8 bytes of state-machine box; re-resolving after the attempt <c>await</c> would
+    /// cost a table lookup instead, and would miss the per-thread cache most of the time because a
+    /// continuation resumes on whichever thread-pool thread is free.
+    /// </remarks>
+    public static RetryBudget? BudgetFor(Resilience policy)
+    {
+        if (policy.Budget is { } configured)
+        {
+            return configured.IsNone ? null : configured;
+        }
+
+        // EnsureValidated ran first, from the entry point, so the warm path here is the reference
+        // comparison it just primed.
+        ExecutionState state = ReferenceEquals(t_lastPolicy, policy)
+            ? t_lastState!
+            : Table.GetValue(policy, Create);
+
+        return state._automaticBudget;
     }
 }

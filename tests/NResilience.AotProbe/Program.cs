@@ -146,6 +146,67 @@ internal static class Program
 
         failures += Check("library: caller cancellation propagates untouched", cancelledCorrectly);
 
+        failures += await GuardsAsync().ConfigureAwait(false);
+
+        return failures;
+    }
+
+    /// <summary>
+    /// The Phase 2 guards under AOT. Both hold mutable state behind a lock and both feed the
+    /// executor's rejection path, so what this checks is that the state machine and the guarded
+    /// rejection survive whole-program compilation — including <c>Task.Delay</c> on a
+    /// <see cref="TimeProvider"/>, which the guard uses and which nothing else in the probe does.
+    /// </summary>
+    private static async Task<int> GuardsAsync()
+    {
+        int failures = 0;
+
+        Resilience instant = Resilience.Default with
+        {
+            Backoff = Backoff.None,
+            Deadline = Timeout.InfiniteTimeSpan,
+            AttemptTimeout = Timeout.InfiniteTimeSpan,
+        };
+
+        var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2 }) { Name = "aot" };
+        Resilience guarded = instant with { Breaker = breaker, Attempts = 2, Budget = RetryBudget.None };
+
+        bool ran = false;
+        CallResult<int> tripped = await guarded.TryRunAsync(
+            static _ => Task.FromException<int>(new IOException("aot")))
+            .ConfigureAwait(false);
+
+        failures += Check("library: two transient attempts open the breaker", breaker.State == BreakerState.Open);
+        failures += Check("library: the breaker records an opening time", breaker.OpenedAt is not null);
+        failures += Check("library: the tripped operation still reports its own failure", !tripped.IsSuccess);
+
+        CallResult<int> refused = await guarded.TryRunAsync(_ =>
+        {
+            ran = true;
+            return Task.FromResult(1);
+        }).ConfigureAwait(false);
+
+        failures += Check("library: an open breaker refuses the call without running it", !ran);
+        failures += Check(
+            "library: a refusal reports DependencyUnavailable",
+            refused.StopReason == StopReason.DependencyUnavailable && refused.Exception is CallRejectedException);
+
+        breaker.Reset();
+        failures += Check("library: Reset closes the breaker", breaker.State == BreakerState.Closed);
+
+        // A quarter of a token per success and no floor, so the bucket funds exactly one retry and
+        // the operation after it is refused at the throttle step rather than at admission.
+        Resilience metered = instant with { Attempts = 3, Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0) };
+
+        await metered.TryRunAsync(static _ => Task.FromException<int>(new IOException("aot"))).ConfigureAwait(false);
+        CallResult<int> throttled = await metered
+            .TryRunAsync(static _ => Task.FromException<int>(new IOException("aot")))
+            .ConfigureAwait(false);
+
+        failures += Check(
+            "library: an exhausted budget refuses the retry",
+            throttled.StopReason == StopReason.BudgetExhausted && throttled.Attempts.Count == 1);
+
         return failures;
     }
 
@@ -165,9 +226,9 @@ internal static class Program
 
         // Phase 0b, .NET 10 / .NET 8, arm64: bytes above an identical un-wrapped callback.
         const double NoiseFloor = 8;
-        const double TrivialSuspendingBudget = 368;      // measured 320
-        const double DefaultSuspendingBudget = 448;      // measured 384
-        const double TryRunSuspendingBudget = 640;       // measured 553
+        const double TrivialSuspendingBudget = 368;      // measured 328 (320 before Phase 2)
+        const double DefaultSuspendingBudget = 448;      // measured 393 (384 before Phase 2)
+        const double TryRunSuspendingBudget = 640;       // measured 561 (553 before Phase 2)
 
         double rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
         double noneSync = await MeasureAsync("None (sync)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);

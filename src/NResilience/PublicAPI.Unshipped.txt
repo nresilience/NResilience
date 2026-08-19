@@ -27,10 +27,51 @@ NResilience.Backoff.Equals(NResilience.Backoff other) -> bool
 NResilience.Backoff.Jitter.get -> NResilience.Jitter
 NResilience.Backoff.Jitter.init -> void
 NResilience.Backoff.Max.get -> System.TimeSpan
+NResilience.Breaker
+NResilience.Breaker.Breaker(NResilience.BreakerSettings? settings = null) -> void
+NResilience.Breaker.Isolate() -> void
+NResilience.Breaker.Name.get -> string?
+NResilience.Breaker.Name.init -> void
+NResilience.Breaker.OpenedAt.get -> System.DateTimeOffset?
+NResilience.Breaker.Reset() -> void
+NResilience.Breaker.Settings.get -> NResilience.BreakerSettings!
+NResilience.Breaker.State.get -> NResilience.BreakerState
+NResilience.BreakerSettings
+NResilience.BreakerSettings.<Clone>$() -> NResilience.BreakerSettings!
+NResilience.BreakerSettings.BreakDuration.get -> System.TimeSpan
+NResilience.BreakerSettings.BreakDuration.init -> void
+NResilience.BreakerSettings.BreakerSettings() -> void
+NResilience.BreakerSettings.ConsecutiveFailures.get -> int
+NResilience.BreakerSettings.ConsecutiveFailures.init -> void
+NResilience.BreakerSettings.Equals(NResilience.BreakerSettings? other) -> bool
+NResilience.BreakerSettings.FailureRatio.get -> double?
+NResilience.BreakerSettings.FailureRatio.init -> void
+NResilience.BreakerSettings.HalfOpenProbes.get -> int
+NResilience.BreakerSettings.HalfOpenProbes.init -> void
+NResilience.BreakerSettings.MaxBreakDuration.get -> System.TimeSpan
+NResilience.BreakerSettings.MaxBreakDuration.init -> void
+NResilience.BreakerSettings.MinimumCalls.get -> int
+NResilience.BreakerSettings.MinimumCalls.init -> void
+NResilience.BreakerSettings.ProbeSuccesses.get -> int
+NResilience.BreakerSettings.ProbeSuccesses.init -> void
+NResilience.BreakerSettings.SlowCallRatio.get -> double
+NResilience.BreakerSettings.SlowCallRatio.init -> void
+NResilience.BreakerSettings.SlowCallThreshold.get -> System.TimeSpan?
+NResilience.BreakerSettings.SlowCallThreshold.init -> void
+NResilience.BreakerSettings.Time.get -> System.TimeProvider!
+NResilience.BreakerSettings.Time.init -> void
+NResilience.BreakerSettings.Validate() -> void
+NResilience.BreakerSettings.Window.get -> System.TimeSpan
+NResilience.BreakerSettings.Window.init -> void
+NResilience.BreakerState
+NResilience.BreakerState.Closed = 0 -> NResilience.BreakerState
+NResilience.BreakerState.HalfOpen = 2 -> NResilience.BreakerState
+NResilience.BreakerState.Isolated = 3 -> NResilience.BreakerState
+NResilience.BreakerState.Open = 1 -> NResilience.BreakerState
 NResilience.CallRejectedException
 NResilience.CallRejectedException.Attempts.get -> NResilience.AttemptLog!
 NResilience.CallRejectedException.CallRejectedException() -> void
-NResilience.CallRejectedException.CallRejectedException(NResilience.StopReason reason, NResilience.AttemptLog! attempts, System.TimeSpan? retryAfter = null) -> void
+NResilience.CallRejectedException.CallRejectedException(NResilience.StopReason reason, NResilience.AttemptLog! attempts, System.TimeSpan? retryAfter = null, System.Exception? innerException = null) -> void
 NResilience.CallRejectedException.CallRejectedException(string! message) -> void
 NResilience.CallRejectedException.CallRejectedException(string! message, System.Exception! innerException) -> void
 NResilience.CallRejectedException.Reason.get -> NResilience.StopReason
@@ -86,6 +127,10 @@ NResilience.Resilience.Backoff.get -> NResilience.Backoff
 NResilience.Resilience.Backoff.init -> void
 NResilience.Resilience.BeforeAttempt.get -> System.Func<NResilience.NextAttempt, System.Threading.Tasks.Task!>?
 NResilience.Resilience.BeforeAttempt.init -> void
+NResilience.Resilience.Breaker.get -> NResilience.Breaker?
+NResilience.Resilience.Breaker.init -> void
+NResilience.Resilience.Budget.get -> NResilience.RetryBudget?
+NResilience.Resilience.Budget.init -> void
 NResilience.Resilience.Classify.get -> NResilience.Classifier!
 NResilience.Resilience.Classify.init -> void
 NResilience.Resilience.Deadline.get -> System.TimeSpan
@@ -111,6 +156,9 @@ NResilience.ResilienceConfigurationException.ResilienceConfigurationException() 
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException(System.Collections.Generic.IReadOnlyList<string!>! problems) -> void
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException(string! message) -> void
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException(string! message, System.Exception! innerException) -> void
+NResilience.RetryBudget
+NResilience.RetryBudget.Name.get -> string?
+NResilience.RetryBudget.Utilisation.get -> double
 NResilience.StopReason
 NResilience.StopReason.AttemptsExhausted = 2 -> NResilience.StopReason
 NResilience.StopReason.BudgetExhausted = 4 -> NResilience.StopReason
@@ -132,6 +180,9 @@ const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
 override NResilience.Attempt.ToString() -> string!
 override NResilience.AttemptLog.ToString() -> string!
 override NResilience.Backoff.GetHashCode() -> int
+override NResilience.BreakerSettings.Equals(object? obj) -> bool
+override NResilience.BreakerSettings.GetHashCode() -> int
+override NResilience.BreakerSettings.ToString() -> string!
 override NResilience.Classifier.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
 override NResilience.Resilience.GetHashCode() -> int
@@ -148,6 +199,8 @@ static NResilience.Backoff.Exponential(System.TimeSpan? transientBase = null, Sy
 static NResilience.Backoff.None.get -> NResilience.Backoff
 static NResilience.Backoff.operator !=(NResilience.Backoff left, NResilience.Backoff right) -> bool
 static NResilience.Backoff.operator ==(NResilience.Backoff left, NResilience.Backoff right) -> bool
+static NResilience.BreakerSettings.operator !=(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
+static NResilience.BreakerSettings.operator ==(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
 static NResilience.Classifier.Default.get -> NResilience.Classifier!
 static NResilience.Classifier.Http.get -> NResilience.Classifier!
 static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
@@ -156,6 +209,9 @@ static NResilience.Resilience.Http.get -> NResilience.Resilience!
 static NResilience.Resilience.None.get -> NResilience.Resilience!
 static NResilience.Resilience.operator !=(NResilience.Resilience? left, NResilience.Resilience? right) -> bool
 static NResilience.Resilience.operator ==(NResilience.Resilience? left, NResilience.Resilience? right) -> bool
+static NResilience.RetryBudget.None.get -> NResilience.RetryBudget!
+static NResilience.RetryBudget.Of(double fraction = 0.1, int minimumPerSecond = 3, System.TimeProvider? time = null) -> NResilience.RetryBudget!
+static NResilience.RetryBudget.Shared(string! name, double fraction = 0.1, int minimumPerSecond = 3) -> NResilience.RetryBudget!
 static NResilience.Verdict.Ok.get -> NResilience.Verdict
 static NResilience.Verdict.Permanent.get -> NResilience.Verdict
 static NResilience.Verdict.Throttled(System.TimeSpan? retryAfter = null) -> NResilience.Verdict

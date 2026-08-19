@@ -35,6 +35,10 @@ public sealed partial record Resilience
         Deadline = Timeout.InfiniteTimeSpan,
         AttemptTimeout = Timeout.InfiniteTimeSpan,
         Backoff = Backoff.None,
+
+        // Redundant against Attempts = 1, and stated anyway: passthrough means *every* bound is
+        // off, and a reader should not have to derive "so no budget either" from the attempt count.
+        Budget = RetryBudget.None,
     };
 
     /// <summary>
@@ -77,6 +81,30 @@ public sealed partial record Resilience
 
     /// <summary>What counts as what. Said once, and read by everything.</summary>
     public Classifier Classify { get; init; } = Classifier.Default;
+
+    /// <summary>
+    /// Null means no circuit breaking. Breakers are shared only where you share the object: this is
+    /// a live, mutable object rather than configuration, and <c>with</c> copies the reference.
+    /// </summary>
+    public Breaker? Breaker { get; init; }
+
+    /// <summary>
+    /// Null means an automatic retry budget private to this policy instance.
+    /// <see cref="RetryBudget.None"/> disables it; <see cref="RetryBudget.Shared(string, double, int)"/>
+    /// or one shared instance opts into sharing.
+    /// <para>
+    /// Deliberately <b>not</b> a process-wide singleton by default. A single global budget would let
+    /// a storm against payments throttle retries to search, which is the blast-radius inversion a
+    /// resilience library exists to prevent.
+    /// </para>
+    /// </summary>
+    /// <remarks>
+    /// The automatic budget cannot live in a field on this record: the synthesized equality compares
+    /// every instance field, so a lazily-created budget would make two identically-configured
+    /// policies stop being equal as a side effect of one of them having executed. It lives in the
+    /// same <c>ConditionalWeakTable</c> as the validated flag, keyed by reference identity.
+    /// </remarks>
+    public RetryBudget? Budget { get; init; }
 
     /// <summary>
     /// Runs before every attempt, including the first. The place to build a fresh request or
@@ -156,7 +184,13 @@ public sealed partial record Resilience
         Attempts <= 1
         && Deadline == Timeout.InfiniteTimeSpan
         && AttemptTimeout == Timeout.InfiniteTimeSpan
-        && BeforeAttempt is null;
+        && BeforeAttempt is null
+        && Breaker is null
+
+        // A budget on a policy that cannot retry still needs its deposits, because a *shared* budget
+        // is funded by the successful traffic of every policy holding it - including single-attempt
+        // ones. Only the absence of a budget, or RetryBudget.None, is free.
+        && Budget is null or { IsNone: true };
 
     /// <summary>
     /// <see cref="Timeout.InfiniteTimeSpan"/> is the explicit "no bound" value rather than a

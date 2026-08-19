@@ -5,6 +5,12 @@ namespace NResilience.Gates;
 /// and .NET 8.0.22, arm64, Release, workstation non-concurrent GC, and is recorded with its
 /// measured value beside it so a failure reads as "this moved" rather than "this is wrong".
 ///
+/// Phase 2 added the breaker and the retry budget and moved every suspending figure by exactly
+/// <b>8 bytes</b> — one reference field in the state-machine box, for the budget the call will
+/// charge. No budget was widened for it; the design's open question 1 allowed 64 B of headroom for
+/// Phase 2 and this used an eighth of it. The breaker costs nothing in the box at all, because the
+/// policy holding it is already a field.
+///
 /// Phase 0b re-pointed every budget at the <b>shipping</b> executor. Where a figure changed, the
 /// Phase 0a stand-in value is kept in the comment, because the delta is the answer to the question
 /// Phase 0 exists to ask.
@@ -59,39 +65,44 @@ public static class Budgets
 
     /// <summary>
     /// The trivial shipping shape: retry and classification, no deadline and no attempt timeout.
-    /// Measured: 320 B on .NET 10, 308 B on .NET 8, against the Phase 0a stand-in's 336 B.
+    /// Measured: 328 B on .NET 10, 313 B on .NET 8, against the Phase 0a stand-in's 336 B.
+    /// (320 B and 308 B before Phase 2.)
     /// </summary>
     public const double TrivialOverhead = 368;
 
     /// <summary>
     /// The realistic policy — <c>Resilience.Default</c>: three attempts, a deadline, an attempt
     /// timeout, exponential backoff, classification and the inline attempt log.
-    /// Measured: 384 B on .NET 10, 381 B on .NET 8, against the Phase 0a stand-in's 401 B.
+    /// Measured: 393 B on .NET 10, 390 B on .NET 8, against the Phase 0a stand-in's 401 B.
+    /// (384 B and 381 B before Phase 2.)
     /// </summary>
     public const double DefaultOverhead = 448;
 
     /// <summary>
     /// The same call with a caller token that can be cancelled and never is — the production case.
-    /// Measured: 400 B on .NET 10, 397 B on .NET 8, against the stand-in's 416 B. The extra 16 B
-    /// over <see cref="DefaultOverhead"/> is the marginal cost of linking against a long-lived
-    /// source whose registration storage already exists; see <see cref="MinimumSocketRatioVersusPolly"/>
-    /// for what the same link costs when real I/O registers on the resulting token.
+    /// Measured: 408 B on .NET 10, 407 B on .NET 8, against the stand-in's 416 B (400 B and 397 B
+    /// before Phase 2). The extra 15 B over <see cref="DefaultOverhead"/> is the marginal cost of
+    /// linking against a long-lived source whose registration storage already exists; see
+    /// <see cref="MinimumSocketRatioVersusPolly"/> for what the same link costs when real I/O
+    /// registers on the resulting token.
     /// </summary>
     public const double DefaultCancellableOverhead = 464;
 
     /// <summary>
     /// <c>TryRunAsync</c>, which always materialises the attempt log because its caller has
-    /// explicitly asked for a result object. Measured: 553 B on .NET 10, 551 B on .NET 8 — so
-    /// asking for the history costs about 170 B over the throwing form. Budgeted rather than
-    /// left to be discovered by a caller who assumed the two were the same price.
+    /// explicitly asked for a result object. Measured: 561 B on .NET 10, 558 B on .NET 8 (553 B and
+    /// 551 B before Phase 2) — so asking for the history costs about 170 B over the throwing form.
+    /// Budgeted rather than left to be discovered by a caller who assumed the two were the same
+    /// price.
     /// </summary>
     public const double TryRunDefaultOverhead = 640;
 
     /// <summary>
     /// The shipping executor must not be more expensive than the hand-written stand-in Phase 0a
-    /// used to establish the achievable floor. Measured: 384 B against 401 B on .NET 10 — the real
+    /// used to establish the achievable floor. Measured: 393 B against 401 B on .NET 10 — the real
     /// loop is <i>cheaper</i>, while additionally capturing a per-attempt exception, classifying
-    /// results and awaiting a pre-attempt hook.
+    /// results, awaiting a pre-attempt hook and carrying the retry budget the stand-in's own
+    /// breaker-and-budget arm did not charge for.
     ///
     /// This is the gate that would catch the design's central mechanism failing to survive
     /// implementation, which is the whole reason Phase 0 was split into 0a and 0b. The allowance is
@@ -164,8 +175,10 @@ public static class Budgets
     // ---- Retry. ----
 
     /// <summary>
-    /// Two transient failures then a success, against the shipping executor. Measured: 2,049 B on
-    /// .NET 10 and 2,336 B on .NET 8, against the Phase 0a stand-in's 2,113 B and 2,848 B — so the
+    /// Two transient failures then a success, against the shipping executor, with the retry budget
+    /// turned off - see ShippingScenarios.RetryArm for why an arm that retries thousands of times a
+    /// second is precisely what the budget exists to refuse. Measured: 2,056 B on .NET 10 and
+    /// 2,344 B on .NET 8, against the Phase 0a stand-in's 2,113 B and 2,848 B — so the
     /// real retry path is cheaper than the stand-in on both, and markedly so on .NET 8.
     ///
     /// Dominated by exception capture and rethrow, which both arms pay. Gated loosely on the

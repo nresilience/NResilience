@@ -88,6 +88,16 @@ public static class ShippingScenarios
     /// attempts, zero delay, no timeout source. The fault is a cached exception instance, so the
     /// figure describes the retry machinery rather than exception construction, which both arms
     /// pay identically.
+    ///
+    /// <para>
+    /// The retry budget is turned <b>off</b> on this arm, and that is a finding rather than a
+    /// convenience. An arm that retries twice per operation, thousands of times a second, with no
+    /// intervening success to fund it, is precisely the traffic pattern the budget exists to refuse -
+    /// so with the shipping default it stops retrying after about thirty operations and the arm
+    /// measures rejections instead of retries. Polly has no budget to disable, so leaving it on would
+    /// also make the A/B a comparison of two different behaviours. What the budget costs when it is
+    /// on is measured by the Default arms, whose successful attempts each take the deposit path.
+    /// </para>
     /// </summary>
     public static RetryArm BuildRetry(int failures = 2) => new(failures);
 
@@ -104,6 +114,7 @@ public static class ShippingScenarios
             {
                 Attempts = failures + 1,
                 Backoff = Lib.Backoff.None,
+                Budget = Lib.RetryBudget.None,
             };
         }
 

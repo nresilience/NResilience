@@ -38,8 +38,9 @@ internal interface IOutcomeShaper<in T, out TOut>
     /// <param name="reason">Why the call stopped.</param>
     /// <param name="deadline">The policy's deadline, for the exception message.</param>
     /// <param name="attempts">The log.</param>
+    /// <param name="retryAfter">When to come back, when the refusal carried a hint.</param>
     /// <returns>The entry point's return value.</returns>
-    TOut Failure(T lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts);
+    TOut Failure(T lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts, TimeSpan? retryAfter);
 }
 
 /// <summary>
@@ -53,14 +54,14 @@ internal readonly struct ThrowingShaper<T> : IOutcomeShaper<T, T>
 
     public T Success(T value, AttemptLog attempts) => value;
 
-    public T Failure(T lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts)
+    public T Failure(T lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts, TimeSpan? retryAfter)
     {
         if (hasValue)
         {
             return lastValue;
         }
 
-        ExceptionDispatchInfo.Capture(Failures.Build(reason, error, deadline, attempts)).Throw();
+        ExceptionDispatchInfo.Capture(Failures.Build(reason, error, deadline, attempts, retryAfter)).Throw();
         return default!;
     }
 }
@@ -73,8 +74,8 @@ internal readonly struct ResultShaper<T> : IOutcomeShaper<T, CallResult<T>>
     public CallResult<T> Success(T value, AttemptLog attempts) =>
         new(true, value, true, null, StopReason.Succeeded, attempts);
 
-    public CallResult<T> Failure(T lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts) =>
-        new(false, lastValue, hasValue, hasValue ? null : Failures.Build(reason, error, deadline, attempts), reason, attempts);
+    public CallResult<T> Failure(T lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts, TimeSpan? retryAfter) =>
+        new(false, lastValue, hasValue, hasValue ? null : Failures.Build(reason, error, deadline, attempts, retryAfter), reason, attempts);
 }
 
 /// <summary>The non-throwing void entry points.</summary>
@@ -85,8 +86,8 @@ internal readonly struct VoidResultShaper : IOutcomeShaper<VoidResult, CallResul
     public CallResult Success(VoidResult value, AttemptLog attempts) =>
         new(true, null, StopReason.Succeeded, attempts);
 
-    public CallResult Failure(VoidResult lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts) =>
-        new(false, Failures.Build(reason, error, deadline, attempts), reason, attempts);
+    public CallResult Failure(VoidResult lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts, TimeSpan? retryAfter) =>
+        new(false, Failures.Build(reason, error, deadline, attempts, retryAfter), reason, attempts);
 }
 
 /// <summary>
@@ -101,13 +102,23 @@ internal readonly struct VoidResultShaper : IOutcomeShaper<VoidResult, CallResul
 /// </summary>
 internal static class Failures
 {
-    public static Exception Build(StopReason reason, Exception? error, TimeSpan deadline, AttemptLog attempts)
+    public static Exception Build(StopReason reason, Exception? error, TimeSpan deadline, AttemptLog attempts, TimeSpan? retryAfter)
     {
         if (reason == StopReason.DeadlineExceeded)
         {
             var deadlineExceeded = new DeadlineExceededException(deadline, attempts, error);
             attempts.AttachTo(deadlineExceeded);
             return deadlineExceeded;
+        }
+
+        // A guard refused the call, so the guard is the failure and whatever the previous attempt
+        // threw is its cause. Reporting that earlier exception instead would say "the dependency
+        // timed out" about a call that was never made.
+        if (reason is StopReason.DependencyUnavailable or StopReason.BudgetExhausted)
+        {
+            var rejected = new CallRejectedException(reason, attempts, retryAfter, error);
+            attempts.AttachTo(rejected);
+            return rejected;
         }
 
         if (error is not null)
