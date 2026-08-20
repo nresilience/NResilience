@@ -54,7 +54,7 @@ operations trustworthy, and it is tested.
 ```csharp
 var api = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
-await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 
 // Attempt, Retrying, Attempt, Succeeded
 Console.WriteLine(string.Join(", ", events.Kinds));

@@ -30,7 +30,7 @@ This type is what replaces a fallback strategy:
 ```csharp
 private async Task<User> ReadUserAsync(UserCache cache, CancellationToken cancellationToken)
 {
-    CallResult<User> result = await Resilience.Http.TryRunAsync(ct => FetchAsync(ct), cancellationToken);
+    CallResult<User> result = await Resilience.Http.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
     if (result.TryGetValue(out User? user))
     {

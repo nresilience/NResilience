@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
+using NResilience.Http;
 
 namespace NResilience.Docs;
 
@@ -9,22 +10,46 @@ public sealed class GettingStarted
 {
     private sealed record User(string Name);
 
+    // <snippet:quick-start-http-client>
+    // One client for the application's lifetime, with the policy already inside it.
+    private static readonly HttpClient Client = ResilienceHttp.CreateClient();
+
+    private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
+        await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
+    // </snippet:quick-start-http-client>
+
     [Fact]
-    public async Task The_first_call()
+    public async Task The_first_call_is_a_client_call()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        using HttpClient client = Doubles.Client(
+        var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Json(new User("ada")));
-        var url = new Uri("https://api.example.com/users/1");
+        using HttpClient client = ResilienceHttp.CreateClient(
+            Resilience.Http with { Backoff = Backoff.None },
+            innerHandler: transport);
 
-        // <snippet:quick-start-first-call>
-        var api = Resilience.Http;
-
-        User? user = await api.RunAsync(ct => client.GetFromJsonAsync<User>(url, ct), cancellationToken);
-        // </snippet:quick-start-first-call>
+        User? user = await client.GetFromJsonAsync<User>(
+            new Uri("https://api.example.com/users/1"), TestContext.Current.CancellationToken);
 
         Assert.Equal("ada", user?.Name);
+        Assert.Equal(2, transport.Requests.Count);
+    }
+
+    [Fact]
+    public async Task Any_call_that_takes_the_attempts_token()
+    {
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var db = new Doubles.Database("ada");
+        int id = 1;
+
+        // <snippet:quick-start-run-any-call>
+        var api = Resilience.Default;
+
+        string name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
+        // </snippet:quick-start-run-any-call>
+
+        Assert.Equal("ada", name);
+        Assert.Equal(2, db.Reads);
     }
 
     [Fact]
@@ -34,7 +59,7 @@ public sealed class GettingStarted
         var api = Resilience.Default with { Attempts = 2, Backoff = Backoff.None };
 
         // <snippet:quick-start-outcome>
-        CallResult<User> result = await api.TryRunAsync(ct => FetchAsync(ct), cancellationToken);
+        CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
         if (!result.TryGetValue(out User? user))
         {

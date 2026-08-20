@@ -24,7 +24,7 @@ private static async Task<Order?> ReadOrderAsync(HttpClient client, string id, C
     var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) };
 
     CallResult<Order?> result = await api.TryRunAsync(
-        ct => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), ct),
+        attempt => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), attempt),
         cancellationToken);
 
     if (result.TryGetValue(out Order? order))

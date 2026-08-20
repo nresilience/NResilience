@@ -29,12 +29,12 @@ public sealed class Tour
         var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
         // 3. Run anything. One method, any return type, nothing to declare.
-        User? user = await api.RunAsync(ct => client.GetFromJsonAsync<User>(url, ct), cancellationToken);
-        HttpResponseMessage response = await api.RunAsync(ct => client.GetAsync(url, ct), cancellationToken);
-        await slow.RunAsync(ct => queue.FlushAsync(ct), cancellationToken);
+        User? user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
+        HttpResponseMessage response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
+        await slow.RunAsync(attempt => queue.FlushAsync(attempt), cancellationToken);
 
         // 4. Fallback is not a strategy. It is an `if`.
-        CallResult<User> result = await api.TryRunAsync(ct => FetchAsync(ct), cancellationToken);
+        CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
         User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGood;
         // </snippet:whole-api>
 
@@ -58,7 +58,7 @@ public sealed class Tour
     // <snippet:fallback-is-an-if>
     private async Task<User> ReadUserAsync(UserCache cache, CancellationToken cancellationToken)
     {
-        CallResult<User> result = await Resilience.Http.TryRunAsync(ct => FetchAsync(ct), cancellationToken);
+        CallResult<User> result = await Resilience.Http.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
         if (result.TryGetValue(out User? user))
         {

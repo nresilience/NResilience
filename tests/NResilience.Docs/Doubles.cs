@@ -27,6 +27,17 @@ internal static class Doubles
         internal T LastKnownGood { get; } = lastKnownGood;
     }
 
+    /// <summary>A read that drops its connection once, then answers.</summary>
+    internal sealed class Database(string name)
+    {
+        internal int Reads { get; private set; }
+
+        internal Task<string> ReadNameAsync(int id, CancellationToken cancellationToken) =>
+            Reads++ == 0
+                ? Task.FromException<string>(new IOException($"the connection dropped reading {id}"))
+                : Task.FromResult(name);
+    }
+
     internal sealed class Queue
     {
         internal int Flushes { get; private set; }

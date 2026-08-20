@@ -17,7 +17,12 @@ public sealed partial record Resilience
 {
     /// <summary>Runs a callback, retrying and bounding it according to this policy.</summary>
     /// <typeparam name="T">What the callback returns. Inferred; there is nothing to declare.</typeparam>
-    /// <param name="work">The work. It must take the attempt's cancellation token — there is no overload that lets you forget.</param>
+    /// <param name="work">
+    /// The work, taking the attempt's cancellation token: cancelled when that attempt hits its
+    /// <see cref="AttemptTimeout"/>, and when <paramref name="cancellationToken"/> is. Pass it into
+    /// whatever you call, because that is what lets a timed-out attempt actually stop. Every overload
+    /// takes it, so there is none that lets you forget.
+    /// </param>
     /// <param name="cancellationToken">The caller's token. Cancelling it aborts the operation immediately and is never treated as a failure.</param>
     /// <returns>What the last attempt returned.</returns>
     public ValueTask<T> RunAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default)
@@ -35,7 +40,7 @@ public sealed partial record Resilience
     }
 
     /// <summary>Runs a callback that returns nothing.</summary>
-    /// <param name="work">The work.</param>
+    /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <returns>A task that completes when the operation does.</returns>
     public ValueTask RunAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
@@ -59,7 +64,7 @@ public sealed partial record Resilience
     /// </summary>
     /// <typeparam name="TState">The state's type.</typeparam>
     /// <typeparam name="T">What the callback returns.</typeparam>
-    /// <param name="work">The work.</param>
+    /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
     /// <param name="state">Handed to the callback on every attempt.</param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <returns>What the last attempt returned.</returns>
@@ -79,7 +84,7 @@ public sealed partial record Resilience
 
     /// <summary>Runs a callback with caller state that returns nothing.</summary>
     /// <typeparam name="TState">The state's type.</typeparam>
-    /// <param name="work">The work.</param>
+    /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
     /// <param name="state">Handed to the callback on every attempt.</param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <returns>A task that completes when the operation does.</returns>
@@ -107,7 +112,7 @@ public sealed partial record Resilience
     /// </para>
     /// </summary>
     /// <typeparam name="T">What the callback returns.</typeparam>
-    /// <param name="work">The work.</param>
+    /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
     /// <param name="cancellationToken">The caller's token. Its cancellation is the one thing this method still throws.</param>
     /// <returns>The outcome.</returns>
     public ValueTask<CallResult<T>> TryRunAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default)
@@ -120,7 +125,7 @@ public sealed partial record Resilience
     }
 
     /// <summary>Runs a callback that returns nothing, and reports the outcome instead of throwing.</summary>
-    /// <param name="work">The work.</param>
+    /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <returns>The outcome.</returns>
     public ValueTask<CallResult> TryRunAsync(Func<CancellationToken, Task> work, CancellationToken cancellationToken = default)
@@ -135,7 +140,7 @@ public sealed partial record Resilience
     /// <summary>Runs a callback with caller state, and reports the outcome instead of throwing.</summary>
     /// <typeparam name="TState">The state's type.</typeparam>
     /// <typeparam name="T">What the callback returns.</typeparam>
-    /// <param name="work">The work.</param>
+    /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
     /// <param name="state">Handed to the callback on every attempt.</param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <returns>The outcome.</returns>
@@ -150,7 +155,7 @@ public sealed partial record Resilience
 
     /// <summary>Runs a callback with caller state that returns nothing, and reports the outcome.</summary>
     /// <typeparam name="TState">The state's type.</typeparam>
-    /// <param name="work">The work.</param>
+    /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
     /// <param name="state">Handed to the callback on every attempt.</param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <returns>The outcome.</returns>

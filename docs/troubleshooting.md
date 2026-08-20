@@ -159,7 +159,7 @@ the scripted sequence. See [testing](testing/index.md).
 ```csharp
 // Every failure carries its own history: on CallResult, on the exceptions the library
 // invents, and on Exception.Data for an original exception it rethrew unchanged.
-CallResult<int> result = await api.TryRunAsync(ct => calls.NextAsync(ct), cancellationToken);
+CallResult<int> result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 
 Console.WriteLine(result.StopReason);   // AttemptsExhausted
 Console.WriteLine(result.Attempts);     // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...

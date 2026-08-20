@@ -1,35 +1,79 @@
 # NResilience
 
-A .NET resilience library built around one flat execution engine, a declarative policy value, and
-defaults that are correct without configuration.
+Add retry, timeouts, and circuit breaking to your .NET calls - with defaults that work out of the box.
 
-**Status: Phase 7 complete - all seven build phases are done.** Three packages ship:
-`NResilience` (the policy value, the fused executor and the `HttpClient` handler),
-`NResilience.Extensions` (DI, configuration, metrics and traces) and `NResilience.Testing` (scripted
-callbacks and a recording listener). HTTP lives in the core package because the core already
-classifies `HttpResponseMessage` and reads `Retry-After`, and because the handler needs nothing
-outside the shared framework - so folding it in costs a consumer no dependency at all. Every allocation gate measures the shipping executor, every
-documentation snippet is compiled and executed in CI, and Native AOT publishes clean on both target
-frameworks.
+## What it gives you
 
-**Documentation: [`docs/`](docs/index.md)** - [quick start](docs/getting-started/quick-start.md),
-[guides](docs/guides/index.md), [features](docs/features/index.md),
-[reference](docs/reference/index.md), [deep dives](docs/deep-dives/index.md),
-[migrating from Polly](docs/migrating-from-polly.md),
-[troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md).
+- Automatic retries with backoff and jitter when a call fails transiently
+- Timeouts so a slow dependency can't hang your application
+- A circuit breaker that stops calling a failing service
+- A retry budget that prevents retries from overwhelming a struggling dependency
+- HTTP-aware out of the box (knows a 503 is retryable, a 404 is not)
+- Works with zero configuration - sensible defaults are already on
 
-- Design: [`plans/nresilience-design-v3.md`](plans/nresilience-design-v3.md)
-- Phase 0a - the baseline, taken before any library code existed: [`plans/phase-0a-results.md`](plans/phase-0a-results.md)
-- Phase 0b - the same harness, re-run against the real executor: [`plans/phase-0b-results.md`](plans/phase-0b-results.md)
-- Phase 1 - the core: [`plans/phase-1-results.md`](plans/phase-1-results.md)
-- Phase 2 - the breaker and the retry budget: [`plans/phase-2-results.md`](plans/phase-2-results.md)
-- Phase 3 - telemetry, and what a listener costs: [`plans/phase-3-results.md`](plans/phase-3-results.md)
-- Phase 4 - the testing package: [`plans/phase-4-results.md`](plans/phase-4-results.md)
-- Phase 5 - the HTTP handler: [`plans/phase-5-results.md`](plans/phase-5-results.md)
-- Phase 6 - DI, configuration and the meter: [`plans/phase-6-results.md`](plans/phase-6-results.md)
-- Phase 7 - the docs, the samples and the docs gate: [`plans/phase-7-results.md`](plans/phase-7-results.md)
+## Quick start
 
-## The whole API, in thirty seconds
+```bash
+dotnet add package NResilience
+```
+
+<!-- snippet: quick-start-http-client -->
+```csharp
+// One client for the application's lifetime, with the policy already inside it.
+private static readonly HttpClient Client = ResilienceHttp.CreateClient();
+
+private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
+    await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
+```
+<!-- endsnippet -->
+
+Every call that client makes now retries up to three times with exponential backoff, gives up
+entirely after 30 seconds, and knows that a 503 is worth retrying but a 404 is not. You didn't
+configure any of that, and there is one cancellation token to pass - your own.
+
+## Tuning a policy
+
+Change one setting and keep the rest:
+
+```csharp
+var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
+```
+
+Everything you didn't mention carries over from the preset.
+
+## Any call, not just HTTP
+
+HTTP gets a client because it is the common case. Everything else - a queue read, a database call, a
+third-party SDK - goes through `RunAsync`, which takes the work as a callback:
+
+<!-- snippet: quick-start-run-any-call -->
+```csharp
+var api = Resilience.Default;
+
+string name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
+```
+<!-- endsnippet -->
+
+Two cancellation tokens appear there, and they are different things. `attempt` is cancelled when that
+attempt hits its `AttemptTimeout`; `cancellationToken` is yours, and cancels the whole call. Passing
+`attempt` into your work is what lets a timed-out attempt actually stop, so every overload requires a
+callback that takes it - there is no zero-argument form to forget.
+
+## Handling failure
+
+When you'd rather check the result than catch an exception, use `TryRunAsync`:
+
+```csharp
+CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGood;
+```
+
+You get the value if it succeeded, or the reason and the attempt history if it didn't - and you
+decide what to do with an `if`.
+
+## The whole API at a glance
+
+Here are all four patterns you just saw, together:
 
 <!-- snippet: whole-api -->
 ```csharp
@@ -40,88 +84,73 @@ var api = Resilience.Http;
 var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
 // 3. Run anything. One method, any return type, nothing to declare.
-User? user = await api.RunAsync(ct => client.GetFromJsonAsync<User>(url, ct), cancellationToken);
-HttpResponseMessage response = await api.RunAsync(ct => client.GetAsync(url, ct), cancellationToken);
-await slow.RunAsync(ct => queue.FlushAsync(ct), cancellationToken);
+User? user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
+HttpResponseMessage response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
+await slow.RunAsync(attempt => queue.FlushAsync(attempt), cancellationToken);
 
 // 4. Fallback is not a strategy. It is an `if`.
-CallResult<User> result = await api.TryRunAsync(ct => FetchAsync(ct), cancellationToken);
+CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGood;
 ```
 <!-- endsnippet -->
 
-There is no pipeline, no builder, no strategy, no context, no property bag and no ordering.
+The whole thing is one value and one method - no fluent builder to learn, no strategy ordering to
+get right.
 
-## Where the allocations are
+## Why NResilience
 
-Bytes above an identical un-wrapped callback, measured in one process on .NET 8 and .NET 10.
-Conditions and the full arm list are in
-[`plans/phase-0b-results.md`](plans/phase-0b-results.md).
+- **Configure with `with` expressions, not a fluent builder.** Change one setting, keep the rest.
+  No `Build()` call, no ordering to get right.
+- **One method for any return type.** `RunAsync` works whether you're calling an HTTP API, reading a
+  queue, or returning `void`. The policy doesn't change.
+- **Sensible defaults, on by default.** Three retries, jittered backoff, a 30-second deadline, HTTP
+  status classification, and a retry budget. Nothing to configure for a working retried HTTP call.
+- **Handle failure with an `if`, not a strategy.** `TryRunAsync` gives you the outcome, the reason,
+  and the attempt history. Decide what to do at the call site.
+- **Low overhead.** One flat execution path means cost doesn't grow with how much policy you
+  configure.
+- **AOT and trimming safe.** No reflection, zero external dependencies, CI-enforced on `net8.0` and
+  `net10.0`.
+
+## What it costs
+
+Bytes above an identical un-wrapped callback, measured in one process on .NET 8 and .NET 10. Every
+figure is a test that fails the build.
 
 | Scenario | Overhead |
 |---|---:|
-| `Resilience.None`, any callback | **0** |
-| Sync-completing, no attempt timeout, static lambda + state | **0** |
-| Sync-completing, full policy, static lambda + state | 64 B — one linked cancellation source |
-| Suspending, full policy | **384 B** — one state-machine box plus the linked source |
-| Suspending, Polly retry + timeout, same harness | 1,291 B |
-| Suspending, full policy, over a real loopback socket | 528 B |
-| Suspending, Polly retry + timeout, same socket | 1,296 B |
+| No policy, any call | **0** |
+| A call that retries, suspends | **384 B** |
+| Polly retry + timeout, same call | 1,291 B |
 
-**3.4× lower overhead than Polly for a realistic policy on the yield gate, and 2.5× over a real
-socket.** The fused design wins in proportion to how much policy is configured, because composition
-overhead scales with layer count and a flat loop's does not. At the other end that cuts the other way,
-and the number is published rather than buried: the smallest policy this library can express costs
-320 B against 304 B for a Polly pipeline with no strategies in it — the two are not doing the same work,
-but at the trivial end there is nothing to win. Every figure here is a test that fails the build.
+Go deeper: [where the allocations are](docs/deep-dives/allocations.md).
 
-"Zero allocation" is never claimed unqualified: every `async` frame that *suspends* heap-allocates
-its own state-machine box, and no library-side trick removes it.
+## Packages
 
-## Layout
-
-| Path | What it is |
+| Package | When you need it |
 |---|---|
-| `src/NResilience` | The library, including `Http/` - the `HttpClient` handler: request cloning, idempotency, per-host scope. Zero dependencies, `net8.0;net10.0`, AOT-clean, public API manifest checked in. |
-| `src/NResilience.Extensions` | `AddResilience()`, configuration binding, the meter and the activity source. |
-| `src/NResilience.Testing` | Scripted callbacks and a recording listener. |
-| `bench/NResilience.Probes` | The shared suspension gate, the allocation instrument, the cancellation probes, the shipping-executor arms, and Phase 0a's hand-written fused loop — still measured, as the floor the real executor has to beat. |
-| `bench/NResilience.Probes.Polly` | The competitive arms, in Polly's native callback shape. |
-| `bench/NResilience.Baseline` | Latency trend harness (NBenchmark). Published, never gated. |
-| `tests/NResilience.Tests` | The behavioural suite: what the loop does, and when. |
-| `tests/NResilience.Gates` | The hard gate: xunit over allocation counters. Depends on no benchmark harness. |
-| `tests/NResilience.AotProbe` | The Native AOT gate: publishes clean, then executes the library and re-checks the budgets. |
-| `tests/NResilience.Docs` | The docs gate: every snippet in this README and under `docs/`, as compiled and executing code. |
-| `tools/NResilience.DocSnippets` | The inliner that puts those snippets into the markdown, and the check that fails when they drift. |
-| `samples/` | Three runnable console applications. See [`docs/samples.md`](docs/samples.md). |
-| `docs/` | The published documentation. `docs/STYLE.md` is the contributor-facing style guide. |
+| `NResilience` | The core library and HTTP handler. Start here. |
+| `NResilience.Extensions` | Dependency injection, configuration binding, metrics. Add this in a hosted app. |
+| `NResilience.Testing` | Helpers for testing your policies. |
 
-## Running everything
+## Documentation
 
-```bash
-# Behaviour.
-dotnet test tests/NResilience.Tests -c Release
+- [Quick start](docs/getting-started/quick-start.md) - a retried HTTP call in two minutes.
+- [Key concepts](docs/getting-started/key-concepts.md) - the five words the rest of the docs use.
+- [Guides](docs/guides/index.md) - worked scenarios.
+- [Features](docs/features/index.md) - one page per knob.
+- [Reference](docs/reference/index.md) - every member, in order.
+- [Deep dives](docs/deep-dives/index.md) - why the library is built this way.
+- [Migrating from Polly](docs/migrating-from-polly.md) - a translation table and the behavior
+  differences worth knowing.
+- [Troubleshooting](docs/troubleshooting.md) and the [FAQ](docs/faq.md).
+- [Samples](docs/samples.md) - three runnable console applications.
 
-# Hard gate. Release only - the budgets were measured against tier-1 code.
-dotnet test tests/NResilience.Gates -c Release
+## Contributing
 
-# The same, printing every measured number.
-dotnet test tests/NResilience.Gates -c Release -l "console;verbosity=detailed"
+Project layout, build and test commands, and the design documents live in
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-# Native AOT gate.
-dotnet publish tests/NResilience.AotProbe -c Release -f net10.0 -warnaserror
-./tests/NResilience.AotProbe/bin/Release/net10.0/*/publish/NResilience.AotProbe
+## Status
 
-# Docs gate: the snippets compile, execute, and match the pages.
-dotnet test tests/NResilience.Docs -c Release
-dotnet run --project tools/NResilience.DocSnippets -- --check
-
-# Re-inline the snippets after editing one.
-dotnet run --project tools/NResilience.DocSnippets -- --write
-
-# Latency trend. Not a gate.
-dotnet run -c Release -f net10.0 --project bench/NResilience.Baseline -- --exclude-category socket
-```
-
-Target frameworks are `net8.0` and `net10.0`, and both run in CI, because "no cliff on net8" is a
-claim the project makes.
+Stable. Targets `net8.0` and `net10.0`; both run in CI; Native AOT publishes clean on both.

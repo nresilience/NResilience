@@ -36,7 +36,7 @@ public sealed class Migration
         var api = Resilience.Default with { Backoff = Backoff.None };
 
         // <snippet:migration-fallback>
-        CallResult<string> result = await api.TryRunAsync(ct => calls.NextAsync(ct), cancellationToken);
+        CallResult<string> result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         string value = result.TryGetValue(out string? fetched) ? fetched : "cached";
         // </snippet:migration-fallback>
 
@@ -68,7 +68,7 @@ public sealed class Migration
         // blocks keep working. The history rides along on Exception.Data.
         try
         {
-            await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+            await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         }
         catch (HttpRequestException e)
         {
@@ -100,7 +100,7 @@ public sealed class Migration
         };
         // </snippet:migration-predicate>
 
-        using HttpResponseMessage response = await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+        using HttpResponseMessage response = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 

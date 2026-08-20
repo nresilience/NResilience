@@ -19,7 +19,7 @@ public sealed class TestingDocs
 
         var policy = Resilience.Http with { Backoff = Backoff.None };
 
-        CallResult<HttpResponseMessage> result = await policy.TryRunAsync(ct => calls.NextAsync(ct));
+        CallResult<HttpResponseMessage> result = await policy.TryRunAsync(attempt => calls.NextAsync(attempt));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, calls.CallCount);
@@ -46,7 +46,7 @@ public sealed class TestingDocs
             AttemptTimeout = TimeSpan.FromSeconds(3),
         };
 
-        Task<CallResult<int>> pending = policy.TryRunAsync(ct => calls.NextAsync(ct)).AsTask();
+        Task<CallResult<int>> pending = policy.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
         time.Advance(TimeSpan.FromSeconds(4));
 
         CallResult<int> result = await pending;
@@ -64,7 +64,7 @@ public sealed class TestingDocs
 
         var policy = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
-        await policy.RunAsync(ct => calls.NextAsync(ct));
+        await policy.RunAsync(attempt => calls.NextAsync(attempt));
 
         // Assert on the order, not just the membership: a telemetry surface that raises the right
         // events in the wrong order still produces a log people believe.

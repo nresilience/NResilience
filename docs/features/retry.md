@@ -17,7 +17,7 @@ exponential backoff and full jitter. Whether an outcome is retried at all is the
 // Three attempts: try, retry, retry. Not "one call plus three retries".
 var api = Resilience.Default with { Attempts = 3 };
 
-int value = await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+int value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 ```
 <!-- endsnippet -->
 

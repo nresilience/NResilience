@@ -91,7 +91,7 @@ After:
 
 <!-- snippet: migration-fallback -->
 ```csharp
-CallResult<string> result = await api.TryRunAsync(ct => calls.NextAsync(ct), cancellationToken);
+CallResult<string> result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 string value = result.TryGetValue(out string? fetched) ? fetched : "cached";
 ```
 <!-- endsnippet -->
@@ -151,7 +151,7 @@ return. After:
 // blocks keep working. The history rides along on Exception.Data.
 try
 {
-    await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+    await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 }
 catch (HttpRequestException e)
 {

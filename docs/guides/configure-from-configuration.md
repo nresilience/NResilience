@@ -79,7 +79,7 @@ public sealed class Orders(IResiliencePolicies policies)
     // construction time is a snapshot, and a configuration reload will never reach it.
     // The indexer is a dictionary lookup.
     public Task<string> ReadAsync(CancellationToken cancellationToken) =>
-        policies["api"].RunAsync(ct => FetchAsync(ct), cancellationToken).AsTask();
+        policies["api"].RunAsync(attempt => FetchAsync(attempt), cancellationToken).AsTask();
 
     private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult("ok");
 }

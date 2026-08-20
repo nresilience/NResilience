@@ -22,7 +22,7 @@ public static class Sequence
     ///     .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable))
     ///     .Returns(new HttpResponseMessage(HttpStatusCode.OK));
     ///
-    /// var result = await policy.TryRunAsync(ct => calls.NextAsync(ct), ct);
+    /// var result = await policy.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
     /// </code>
     /// </example>
     public static Sequence<T> For<T>(TimeProvider? time = null) => new(time ?? TimeProvider.System);

@@ -14,13 +14,13 @@ var api = Resilience.Default with
 
 Console.WriteLine("A call that fails twice and then succeeds:");
 var flaky = new FakeDependency(failuresBeforeSuccess: 2);
-string value = await api.RunAsync(ct => flaky.ReadAsync(ct), CancellationToken.None);
+string value = await api.RunAsync(attempt => flaky.ReadAsync(attempt), CancellationToken.None);
 Console.WriteLine($"  -> {value}");
 
 Console.WriteLine();
 Console.WriteLine("A call that never succeeds, reported rather than thrown:");
 var broken = new FakeDependency(failuresBeforeSuccess: int.MaxValue);
-CallResult<string> result = await api.TryRunAsync(ct => broken.ReadAsync(ct), CancellationToken.None);
+CallResult<string> result = await api.TryRunAsync(attempt => broken.ReadAsync(attempt), CancellationToken.None);
 
 Console.WriteLine($"  -> {result.StopReason}");
 Console.WriteLine($"  -> {result.Attempts}");

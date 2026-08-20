@@ -18,7 +18,7 @@ public sealed class Features
         // Three attempts: try, retry, retry. Not "one call plus three retries".
         var api = Resilience.Default with { Attempts = 3 };
 
-        int value = await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+        int value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         // </snippet:retry-attempts>
 
         Assert.Equal(42, value);
@@ -72,7 +72,7 @@ public sealed class Features
         };
         // </snippet:retry-custom-backoff>
 
-        Assert.Equal(7, await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken));
+        Assert.Equal(7, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public sealed class Features
         };
         // </snippet:retry-before-attempt>
 
-        await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+        await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         Assert.Equal(2, tokens.Refreshes);
     }
 
@@ -172,7 +172,7 @@ public sealed class Features
         };
         // </snippet:classifier-custom-exception>
 
-        Assert.Equal(1, await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken));
+        Assert.Equal(1, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
     }
 
     [Fact]
@@ -197,7 +197,7 @@ public sealed class Features
         };
         // </snippet:classifier-result-rule>
 
-        Reply reply = await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+        Reply reply = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         Assert.Equal("OK", reply.Code);
     }
 
@@ -230,7 +230,7 @@ public sealed class Features
     }
 
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Sequence<int> calls) =>
-        await policy.TryRunAsync(ct => calls.NextAsync(ct));
+        await policy.TryRunAsync(attempt => calls.NextAsync(attempt));
 
     internal sealed record Reply(string Code);
 

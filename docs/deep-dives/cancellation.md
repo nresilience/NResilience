@@ -34,6 +34,10 @@ the *next* operation's cancellation, which is a data race dressed up as a timeou
 
 When there is no ceiling, the callback receives the caller's token unchanged.
 
+The samples name that parameter `attempt` rather than `ct`, because two tokens in scope with names
+that differ only in length is how a call site ends up passing the wrong one - and passing the caller's
+token where the attempt's belongs disables the attempt timeout without any visible symptom.
+
 ## Work that ignores the token
 
 > [!CAUTION]

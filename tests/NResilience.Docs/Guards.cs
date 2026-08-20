@@ -74,8 +74,8 @@ public sealed class Guards
         var api = Resilience.Default with { Time = time, Attempts = 1, Breaker = breaker, Backoff = Backoff.None };
         Sequence<int> calls = Sequence.For<int>(time).Throws(new IOException(), 2).Returns(1);
 
-        await api.TryRunAsync(ct => calls.NextAsync(ct));
-        Task<CallResult<int>> rejected = api.TryRunAsync(ct => calls.NextAsync(ct)).AsTask();
+        await api.TryRunAsync(attempt => calls.NextAsync(attempt));
+        Task<CallResult<int>> rejected = api.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
         time.Advance(TimeSpan.FromMilliseconds(100));
         CallResult<int> result = await rejected;
 

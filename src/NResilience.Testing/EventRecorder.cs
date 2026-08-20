@@ -10,7 +10,7 @@ namespace NResilience.Testing;
 /// var events = new EventRecorder();
 /// var policy = Resilience.Default with { Time = time, OnEvent = events.Record };
 ///
-/// await policy.TryRunAsync(ct => calls.NextAsync(ct), ct);
+/// await policy.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 ///
 /// Assert.Equal(
 ///     [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],

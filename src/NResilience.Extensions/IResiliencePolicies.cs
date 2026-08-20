@@ -13,8 +13,8 @@ namespace NResilience.Extensions;
 /// <code>
 /// public class MyClient(IResiliencePolicies policies)
 /// {
-///     public async Task&lt;User&gt; GetAsync(CancellationToken ct) =>
-///         await policies["api"].RunAsync(ct2 => FetchAsync(ct2), ct);
+///     public async Task&lt;User&gt; GetAsync(CancellationToken cancellationToken) =>
+///         await policies["api"].RunAsync(attempt => FetchAsync(attempt), cancellationToken);
 /// }
 /// </code>
 /// </example>

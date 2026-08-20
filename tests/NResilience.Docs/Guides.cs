@@ -37,7 +37,7 @@ public sealed class Guides
         var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) };
 
         CallResult<Order?> result = await api.TryRunAsync(
-            ct => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), ct),
+            attempt => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), attempt),
             cancellationToken);
 
         if (result.TryGetValue(out Order? order))
@@ -58,7 +58,7 @@ public sealed class Guides
         Assert.Equal(BreakerState.Closed, dependencies.Payments.State);
 
         CallResult<string> result = await dependencies.Charge.TryRunAsync(
-            ct => Task.FromResult("charged"),
+            attempt => Task.FromResult("charged"),
             TestContext.Current.CancellationToken);
 
         Assert.True(result.IsSuccess);

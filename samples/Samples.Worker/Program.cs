@@ -38,7 +38,7 @@ Console.WriteLine();
 
 Console.WriteLine("A call through the registered policy:");
 CallResult<string> direct = await policies["api"].TryRunAsync(
-    static ct => Task.FromResult("answered"),
+    static attempt => Task.FromResult("answered"),
     CancellationToken.None);
 Console.WriteLine($"  -> {direct.StopReason}");
 

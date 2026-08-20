@@ -50,6 +50,11 @@ The `RunAsync` forms throw: the original exception rethrown with its stack intac
 [exceptions the library invents](exceptions.md). The `TryRunAsync` forms report instead, and always
 materialize the attempt log.
 
+Every signature carries two `CancellationToken`s and they are different things. The one the callback
+receives is the attempt's: it is cancelled when that attempt hits its `AttemptTimeout`, and when the
+token you passed in is cancelled. The trailing parameter is yours, and cancels the whole call. See
+[the cancellation contract](../deep-dives/cancellation.md).
+
 The `TState` overloads exist so the callback can be `static` and allocate no closure. They are the
 same length as the closure form at the call site.
 

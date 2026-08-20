@@ -27,7 +27,7 @@ public sealed class TelemetryDocs
         };
         // </snippet:telemetry-listener>
 
-        Assert.Equal(1, await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken));
+        Assert.Equal(1, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class TelemetryDocs
         // <snippet:telemetry-recorder>
         var api = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
-        await api.RunAsync(ct => calls.NextAsync(ct), cancellationToken);
+        await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 
         // Attempt, Retrying, Attempt, Succeeded
         Console.WriteLine(string.Join(", ", events.Kinds));
@@ -69,7 +69,7 @@ public sealed class TelemetryDocs
         var events = new EventRecorder();
         Resilience api = Resilience.Default with { Name = "api", Attempts = 1, OnEvent = events.Record };
 
-        await api.RunAsync(ct => Task.FromResult(1), TestContext.Current.CancellationToken);
+        await api.RunAsync(attempt => Task.FromResult(1), TestContext.Current.CancellationToken);
 
         // <snippet:telemetry-tostring>
         // [PolicyName] Kind #N VerdictKind ExceptionType (duration) +delay
