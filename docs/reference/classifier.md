@@ -58,7 +58,7 @@ Value equality; `ToString()` prints `Throttled (retry after 2s)`.
 | `Throttled` | Yes, long curve or `Retry-After` | No - the dependency is working correctly |
 | `Permanent` | Never | No - overwhelmingly a client-side fact |
 
-Two verdicts are produced by the executor rather than by a classifier, and no classifier can override
+Two verdicts are produced by the [executor](index.md) rather than by a classifier, and no classifier can override
 either: its own attempt timeout, which is `Transient`, and caller cancellation, which is not a failure
 at all.
 

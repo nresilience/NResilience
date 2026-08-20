@@ -6,8 +6,12 @@ order: 4
 
 # Circuit breaker
 
-A breaker stops calling a dependency that is failing. It is **opt-in**, and it is an object rather
-than a setting, because its scope is a decision only you can make.
+When a dependency is failing, calling it again on every request only makes things worse - you are
+hammering something that cannot keep up, and every caller doing the same thing piles on load it
+cannot handle. A **circuit breaker** stops calling the dependency in that state, gives it time to
+recover, and lets only a small number of trial calls through to check whether it has. It is
+**opt-in**, and it is an object rather than a setting, because its scope - how widely the "stop
+calling" decision is shared - is a decision only you can make.
 
 ## Turning it on
 
@@ -29,7 +33,23 @@ that ancestor held.
 For HTTP, the handler scopes a breaker per host for you. See
 [per-host scope](../http/per-host-scope.md).
 
+## The four states
+
+A breaker is always in one of four states:
+
+| State | What it means |
+| --- | --- |
+| `Closed` | Normal operation. Calls go through. Failures are counted. |
+| `Open` | The dependency is failing. Calls are refused for the break duration. |
+| `HalfOpen` | The break has elapsed. A small number of trial calls (probes) are let through to test recovery. |
+| `Isolated` | Forced open by an operator via `Isolate()`. Stays open until someone calls `Reset()`. |
+
 ## What trips it
+
+The most common real degradation is not a dependency returning errors - it is a dependency returning
+200s at 30 times normal latency while your thread pool and connection pool fill up. The settings
+below cover both: consecutive failures is the default trip, and the slow-call settings catch the case
+where the dependency is answering correctly but too slowly.
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -47,7 +67,8 @@ For HTTP, the handler scopes a breaker per host for you. See
 <!-- snippet: breaker-slow-calls -->
 ```csharp
 // The most common real degradation is not errors, it is a dependency answering 200s at
-// 30x normal latency. An error-rate breaker sits closed through the whole incident.
+// 30x normal latency. A breaker that only counts errors stays closed through the whole
+// incident, because the responses are not failing - they are just slow.
 var breaker = new Breaker(new BreakerSettings
 {
     ConsecutiveFailures = 5,                             // the default trip condition
@@ -73,10 +94,6 @@ has one answer rather than depending on composition order. Only `Transient` outc
 evidence: a `Throttled` response means the dependency is working correctly and defending itself, and
 a `Permanent` one is overwhelmingly a client-side fact.
 
-Slow calls matter because the most common real degradation is not a dependency returning errors, it
-is a dependency returning 200s at 30 times normal latency while your thread pool and connection pool
-fill up.
-
 ## What a refused call looks like
 
 <!-- snippet: breaker-rejection -->
@@ -92,8 +109,9 @@ if (result.Exception is CallRejectedException rejection)
 ```
 <!-- endsnippet -->
 
-A refusal is not fail-fast: it serves a short pause first, because a cheap rejection inside a
-caller's polling loop is a CPU spin. `StopReason.DependencyUnavailable` is the breaker's refusal;
+A refusal is not fail-fast: it serves a short pause first, because without that pause a caller in
+a tight polling loop would busy-spin (repeatedly calling and being rejected without waiting),
+burning CPU for nothing. `StopReason.DependencyUnavailable` is the breaker's refusal;
 `BudgetExhausted` is the [budget's](retry-budget.md).
 
 Go deeper: [Guarded rejection](../deep-dives/guarded-rejection.md).

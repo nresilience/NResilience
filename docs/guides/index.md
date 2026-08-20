@@ -6,7 +6,10 @@ order: 2
 
 # Guides
 
-Each guide is one scenario, start to finish.
+Each guide is one scenario, start to finish. A **policy** is the object that says what to do when
+a call fails - whether to retry, how long to wait, and when to stop calling the dependency. If the
+word is new, [key concepts](../getting-started/key-concepts.md) defines it and the rest of the
+vocabulary these guides use.
 
 | Guide | The goal you arrived with |
 | --- | --- |

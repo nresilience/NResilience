@@ -6,13 +6,17 @@ order: 3
 
 # Classification
 
-A classifier turns an outcome into a [verdict](../getting-started/key-concepts.md#every-outcome-gets-one-of-four-verdicts).
-It is **on by default**: `Classifier.Default` on `Resilience.Default`, `Classifier.Http` on
-`Resilience.Http`.
+When a call fails, the library has to decide what to do next - retry, give up, or treat the failure
+as permanent. That decision is called a **verdict**, and a **classifier** is the rule that turns an
+outcome into one. It is **on by default**: `Classifier.Default` on `Resilience.Default`,
+`Classifier.Http` on `Resilience.Http`.
 
-You say it once. Retry, the backoff curve, the attempt log, the circuit breaker and the
-retry budget all read the same answer, so there is no way for them to disagree about what a failure
-was.
+The point of having one rule is that retry, the backoff curve, the attempt log, the circuit breaker
+and the retry budget all read the same answer, so there is no way for them to disagree about what a
+failure was. A classifier that does not recognize an exception type treats it as `Permanent` by
+default - retrying a programming error (a null reference, a validation failure) turns a fast, clear
+failure into a slow, confusing one, so the safe default is to not retry what you did not tell it
+about.
 
 ## The shipped classifiers
 

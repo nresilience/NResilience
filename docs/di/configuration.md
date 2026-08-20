@@ -6,6 +6,11 @@ order: 1
 
 # Configuration
 
+Configuration binding lets operations change policy settings - a deadline, an attempt count, a
+breaker threshold - without a redeploy, while the parts that belong in code (a classifier, a shared
+breaker) stay in code. This page shows the bindable shape, what each property maps to, and the one
+trap to avoid when binding from JSON.
+
 <!-- snippet: di-register-section -->
 ```csharp
 services.AddResilience(configuration.GetSection("Resilience"));
@@ -63,6 +68,20 @@ mentioning only `Attempts` changes only the attempt count, whatever the base pol
 `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `HalfOpenProbes`,
 `ProbeSuccesses`, `SlowCallThreshold`, `SlowCallRatio`.
 
+## Why the binding target is a DTO
+
+> [!NOTE]
+> Binding a section straight onto `Resilience` looks like it works, and is **silently partial**.
+> `Attempts` and `Deadline` bind; `Backoff:Max` is dropped because the cap is a computed property;
+> `Classify: "Http"` is ignored, leaving a policy that does not retry a 503; and
+> `Breaker:ConsecutiveFailures` constructs a live circuit breaker with default settings, ignoring the
+> value you set.
+
+The middle case is the dangerous one, because the half that worked is the evidence people use to
+conclude the other half did too. `ResilienceOptions` is a flat, mutable DTO (a plain data transfer
+object) and `ToPolicy` does the projection by hand, so what a section says is what the policy gets.
+All three failures are gated by a test.
+
 ## What JSON cannot hold
 
 A classifier is a lambda, and so are `BeforeAttempt` and `OnEvent`. A breaker you mean to share with
@@ -84,20 +103,6 @@ services.AddResilience(
     });
 ```
 <!-- endsnippet -->
-
-## Why the binding target is a DTO
-
-> [!NOTE]
-> Binding a section straight onto `Resilience` looks like it works, and is **silently partial**.
-> `Attempts` and `Deadline` bind; `Backoff:Max` is dropped because the cap is a computed property;
-> `Classify: "Http"` is ignored, leaving a policy that does not retry a 503; and
-> `Breaker:ConsecutiveFailures` constructs a live circuit breaker with default settings, ignoring the
-> value you set.
-
-The middle case is the dangerous one, because the half that worked is the evidence people use to
-conclude the other half did too. `ResilienceOptions` is a flat, mutable DTO and `ToPolicy` does the
-projection by hand, so what a section says is what the policy gets. All three failures are gated by a
-test.
 
 Go deeper: [`ResilienceOptions` reference](../reference/options.md).
 

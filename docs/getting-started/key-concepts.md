@@ -6,10 +6,15 @@ order: 2
 
 # Key concepts
 
-## A policy is a value
+## What is a policy?
 
-A **policy** is the value that holds your retry, timeout, and breaker settings. You start from a
-preset and derive variants with `with`, which copies everything you did not mention.
+A network call can fail, hang, or come back from a dependency that is struggling. A **policy** is
+the object that says what to do when that happens: whether to retry, how long to wait in total, how
+long to wait per attempt, and when to stop calling the dependency at all.
+
+In NResilience a policy is a value, not a built pipeline. You hold one in a field, compare two for
+equality, and derive a variant without a builder. You start from a preset and derive variants with
+`with`, which copies everything you did not mention.
 
 <!-- snippet: key-concepts-policy-value -->
 ```csharp
@@ -51,7 +56,12 @@ public static class Policies
 
 Go deeper: [`Resilience` reference](../reference/resilience.md).
 
-## Deadline and attempt timeout are different things
+## Deadline and attempt timeout
+
+A retried call needs two time bounds, and mixing them up is a common bug: a 30-second per-attempt
+timeout with three retries can run for 90 seconds, which is probably not what you meant. The
+**deadline** is the ceiling on the whole call, retries and backoff included. The **attempt
+timeout** is the ceiling on a single attempt.
 
 <!-- snippet: key-concepts-two-bounds -->
 ```csharp
@@ -71,8 +81,9 @@ Go deeper: [Deadlines and attempt timeouts](../features/deadlines.md).
 
 ## Every outcome gets one of four verdicts
 
-A **classifier** turns an outcome - a returned value or a thrown exception - into a **verdict**, and
-everything downstream reads that one answer.
+A call can come back as a value or as a thrown exception, and the library has to decide what to do
+next - retry, give up, or treat the failure as permanent. A **classifier** turns that outcome into a
+**verdict**, and everything downstream reads that one answer.
 
 | Verdict | What it means | What happens |
 | --- | --- | --- |
@@ -97,22 +108,25 @@ programming error turns a fast, clear failure into a slow, confusing one.
 
 Go deeper: [Classification](../features/classification.md).
 
-## A call ends in one of six ways
+## Why a call stopped
 
-`StopReason` says which: `Succeeded`, `Permanent`, `AttemptsExhausted`, `DeadlineExceeded`,
-`BudgetExhausted` or `DependencyUnavailable`. `TryRunAsync` hands it back on a `CallResult<T>`
-alongside the value, the exception and the attempt log; `RunAsync` throws instead, rethrowing the
-original exception unchanged so existing `catch` blocks keep working.
+A retried call can stop for several reasons - it worked, it hit a failure it won't retry, it ran
+out of attempts, it ran out of time. `StopReason` names which one applied, and it takes one of six
+values: `Succeeded`, `Permanent`, `AttemptsExhausted`, `DeadlineExceeded`, `BudgetExhausted` or
+`DependencyUnavailable`. `TryRunAsync` hands it back on a `CallResult<T>` alongside the value, the
+exception and the attempt log; `RunAsync` throws instead, rethrowing the original exception unchanged
+so existing `catch` blocks keep working.
 
 Go deeper: [`CallResult<T>`](../reference/call-result.md) and
 [exceptions](../reference/exceptions.md).
 
 ## The two guards
 
-A **circuit breaker** stops calling a dependency that is failing. A **retry budget** bounds retries
-as a fraction of traffic, so a failing dependency cannot turn a fleet of clients into a load
-generator. The budget is on by default; the breaker is an object you construct and share exactly as
-widely as you intend.
+A struggling dependency can take down not just your calls but the fleet of clients calling it, if
+every client retries at once. Two guards stop that: a **circuit breaker** stops calling a dependency
+that is failing, and a **retry budget** bounds retries as a fraction of traffic so a failing
+dependency cannot turn a fleet of clients into a load generator. The budget is on by default; the
+breaker is an object you construct and share exactly as widely as you intend.
 
 Go deeper: [Circuit breaker](../features/circuit-breaker.md) and
 [retry budget](../features/retry-budget.md).

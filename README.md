@@ -1,13 +1,21 @@
 # NResilience
 
-Add retry, timeouts, and circuit breaking to your .NET calls - with defaults that work out of the box.
+A dependency that goes slow or starts failing can hang your requests, tie up your threads, and take
+your own application down with it - and retrying blindly only makes that worse, because every caller
+hits the failing service again at the same time. NResilience adds retry, timeouts, and circuit
+breaking to a .NET call so a struggling dependency degrades your app instead of crashing it - with
+sensible defaults already on, so a working retried HTTP call is one line, and every call you tune
+after that is one `with` expression, not a builder chain.
 
 ## What it gives you
 
-- Automatic retries with backoff and jitter when a call fails transiently
+- Retries when a call fails transiently, with backoff (a short wait before each retry) and jitter
+  (random spacing so clients don't all retry at once)
 - Timeouts so a slow dependency can't hang your application
-- A circuit breaker that stops calling a failing service
-- A retry budget that prevents retries from overwhelming a struggling dependency
+- A circuit breaker - a switch that stops calling a dependency when it's failing, so you don't pile
+  on load it can't handle
+- A retry budget - a cap on retries as a fraction of traffic, so a fleet of clients can't overwhelm
+  a struggling dependency
 - HTTP-aware out of the box (knows a 503 is retryable, a 404 is not)
 - Works with zero configuration - sensible defaults are already on
 
@@ -117,16 +125,15 @@ get right.
 
 ## What it costs
 
-Bytes above an identical un-wrapped callback, measured in one process on .NET 8 and .NET 10. Every
-figure is a test that fails the build.
+Bytes above an identical un-wrapped callback, on .NET 8 and .NET 10. These are ceilings CI enforces,
+not the measured values - a build fails if a change comes in over one.
 
 | Scenario | Overhead |
 |---|---:|
 | No policy, any call | **0** |
-| A call that retries, suspends | **384 B** |
-| Polly retry + timeout, same call | 1,291 B |
+| A call that retries, suspends | **448 B** ceiling |
 
-Go deeper: [where the allocations are](docs/deep-dives/allocations.md).
+The measured values per framework are in [where the allocations are](docs/deep-dives/allocations.md).
 
 ## Packages
 

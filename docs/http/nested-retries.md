@@ -6,9 +6,14 @@ order: 3
 
 # Nested retries
 
-Retries compose multiplicatively, and the amplification is invisible from any single layer: three
-layers each retrying three times is 27 attempts at the bottom, and every layer believes it is being
-reasonable.
+Retries compose multiplicatively, and the amplification is invisible from any single layer. If a
+frontend retries 3 times, calls a backend that retries 3 times, which calls a database that retries
+3 times, one user action becomes 3 x 3 x 3 = 27 attempts at the bottom - and every layer believes it
+is being reasonable, because each one only sees its own 3 attempts.
+
+The fix is to reduce the inner attempt count: the layer closest to the failing dependency is the
+one that should retry, and the layers above it should hand the call through with little or no retry
+of their own. The handler helps you see when that is needed, and reports it rather than intervening.
 
 `DetectNestedRetries` is **on by default** and costs one header on a request that is already being
 retried.
@@ -36,7 +41,8 @@ would be a bigger surprise than the amplification.
 bool callerWillRetry = request.Headers.ContainsKey(ResilienceHttp.NestedRetryHeader);
 ```
 
-The useful reaction is usually to reduce the inner attempt count to one, or to shorten the inner
-deadline so the caller's retry has budget left to be useful. That decision belongs to your service,
-so the library states the fact rather than acting on it.
+A service that reads this header knows its caller will retry. The useful reaction is usually to
+reduce the inner attempt count to one, or to shorten the inner deadline so the caller's retry has
+budget left to be useful. That decision belongs to your service, so the library states the fact
+rather than acting on it.
 

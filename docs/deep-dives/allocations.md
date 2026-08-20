@@ -36,8 +36,8 @@ pooled timer source's own token must never be handed to user code, because `TryR
 identity - a callback that outlived its attempt would observe the next operation's cancellation. One
 linked source per attempt is therefore the floor, and the floor measures 64 bytes (the ceiling is 72).
 
-Polly reaches 24 bytes here by handing out its pooled token, which is the exact hazard this design
-refuses.
+A design that hands out its pooled token reaches 24 bytes here, which is the exact hazard this
+design refuses.
 
 ## Why a listener costs 48 bytes and not zero
 

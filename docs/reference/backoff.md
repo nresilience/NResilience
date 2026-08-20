@@ -25,7 +25,7 @@ The delay for attempt *n* is `base × factor^(n-2)`, capped at `Max`, then jitte
 is served the base delay.
 
 `Verdict.RetryAfter` wins over every curve: it is honored verbatim, capped only by `Max`, with no
-jitter applied. The executor additionally refuses to serve any delay that would consume the rest of
+jitter applied. The [executor](index.md) additionally refuses to serve any delay that would consume the rest of
 the deadline - the call fails with the deadline instead of sleeping through it.
 
 `default(Backoff)` reads as `Backoff.Default`, because `policy with { Backoff = default }` compiles.

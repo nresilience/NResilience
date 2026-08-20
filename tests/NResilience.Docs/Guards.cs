@@ -27,7 +27,8 @@ public sealed class Guards
     {
         // <snippet:breaker-slow-calls>
         // The most common real degradation is not errors, it is a dependency answering 200s at
-        // 30x normal latency. An error-rate breaker sits closed through the whole incident.
+        // 30x normal latency. A breaker that only counts errors stays closed through the whole
+        // incident, because the responses are not failing - they are just slow.
         var breaker = new Breaker(new BreakerSettings
         {
             ConsecutiveFailures = 5,                             // the default trip condition

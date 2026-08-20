@@ -6,6 +6,12 @@ order: 6
 
 # Testing
 
+Testing retry and backoff code the naive way means using real delays - a 30-second timeout test
+takes 30 seconds, and a backoff test can pass on one machine and fail on another when timing
+varies. The testing package fixes that: it gives you scripted callbacks (so the dependency's
+behavior is deterministic), a recording listener (so you assert on what the policy did, not on
+elapsed time), and a clock you control (so a 30-second deadline runs in microseconds).
+
 ```bash
 dotnet add package NResilience.Testing
 ```
@@ -44,7 +50,7 @@ attempt timeouts and deadlines testable.
 <!-- snippet: testing-fake-time -->
 ```csharp
 // Pass the same clock to the policy and to the script, or a scripted delay is a real
-// sleep - and a real sleep is the flakiness this package removes.
+// sleep - and a real sleep is what makes timing tests slow and flaky.
 var time = new FakeTimeProvider();
 
 Sequence<int> calls = Sequence.For<int>(time)
@@ -69,7 +75,7 @@ Assert.IsType<AttemptTimeoutException>(result.Exception);
 
 > [!IMPORTANT]
 > Pass the same `TimeProvider` to the policy and to the sequence. A scripted delay served against the
-> system clock is a real sleep, and a real sleep is the flakiness this package removes.
+> system clock is a real sleep, and a real sleep is what makes timing tests slow and flaky.
 
 A test with a fake clock and no real delays runs the whole 30-second deadline in microseconds.
 
@@ -84,8 +90,9 @@ var policy = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.
 
 await policy.RunAsync(attempt => calls.NextAsync(attempt));
 
-// Assert on the order, not just the membership: a telemetry surface that raises the right
-// events in the wrong order still produces a log people believe.
+// Assert on the order, not just the membership: if a telemetry surface raises the right
+// events in the wrong order, the log it produces is misleading even though every event
+// is present.
 Assert.Equal(
     [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
     events.Kinds);
@@ -96,10 +103,10 @@ Assert.Equal(42, events.Single(CallEventKind.Succeeded).Result);
 <!-- endsnippet -->
 
 `EventRecorder` records every [`CallEvent`](../reference/events.md) in order. `Kinds` is the usual
-assertion surface, and asserting on the whole sequence is worth the extra characters: a telemetry
-surface that raises the right events in the wrong order still produces a log people believe.
-`Single(kind)`, `OfKind(kind)`, `CountOf(kind)`, `Contains(kind)` and `Clear()` are there for the
-narrower assertions.
+assertion surface, and asserting on the whole sequence is worth the extra characters: if a
+telemetry surface raises the right events in the wrong order, the log it produces is misleading
+even though every event is present. `Single(kind)`, `OfKind(kind)`, `CountOf(kind)`,
+`Contains(kind)` and `Clear()` are there for the narrower assertions.
 
 ## Testing an HTTP client
 

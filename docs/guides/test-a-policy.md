@@ -8,8 +8,10 @@ order: 4
 
 ## Scenario
 
-You want a test that proves the call is retried, that the deadline bites, and that neither claim
-depends on a real sleep.
+Testing retry and backoff code the naive way means using real delays - a 30-second timeout test
+takes 30 seconds, and a backoff test can pass on one machine and fail on another when timing
+varies. You want a test that proves the call is retried, that the deadline bites, and that neither
+claim depends on a real sleep.
 
 ## Complete example
 
@@ -31,8 +33,10 @@ Assert.Equal(3, result.Attempts.Count);
 
 ## What's happening
 
-- **The script is the double.** `Sequence.For<T>()` serves outcomes one per call in order, so "fails
-  twice then succeeds" is the test's first three lines rather than a mock framework.
+- **The script is the double.** A test double (a stand-in for the real dependency) is what
+  `Sequence.For<T>()` provides: it serves outcomes one per call in order, so "fails twice then
+  succeeds" is the test's first three lines rather than a mock framework (a library for setting up
+  call expectations on fake objects).
 - **`Backoff.None`** removes the only thing that would have made this test slow.
 - **The attempt log is the assertion.** `result.Attempts.Count` is deterministic where a stopwatch is
   not.
@@ -42,7 +46,7 @@ Assert.Equal(3, result.Attempts.Count);
 <!-- snippet: testing-fake-time -->
 ```csharp
 // Pass the same clock to the policy and to the script, or a scripted delay is a real
-// sleep - and a real sleep is the flakiness this package removes.
+// sleep - and a real sleep is what makes timing tests slow and flaky.
 var time = new FakeTimeProvider();
 
 Sequence<int> calls = Sequence.For<int>(time)
@@ -79,8 +83,9 @@ var policy = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.
 
 await policy.RunAsync(attempt => calls.NextAsync(attempt));
 
-// Assert on the order, not just the membership: a telemetry surface that raises the right
-// events in the wrong order still produces a log people believe.
+// Assert on the order, not just the membership: if a telemetry surface raises the right
+// events in the wrong order, the log it produces is misleading even though every event
+// is present.
 Assert.Equal(
     [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
     events.Kinds);

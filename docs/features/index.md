@@ -6,6 +6,8 @@ order: 3
 
 # Features
 
+Each feature is one knob: what it is, whether it is on by default, and how to read what it produces.
+
 | Feature | On by default? | Page |
 | --- | --- | --- |
 | Retry, backoff and jitter | Yes - three attempts, exponential, full jitter | [Retry](retry.md) |

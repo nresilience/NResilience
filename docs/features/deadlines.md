@@ -6,8 +6,23 @@ order: 2
 
 # Deadlines and attempt timeouts
 
-Both are **on by default**: a 30-second `Deadline` for the whole call and a 10-second
-`AttemptTimeout` for any one attempt. `Timeout.InfiniteTimeSpan` turns either off.
+A retried call needs two time bounds, and mixing them up is a common bug: a 30-second per-attempt
+timeout with three retries can run for 90 seconds, which is probably not what you meant. The
+**deadline** is the ceiling on the whole call - every attempt, every backoff delay, everything.
+The **attempt timeout** is the ceiling on a single attempt. Both are **on by default**: a 30-second
+`Deadline` for the whole call and a 10-second `AttemptTimeout` for any one attempt.
+`Timeout.InfiniteTimeSpan` turns either off.
+
+> [!CAUTION]
+> A timeout cannot kill a callback that ignores its cancellation token. The attempt timeout fires,
+> the token is cancelled, and a callback that never observes it keeps running - and the policy waits
+> for it, because the [executor](../reference/index.md) (the internal loop that runs each attempt) is
+> awaiting that very task. Every execution overload requires a callback that takes a
+> `CancellationToken`, so there is no zero-argument form to forget - and
+> [NRES001 and NRES002](../reference/analyzers.md) report a call handed the wrong token at build
+> time. When an attempt overruns its ceiling by more than a second, an `OrphanedWork` event fires
+> naming the policy - raised retrospectively, when the work finally does return, which is the only
+> moment the overrun is observable at all.
 
 ## The two bounds
 
@@ -73,17 +88,9 @@ throw away the completed work. The post-attempt check stops the loop starting *a
 
 ## Work that ignores its token
 
-> [!CAUTION]
-> A timeout cannot kill a callback that ignores its cancellation token. The attempt timeout fires,
-> the token is cancelled, and a callback that never observes it keeps running - and the policy waits
-> for it, because the executor is awaiting that very task.
-
-The defenses here are structural. Every execution overload requires a callback that takes a
-`CancellationToken`, so there is no zero-argument form to forget. And when an attempt overruns its
-ceiling by more than a second, an `OrphanedWork` event fires naming the policy - raised
-retrospectively, when the work finally does return, which is the only moment the overrun is observable
-at all. Handing a call the wrong token, or none, is reported at build time by
-[NRES001 and NRES002](../reference/analyzers.md).
+The CAUTION above is the reason every execution overload requires a callback that takes a
+`CancellationToken`: there is no zero-argument form to forget. The analyzer and the `OrphanedWork`
+event are the two backstops when a callback does ignore it anyway.
 
 Go deeper: [The cancellation contract](../deep-dives/cancellation.md).
 

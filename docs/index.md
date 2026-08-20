@@ -1,14 +1,17 @@
 ---
 title: NResilience
-description: Retry, timeouts, and circuit breaking for .NET calls - defaults on out of the box, one method for any callback, no builder chain.
+description: A dependency that goes slow or starts failing can hang your requests, tie up your threads, and take your own application down - retry, timeouts, and circuit breaking for .NET calls, on by default.
 order: 0
 ---
 
 # NResilience
 
-Add retry, timeouts, and circuit breaking to your .NET calls. Defaults are on, so a working retried
-HTTP call is one line - and every call you tune after that is one `with` expression, not a builder
-chain.
+A dependency that goes slow or starts failing can hang your requests, tie up your threads, and take
+your own application down with it - and retrying blindly only makes that worse, because every caller
+hits the failing service again at the same time. NResilience adds retry, timeouts, and circuit
+breaking to a .NET call so a struggling dependency degrades your app instead of crashing it - with
+sensible defaults already on, so a working retried HTTP call is one line, and every call you tune
+after that is one `with` expression, not a builder chain.
 
 <!-- snippet: whole-api -->
 ```csharp
@@ -42,18 +45,17 @@ User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGoo
 | Why it is built this way | [Deep dives](deep-dives/index.md) |
 | To move off Polly | [Migrating from Polly](migrating-from-polly.md) |
 
-## What is already on
+## What it gives you
 
-`Resilience.Default` and `Resilience.Http` retry three times with exponential backoff and full
-jitter, bound the whole call to 30 seconds and any one attempt to 10, and keep a retry budget so a
-failing dependency cannot turn your client into a load generator. Nothing has to be configured for
-that to be true.
+- Retries when a call fails transiently, with backoff (a short wait before each retry) and jitter
+  (random spacing so clients don't all retry at once)
+- Timeouts so a slow dependency can't hang your application
+- A circuit breaker - a switch that stops calling a dependency when it's failing, so you don't pile
+  on load it can't handle
+- A retry budget - a cap on retries as a fraction of traffic, so a fleet of clients can't overwhelm
+  a struggling dependency
+- HTTP-aware out of the box (knows a 503 is retryable, a 404 is not)
+- Works with zero configuration - sensible defaults are already on
 
-Two things are deliberately off until you ask: the [circuit breaker](features/circuit-breaker.md),
-because its scope is a decision only you can make, and
-[telemetry](features/telemetry.md), because a listener you did not attach should cost nothing.
-
-## What it costs
-
-Overhead is one allocation per call, gated in CI - the ceilings and the comparison against Polly are
-in [where the allocations are](deep-dives/allocations.md).
+Overhead is one allocation per call, gated in CI. The measured values per framework and the gate
+source are in [where the allocations are](deep-dives/allocations.md).

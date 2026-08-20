@@ -6,6 +6,12 @@ order: 5
 
 # Dependency injection
 
+`ResilienceHttp.CreateClient()` builds a client with a handler and keeps it for the life of the
+process. In an application with a DI container, you want the container to own that wiring: the
+handler should be part of the `IHttpClientFactory` pipeline, the policy should be named so a
+dashboard can tell clients apart, and configuration changes should reach the policy without a
+redeploy. The extensions package adds that.
+
 ```bash
 dotnet add package NResilience.Extensions
 ```
@@ -47,7 +53,7 @@ services.AddResilience("reports", o =>
 
 Registration validates eagerly, so `Attempts = 0` fails at startup rather than on the first request.
 
-Inject the roster, not a policy:
+Inject the **roster** (the set of named policies registered at startup), not a policy:
 
 <!-- snippet: di-inject -->
 ```csharp
@@ -73,7 +79,8 @@ lists when a name is missing.
 
 ## What reloads, and what survives it
 
-A policy is an immutable value, so hot reload is a reference swap: `IOptionsMonitor` fires, the
+Hot reload (changing policy settings without a redeploy) works because a policy is an immutable
+value, so a reload is a reference swap: `IOptionsMonitor` fires, the
 section is projected onto a new `Resilience`, and the roster hands out the new one. There is no
 in-flight execution to drain and no pipeline to rebuild.
 
@@ -82,9 +89,10 @@ opened because a dependency is down stays open across a configuration edit, and 
 budget keeps the traffic history it has accumulated - it is pinned to the registration name rather
 than to the policy instance for exactly that reason.
 
-An `HttpClient` sees a reloaded policy at the next handler rotation - every two minutes by default -
-rather than on the next request. The handler holds the per-host state, and rebuilding it per request
-to make reload instant would throw that state away on every call.
+An `HttpClient` sees a reloaded policy at the next handler rotation (the `IHttpClientFactory`
+default is to rebuild handler chains every two minutes) - rather than on the next request. The
+handler holds the per-host state, and rebuilding it per request to make reload instant would throw
+that state away on every call.
 
 ## Next
 

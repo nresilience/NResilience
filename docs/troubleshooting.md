@@ -103,7 +103,7 @@ Check that you are binding to `ResilienceOptions` - through `services.AddResilie
 and not onto `Resilience` yourself. Direct binding onto the record is **silently partial**:
 `Backoff:Max` is dropped, `Classify` is ignored, and `Breaker:ConsecutiveFailures` constructs a
 default-settings breaker while ignoring your value. See
-[why the binding target is a DTO](di/configuration.md#why-the-binding-target-is-a-dto).
+[why the binding target is a DTO (data transfer object)](di/configuration.md#why-the-binding-target-is-a-dto).
 
 Also check the property is bindable at all: a classifier, `BeforeAttempt` and `OnEvent` are lambdas and
 belong in the `configure` callback.
@@ -150,8 +150,9 @@ says the same thing at build time.
 ### A test is slow, or flaky
 
 Set `Backoff = Backoff.None` for tests that only assert that a retry happened, and use
-`FakeTimeProvider` for tests that assert on timing - passing the same clock to the policy **and** to
-the scripted sequence. See [testing](testing/index.md).
+`FakeTimeProvider` (a test clock from `Microsoft.Extensions.TimeProvider.Testing` that you advance
+manually instead of waiting) for tests that assert on timing - passing the same clock to the policy
+**and** to the scripted sequence. See [testing](testing/index.md).
 
 ### I need to see what actually happened
 

@@ -6,6 +6,10 @@ order: 7
 
 # Reference
 
+The **executor** is the internal loop that runs each attempt, applies the deadline and attempt
+timeout, serves the backoff, and decides whether to retry - one flat pass, no strategy pipeline.
+Several pages below use the term; it is defined here once.
+
 | Page | Types |
 | --- | --- |
 | [`Resilience`](resilience.md) | `Resilience`, the execution methods, `NextAttempt` |

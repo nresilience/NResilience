@@ -9,7 +9,8 @@ order: 3
 ## Scenario
 
 Operations wants to change a deadline or an attempt count without a deploy, and you want the rest of
-the policy - the classifier, the shared breaker - to stay in code where it belongs.
+the policy - the classifier (the rule that decides which failures are worth retrying) and the shared
+breaker (a switch that stops calling a failing dependency) - to stay in code where it belongs.
 
 ## Complete example
 
@@ -59,10 +60,11 @@ With this section:
 
 - **One policy per child** of the section, named by its key. `Preset` picks the starting point and
   every other property overrides it.
-- **Values reload; the roster does not.** A name that appears in the file after the container is built
-  has nothing to be injected into, so the set of names is read once at registration.
-- **Registration validates eagerly**, so a deadline of minus one second fails at startup rather than
-  on the first request.
+- **Values reload; the roster does not.** The roster is the set of named policies registered at
+  startup - a name that appears in the file after the container is built has nothing to be injected
+  into, so the set of names is read once at registration.
+- **Registration validates eagerly** (at startup, not on the first request), so a deadline of
+  minus one second fails at startup rather than on the first request.
 - **`AddResilience("api")` on a client** resolves the registered policy by name and keeps its name in
   the telemetry.
 

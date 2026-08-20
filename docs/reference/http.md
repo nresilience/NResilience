@@ -44,7 +44,7 @@ Both constructors validate the policy. The synchronous `Send` throws `NotSupport
 | Member | Meaning |
 | --- | --- |
 | `CreateClient(policy = null, options = null, innerHandler = null)` | An `HttpClient` with the handler in front of it, built the way the DI registration builds one. Disposing it disposes the chain. |
-| `Repeatable` | `HttpRequestOptionsKey<bool>`. Per-request override of the idempotency decision; wins in both directions. |
+| `Repeatable` | `HttpRequestOptionsKey<bool>`. Per-request override of the [idempotency](../http/idempotency.md) decision; wins in both directions. |
 | `NestedRetryHeader` | `"X-NResilience-Retrying"`. |
 
 Retried methods: GET, HEAD, PUT, DELETE, OPTIONS, TRACE. Not retried: POST, PATCH, and any method the

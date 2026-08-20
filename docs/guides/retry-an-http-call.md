@@ -42,15 +42,19 @@ private static async Task<Order?> ReadOrderAsync(HttpClient client, string id, C
 ## What's happening
 
 - **`Resilience.Http`** brings [`Classifier.Http`](../features/classification.md), which reads a 503
-  as transient, a 429 as throttling, and a 404 as an answer rather than a failure.
+  as transient (a failure that may not recur - worth retrying), a 429 as throttling, and a 404 as an
+  answer rather than a failure.
 - **Three attempts** with exponential backoff and full jitter, from
-  [`Backoff.Default`](../features/retry.md#backoff). A `Retry-After` header, if the server sends one,
-  wins over the curve.
+  [`Backoff.Default`](../features/retry.md#backoff). Backoff is the short wait before each retry;
+  jitter is random spacing so multiple clients don't all retry at the same instant. A `Retry-After`
+  header, if the server sends one, wins over the curve.
 - **The deadline** bounds the whole thing, retries and backoff included. The attempt ceiling stays at
   its default of 10 seconds, capped by whatever is left of the deadline. See
   [deadlines](../features/deadlines.md).
-- **A retry budget** is already running, private to this policy, so a broad outage cannot turn this
-  client into a load generator. See [retry budget](../features/retry-budget.md).
+- **A retry budget** - a cap on retries as a fraction of traffic - is already running, private to
+  this policy, so a broad outage cannot turn this client into a load generator (a caller that piles
+  extra requests onto a dependency that is already struggling). See
+  [retry budget](../features/retry-budget.md).
 - **`TryRunAsync`** reports the outcome instead of throwing, and always materializes the attempt log.
 
 ## Use the handler instead when the client is shared
@@ -81,8 +85,11 @@ In an application with a container, that whole line is
 ## Handle the outcome
 
 `result.TryGetValue(out var order)` is the success test. On failure, `result.StopReason` says why the
-call stopped - `AttemptsExhausted`, `DeadlineExceeded`, `DependencyUnavailable`, `BudgetExhausted` or
-`Permanent` - and `result.Attempts` prints every attempt with its verdict and the delay before it.
+call stopped - `AttemptsExhausted` (every retry was used), `DeadlineExceeded` (the overall time bound
+ran out), `DependencyUnavailable` (the [breaker](../features/circuit-breaker.md) is refusing calls),
+`BudgetExhausted` (the [retry budget](../features/retry-budget.md) is spent) or `Permanent` (the
+classifier said this failure will not change on retry) - and `result.Attempts` prints every attempt
+with its verdict and the delay before it.
 
 ## When to go deeper
 

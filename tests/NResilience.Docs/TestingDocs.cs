@@ -32,7 +32,7 @@ public sealed class TestingDocs
     {
         // <snippet:testing-fake-time>
         // Pass the same clock to the policy and to the script, or a scripted delay is a real
-        // sleep - and a real sleep is the flakiness this package removes.
+        // sleep - and a real sleep is what makes timing tests slow and flaky.
         var time = new FakeTimeProvider();
 
         Sequence<int> calls = Sequence.For<int>(time)
@@ -66,8 +66,9 @@ public sealed class TestingDocs
 
         await policy.RunAsync(attempt => calls.NextAsync(attempt));
 
-        // Assert on the order, not just the membership: a telemetry surface that raises the right
-        // events in the wrong order still produces a log people believe.
+        // Assert on the order, not just the membership: if a telemetry surface raises the right
+        // events in the wrong order, the log it produces is misleading even though every event
+        // is present.
         Assert.Equal(
             [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
             events.Kinds);

@@ -6,11 +6,20 @@ order: 2
 
 # Per-host scope
 
+If one `HttpClient` talks to several hosts and one of them goes down, a single shared breaker would
+trip calls to all the healthy hosts too - a problem in one place taking down everything. The handler
+solves this by keeping a separate breaker and retry budget per host, so a dead host only affects
+calls to that host.
+
 `BreakerPerHost` and `BudgetPerHost` are **on by default**. The handler keeps one breaker and one
 retry budget per authority it has seen, created on first use.
 
-One breaker across every host means a dead host trips calls to the healthy ones, which is the
-failure a per-host breaker prevents.
+> [!WARNING]
+> The registry is unbounded: the set of hosts one `HttpClient` talks to is a property of the
+> application rather than of its traffic, and an eviction policy over a dozen entries would be a cache
+> with a bug in it. A client that talks to an **unbounded** set of hosts - a proxy, a crawler, a
+> webhook dispatcher - should set `BreakerPerHost` and `BudgetPerHost` to false and scope the guards on
+> the policy instead.
 
 ## Reading it
 
@@ -53,13 +62,6 @@ dashboard separate a client's hosts.
 
 **A non-repeatable request runs the same policy with one attempt**, rather than no policy. The breaker
 still sees the outcome and the budget still receives its deposit, and nothing is sent twice.
-
-> [!WARNING]
-> The registry is unbounded: the set of hosts one `HttpClient` talks to is a property of the
-> application rather than of its traffic, and an eviction policy over a dozen entries would be a cache
-> with a bug in it. A client that talks to an **unbounded** set of hosts - a proxy, a crawler, a
-> webhook dispatcher - should set `BreakerPerHost` and `BudgetPerHost` to false and scope the guards on
-> the policy instead.
 
 Handler lifetime decides how long that state lives. `IHttpClientFactory` rotates handler chains every
 two minutes by default, so the breakers and budgets of a factory-built client are rotated with them;

@@ -22,17 +22,17 @@ roughly the sum of the state that has to live across the awaits rather than the 
 ## What that buys, measured
 
 Bytes above an identical un-wrapped suspending callback, one process, one run. The NResilience
-figures are the ceilings the build enforces; the Polly figures are the published values the same
+figures are the ceilings the build enforces; the reference figures are the published values the same
 harness reproduces within a range. Each ratio is a gate that fails the build: the fused loop must
-stay at least 2.5x cheaper than Polly's equivalent pipeline on the yield harness, and at least 2.0x
+stay at least 2.5x cheaper than a comparable layered pipeline on the yield harness, and at least 2.0x
 cheaper over a real loopback socket.
 
 | Arm | Ceiling | Ratio (gate) |
 | --- | ---: | ---: |
 | NResilience, full policy | 448 B | |
-| Polly retry + timeout, same harness | ~1,291 B (harness range 1,100-1,600) | **>= 2.5x** (measured 3.2x) |
+| Comparable layered pipeline (retry + timeout), same harness | ~1,291 B (harness range 1,100-1,600) | **>= 2.5x** (measured 3.2x) |
 | NResilience, trivial policy | 368 B | |
-| Polly, empty pipeline | ~304 B (harness range 250-400) | **<= 1.25x** (measured 1.05x) |
+| Comparable layered pipeline, empty | ~304 B (harness range 250-400) | **<= 1.25x** (measured 1.05x) |
 
 Over a real loopback socket the same comparison measures **2.38x**, and the build gates that ratio
 at 2.0x.
@@ -53,9 +53,9 @@ would have been a local in a small frame is a field in a box whose size is a bud
 the policy's `Backoff` in a local, for readability, costs 56 bytes on every suspending call to save a
 field load the JIT keeps in a register anyway. That is the tenor of the whole file.
 
-The compensations are real, though. There is no composition order to get wrong, so the
-most-commented question in Polly's repository - whether the breaker sees attempts or whole operations,
-which depends on whether the breaker was added before or after the retry - does not exist here. The
+The compensations are real, though. There is no composition order to get wrong, so the recurring
+question for layered pipelines - whether the breaker sees attempts or whole operations, which
+depends on whether the breaker was added before or after the retry - does not exist here. The
 breaker samples attempts, always. And a policy is a value rather than a built pipeline, so deriving a
 variant is one expression and equality is structural.
 

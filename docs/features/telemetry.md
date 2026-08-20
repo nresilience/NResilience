@@ -6,8 +6,11 @@ order: 6
 
 # Telemetry
 
-Telemetry is one event stream: every attempt, retry, refusal, and outcome is observable through one
-listener. It is **opt-in** for a policy you build by hand - `OnEvent = null` means the executor
+When a retried call is slow or failing in production, you need to see what the policy is doing -
+which attempts are being retried, how long they take, whether a breaker opened, whether the budget is
+spent. Telemetry is how you see that. It is one event stream: every attempt, retry, refusal, and
+outcome is observable through one listener. It is **opt-in** for a policy you build by hand -
+`OnEvent = null` means the [executor](../reference/index.md) (the internal loop that runs each attempt)
 raises nothing and pays nothing - and **on by default** for a policy registered in a container,
 because a registered policy is part of an application that runs in production.
 

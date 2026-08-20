@@ -6,6 +6,12 @@ order: 1
 
 # Idempotency
 
+An HTTP method is **idempotent** (or retry-safe) if sending it twice has the same effect as sending
+it once. A GET re-reads the same resource; a DELETE that succeeded returns 404 the second time -
+neither duplicates anything. A POST that creates an order, sent twice, creates two orders. The
+handler retries only methods that are safe to repeat, and leaves unsafe ones alone unless you say
+otherwise.
+
 GET, HEAD, PUT, DELETE, OPTIONS and TRACE are retried. POST and PATCH are not, and neither is any
 method the library has not heard of - retrying something unrecognized is a guess, and the direction
 to guess in is the one that does not duplicate it.

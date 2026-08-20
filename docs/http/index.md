@@ -6,6 +6,19 @@ order: 4
 
 # HTTP
 
+A [policy](../getting-started/key-concepts.md#what-is-a-policy) handles retry, timeouts, and
+breaking for any call - but HTTP has its own constraints that a policy on its own cannot address:
+an `HttpRequestMessage` can only be sent once, so a retry needs a fresh request; a retried POST
+can duplicate a charge or an order, so unsafe methods need a check; and the breaker and budget
+need scoping per host so one dead host does not trip calls to healthy ones. The handler does that
+HTTP-specific work.
+
+> [!IMPORTANT]
+> `HttpClient.Timeout` defaults to 100 seconds and covers the **entire** send - every attempt, every
+> backoff delay - rather than one attempt. It silently caps any policy whose deadline is longer, and
+> nothing in the policy can see it. The handler takes ownership of it by default so the policy's
+> [deadline](../features/deadlines.md) is the only bound.
+
 ```bash
 dotnet add package NResilience
 ```
@@ -73,16 +86,11 @@ using HttpClient client = ResilienceHttp.CreateClient(
 
 ## The transport timeout
 
-> [!IMPORTANT]
-> `HttpClient.Timeout` defaults to 100 seconds and covers the **entire** send - every attempt, every
-> backoff delay - rather than one attempt. It silently caps any policy whose deadline is longer, and
-> nothing in the policy can see it.
-
-`OwnTransportTimeout` sets it to `Timeout.InfiniteTimeSpan` so the [deadline](../features/deadlines.md)
-is the only bound, and it is honored by whoever builds the client: `ResilienceHttp.CreateClient` or
-the DI registration. A `DelegatingHandler` cannot reach the client in front of it, so setting the
-option `false` on a handler you hand to your own `HttpClient` does nothing at all - set the timeout
-yourself:
+`OwnTransportTimeout` sets `HttpClient.Timeout` to `Timeout.InfiniteTimeSpan` so the
+[deadline](../features/deadlines.md) is the only bound, and it is honored by whoever builds the
+client: `ResilienceHttp.CreateClient` or the DI registration. A `DelegatingHandler` cannot reach
+the client in front of it, so setting the option `false` on a handler you hand to your own
+`HttpClient` does nothing at all - set the timeout yourself:
 
 <!-- snippet: troubleshoot-transport-timeout -->
 ```csharp

@@ -16,7 +16,7 @@ order: 7
 | `AttemptNumber` | 1-based. The attempt that just finished, or - on `Retrying` and the pre-attempt kinds - the one about to run. |
 | `Verdict` | How the most recent attempt was classified. `Ok` when nothing has run yet. |
 | `Duration` | The attempt's duration on `Attempt`; how long the call has been running on every other kind. |
-| `Delay` | The pause about to be served: the backoff on `Retrying`, the rejection pause on `Rejected`. Null elsewhere. |
+| `Delay` | The pause about to be served: the backoff on `Retrying`, the [rejection pause](../deep-dives/guarded-rejection.md) on `Rejected`. Null elsewhere. |
 | `Exception` | What the most recent attempt threw, or null. |
 | `Result` | What the most recent attempt returned, as `object`, or null when it threw or returned nothing. |
 | `Reason` | Why the call stopped, on the terminal kinds. Null elsewhere. |
@@ -31,7 +31,7 @@ order: 7
 | `Succeeded` | Yes | | `Succeeded` |
 | `NotRetried` | Yes | | `Permanent` |
 | `Exhausted` | Yes | | `AttemptsExhausted` |
-| `Rejected` | Yes | The rejection pause | `DependencyUnavailable` or `BudgetExhausted` |
+| `Rejected` | Yes | The [rejection pause](../deep-dives/guarded-rejection.md) | `DependencyUnavailable` or `BudgetExhausted` |
 | `DeadlineExceeded` | Yes | | `DeadlineExceeded` |
 | `OrphanedWork` | | | |
 | `BreakerOpened` | | | |
@@ -53,6 +53,6 @@ Breaker transitions are raised outside the breaker's lock, on the call that caus
 
 ## Listener contract
 
-Synchronous, on the executor's thread. A listener that blocks blocks the call. An exception a listener
+Synchronous, on the [executor's](index.md) thread. A listener that blocks blocks the call. An exception a listener
 throws is swallowed. Two listeners is `OnEvent = first + second`.
 

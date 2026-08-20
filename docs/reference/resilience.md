@@ -12,7 +12,7 @@ order: 1
 
 | Member | Value |
 | --- | --- |
-| `Resilience.None` | Passthrough. One attempt, no bounds, no budget. The executor returns the callback's own task. |
+| `Resilience.None` | Passthrough. One attempt, no bounds, no budget. The [executor](index.md) returns the callback's own task. |
 | `Resilience.Default` | Three attempts, 30 s deadline, 10 s attempt timeout, `Backoff.Default`, `Classifier.Default`. |
 | `Resilience.Http` | `Default` with `Classifier.Http` and `Name = "http"`. |
 

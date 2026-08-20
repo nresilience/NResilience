@@ -23,9 +23,9 @@ trimming clean, and ships a checked-in public API manifest. The `HttpClient` han
 rather than in a package of its own, so there is no separate HTTP install.
 
 `NResilience.Extensions` is the one package deliberately kept separate. It pulls in the
-`Microsoft.Extensions.*` family, so install the core package for a library and the extensions package
-for an app that has a container; a library that wants resilience internally should not have to impose
-a hosting model on its own consumers.
+`Microsoft.Extensions.*` family, so install the core package for a library and the extensions
+package for an app that has a container. A library that wants resilience internally should not have
+to impose a hosting model on its own consumers.
 
 ## Which one do I actually need?
 

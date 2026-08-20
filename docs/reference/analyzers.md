@@ -146,7 +146,7 @@ await api.RunAsync(async attempt => await client.GetAsync(url, attempt), cancell
 await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 ```
 
-The execution overloads already take a `Task`-returning delegate, and the executor invokes the
+The execution overloads already take a `Task`-returning delegate, and the [executor](index.md) invokes the
 callback inside the same `try` that classifies its outcome - so a callback that throws
 synchronously is classified exactly as a faulted task is, and dropping `async` changes nothing but
 the allocation. Reported only when the whole body is one `await` whose task is already the

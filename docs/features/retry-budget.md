@@ -6,16 +6,13 @@ order: 5
 
 # Retry budget
 
-A retry budget bounds retries as a **fraction of traffic** rather than per call. It is **on by
-default**: a policy with `Budget = null` and more than one attempt gets an automatic budget private
-to that policy instance, so you get storm protection without learning the word.
-
-## Why a fraction
-
 A per-call attempt limit cannot prevent a retry storm, because every caller independently believes it
-is being reasonable. Retries compose multiplicatively: if a frontend, a backend and a database each
-permit three retries, one user action can become 4³ = 64 attempts at the bottom. With every client
-independently holding to 10%, total amplification is 1.1 times.
+is being reasonable. If a frontend, a backend and a database each permit three retries, one user
+action can become 4³ = 64 attempts at the bottom - and every client hammering a failing dependency
+makes the outage worse. A **retry budget** solves this by bounding retries as a **fraction of
+traffic** rather than per call. It is **on by default**: a policy with `Budget = null` and more than
+one attempt gets an automatic budget private to that policy instance, so you get storm protection
+without learning the word.
 
 ## Tuning, sharing and turning it off
 
@@ -51,11 +48,12 @@ var refund = Resilience.Http with { Budget = budget };
 Sharing is opt-in. A single process-wide budget would let a storm against payments throttle retries
 to search, which is the failure a shared budget exists to prevent.
 
-Budget state is per-process and there is no coordination between pods. That is not a defect - it is
-why the mechanism works at all: every client independently capping retries bounds fleet-wide
-amplification with no protocol. It does follow that a budget allocated per `HttpClient` instance, or
-resolved from a scoped DI container, is worthless, because it is thrown away before it can observe
-enough traffic to mean anything. Share one instance, or use `RetryBudget.Shared`.
+Budget state is per-process and there is no coordination between separate instances of your
+application (no shared counter across machines). That is not a defect - it is why the mechanism
+works at all: every client independently capping retries bounds the total across the whole fleet
+with no protocol. It does follow that a budget allocated per `HttpClient` instance, or resolved from
+a scoped DI container, is worthless, because it is thrown away before it can observe enough traffic
+to mean anything. Share one instance, or use `RetryBudget.Shared`.
 
 ## What a refused retry looks like
 

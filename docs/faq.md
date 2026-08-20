@@ -46,11 +46,13 @@ add a knob and an opinion, not a capability.
 
 ### Where is bulkhead isolation?
 
-`SemaphoreSlim`, or the platform's concurrency limiter. Everything a bulkhead does is available without
-a policy being involved, and the interesting part - what to do when the bulkhead is full - is a decision
-at the call site.
+A bulkhead is a limit on how many calls to one dependency can run at once, so a slow or failing
+dependency cannot consume all your threads and starve calls to everything else. `SemaphoreSlim`,
+or the platform's concurrency limiter, is all you need: everything a bulkhead does is available
+without a policy being involved, and the interesting part - what to do when the bulkhead is full -
+is a decision at the call site.
 
-### Can I add my own strategy?
+### Can I add my own policy layer?
 
 Not by composition, because there is nothing to compose into: the engine is
 [one flat method](deep-dives/one-executor.md). The extension points are the
@@ -80,7 +82,9 @@ policy is part of an application that runs in production, so the registration at
 
 ### Is it AOT and trimming safe?
 
-Yes, and it is CI-enforced: `dotnet publish -p:PublishAot=true` with warnings as errors, plus a
+Yes. AOT (ahead-of-time compilation, which compiles to native code at publish time rather than
+generating it at runtime) and trimming (removing unused code at publish time to shrink the binary)
+are both CI-enforced: `dotnet publish -p:PublishAot=true` with warnings as errors, plus a
 published binary that executes a policy - including DI, configuration binding and the meter - and
 re-checks the allocation budgets. There is no reflection anywhere in the core.
 
@@ -93,9 +97,4 @@ with a test behind it.
 
 Yes - `.AddResilience()` on the client builder. Note the two-minute handler rotation for configuration
 reload, described under [dependency injection](di/index.md).
-
-### Can I run it alongside Polly?
-
-Yes. The metric, tag and event names share nothing with Polly's, so a process running both stays
-legible - which is what makes migrating one client at a time practical.
 

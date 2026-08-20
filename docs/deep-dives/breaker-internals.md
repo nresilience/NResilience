@@ -1,6 +1,6 @@
 ---
 title: Breaker internals
-description: The state machine, the defaults that differ from Polly's, and why closing needs two probes.
+description: The state machine, the defaults, and why closing needs two probes.
 order: 4
 ---
 
@@ -17,12 +17,12 @@ Reading `State` reports `HalfOpen` for an open breaker whose break has elapsed, 
 the next call will find - but the transition itself happens on admission, so a health endpoint polling
 the state cannot consume the probe slot a real call needs.
 
-## Every default here differs from Polly's, deliberately
+## Every default is chosen, deliberately
 
-Polly's default breaker is rate-based: `FailureRatio` 0.1 over a minimum throughput of 100 calls per
-30 seconds. That means a service doing fewer than 100 calls per 30 seconds can never open its breaker
-- and that is the median .NET service. So consecutive failures is the default trip condition here,
-and the rate-based trip is opt-in alongside it rather than instead of it.
+A rate-based trip (`FailureRatio` 0.1 over a minimum throughput of 100 calls per 30 seconds) is the
+common default, and it means a service doing fewer than 100 calls per 30 seconds can never open its
+breaker - which is the median .NET service. So consecutive failures is the default trip condition
+here, and the rate-based trip is opt-in alongside it rather than instead of it.
 
 **Two probe successes, not one.** Closing a breaker on a single lucky probe, in front of a dependency
 that is still broken and a client fleet whose accumulated retries are waiting, is how breakers

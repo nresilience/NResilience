@@ -44,15 +44,19 @@ public sealed class Dependencies
 
 ## What's happening
 
-- **The breaker is a field**, so its scope is visible at the point of construction. Every policy
-  derived from `Charge` shares it, and nothing else does. See
-  [circuit breaker](../features/circuit-breaker.md).
-- **`SlowCallThreshold`** makes it trip on brownouts as well as errors, which is the failure mode an
-  error-rate breaker sits closed through.
+- **The [breaker](../features/circuit-breaker.md) is a field**, so its scope is visible at the point
+  of construction. A breaker is a switch that stops calling a dependency when it is failing. Every
+  policy derived from `Charge` shares it, and nothing else does.
+- **`SlowCallThreshold`** makes it trip on brownouts (slow responses) as well as errors. An
+  error-rate breaker that only counts failures can stay closed while the dependency is returning
+  errors slowly - it looks healthy by error count, but it is already struggling.
 - **`BreakDuration` doubles** on each consecutive open, up to `MaxBreakDuration`, so a long outage
-  does not mean a breaker flapping on a fixed cadence forever.
-- **The budget is shared by name**, so charges and refunds throttle against one pool - and search,
-  which does not name it, is unaffected. See [retry budget](../features/retry-budget.md).
+  does not mean a breaker reopening on a fixed schedule forever, hammering the dependency each time
+  it closes.
+- **The [retry budget](../features/retry-budget.md) is shared by name**, so charges and refunds
+  throttle against one pool - and search, which does not name it, is unaffected. A retry budget caps
+  retries as a fraction of traffic so a failing dependency is not overwhelmed by too many clients
+  retrying at once.
 - **`Name`** appears in every event and every metric tag, which is how a dashboard tells this
   dependency from the others.
 
@@ -83,8 +87,9 @@ A refused call fails with `CallRejectedException`, and `Reason` tells you which 
 opposite responses - "the dependency is down" against "we are retrying too hard" - so they are
 distinguishable everywhere, including in the metrics.
 
-A refusal is not instant. It serves a short pause first, because a cheap rejection inside a caller's
-polling loop is a CPU spin.
+A refusal is not instant. It serves a short pause first, because without that pause a caller in a
+tight polling loop would busy-spin (repeatedly calling and being rejected without waiting), burning
+CPU for nothing.
 
 ## When to go deeper
 

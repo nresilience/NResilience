@@ -6,9 +6,10 @@ order: 1
 
 # Retry
 
-Retry is **on by default**: `Resilience.Default` and `Resilience.Http` make up to three attempts with
-exponential backoff and full jitter. Whether an outcome is retried at all is the
-[classifier's](classification.md) decision, not the retry loop's.
+Retry is **on by default**: `Resilience.Default` and `Resilience.Http` make up to three attempts
+with exponential backoff (each delay is larger than the last) and full jitter (each delay is
+randomized so that multiple clients do not all retry at the same instant). Whether an outcome is
+retried at all is the [classifier's](classification.md) decision, not the retry loop's.
 
 ## Attempts
 
@@ -58,6 +59,10 @@ applied to it. A server telling you when to come back is better information than
 immediately, and is only correct when you know the dependency is not shared.
 
 ## Jitter
+
+When many clients retry at the same time - say, after a brief outage clears - they can all hit the
+dependency at the same instant, causing a second spike that looks like the first. Jitter spreads
+those retries out by adding a random component to each delay.
 
 <!-- snippet: retry-jitter -->
 ```csharp

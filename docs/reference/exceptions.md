@@ -9,7 +9,7 @@ order: 8
 When the operation genuinely failed, **the original exception is rethrown unchanged**, through
 `ExceptionDispatchInfo`, with its stack intact. `catch (HttpRequestException)` and
 `catch (SqlException)` keep working. The library only invents an exception for failures it invented: a
-deadline it enforced, a timeout it fired, a call it refused to make.
+deadline it enforced, an attempt timeout it fired, a call it refused to make.
 
 The attempt log rides along on `Exception.Data`, under `AttemptLog.DataKey`. Read it with
 `AttemptLog.Of(exception)`.
@@ -24,7 +24,7 @@ A call a guard refused. `Exception`.
 | `Attempts` | Whatever had already happened. |
 | `RetryAfter` | When to come back, when the refusal carried a hint. |
 
-It arrives no sooner than the rejection pause. A rejection reports itself rather than the last
+It arrives no sooner than the [rejection pause](../deep-dives/guarded-rejection.md). A rejection reports itself rather than the last
 attempt's exception, because the call it describes was never made; the previous attempt's exception is
 the inner one.
 
@@ -46,7 +46,7 @@ One attempt exceeded its own ceiling. Derives from `TimeoutException`.
 | `Timeout` | The ceiling the attempt exceeded. |
 | `Attempts` | Everything that happened, when this is the exception the call ended on. |
 
-Classified `Transient` by the executor itself, never by a classifier.
+Classified `Transient` by the [executor](index.md) itself, never by a classifier.
 
 ## `ResilienceConfigurationException`
 
