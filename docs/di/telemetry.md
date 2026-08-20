@@ -1,22 +1,20 @@
 ---
 title: Telemetry in DI
-description: What a registered policy records, how to see it, and how to turn it off.
+description: Manage telemetry and observability for policies registered in a DI container.
 order: 2
 ---
 
 # Telemetry in DI
 
-A policy you build by hand and hold in a `static readonly` field costs nothing when it is not
-running - no listener attached, no allocations, no overhead. A policy registered in a container is
-different: it is part of an application that runs in production, and a resilience library whose
-metrics are off unless you find the switch is a library whose metrics are off. So a registered
-policy records to the library's **meter** (a named set of instruments that a metrics collector can
-read) **by default**.
+Observability is critical for managing resilience in production. When you register policies in a DI container, NResilience automatically instruments them to provide real-time insights into call durations, retry rates, and circuit breaker state. This telemetry is exposed through a standard meter, making it compatible with most monitoring tools.
 
-The switches are `ResilienceOptions.Telemetry = false` in configuration and `telemetry: false` on the
-HTTP registrations.
+To disable telemetry for a specific policy, use one of the following switches:
+- **Configuration**: Set `ResilienceOptions.Telemetry = false`.
+- **HTTP registration**: Set `telemetry: false` during the registration call.
 
-## Collecting it
+## Collect telemetry
+
+To collect metrics and traces, configure OpenTelemetry to use the NResilience meter and activity source.
 
 ```csharp
 builder.Services.AddOpenTelemetry()
@@ -24,24 +22,25 @@ builder.Services.AddOpenTelemetry()
     .WithTracing(t => t.AddSource(ResilienceTelemetry.ActivitySourceName));
 ```
 
-Both names are `"NResilience"`. The instruments themselves are listed under
-[telemetry](../features/telemetry.md); the number to watch is
-`nresilience.attempts ÷ nresilience.calls`.
+Both `MeterName` and `ActivitySourceName` are `"NResilience"`. For a full list of instruments, see [Telemetry](../features/telemetry.md). The primary metric to monitor is the retry fraction: `nresilience.attempts ÷ nresilience.calls`.
 
-## Spans
+## Distributed tracing and spans
 
-A **span** (a unit of distributed tracing that covers one operation) is added per call: an HTTP
-client registration puts a telemetry handler **ahead** of the resilience handler, so its activity
-covers every attempt. That is the boundary a per-attempt HTTP span cannot show you: "these three
-sends were one call that eventually succeeded".
+NResilience adds a **span** (a unit of distributed tracing) for every call. 
 
-Attempts, retries and breaker transitions are added to the current activity as span events, tagged
-with the attempt number, the verdict, the delay and the exception type. `StartActivity` returns null
-when nobody is **sampling** (the tracing system decides which spans to record - when nobody is,
-there is nothing to record and the call is free), which is what makes an always-registered handler
-affordable.
+For HTTP client registrations, NResilience places a telemetry handler ahead of the resilience handler. This ensures the activity covers every attempt, providing a clear boundary that shows when multiple sends belong to a single logical call.
 
-## Instrumenting a policy you built by hand
+Attempts, retries, and circuit breaker transitions are recorded as span events. Each event is tagged with:
+- The attempt number.
+- The verdict.
+- The delay.
+- The exception type (if applicable).
+
+The library uses `StartActivity`, which returns `null` if the tracing system is not sampling. This ensures that if no one is recording traces, the registered handler adds negligible overhead.
+
+## Instrument manually created policies
+
+If you create a policy manually (e.g., in a static field), it is not instrumented by default. Use the `WithTelemetry()` method to enable it.
 
 <!-- snippet: telemetry-with-telemetry -->
 ```csharp
@@ -51,12 +50,10 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 ```
 <!-- endsnippet -->
 
-`WithTelemetry` chains after whatever `OnEvent` already held rather than replacing it, and applying it
-twice applies it once - so a defensive registration path cannot double-count.
+The `WithTelemetry` method chains the instrumentation after any existing `OnEvent` listener rather than replacing it. Calling it multiple times on the same policy only applies the instrumentation once to prevent double-counting.
 
-## What is not here
+## Logging
 
-No `ILogger` integration. `OnEvent` takes a lambda and a log line is one line of your code; a
-built-in logger would invent an event-id vocabulary and message templates to maintain and defend, and
-what it would save is a lambda. The [telemetry](../features/telemetry.md) page shows the line.
+NResilience does not provide built-in `ILogger` integration. Because `OnEvent` accepts a lambda, you can easily implement your own logging. This approach avoids the need for a library-maintained vocabulary of event IDs and message templates.
 
+For an example of how to implement a log listener, see the [Telemetry](../features/telemetry.md) page.

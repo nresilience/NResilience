@@ -1,40 +1,49 @@
 ---
 title: Backoff
-description: The delay between attempts - the shipped curves, the parameters, and jitter.
+description: Reference for the Backoff structure, supported delay curves, and jitter configurations.
 order: 4
 ---
 
 # `Backoff`
 
-`readonly record struct Backoff`.
+`Backoff` is a `readonly record struct` that determines the delay between retry attempts.
 
-| Member | Meaning |
-| --- | --- |
-| `Backoff.Default` | `Exponential()` - 100 ms transient base, 1 s throttled base, factor 2, 30 s cap, full jitter. |
-| `Backoff.None` | Retry immediately. Correct only when the dependency is known not to be shared. |
-| `Backoff.Exponential(transientBase, throttledBase, factor, max)` | Exponential, with separate bases per retryable verdict. All four parameters are optional. |
-| `Backoff.Constant(delay)` | The same delay every time. |
-| `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Compute it yourself. Ignores `Max` and jitter. |
-| `Jitter` | How much randomness to apply. `init`-settable, so `Backoff.Default with { Jitter = Jitter.None }` works. |
-| `Max` | The hard cap on any single delay, or `Timeout.InfiniteTimeSpan`. |
-| `Compute(in NextAttempt)` | The delay before that attempt. Never negative. |
+| Member | Description |
+| :--- | :--- |
+| `Backoff.Default` | Uses `Exponential()` with a 100 ms transient base, 1 s throttled base, factor of 2, 30 s cap, and full jitter. |
+| `Backoff.None` | Retries immediately. Use this only when the dependency is not shared. |
+| `Backoff.Exponential(transientBase, throttledBase, factor, max)` | Uses exponential backoff with separate bases for different retryable verdicts. All parameters are optional. |
+| `Backoff.Constant(delay)` | Applies the same delay before every retry. |
+| `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Allows you to compute the delay yourself. This mode ignores the `Max` property and jitter. |
+| `Jitter` | Determines the amount of randomness applied to the delay. |
+| `Max` | The maximum allowable delay for any single attempt. Defaults to 30 s. Use `Timeout.InfiniteTimeSpan` for no cap. |
+| `Compute(in NextAttempt)` | Calculates the delay before the specified attempt. This value is never negative. |
 
-Defaults: `transientBase` 100 ms, `throttledBase` 1 s, `factor` 2.0, `max` 30 s.
+### Exponential backoff calculation
+For exponential backoff, the delay for attempt *n* is calculated as:
+`base × factor^(n-2)`
 
-The delay for attempt *n* is `base × factor^(n-2)`, capped at `Max`, then jittered. So the first retry
-is served the base delay.
+The result is capped at `Max` and then jittered. The first retry is served the base delay.
 
-`Verdict.RetryAfter` wins over every curve: it is honored verbatim, capped only by `Max`, with no
-jitter applied. The [executor](index.md) additionally refuses to serve any delay that would consume the rest of
-the deadline - the call fails with the deadline instead of sleeping through it.
+**Default parameters**:
+- `transientBase`: 100 ms
+- `throttledBase`: 1 s
+- `factor`: 2.0
+- `max`: 30 s
 
-`default(Backoff)` reads as `Backoff.Default`, because `policy with { Backoff = default }` compiles.
+### Priority and constraints
+The `Verdict.RetryAfter` value takes precedence over all backoff curves. It is honored verbatim, capped only by `Max`, and no jitter is applied.
+
+The [executor](index.md) also ensures that a delay does not consume the remaining time on the deadline. If a delay would exceed the deadline, the call fails immediately with a deadline exception instead of sleeping.
+
+**Note**: `default(Backoff)` is equivalent to `Backoff.Default`.
 
 ## `Jitter`
 
-| Value | Delay |
-| --- | --- |
-| `Full` | `random(0, computed)`. The default, and the only shape that destroys the correlation between clients. |
-| `Equal` | `computed/2 + random(0, computed/2)`. Keeps a floor under the delay. |
-| `None` | No randomness. Only correct in tests, and rarely there. |
+Jitter adds randomness to the delay to prevent "thundering herd" problems where multiple clients retry simultaneously.
 
+| Value | Resulting Delay |
+| :--- | :--- |
+| `Full` | `random(0, computed)`. This is the default and the most effective way to break correlation between clients. |
+| `Equal` | `(computed / 2) + random(0, computed / 2)`. This maintains a minimum delay floor. |
+| `None` | No randomness is applied. This is typically only used in tests. |

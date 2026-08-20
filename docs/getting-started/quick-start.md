@@ -6,6 +6,8 @@ order: 1
 
 # Quick start
 
+Install the NResilience package:
+
 ```bash
 dotnet add package NResilience
 ```
@@ -20,18 +22,20 @@ private static async Task<User?> GetUserAsync(int id, CancellationToken cancella
 ```
 <!-- endsnippet -->
 
-That is a working retried client, and the only cancellation token in it is your own.
-`CreateClient()` puts the [`Resilience.Http`](../reference/resilience.md) preset in front of the
-transport: three attempts, exponential backoff with full jitter, a 30-second deadline, a 10-second
-attempt timeout, and a classifier that knows a 503 is worth retrying and a 404 is not.
+This creates a working retried client. Provide only your own cancellation token.
 
-The client's [handler](../http/index.md) does the HTTP-specific part: it rebuilds the request for
-every attempt, keeps POST out of the retry path, and scopes the breaker to the host.
+`CreateClient()` uses the [`Resilience.Http`](../reference/resilience.md) preset, which provides:
+- Three attempts
+- Exponential backoff with full jitter
+- A 30-second deadline
+- A 10-second attempt timeout
+- An HTTP classifier that retries `503` responses but not `404` responses
+
+The client's [handler](../http/index.md) handles HTTP-specific logic: it rebuilds the request for every attempt, excludes POST requests from the retry path, and scopes the circuit breaker to the host.
 
 ## Run any call, not just HTTP
 
-HTTP gets a client because it is the common case. Everything else - a queue read, a database call, a
-third-party SDK - goes through `RunAsync`, which takes the work as a callback.
+Wrap any asynchronous work - such as a queue read, a database call, or a third-party SDK - using `RunAsync`.
 
 <!-- snippet: quick-start-run-any-call -->
 ```csharp
@@ -41,19 +45,18 @@ string name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cance
 ```
 <!-- endsnippet -->
 
-The callback takes a token of its own, and it is not the one you passed in. `attempt` is cancelled
-when that attempt hits its [`AttemptTimeout`](../features/deadlines.md); `cancellationToken` is
-yours, and cancels the whole call. Passing `attempt` into your work is what lets a timed-out attempt
-actually stop.
+The callback provides an `attempt` token, which differs from the `cancellationToken` you pass in:
+- `attempt` is cancelled when the specific attempt hits its [`AttemptTimeout`](../features/deadlines.md).
+- `cancellationToken` cancels the entire operation.
+
+Pass the `attempt` token into your work to ensure that timed-out attempts actually stop.
 
 > [!TIP]
-> Every execution overload requires a callback that takes a `CancellationToken`, so there is no
-> zero-argument form to forget - and if the work is handed the wrong token,
-> [an analyzer in the package](../reference/analyzers.md) says so at build time.
+> Every execution overload requires a callback that takes a `CancellationToken`. An [analyzer in the package](../reference/analyzers.md) notifies you at build time if you pass the wrong token to your work.
 
-## Read the outcome without an exception
+## Handle outcomes without exceptions
 
-`RunAsync` throws what the call threw. When you would rather branch than catch, use `TryRunAsync`.
+`RunAsync` throws the exception encountered during the call. To branch on the outcome instead of catching exceptions, use `TryRunAsync`.
 
 <!-- snippet: quick-start-outcome -->
 ```csharp
@@ -68,13 +71,10 @@ if (!result.TryGetValue(out User? user))
 ```
 <!-- endsnippet -->
 
-The `if` is the whole fallback story: on failure, serve whatever you keep for exactly this case -
-a cached value, a default, a retry scheduled by your own code.
+Implement your fallback strategy in the `if` block, such as by serving a cached value or a default.
 
-## Next
+## Next steps
 
-- [Key concepts](key-concepts.md) - the vocabulary the rest of the docs use, and how to organize
-  your policies.
-- [Retry an HTTP call](../guides/retry-an-http-call.md) - the same thing, end to end, with the
-  handler.
-- [`CallResult<T>`](../reference/call-result.md) - every member of what came back.
+- [Key concepts](key-concepts.md) - learn the core terminology and how to organize policies.
+- [Retry an HTTP call](../guides/retry-an-http-call.md) - follow an end-to-end example with the handler.
+- [`CallResult<T>`](../reference/call-result.md) - explore the properties of the call outcome.

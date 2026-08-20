@@ -1,25 +1,32 @@
 ---
 title: Idempotency
-description: Which methods are retried, and how to say that one particular POST is safe to repeat.
+description: Learn which HTTP methods are retried by default and how to mark specific requests as safe for repetition.
 order: 1
 ---
 
 # Idempotency
 
-An HTTP method is **idempotent** (or retry-safe) if sending it twice has the same effect as sending
-it once. A GET re-reads the same resource; a DELETE that succeeded returns 404 the second time -
-neither duplicates anything. A POST that creates an order, sent twice, creates two orders. The
-handler retries only methods that are safe to repeat, and leaves unsafe ones alone unless you say
-otherwise.
+An HTTP method is **idempotent** if sending the same request multiple times has the same effect as sending it once. For example, a `GET` request re-reads the same resource, and a `DELETE` request removes a resource; neither action duplicates data. In contrast, a `POST` request that creates an order can result in multiple orders if retried.
 
-GET, HEAD, PUT, DELETE, OPTIONS and TRACE are retried. POST and PATCH are not, and neither is any
-method the library has not heard of - retrying something unrecognized is a guess, and the direction
-to guess in is the one that does not duplicate it.
+To prevent data duplication, the NResilience handler only retries methods that are safe to repeat.
 
-A retried POST is a duplicate order, a duplicate message or a duplicate charge. Microsoft's standard
-handler retries POST by default, which creates duplicates; it offers an opt-out.
+## Default retry behavior
 
-## Per request, which is the finer instrument
+The handler retries the following methods:
+- `GET`
+- `HEAD`
+- `PUT`
+- `DELETE`
+- `OPTIONS`
+- `TRACE`
+
+`POST` and `PATCH` are not retried by default. Additionally, any unrecognized HTTP methods are treated as unsafe and are not retried to avoid unintended side effects.
+
+A retried `POST` is a duplicate order, a duplicate message, or a duplicate charge. Microsoft's standard handler retries `POST` by default, which creates duplicates; it offers an opt-out. NResilience inverts this default.
+
+## Mark a request as repeatable
+
+If you know a specific `POST` or `PATCH` request is safe to repeat - for example, because it includes an idempotency key - you can mark it as repeatable on a per-request basis. This is the most precise way to control retry behavior.
 
 <!-- snippet: http-repeatable -->
 ```csharp
@@ -33,25 +40,20 @@ using HttpResponseMessage response = await client.SendAsync(request, cancellatio
 ```
 <!-- endsnippet -->
 
-`ResilienceHttp.Repeatable` decides when it is set, and it beats `RetryUnsafeMethods` in **both**
-directions: `true` retries a POST, and `false` keeps a GET from being repeated whatever its method
-says. Whoever writes the request knows something the client registration cannot - such as whether it
-carries an idempotency key.
+The `ResilienceHttp.Repeatable` option overrides the client-level `RetryUnsafeMethods` setting in both directions:
+- Setting it to `true` allows a `POST` or `PATCH` request to be retried.
+- Setting it to `false` prevents a `GET` or `PUT` request from being retried.
 
-## Per client
+## Enable retries for a client
 
-`HttpResilienceOptions.RetryUnsafeMethods = true` retries POST and PATCH for a whole client. That is
-a statement about every request that client will ever send, so prefer the per-request switch unless
-the whole API is genuinely idempotent.
+You can enable retries for `POST` and `PATCH` across an entire client by setting `HttpResilienceOptions.RetryUnsafeMethods = true`. 
 
-## What a retried request looks like
+Use this setting only if the entire API served by that client is genuinely idempotent. For most scenarios, the per-request `ResilienceHttp.Repeatable` option is safer and more precise.
 
-Each attempt gets a fresh `HttpRequestMessage` carrying the original's method, URI, version, headers
-and options. The body is buffered once, before the first attempt, and every attempt gets its own copy
-of it - unconditionally, because a retry that works for `StringContent` and throws for
-`StreamContent` is exactly the bug that only shows up in production.
+## Request and response handling
 
-The response a retry supersedes is disposed for you. The final response - whether it succeeded or is
-the 503 the policy ran out of attempts on - is handed back alive, because you need it, not least to
-dispose it yourself.
+To ensure retries are successful and resource-efficient, the handler manages requests and responses as follows:
 
+- **Request cloning**: Each retry attempt uses a fresh `HttpRequestMessage`. The handler copies the original method, URI, version, headers, and options.
+- **Body buffering**: The request body is buffered once before the first attempt. Every subsequent attempt receives a fresh copy of the buffered content, ensuring compatibility with both `StringContent` and `StreamContent`.
+- **Response disposal**: The handler automatically disposes of any `HttpResponseMessage` that is superseded by a retry. The final response - whether it is a success or the final failure - is returned to the caller for manual disposal.

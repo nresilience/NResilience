@@ -1,18 +1,16 @@
 ---
 title: Reference
-description: Every public member, in a stable order, one page per type family.
+description: A comprehensive reference of the NResilience public API, organized by type family.
 order: 7
 ---
 
 # Reference
 
-The **executor** is the internal loop that runs each attempt, applies the deadline and attempt
-timeout, serves the backoff, and decides whether to retry - one flat pass, no strategy pipeline.
-Several pages below use the term; it is defined here once.
+The **executor** is the internal loop that manages the execution of each attempt. It applies deadlines and attempt timeouts, handles backoff delays, and determines whether a call should be retried. To maintain simplicity and performance, the executor uses a flat execution pass rather than a strategy pipeline.
 
-| Page | Types |
-| --- | --- |
-| [`Resilience`](resilience.md) | `Resilience`, the execution methods, `NextAttempt` |
+| Topic | Types and Members |
+| :--- | :--- |
+| [`Resilience`](resilience.md) | `Resilience`, execution methods, `NextAttempt` |
 | [`CallResult<T>`](call-result.md) | `CallResult<T>`, `CallResult`, `StopReason`, `AttemptLog`, `Attempt` |
 | [Classifier and verdicts](classifier.md) | `Classifier`, `Verdict`, `VerdictKind` |
 | [`Backoff`](backoff.md) | `Backoff`, `Jitter` |
@@ -23,8 +21,4 @@ Several pages below use the term; it is defined here once.
 | [HTTP](http.md) | `ResilienceHandler`, `HttpResilienceOptions`, `ResilienceHttp` |
 | [Options and registration](options.md) | `ResilienceOptions`, `BreakerOptions`, `IResiliencePolicies`, `ResilienceTelemetry`, `AddResilience` |
 | [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder` |
-| [Analyzers](analyzers.md) | NRES001-NRES007, the diagnostics that ship in the package |
-
-The public surface is a checked-in manifest: surface growth is a reviewed diff rather than an
-accident.
-
+| [Analyzers](analyzers.md) | Diagnostics `NRES001` through `NRES007` |

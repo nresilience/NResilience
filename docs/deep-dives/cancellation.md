@@ -1,73 +1,49 @@
 ---
 title: The cancellation contract
-description: Which token cancels what, who decides what a cancellation meant, and what happens to work that ignores it.
+description: Learn how NResilience manages different cancellation sources and the consequences of ignoring cancellation tokens.
 order: 3
 ---
 
 # The cancellation contract
 
-Three things can end an attempt early, and conflating any two of them is a bug people spend afternoons
-on. So the executor never asks a predicate which one happened - it knows, because it owns the sources.
+A resilience attempt can end prematurely for three distinct reasons. Conflating these reasons is a common source of bugs. To ensure clarity, the executor manages the sources of cancellation directly and avoids using predicates to determine the cause.
 
-| What happened | Who decides | Verdict |
-| --- | --- | --- |
-| The caller cancelled the token they passed in | Nobody. It is not a failure | Rethrown, always |
-| The attempt exceeded its ceiling | The executor | `Transient`, with an `AttemptTimeoutException` |
-| The callback threw something else | Your classifier | Whatever it says |
+| Scenario | Decision Maker | Outcome / Verdict |
+| :--- | :--- | :--- |
+| The caller cancels the provided token | External | Rethrown as `OperationCanceledException` |
+| The attempt exceeds its time ceiling | Executor | Classified as `Transient` via `AttemptTimeoutException` |
+| The callback throws an exception | Classifier | Determined by the configured `Classifier` |
 
-Caller cancellation is checked at the top of the call, after every attempt returns, and after every
-backoff delay - because a token cancelled 400 milliseconds into a backoff must abort the operation
-rather than start another attempt. It is never retried, never counted against a breaker or a budget,
-never converted into a timeout, and no classifier can override it. `TryRunAsync` reports every other
-failure and still throws this one.
+### Caller cancellation behavior
+The executor checks for caller cancellation at the start of the operation, after every attempt returns, and after every backoff delay. This ensures that if a token is cancelled during a backoff period, the operation aborts immediately instead of starting another attempt.
 
-There is one deliberate asymmetry. A caller who cancels while an attempt is already succeeding gets the
-value. They have waited for that attempt either way, and throwing away work that is done and paid for
-helps nobody; the post-attempt check exists to stop the loop starting *another* attempt.
+Caller cancellation is never retried, counted against a circuit breaker or retry budget, or converted into a timeout. No classifier can override this behavior. Even when using `TryRunAsync`, caller cancellation is thrown as an exception.
+
+**Asymmetry in success**: If a caller cancels while an attempt is already succeeding, the executor returns the successful value. Since the caller has already waited for the attempt to complete, discarding the result provides no benefit. The post-attempt check exists primarily to prevent the loop from starting a subsequent attempt.
 
 ## The token the callback receives
 
-When there is an effective attempt ceiling, the callback receives a token linked from two sources: a
-pooled source driving the timer, and the caller's token. The pooled source's own token is never handed
-out, because `TryReset` preserves token identity - a callback that outlived its attempt would observe
-the *next* operation's cancellation, which is a data race dressed up as a timeout.
+When an attempt ceiling is defined, the callback receives a token linked from two sources: a pooled timer source and the caller's token. 
 
-When there is no ceiling, the callback receives the caller's token unchanged.
+The executor does not hand out the pooled source's own token directly. This is because `TryReset` preserves token identity; if a callback outlived its attempt, it would observe the cancellation of the *next* operation, creating a data race.
 
-The samples name that parameter `attempt` rather than `ct`, because two tokens in scope with names
-that differ only in length is how a call site ends up passing the wrong one - and passing the caller's
-token where the attempt's belongs disables the attempt timeout without any visible symptom.
+If no ceiling is defined, the callback receives the caller's token unchanged.
+
+**Naming convention**: In examples, this parameter is named `attempt` rather than `ct`. Using names that differ by more than just length reduces the risk of passing the caller's token where the attempt's token is required, which would silently disable the attempt timeout.
 
 ## Work that ignores the token
 
 > [!CAUTION]
-> A timeout cannot kill a callback that ignores its cancellation token. The orphaned work keeps
-> running, and the policy does not move on: the executor is awaiting the very task that ignored its
-> token, so a callback that never returns hangs the call along with itself.
+> A timeout cannot terminate a callback that ignores its cancellation token. If a callback ignores the token, the orphaned work continues to run, and the policy cannot proceed. The executor awaits the task that ignored the token, so a callback that never returns will hang the entire call.
 
-This is the failure mode behind a long line of issues filed against every resilience library,
-including ones where the library's own shipped sample demonstrated it.
+This is a common failure mode in resilience libraries. Rather than racing the attempt against its timeout - which would require allocating a promise and registration for every suspending call - NResilience uses structural mitigations:
 
-Moving on regardless would mean racing the attempt against its timeout, and that allocates a promise
-and a registration on every suspending call whether or not anything ever times out. That price is not
-worth a diagnostic, so the mitigations are structural instead:
+- **Required Tokens**: Every execution overload requires a callback that accepts a `CancellationToken`. There is no zero-argument form that allows you to forget the token.
+- **Orphaned Work Events**: An `OrphanedWork` event is raised retrospectively the moment a callback finally returns if it overran its ceiling by more than one second. This catches every callback that ignores its token but eventually finishes.
+- **Build-time Analyzers**: [NRES001 and NRES002](../reference/analyzers.md) analyze the callback at build time. They report when a call that accepts a cancellation token is handed the wrong token or no token at all.
 
-- **Every execution overload requires a callback that takes a `CancellationToken`.** There is no
-  zero-argument form to forget.
-- **An `OrphanedWork` event names the policy** when an attempt overruns its ceiling by more than a
-  second. It is raised retrospectively, the moment the work finally does return, which catches every
-  callback that ignores its token and eventually finishes.
-- **Two analyzers say it at build time.** [NRES001 and NRES002](../reference/analyzers.md) read the
-  callback and report a call that takes a cancellation token and was handed the wrong one, or none.
-  They ship inside the package, so nobody has to know they exist.
-
-A callback that never finishes leaves the call itself hanging, and there the diagnostic you need is a
-stack dump rather than an event. The library cannot fix uncooperative code. It can refuse to make
-forgetting easy, and it can tell you when it happened.
+While the library cannot fix uncooperative code that never finishes, it prevents forgetting the token and provides diagnostics when it happens. If a call hangs indefinitely, a stack dump is the necessary diagnostic tool.
 
 ## `HttpClient.Timeout`
 
-The transport timeout is the one bound nothing in the policy can see: it defaults to 100 seconds and
-covers the entire send, retries and backoff included. Two timeout systems interacting silently is the
-worst available default, so the HTTP integration takes it over. See [HTTP](../http/index.md).
-
+The transport timeout is a bound that the resilience policy cannot see. By default, it is 100 seconds and covers the entire send operation, including all retries and backoff delays. Because having two silent timeout systems is problematic, the NResilience HTTP integration takes ownership of this setting. For more information, see the [HTTP guide](../http/index.md).

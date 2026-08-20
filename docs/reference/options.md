@@ -1,83 +1,79 @@
 ---
 title: Options and registration
-description: ResilienceOptions, BreakerOptions, IResiliencePolicies, ResilienceTelemetry and the AddResilience overloads.
+description: Reference for ResilienceOptions, BreakerOptions, IResiliencePolicies, and the AddResilience registration methods.
 order: 10
 ---
 
 # Options and registration
 
-Package `NResilience.Extensions`. The registration methods live in
-`Microsoft.Extensions.DependencyInjection`, which is where people look for one.
+Registration methods are located in the `NResilience.Extensions` package and are provided as extension methods for `IServiceCollection` and `IHttpClientBuilder`.
 
 ## `AddResilience` on `IServiceCollection`
 
-| Overload | What it does |
-| --- | --- |
-| `AddResilience(name, Resilience policy, configure = null)` | Registers a policy value. Validates eagerly. |
-| `AddResilience(name, Action<ResilienceOptions> configureOptions, configure = null)` | Registers one configured in code. |
-| `AddResilience(name, IConfiguration section, configure = null)` | Registers one bound to a section. Reloads. |
-| `AddResilience(IConfiguration section)` | Registers every child of the section as a policy named by its key. |
-| `AddResilience()` | Registers `IResiliencePolicies` and no policies. |
+Use these methods to register resilience policies within the dependency injection container.
 
-`configure` is a `Func<Resilience, Resilience>` that runs **last**, after the section and after live
-objects are re-attached.
+| Overload | Description |
+| :--- | :--- |
+| `AddResilience(name, Resilience policy, configure = null)` | Registers a specific policy instance. This method validates the policy eagerly. |
+| `AddResilience(name, Action<ResilienceOptions> configureOptions, configure = null)` | Registers a policy configured via code. |
+| `AddResilience(name, IConfiguration section, configure = null)` | Registers a policy bound to a configuration section. Supports live reloading. |
+| `AddResilience(IConfiguration section)` | Registers every child of the configuration section as a policy, using the keys as names. |
+| `AddResilience()` | Registers the `IResiliencePolicies` service without any initial policies. |
+
+The optional `configure` parameter is a `Func<Resilience, Resilience>` that runs last, after the configuration section is processed and live objects are re-attached.
 
 ## `AddResilience` on `IHttpClientBuilder`
 
-| Overload | What it does |
-| --- | --- |
-| `AddResilience(Resilience? policy = null, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true)` | Adds the handler with a policy value, defaulting to `Resilience.Http`. |
-| `AddResilience(string policyName, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true)` | Adds the handler with a registered policy, resolved when the handler chain is built. |
+Use these methods to add the `ResilienceHandler` to an `HttpClient` pipeline.
 
-The policy is named after the client unless it carries a name of its own; a preset's name does not
-count, so four clients on `Resilience.Http` do not all report as `http`.
+| Overload | Description |
+| :--- | :--- |
+| `AddResilience(Resilience? policy = null, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true)` | Adds the handler using the provided policy value, defaulting to `Resilience.Http`. |
+| `AddResilience(string policyName, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true)` | Adds the handler using a registered policy, which is resolved when the handler chain is built. |
+
+If the policy does not have its own name, it is named after the client. This prevents multiple clients using `Resilience.Http` from all reporting under the same name in telemetry.
 
 ## `IResiliencePolicies`
 
-| Member | Meaning |
-| --- | --- |
-| `this[string name]` | The current policy for that name. Throws `ResilienceConfigurationException` listing what is registered. |
-| `Names` | Every registered name. |
-| `TryGet(name, out policy)` | The non-throwing form. `policy` is `Resilience.Default` when there is none. |
+The `IResiliencePolicies` service provides access to registered policies.
 
-Resolve per call. A policy captured at construction is a snapshot no reload will reach.
+| Member | Description |
+| :--- | :--- |
+| `this[string name]` | Returns the current policy for the specified name. Throws a `ResilienceConfigurationException` if the name is not registered. |
+| `Names` | A collection of all registered policy names. |
+| `TryGet(name, out policy)` | A non-throwing method to retrieve a policy. Returns `Resilience.Default` if no policy is found. |
+
+**Recommendation**: Resolve policies per call. Capturing a policy at construction creates a snapshot that will not reflect configuration reloads.
 
 ## `ResilienceOptions`
 
-`sealed class`. Flat, mutable, and every property nullable, where null means "say nothing".
+`ResilienceOptions` is a `sealed class` used for binding configuration to a policy. All properties are nullable; a `null` value indicates that the property should not be overridden.
 
-`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `TransientBaseDelay`,
-`ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`,
-`BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Telemetry`.
+**Properties**:
+`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Telemetry`.
 
-`ToPolicy(Resilience? baseline = null)` projects onto a policy: the preset first when set, then every
-property that is not null. It does not validate - the caller does, so a bad section fails at
-registration.
+- **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. This method does not perform validation; validation occurs at registration or execution.
+- **Budget Disabling**: Setting `BudgetFraction = 0` disables the retry budget.
 
-`BudgetFraction = 0` is the off switch, because "retries may add at most 0%" is not a budget anyone
-can spend from.
-
-See [Configuration](../di/configuration.md) for the section shape and for why the binding target is a
-DTO rather than the record.
+For more information on the configuration structure, see [Configuration](../di/configuration.md).
 
 ## `BreakerOptions`
 
-The bindable shape of [`BreakerSettings`](breaker.md), with the same property names, all nullable.
-`ToBreaker(string? name = null)` builds the live breaker. A configured breaker is created once per
-policy and survives configuration reloads, because its state is the point.
+`BreakerOptions` provides the bindable shape of [`BreakerSettings`](breaker.md) with nullable properties.
+
+- **`ToBreaker(string? name = null)`**: Builds a live `Breaker` instance. A configured breaker is created once per policy and persists through configuration reloads to maintain its state.
 
 ## `ResilienceTelemetry`
 
-`static class`.
+`ResilienceTelemetry` is a `static class` that provides access to the library's instrumentation.
 
-| Member | Meaning |
-| --- | --- |
-| `MeterName` | `"NResilience"`. |
-| `ActivitySourceName` | `"NResilience"`. |
-| `Meter` | The meter every instrument is created on. |
-| `ActivitySource` | The source the HTTP registration gives a logical operation a span from. |
-| `Listener` | The `Action<CallEvent>` that records to the instruments. Stateless and allocation-free. |
-| `WithTelemetry(this Resilience policy)` | The policy with `Listener` chained after whatever `OnEvent` held. Idempotent. |
+| Member | Description |
+| :--- | :--- |
+| `MeterName` | The name of the meter: `"NResilience"`. |
+| `ActivitySourceName` | The name of the activity source: `"NResilience"`. |
+| `Meter` | The `Meter` instance used to create all instruments. |
+| `ActivitySource` | The `ActivitySource` used to provide spans for HTTP operations. |
+| `Listener` | An `Action<CallEvent>` that records data to instruments. It is stateless and allocation-free. |
+| `WithTelemetry(this Resilience policy)` | An extension method that chains the `Listener` to the policy's `OnEvent` handler. This operation is idempotent. |
 
-The instruments are listed under [telemetry](../features/telemetry.md).
-
+For a list of available instruments, see [Telemetry](../features/telemetry.md).

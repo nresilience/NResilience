@@ -1,20 +1,20 @@
 ---
 title: Retry budget
-description: Retries bounded as a fraction of traffic - on by default, and the reason a failing dependency cannot turn your client into a load generator.
+description: Bound retries as a fraction of traffic to prevent retry storms and excessive load on dependencies.
 order: 5
 ---
 
 # Retry budget
 
-A per-call attempt limit cannot prevent a retry storm, because every caller independently believes it
-is being reasonable. If a frontend, a backend and a database each permit three retries, one user
-action can become 4³ = 64 attempts at the bottom - and every client hammering a failing dependency
-makes the outage worse. A **retry budget** solves this by bounding retries as a **fraction of
-traffic** rather than per call. It is **on by default**: a policy with `Budget = null` and more than
-one attempt gets an automatic budget private to that policy instance, so you get storm protection
-without learning the word.
+A per-call attempt limit cannot prevent a retry storm because each caller independently believes its retry behavior is reasonable. For example, if a frontend, a backend, and a database each permit three retries, a single user action can result in 64 attempts at the bottom layer. This can overwhelm a failing dependency and worsen an outage.
 
-## Tuning, sharing and turning it off
+A **retry budget** prevents this by bounding retries as a fraction of total traffic rather than per call.
+
+Retry budgets are enabled by default. If a policy has more than one attempt and `Budget` is `null`, NResilience automatically creates a budget private to that policy instance.
+
+## Configure and share the budget
+
+You can tune the budget parameters or opt out of the feature entirely.
 
 <!-- snippet: budget-off -->
 ```csharp
@@ -28,10 +28,14 @@ var generous = Resilience.Default with { Budget = RetryBudget.Of(fraction: 0.2, 
 ```
 <!-- endsnippet -->
 
-| Parameter | Default | What it does |
-| --- | --- | --- |
-| `fraction` | 0.1 | Retries funded per successful attempt - one retry per ten successes in steady state |
-| `minimumPerSecond` | 3 | An absolute floor, so a low-traffic client can still retry at all |
+| Parameter | Default | Description |
+| :--- | :--- | :--- |
+| `fraction` | 0.1 | The number of retries funded per successful attempt. For example, 0.1 funds one retry per ten successes in a steady state. |
+| `minimumPerSecond` | 3 | The absolute minimum number of retries allowed per second, ensuring low-traffic clients can still retry. |
+
+### Share a budget across policies
+
+Sharing a budget is opt-in. Use a shared budget to bound the aggregate number of retries across multiple policies.
 
 <!-- snippet: budget-shared -->
 ```csharp
@@ -45,21 +49,17 @@ var refund = Resilience.Http with { Budget = budget };
 ```
 <!-- endsnippet -->
 
-Sharing is opt-in. A single process-wide budget would let a storm against payments throttle retries
-to search, which is the failure a shared budget exists to prevent.
+Avoid using a single process-wide budget for unrelated services. A storm against one service could throttle retries for another unrelated service, which is the exact failure a shared budget is intended to prevent.
 
-Budget state is per-process and there is no coordination between separate instances of your
-application (no shared counter across machines). That is not a defect - it is why the mechanism
-works at all: every client independently capping retries bounds the total across the whole fleet
-with no protocol. It does follow that a budget allocated per `HttpClient` instance, or resolved from
-a scoped DI container, is worthless, because it is thrown away before it can observe enough traffic
-to mean anything. Share one instance, or use `RetryBudget.Shared`.
+### Implementation details
 
-## What a refused retry looks like
+Budget state is maintained per-process. There is no coordination between separate instances of your application. This decentralized approach bounds the total number of retries across the entire fleet without requiring a coordination protocol.
 
-The first attempt always runs - a budget throttles retries, not calls. When it will not fund one, the
-call stops with `StopReason.BudgetExhausted` after a short pause, and
-`CallRejectedException.RetryAfter` carries how long until the floor rate has accrued a whole token.
+Because budget state is local, do not allocate a budget per `HttpClient` instance or resolve it from a scoped DI container. Doing so causes the budget to be discarded before it can observe enough traffic to be effective. Instead, share a single instance or use `RetryBudget.Shared`.
+
+## Handle rejected retries
+
+The first attempt always runs; a budget throttles only the retries. When a budget cannot fund a retry, the call stops with `StopReason.BudgetExhausted` after a short pause. The `CallRejectedException.RetryAfter` property indicates how long to wait before the floor rate accrues another token.
 
 <!-- snippet: breaker-rejection -->
 ```csharp
@@ -74,7 +74,9 @@ if (result.Exception is CallRejectedException rejection)
 ```
 <!-- endsnippet -->
 
-## Watching it
+## Monitor budget utilization
+
+You can monitor the utilization of a budget to identify when retries are being refused.
 
 <!-- snippet: budget-utilisation -->
 ```csharp
@@ -84,8 +86,6 @@ double spent = budget.Utilisation;   // 0 to 1
 ```
 <!-- endsnippet -->
 
-`nresilience.attempts ÷ nresilience.calls` is the number to alert on - see
-[telemetry](telemetry.md).
+For high-level alerting, monitor the ratio of `nresilience.attempts` to `nresilience.calls`. For more information, see [telemetry](telemetry.md).
 
-Go deeper: [Retry budget internals](../deep-dives/retry-budget-internals.md).
-
+For a deeper dive into the implementation, see [Retry budget internals](../deep-dives/retry-budget-internals.md).

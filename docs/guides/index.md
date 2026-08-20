@@ -1,20 +1,18 @@
 ---
 title: Guides
-description: Worked scenarios, each one complete and copy-pasteable.
+description: Practical scenarios for implementing resilience policies in your application.
 order: 2
 ---
 
 # Guides
 
-Each guide is one scenario, start to finish. A **policy** is the object that says what to do when
-a call fails - whether to retry, how long to wait, and when to stop calling the dependency. If the
-word is new, [key concepts](../getting-started/key-concepts.md) defines it and the rest of the
-vocabulary these guides use.
+These guides provide complete, step-by-step scenarios for common resilience tasks. Each guide takes you from the initial problem to a working implementation.
 
-| Guide | The goal you arrived with |
-| --- | --- |
-| [Retry an HTTP call](retry-an-http-call.md) | "This API fails sometimes and I want the call to survive it." |
-| [Protect a dependency](protect-a-dependency.md) | "Payments is flaky and I do not want it taking the rest of the app down." |
-| [Configure from appsettings](configure-from-configuration.md) | "Operations wants to change the deadline without a deploy." |
-| [Test a policy](test-a-policy.md) | "I want a test that proves the retry happens, and that runs in milliseconds." |
+If you are new to NResilience, see [Key concepts](../getting-started/key-concepts.md) to learn about policies, verdicts, and the library's core vocabulary.
 
+| Guide | Goal |
+| :--- | :--- |
+| [Retry an HTTP call](retry-an-http-call.md) | Ensure an API call succeeds despite occasional transient failures. |
+| [Protect a dependency](protect-a-dependency.md) | Use a circuit breaker to prevent a flaky dependency from affecting the rest of your application. |
+| [Configure from appsettings](configure-from-configuration.md) | Update policy settings, such as deadlines, without redeploying the application. |
+| [Test a policy](test-a-policy.md) | Write fast, reliable tests to verify that your policies behave as expected. |

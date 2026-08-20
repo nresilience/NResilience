@@ -1,66 +1,60 @@
 ---
 title: Exceptions
-description: What the library throws, what it rethrows unchanged, and where the attempt log is.
+description: Reference for the exceptions thrown by NResilience and how to access the attempt log.
 order: 8
 ---
 
 # Exceptions
 
-When the operation genuinely failed, **the original exception is rethrown unchanged**, through
-`ExceptionDispatchInfo`, with its stack intact. `catch (HttpRequestException)` and
-`catch (SqlException)` keep working. The library only invents an exception for failures it invented: a
-deadline it enforced, an attempt timeout it fired, a call it refused to make.
+When a resilience operation fails, NResilience rethrows the original exception unchanged using `ExceptionDispatchInfo`. This preserves the original stack trace, ensuring that standard catch blocks - such as `catch (HttpRequestException)` or `catch (SqlException)` - continue to work as expected.
 
-The attempt log rides along on `Exception.Data`, under `AttemptLog.DataKey`. Read it with
-`AttemptLog.Of(exception)`.
+The library only introduces new exception types for failures it generates, such as deadlines it enforces or calls it refuses to make.
+
+### Accessing the attempt log
+For any exception thrown by the library, the attempt log is stored in `Exception.Data` under the `AttemptLog.DataKey`. You can retrieve this log using `AttemptLog.Of(exception)`.
 
 ## `CallRejectedException`
 
-A call a guard refused. `Exception`.
+A `CallRejectedException` is thrown when a guard refuses to execute a call.
 
-| Member | Meaning |
-| --- | --- |
-| `Reason` | `DependencyUnavailable` for an open breaker, `BudgetExhausted` for a depleted budget. |
-| `Attempts` | Whatever had already happened. |
-| `RetryAfter` | When to come back, when the refusal carried a hint. |
+| Member | Description |
+| :--- | :--- |
+| `Reason` | The reason for the refusal: `DependencyUnavailable` for an open circuit breaker, or `BudgetExhausted` for a depleted retry budget. |
+| `Attempts` | The history of attempts that occurred before the call was rejected. |
+| `RetryAfter` | A hint indicating when the caller should retry the operation, if provided. |
 
-It arrives no sooner than the [rejection pause](../deep-dives/guarded-rejection.md). A rejection reports itself rather than the last
-attempt's exception, because the call it describes was never made; the previous attempt's exception is
-the inner one.
+This exception is thrown no sooner than the [rejection pause](../deep-dives/guarded-rejection.md). Because the rejected call was never made, this exception reports the rejection itself; the exception from the previous attempt is contained as the inner exception.
 
 ## `DeadlineExceededException`
 
-The wall-clock budget for the whole call ran out. Derives from `TimeoutException`.
+A `DeadlineExceededException` occurs when the overall wall-clock budget for the entire call expires. This exception derives from `TimeoutException`.
 
-| Member | Meaning |
-| --- | --- |
+| Member | Description |
+| :--- | :--- |
 | `Deadline` | The budget that was exceeded. |
-| `Attempts` | Everything that happened before it ran out. |
+| `Attempts` | All attempts that occurred before the deadline was reached. |
 
 ## `AttemptTimeoutException`
 
-One attempt exceeded its own ceiling. Derives from `TimeoutException`.
+An `AttemptTimeoutException` is thrown when a single attempt exceeds its specific time ceiling. This exception derives from `TimeoutException`.
 
-| Member | Meaning |
-| --- | --- |
-| `Timeout` | The ceiling the attempt exceeded. |
-| `Attempts` | Everything that happened, when this is the exception the call ended on. |
+| Member | Description |
+| :--- | :--- |
+| `Timeout` | The ceiling that the attempt exceeded. |
+| `Attempts` | The complete attempt log, if this was the final exception of the call. |
 
-Classified `Transient` by the [executor](index.md) itself, never by a classifier.
+The [executor](index.md) always classifies `AttemptTimeoutException` as `Transient`, regardless of the configured classifier.
 
 ## `ResilienceConfigurationException`
 
-A policy, breaker settings or budget parameters that cannot be used.
+A `ResilienceConfigurationException` is thrown when a policy, breaker setting, or budget parameter is invalid.
 
-| Member | Meaning |
-| --- | --- |
-| `Problems` | **Every** problem found, not just the first. |
+| Member | Description |
+| :--- | :--- |
+| `Problems` | A collection of all configuration problems found. |
 
-Thrown by `Resilience.Validate()`, `BreakerSettings.Validate()`, the `RetryBudget` factories, at DI
-registration, and lazily on the first execution of a policy instance.
+This exception is thrown by `Resilience.Validate()`, `BreakerSettings.Validate()`, and the `RetryBudget` factories. It may also be thrown during DI registration or lazily during the first execution of a policy instance.
 
 ## Caller cancellation
 
-`OperationCanceledException` from the token you passed in is never retried, never counted, never
-converted into a timeout, and never suppressed - including by `TryRunAsync`.
-
+If the `CancellationToken` you provided is cancelled, an `OperationCanceledException` is thrown. This exception is never retried, counted as an attempt, converted into a timeout, or suppressed - even when using `TryRunAsync`.

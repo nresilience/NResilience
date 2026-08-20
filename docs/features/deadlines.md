@@ -1,30 +1,29 @@
 ---
 title: Deadlines and attempt timeouts
-description: The two bounds, how they interact, and what happens to work that ignores its cancellation token.
+description: Manage total call duration and individual attempt limits.
 order: 2
 ---
 
 # Deadlines and attempt timeouts
 
-A retried call needs two time bounds, and mixing them up is a common bug: a 30-second per-attempt
-timeout with three retries can run for 90 seconds, which is probably not what you meant. The
-**deadline** is the ceiling on the whole call - every attempt, every backoff delay, everything.
-The **attempt timeout** is the ceiling on a single attempt. Both are **on by default**: a 30-second
-`Deadline` for the whole call and a 10-second `AttemptTimeout` for any one attempt.
-`Timeout.InfiniteTimeSpan` turns either off.
+A retried call requires two different time bounds to avoid common timeout bugs. For example, a 30-second per-attempt timeout with three retries could result in a total call duration of 90 seconds.
+
+The **deadline** is the ceiling for the entire operation, including every attempt and backoff delay. The **attempt timeout** is the ceiling for a single attempt.
+
+Both are enabled by default:
+- **Deadline**: 30 seconds for the whole call.
+- **Attempt timeout**: 10 seconds for any single attempt.
+
+Use `Timeout.InfiniteTimeSpan` to disable either bound.
 
 > [!CAUTION]
-> A timeout cannot kill a callback that ignores its cancellation token. The attempt timeout fires,
-> the token is cancelled, and a callback that never observes it keeps running - and the policy waits
-> for it, because the [executor](../reference/index.md) (the internal loop that runs each attempt) is
-> awaiting that very task. Every execution overload requires a callback that takes a
-> `CancellationToken`, so there is no zero-argument form to forget - and
-> [NRES001 and NRES002](../reference/analyzers.md) report a call handed the wrong token at build
-> time. When an attempt overruns its ceiling by more than a second, an `OrphanedWork` event fires
-> naming the policy - raised retrospectively, when the work finally does return, which is the only
-> moment the overrun is observable at all.
+> A timeout cannot terminate a callback that ignores its cancellation token. If a callback never observes the token, the policy must wait for the task to complete because the [executor](../reference/index.md) is awaiting that task.
+> 
+> To prevent this, every execution overload requires a callback that accepts a `CancellationToken`. The [analyzers](../reference/analyzers.md) (NRES001 and NRES002) report cases where a callback is handed the wrong token at build time. If an attempt overruns its ceiling by more than one second, an `OrphanedWork` event fires retrospectively when the work finally returns.
 
 ## The two bounds
+
+The effective ceiling for any attempt is the minimum of the `AttemptTimeout` and the time remaining on the `Deadline`.
 
 <!-- snippet: deadline-effective -->
 ```csharp
@@ -40,14 +39,13 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-`Deadline` covers everything: every attempt, every backoff delay, every `BeforeAttempt` hook. It is
-wall-clock time from the moment you call `RunAsync`.
+`Deadline` is measured as wall-clock time from the moment you call `RunAsync`. It covers every attempt, every backoff delay, and every `BeforeAttempt` hook.
 
-`AttemptTimeout` covers one attempt. The effective ceiling is `min(AttemptTimeout, time left on the
-deadline)`, and a retry the deadline has no time left for is never started - the call fails with the
-deadline rather than sleeping through it.
+`AttemptTimeout` covers a single attempt. If no time remains on the deadline, a retry is never started; the call fails immediately with a deadline exception rather than sleeping through a backoff delay.
 
-## Handling them
+## Handle timeout exceptions
+
+Both `DeadlineExceededException` and `AttemptTimeoutException` derive from `TimeoutException`. You can catch them together or separately. Both exceptions include the attempt log.
 
 <!-- snippet: deadline-handle-exception -->
 ```csharp
@@ -68,29 +66,22 @@ catch (TimeoutException attempt)
 ```
 <!-- endsnippet -->
 
-`DeadlineExceededException` and `AttemptTimeoutException` both derive from `TimeoutException`, so one
-`catch` covers "it did not answer in time" while the two stay distinguishable. Both carry the attempt
-log.
+The executor classifies attempt timeouts as `Transient`. This classification happens internally rather than through your classifier, allowing the executor to distinguish its own timeout from caller cancellation.
 
-An attempt timeout is classified `Transient` by the executor itself, never by your classifier: the
-executor knows which cancellation source fired, and telling its own timeout apart from caller
-cancellation is the classic bug in timeout implementations.
+## Caller cancellation
 
-## Caller cancellation is not a failure
+Cancelling the token you provide to the call aborts the operation immediately. Caller cancellation is not treated as a failure:
+- It is never retried.
+- It is not counted against a breaker or a budget.
+- It is never converted into a timeout.
+- Classifiers cannot override it.
 
-Cancelling the token you passed in aborts the call immediately. It is never retried, never counted
-against a breaker or a budget, never converted into a timeout, and no classifier can override it.
-`OperationCanceledException` comes straight back out - including from `TryRunAsync`, which is the one
-thing that method still throws.
+The call returns an `OperationCanceledException`, even when using `TryRunAsync`.
 
-One asymmetry: a token cancelled while an attempt was already succeeding does not
-throw away the completed work. The post-attempt check stops the loop starting *another* attempt.
+If a token is cancelled while an attempt is already succeeding, NResilience does not discard the completed work. The post-attempt check prevents the loop from starting *another* attempt.
 
-## Work that ignores its token
+## Work that ignores the token
 
-The CAUTION above is the reason every execution overload requires a callback that takes a
-`CancellationToken`: there is no zero-argument form to forget. The analyzer and the `OrphanedWork`
-event are the two backstops when a callback does ignore it anyway.
+Because timeouts rely on the cancellation token, callbacks must observe it to be terminated. The requirement for a `CancellationToken` in every execution overload, combined with the analyzer and the `OrphanedWork` event, provides safeguards against callbacks that ignore cancellation.
 
-Go deeper: [The cancellation contract](../deep-dives/cancellation.md).
-
+For more information, see [The cancellation contract](../deep-dives/cancellation.md).

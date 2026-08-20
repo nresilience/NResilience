@@ -1,6 +1,6 @@
 ---
 title: Key concepts
-description: Policy, verdict, deadline, attempt timeout, and call result - the vocabulary the rest of the docs use.
+description: Learn about policies, verdicts, deadlines, attempt timeouts, and call results.
 order: 2
 ---
 
@@ -8,13 +8,9 @@ order: 2
 
 ## What is a policy?
 
-A network call can fail, hang, or come back from a dependency that is struggling. A **policy** is
-the object that says what to do when that happens: whether to retry, how long to wait in total, how
-long to wait per attempt, and when to stop calling the dependency at all.
+A network call can fail, hang, or encounter a struggling dependency. A **policy** defines how to handle these situations: whether to retry, the total time limit, the per-attempt time limit, and when to stop calling the dependency entirely.
 
-In NResilience a policy is a value, not a built pipeline. You hold one in a field, compare two for
-equality, and derive a variant without a builder. You start from a preset and derive variants with
-`with`, which copies everything you did not mention.
+In NResilience, a policy is a value, not a built pipeline. Store a policy in a field, compare two policies for equality, and derive variants without using a builder. Start with a preset and use the `with` expression to create variants; `with` copies all settings you don't explicitly change.
 
 <!-- snippet: key-concepts-policy-value -->
 ```csharp
@@ -27,11 +23,9 @@ Console.WriteLine(once.Deadline);                       // 00:01:00 - `with` cop
 ```
 <!-- endsnippet -->
 
-One policy covers every return type: the result type is a property of the call, not of the policy.
-`Resilience` is not generic and there is no generic variant.
+A single policy works for any return type because the result type is a property of the call, not the policy.
 
-A policy is a good fit for a `static readonly` field, because it is a value rather than a built
-pipeline. Name your policies once, where their lifetime is obvious, and derive variants from them:
+Policies are ideal for `static readonly` fields. Name your policies where their lifetime is obvious and derive variants as needed:
 
 <!-- snippet: quick-start-house-policy -->
 ```csharp
@@ -52,16 +46,16 @@ public static class Policies
 ```
 <!-- endsnippet -->
 
-`with` copies everything you did not mention, so `Realtime` keeps `Api`'s deadline and classifier.
+The `Realtime` policy keeps the deadline and classifier from the `Api` policy.
 
-Go deeper: [`Resilience` reference](../reference/resilience.md).
+For more information, see the [`Resilience` reference](../reference/resilience.md).
 
 ## Deadline and attempt timeout
 
-A retried call needs two time bounds, and mixing them up is a common bug: a 30-second per-attempt
-timeout with three retries can run for 90 seconds, which is probably not what you meant. The
-**deadline** is the ceiling on the whole call, retries and backoff included. The **attempt
-timeout** is the ceiling on a single attempt.
+A retried call requires two distinct time bounds. Mixing these bounds is a common source of bugs. For example, a 30-second per-attempt timeout with three retries can run for 90 seconds.
+
+- **Deadline**: The ceiling for the entire operation, including all retries and backoff time.
+- **Attempt timeout**: The ceiling for a single attempt.
 
 <!-- snippet: key-concepts-two-bounds -->
 ```csharp
@@ -73,24 +67,20 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-The effective ceiling for an attempt is the smaller of `AttemptTimeout` and the time left on the
-`Deadline`, so "is that per attempt or total?" has no answer to get wrong. The two bounds have
-different names everywhere in this library, and the docs keep them apart the same way.
+The effective ceiling for an attempt is the smaller of the `AttemptTimeout` and the time remaining on the `Deadline`.
 
-Go deeper: [Deadlines and attempt timeouts](../features/deadlines.md).
+For more information, see [Deadlines and attempt timeouts](../features/deadlines.md).
 
-## Every outcome gets one of four verdicts
+## Verdicts
 
-A call can come back as a value or as a thrown exception, and the library has to decide what to do
-next - retry, give up, or treat the failure as permanent. A **classifier** turns that outcome into a
-**verdict**, and everything downstream reads that one answer.
+A call returns a value or throws an exception. The library then decides whether to retry, give up, or treat the failure as permanent. A **classifier** maps the outcome to a **verdict**.
 
-| Verdict | What it means | What happens |
+| Verdict | Meaning | Action |
 | --- | --- | --- |
-| `Ok` | The call worked | Returned |
-| `Transient` | May not recur | Retried on the short backoff curve; counts against the breaker |
-| `Throttled` | The dependency is defending itself | Retried on the long curve, or on the server's own `Retry-After`; never counted against the dependency |
-| `Permanent` | Will recur | Never retried |
+| `Ok` | The call succeeded | Result is returned |
+| `Transient` | The failure may not recur | Retried on the short backoff curve; counts against the circuit breaker |
+| `Throttled` | The dependency is defending itself | Retried on the long curve or based on the server's `Retry-After` header; not counted against the dependency |
+| `Permanent` | The failure will recur | Not retried |
 
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
@@ -103,31 +93,31 @@ var api = Resilience.Http with { Classify = classify };
 ```
 <!-- endsnippet -->
 
-`Classifier.Default` treats an exception type it does not recognize as `Permanent`. Retrying a
-programming error turns a fast, clear failure into a slow, confusing one.
+`Classifier.Default` treats unrecognized exception types as `Permanent`. This prevents programming errors from becoming slow, confusing failures.
 
-Go deeper: [Classification](../features/classification.md).
+For more information, see [Classification](../features/classification.md).
 
 ## Why a call stopped
 
-A retried call can stop for several reasons - it worked, it hit a failure it won't retry, it ran
-out of attempts, it ran out of time. `StopReason` names which one applied, and it takes one of six
-values: `Succeeded`, `Permanent`, `AttemptsExhausted`, `DeadlineExceeded`, `BudgetExhausted` or
-`DependencyUnavailable`. `TryRunAsync` hands it back on a `CallResult<T>` alongside the value, the
-exception and the attempt log; `RunAsync` throws instead, rethrowing the original exception unchanged
-so existing `catch` blocks keep working.
+A retried call stops when it succeeds, hits a non-retryable failure, runs out of attempts, or runs out of time. The `StopReason` property identifies why the call stopped. It takes one of six values:
+- `Succeeded`
+- `Permanent`
+- `AttemptsExhausted`
+- `DeadlineExceeded`
+- `BudgetExhausted`
+- `DependencyUnavailable`
 
-Go deeper: [`CallResult<T>`](../reference/call-result.md) and
-[exceptions](../reference/exceptions.md).
+`TryRunAsync` returns this reason within a `CallResult<T>` along with the value, the exception, and the attempt log. `RunAsync` rethrows the original exception unchanged so that existing `catch` blocks continue to work.
+
+For more information, see [`CallResult<T>`](../reference/call-result.md) and [exceptions](../reference/exceptions.md).
 
 ## The two guards
 
-A struggling dependency can take down not just your calls but the fleet of clients calling it, if
-every client retries at once. Two guards stop that: a **circuit breaker** stops calling a dependency
-that is failing, and a **retry budget** bounds retries as a fraction of traffic so a failing
-dependency cannot turn a fleet of clients into a load generator. The budget is on by default; the
-breaker is an object you construct and share exactly as widely as you intend.
+To prevent a fleet of clients from overwhelming a struggling dependency, NResilience provides two guards:
 
-Go deeper: [Circuit breaker](../features/circuit-breaker.md) and
-[retry budget](../features/retry-budget.md).
+- **Circuit breaker**: Stops calling a dependency that is failing.
+- **Retry budget**: Limits retries as a fraction of total traffic.
 
+The retry budget is enabled by default. The circuit breaker is an object that you construct and share across the scope of the dependency.
+
+For more information, see [Circuit breaker](../features/circuit-breaker.md) and [retry budget](../features/retry-budget.md).

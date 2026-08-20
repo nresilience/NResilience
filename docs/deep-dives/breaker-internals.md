@@ -1,70 +1,59 @@
 ---
 title: Breaker internals
-description: The state machine, the defaults, and why closing needs two probes.
+description: A deep dive into the circuit breaker state machine, the reasoning behind default settings, and implementation details.
 order: 4
 ---
 
 # Breaker internals
 
+The circuit breaker in NResilience is designed to prevent a failing dependency from overwhelming both the client and the server. This guide explains the technical reasoning behind its state machine and default configurations.
+
 ## The state machine
 
-`Closed` samples every attempt. A trip moves it to `Open` with a break deadline. When a call arrives
-after that deadline it becomes the breaker's probe and the state moves to `HalfOpen`; up to
-`HalfOpenProbes` calls are in flight there at once. `ProbeSuccesses` successes close it; one failure
-re-opens it with a longer break. `Isolated` is `Open` that never self-heals.
+The breaker transitions through the following states:
 
-Reading `State` reports `HalfOpen` for an open breaker whose break has elapsed, because that is what
-the next call will find - but the transition itself happens on admission, so a health endpoint polling
-the state cannot consume the probe slot a real call needs.
+- **Closed**: The breaker samples every attempt. If trip conditions are met, the breaker moves to the `Open` state and sets a break deadline.
+- **Open**: Calls are refused immediately. When a call arrives after the break deadline has elapsed, the breaker transitions to `HalfOpen` and treats that call as a probe.
+- **HalfOpen**: A limited number of concurrent trial calls (`HalfOpenProbes`) are allowed. If the required number of `ProbeSuccesses` is reached, the breaker returns to the `Closed` state. A single failure during this phase re-opens the breaker and increases the break duration.
+- **Isolated**: This is a manually triggered state that behaves like `Open` but never self-heals.
 
-## Every default is chosen, deliberately
+To ensure health endpoints can monitor the breaker without interfering with it, reading the `State` property reports `HalfOpen` for an open breaker whose break has elapsed. However, the actual transition to `HalfOpen` only occurs during call admission, meaning health checks do not consume probe slots.
 
-A rate-based trip (`FailureRatio` 0.1 over a minimum throughput of 100 calls per 30 seconds) is the
-common default, and it means a service doing fewer than 100 calls per 30 seconds can never open its
-breaker - which is the median .NET service. So consecutive failures is the default trip condition
-here, and the rate-based trip is opt-in alongside it rather than instead of it.
+## Design of the defaults
 
-**Two probe successes, not one.** Closing a breaker on a single lucky probe, in front of a dependency
-that is still broken and a client fleet whose accumulated retries are waiting, is how breakers
-oscillate and how a metastable failure sustains itself.
+The default settings are chosen to handle the characteristics of typical .NET services.
 
-**The break duration doubles**, up to `MaxBreakDuration`, and the counter resets on a clean close. This
-is exponential backoff applied to the breaker itself, and its absence is why breakers flap on a fixed
-cadence forever.
+### Consecutive failures vs. rate-based trips
+While rate-based trips (e.g., a 10% failure ratio) are common, they require a minimum throughput to be accurate. For a service doing fewer than 100 calls per 30 seconds, a rate-based breaker may never trip. Therefore, NResilience uses consecutive failures as the default trip condition, with rate-based trips available as an optional addition.
 
-**Slow calls count.** The most common real degradation is not a dependency returning errors, it is one
-returning 200s at 30 times normal latency while your thread pool and connection pool fill up. An
-error-rate breaker sits closed through the entire incident, which is why `SlowCallThreshold` exists and
-why the attempt's duration is handed to the breaker along with its verdict.
+### Why two probe successes?
+Closing a breaker after a single successful probe is risky. If a dependency is only intermittently available, a single "lucky" probe could close the breaker just as a fleet of accumulated retries hits the service, leading to oscillation and metastable failure. Requiring multiple successes ensures the dependency has truly recovered.
 
-## What counts as evidence
+### Exponential break growth
+The break duration doubles with each consecutive trip, up to `MaxBreakDuration`. This applies exponential backoff to the breaker itself, preventing the "flapping" behavior seen with fixed-duration breaks.
 
-Only `Transient` outcomes. A `Throttled` response means the dependency is working correctly and
-defending itself - tripping on it would turn a working rate limiter into an outage. A `Permanent`
-outcome is overwhelmingly a client-side fact: your request was malformed, and the dependency is fine.
+### Tracking slow calls
+Dependency degradation often manifests as high latency rather than explicit errors. A service returning `200 OK` at 30 times the normal latency can exhaust thread and connection pools. The `SlowCallThreshold` allows the breaker to trip based on duration, ensuring that "slow" calls are treated as failures.
 
-And it samples **attempts**, not operations, because that is the only reading that produces a useful
-failure signal. It is also why admission is checked per attempt rather than once per call: a first
-attempt that trips the breaker must stop the second, which is the entire point of having tripped.
+## Evidence and sampling
 
-## Concurrency
+The breaker only counts `Transient` outcomes as evidence of failure.
+- **Throttled responses**: These indicate the dependency is working correctly by defending itself. Tripping on these would turn a functioning rate limiter into a full outage.
+- **Permanent failures**: These are typically client-side errors (e.g., malformed requests) and do not indicate a dependency failure.
 
-An uncontended `lock`, not a lock-free scheme. Sliding-window rotation is a multi-word operation whose
-failure mode under `Interlocked` alone is a silently incorrect failure ratio, which is far worse than
-being slow. An uncontended lock is roughly 20 nanoseconds and the callback it guards dominates by
-orders of magnitude.
+The breaker samples **attempts**, not logical operations. This is critical because a first attempt that trips the breaker must stop the second attempt immediately; checking admission only once per call would defeat the purpose of the breaker.
 
-The window is ten buckets - 3-second granularity on the default 30-second window, finer than any trip
-decision needs - and the arrays exist only when a rate-based trip is actually configured. A
-consecutive-failures breaker is three fields and no array.
+## Concurrency and implementation
 
-Transitions are handed back to the executor rather than raised under the lock, because a listener is
-arbitrary user code and one slow listener holding that lock would serialize every call through the
-breaker.
+### Lock strategy
+The breaker uses a standard `lock` rather than a lock-free scheme. Sliding-window rotation is a multi-word operation; implementing this with `Interlocked` alone could lead to silently incorrect failure ratios. Since an uncontended lock takes approximately 20 nanoseconds and the protected callback is orders of magnitude slower, the lock does not introduce a bottleneck.
 
-## Why the breaker owns its own clock
+### Memory efficiency
+To minimize overhead, the window is divided into ten buckets (providing 3-second granularity for a 30-second window). The arrays required for rate-based tracking are only allocated if a rate-based trip is configured. A breaker relying solely on consecutive failures uses only three fields and no arrays.
 
-`State` and `OpenedAt` are read from health endpoints and admin handlers that have no policy in hand.
-And one breaker shared by two policies with different clocks would have no single answer to "how long
-have you been open?".
+### Event dispatch
+Breaker transitions are passed back to the executor rather than being raised inside the lock. This prevents arbitrary user code in a listener from holding the lock and serializing all calls through the breaker.
 
+## Clock ownership
+
+The breaker maintains its own `TimeProvider`. This is necessary because `State` and `OpenedAt` are often read by health endpoints or admin handlers that do not have access to a specific policy. Additionally, a shared breaker used by multiple policies with different clocks would have no consistent way to determine how long it has been open.

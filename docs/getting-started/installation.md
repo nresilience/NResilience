@@ -1,36 +1,34 @@
 ---
 title: Installation
-description: The three packages, what each one adds, and which ones you need.
+description: Learn about the NResilience packages and which ones you need for your project.
 order: 3
 ---
 
 # Installation
 
+Install the packages you need using the .NET CLI:
+
 ```bash
-dotnet add package NResilience              # the engine, the policy value, the HttpClient handler
-dotnet add package NResilience.Extensions   # AddResilience(), configuration, metrics
-dotnet add package NResilience.Testing      # scripted callbacks and a recording listener
+dotnet add package NResilience              # Core engine, policy values, and HttpClient handler
+dotnet add package NResilience.Extensions   # Dependency injection, configuration, and metrics
+dotnet add package NResilience.Testing      # Scripted callbacks and recording listeners
 ```
 
-| Package | Add it when | Depends on |
+## Package details
+
+| Package | Use case | Depends on |
 | --- | --- | --- |
-| `NResilience` | Always. It is the whole API, HTTP included. | Nothing |
-| `NResilience.Extensions` | You have a DI container, configuration, or OpenTelemetry. | `NResilience`, `Microsoft.Extensions.*` |
-| `NResilience.Testing` | In test projects. | `NResilience` |
+| `NResilience` | Always. This contains the full API, including HTTP support. | None |
+| `NResilience.Extensions` | Use this for projects with a DI container, configuration, or OpenTelemetry. | `NResilience`, `Microsoft.Extensions.*` |
+| `NResilience.Testing` | Use this in test projects. | `NResilience` |
 
-`NResilience` has no dependencies at all, targets `net8.0` and `net10.0`, is Native AOT and
-trimming clean, and ships a checked-in public API manifest. The `HttpClient` handler is in it
-rather than in a package of its own, so there is no separate HTTP install.
+`NResilience` has no external dependencies, targets `net8.0` and `net10.0`, and is compatible with Native AOT and trimming. The `HttpClient` handler is included in the core package to simplify installation.
 
-`NResilience.Extensions` is the one package deliberately kept separate. It pulls in the
-`Microsoft.Extensions.*` family, so install the core package for a library and the extensions
-package for an app that has a container. A library that wants resilience internally should not have
-to impose a hosting model on its own consumers.
+`NResilience.Extensions` is kept separate because it depends on the `Microsoft.Extensions.*` family. Use the core package for libraries to avoid imposing a specific hosting model on your consumers. Use the extensions package for applications with a DI container.
 
-## Which one do I actually need?
+## Which package do I need?
 
-If you are calling an HTTP API from an ASP.NET Core application, install `NResilience.Extensions`
-(which brings in `NResilience`) and write one line:
+If you call an HTTP API from an ASP.NET Core application, install `NResilience.Extensions` (which includes `NResilience`) and register the resilience handler:
 
 <!-- snippet: migration-registration -->
 ```csharp
@@ -38,5 +36,4 @@ services.AddHttpClient<Client>().AddResilience();
 ```
 <!-- endsnippet -->
 
-Go deeper: [Dependency injection](../di/index.md).
-
+For more information, see [Dependency injection](../di/index.md).

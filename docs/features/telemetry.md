@@ -1,22 +1,20 @@
 ---
 title: Telemetry
-description: One event type, one delegate, and the metrics the extensions package builds on them.
+description: Observe policy behavior through a single event stream and integrated metrics.
 order: 6
 ---
 
 # Telemetry
 
-When a retried call is slow or failing in production, you need to see what the policy is doing -
-which attempts are being retried, how long they take, whether a breaker opened, whether the budget is
-spent. Telemetry is how you see that. It is one event stream: every attempt, retry, refusal, and
-outcome is observable through one listener. It is **opt-in** for a policy you build by hand -
-`OnEvent = null` means the [executor](../reference/index.md) (the internal loop that runs each attempt)
-raises nothing and pays nothing - and **on by default** for a policy registered in a container,
-because a registered policy is part of an application that runs in production.
+When a call is slow or fails in production, you need visibility into the policy's behavior - such as which attempts are being retried, how long they take, whether a circuit breaker opened, or if the retry budget is exhausted. Telemetry provides this visibility through a single event stream.
 
-The whole surface is one struct and one delegate: `CallEvent` and `Resilience.OnEvent`.
+Telemetry is enabled by default for policies registered in a container. For policies built manually, it is opt-in. If `OnEvent` is `null`, the [executor](../reference/index.md) raises no events and incurs no performance overhead.
 
-## Attaching a listener
+The telemetry system uses a single struct, `CallEvent`, and a single delegate, `Resilience.OnEvent`.
+
+## Attach a listener
+
+You can attach a listener to a policy to log or record events.
 
 <!-- snippet: telemetry-listener -->
 ```csharp
@@ -31,29 +29,26 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-The listener is synchronous and runs on the thread the executor is running on, so a listener that
-blocks blocks the call. Log, count, enqueue; do not do I/O. An exception thrown by a listener is
-swallowed - telemetry that can fail the operation it is observing is worse than no telemetry.
+The listener is synchronous and runs on the same thread as the executor. To avoid blocking the call, only perform fast operations such as logging, counting, or enqueuing; do not perform synchronous I/O. Any exception thrown by a listener is swallowed to prevent telemetry from failing the operation it is observing.
 
-Two listeners is `OnEvent = first + second`.
+To use multiple listeners, combine them using the `+` operator: `OnEvent = first + second`.
 
-## The events
+## Event types
 
-| Kind | When | Terminal? |
-| --- | --- | --- |
-| `Attempt` | An attempt finished, whatever the verdict | No |
-| `Retrying` | A retry is decided and its backoff is about to be served | No |
+| Kind | Description | Terminal? |
+| :--- | :--- | :--- |
+| `Attempt` | An attempt finished, regardless of the verdict | No |
+| `Retrying` | A retry was decided and the backoff delay is about to start | No |
 | `Succeeded` | The call succeeded | Yes |
 | `NotRetried` | The outcome was `Permanent` | Yes |
-| `Exhausted` | The last attempt failed and there were none left | Yes |
-| `Rejected` | A breaker or the budget refused the call | Yes |
-| `DeadlineExceeded` | The wall-clock budget ran out | Yes |
-| `OrphanedWork` | A callback ran well past the timeout that should have stopped it | No |
-| `BreakerOpened` / `BreakerClosed` / `BreakerHalfOpened` | A breaker changed state | No |
-| `NestedRetry` | This request is already inside a retrying client | No |
+| `Exhausted` | The final attempt failed and no retries remain | Yes |
+| `Rejected` | A circuit breaker or the retry budget refused the call | Yes |
+| `DeadlineExceeded` | The total wall-clock budget expired | Yes |
+| `OrphanedWork` | A callback ran past the timeout that should have stopped it | No |
+| `BreakerOpened` / `BreakerClosed` / `BreakerHalfOpened` | A circuit breaker changed state | No |
+| `NestedRetry` | The request is already inside another retrying client | No |
 
-**Every call ends with exactly one terminal event.** The invariant is tested, and it is what makes
-a count of logical operations trustworthy.
+**Every call ends with exactly one terminal event.** This invariant ensures that counts of logical operations are accurate.
 
 <!-- snippet: telemetry-recorder -->
 ```csharp
@@ -66,9 +61,9 @@ Console.WriteLine(string.Join(", ", events.Kinds));
 ```
 <!-- endsnippet -->
 
-`Duration` is the attempt's own on an `Attempt` event and the call's elapsed time on every other
-kind. `Delay` is the pause about to be served on `Retrying` and `Rejected`, and null elsewhere.
-`Reason` distinguishes the two refusals a `Rejected` event covers.
+- `Duration` represents the individual attempt's duration for `Attempt` events, and the total elapsed time for all other event types.
+- `Delay` represents the pause about to be served for `Retrying` and `Rejected` events; it is `null` for other events.
+- `Reason` distinguishes between the two types of refusals covered by a `Rejected` event.
 
 <!-- snippet: telemetry-tostring -->
 ```csharp
@@ -77,11 +72,11 @@ Console.WriteLine(events[0]);   // [api] Attempt #1 Ok (0.1ms)
 ```
 <!-- endsnippet -->
 
-Go deeper: [`CallEvent` reference](../reference/events.md).
+For more details, see the [`CallEvent` reference](../reference/events.md).
 
 ## Metrics and traces
 
-`NResilience.Extensions` ships a meter, an activity source and a listener that feeds both.
+The `NResilience.Extensions` package provides a meter, an activity source, and a listener that feeds both.
 
 <!-- snippet: telemetry-with-telemetry -->
 ```csharp
@@ -91,17 +86,14 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 ```
 <!-- endsnippet -->
 
-| Instrument | Unit | What it is |
-| --- | --- | --- |
-| `nresilience.calls` | `{call}` | Logical operations - one per call, whatever happened inside it |
-| `nresilience.attempts` | `{attempt}` | Wire-level attempts |
-| `nresilience.rejections` | `{rejection}` | Calls a guard refused, tagged `dependency_unavailable` or `budget_exhausted` |
+| Instrument | Unit | Description |
+| :--- | :--- | :--- |
+| `nresilience.calls` | `{call}` | Total logical operations |
+| `nresilience.attempts` | `{attempt}` | Total wire-level attempts |
+| `nresilience.rejections` | `{rejection}` | Calls refused by a guard, tagged `dependency_unavailable` or `budget_exhausted` |
 | `nresilience.call.duration` | s | End-to-end duration of a logical operation |
-| `nresilience.attempt.duration` | s | Duration of one attempt |
+| `nresilience.attempt.duration` | s | Duration of a single attempt |
 
-`nresilience.attempts ÷ nresilience.calls` is the **retry fraction**: the characteristic metric of a
-retry feedback loop, and the one that tells you whether you are approaching a storm rather than
-merely serving errors. The counters are split so that it is computable.
+The **retry fraction** is calculated as `nresilience.attempts ÷ nresilience.calls`. This is the primary metric for monitoring retry feedback loops and identifying potential retry storms.
 
-Go deeper: [Telemetry in DI](../di/telemetry.md).
-
+For more information, see [Telemetry in DI](../di/telemetry.md).

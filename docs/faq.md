@@ -1,100 +1,58 @@
 ---
 title: FAQ
-description: The questions that are decisions rather than problems.
+description: Technical reasoning behind design decisions in NResilience.
 order: 12
 ---
 
 # FAQ
 
-### Why is there no builder?
+## Design decisions
 
-A policy is a record, so `with` is the configuration language. A builder buys a validation hook at
-`Build()` and costs a mutable-to-immutable transition, an ordering that matters, and a type that cannot
-be a `static readonly` field. The trade was made knowingly: validation happens when you call
-`Validate()`, eagerly at DI registration, and lazily on the first execution of each policy instance.
+### Why is there no builder?
+A policy is a record, so `with` expressions serve as the configuration language. A builder would provide a validation hook at `Build()` but would require a mutable-to-immutable transition, introduce an ordering dependency, and prevent the use of `static readonly` fields. 
+
+Validation occurs when you call `Validate()`, eagerly during dependency injection registration, or lazily on the first execution of each policy instance.
 
 ### Why is `Resilience` not generic?
+The result type is a property of the call, not the policy. A single policy can handle `HttpResponseMessage`, `int`, `Stream`, or `void`. Result classification is resolved per result type and cached, so the policy does not need to be generic.
 
-Because the result type is a property of the call, not of the policy. One policy covers
-`HttpResponseMessage`, `int`, `Stream` and `void`. Result classification is resolved per result type and
-cached, so the policy never needs to know.
-
-### Why is `Attempts` the total rather than the retry count?
-
-Because "3 retries" is ambiguous and "3 attempts" is not. `Attempts = 1` means no retry, and nobody has
-to remember which end the off-by-one is on.
+### Why is `Attempts` the total count rather than the retry count?
+Using total attempts removes ambiguity. `Attempts = 1` means no retry occurs, eliminating off-by-one errors common in retry count configurations.
 
 ### Is there a synchronous API?
-
-No. A retry loop that blocks holds a thread through every backoff delay, and a library that offers both
-either duplicates its engine or deadlocks somebody. `ResilienceHandler.Send` throws
-`NotSupportedException` for the same reason.
+No. A retry loop that blocks holds a thread through every backoff delay. Offering both synchronous and asynchronous APIs would either duplicate the engine or risk deadlocks. For this reason, `ResilienceHandler.Send` throws a `NotSupportedException`.
 
 ### Where is hedging?
-
-Not implemented. Hedging - issuing a second request before the first has failed - is a real technique
-and a genuinely dangerous default: it multiplies load on a dependency that is already slow, which is
-exactly when it fires. It needs a budget, a latency threshold that adapts, and an idempotency story per
-request, and shipping it without all three would be shipping a foot-gun. The
-[retry budget](features/retry-budget.md) and the [breaker](features/circuit-breaker.md) are the
-groundwork it would need.
+Hedging is not implemented. Issuing a second request before the first fails is a dangerous default because it multiplies load on a dependency exactly when it is slow. Implementing hedging safely requires a budget, an adaptive latency threshold, and a per-request idempotency strategy. The [retry budget](../features/retry-budget.md) and the [circuit breaker](../features/circuit-breaker.md) provide the necessary groundwork for this feature.
 
 ### Where is a rate limiter?
-
-`System.Threading.RateLimiting` is in the platform and is good. A resilience library wrapping it would
-add a knob and an opinion, not a capability.
+`System.Threading.RateLimiting` is available in the .NET platform. Wrapping it in a resilience library would introduce a specific opinion rather than a new capability.
 
 ### Where is bulkhead isolation?
-
-A bulkhead is a limit on how many calls to one dependency can run at once, so a slow or failing
-dependency cannot consume all your threads and starve calls to everything else. `SemaphoreSlim`,
-or the platform's concurrency limiter, is all you need: everything a bulkhead does is available
-without a policy being involved, and the interesting part - what to do when the bulkhead is full -
-is a decision at the call site.
+A bulkhead limits how many concurrent calls can run against one dependency to prevent a failing service from exhausting all available threads. `SemaphoreSlim` or the platform's concurrency limiter provides this functionality. Because the decision of how to handle a full bulkhead occurs at the call site, it does not require a policy.
 
 ### Can I add my own policy layer?
-
-Not by composition, because there is nothing to compose into: the engine is
-[one flat method](deep-dives/one-executor.md). The extension points are the
-[classifier](features/classification.md), `Backoff.Custom`, `BeforeAttempt` and `OnEvent`. That is
-a smaller opening than a pipeline, and the argument for it is API stability: the surface
-stays small because there is less to get wrong later.
+You cannot add layers through composition because the engine is [one flat method](../deep-dives/one-executor.md). Extension points include the [classifier](../features/classification.md), `Backoff.Custom`, `BeforeAttempt`, and `OnEvent`. This restricted surface ensures long-term API stability.
 
 ### Is a `Breaker` thread-safe? Can I share one across policies?
-
-Yes and yes - sharing one is how you say "these calls are the same dependency". It is guarded by an
-uncontended lock. `with` copies the reference, never the state.
+Yes. Sharing a breaker allows you to treat multiple different calls as the same dependency. The breaker is guarded by an uncontended lock. Using `with` copies the reference to the breaker, not its internal state.
 
 ### Does the breaker see attempts or whole operations?
-
-Attempts, always. That question has one answer here rather than depending on composition order.
+The breaker always samples individual attempts. This provides a consistent behavior regardless of how the policy is configured.
 
 ### Why does refusing a call take 100 milliseconds?
+A free rejection inside a polling loop creates a CPU spin, turning a load-shedding guard into a load generator. For more details, see [Guarded rejection](../deep-dives/guarded-rejection.md).
 
-Because a free rejection inside a polling loop is a CPU spin, and the guard that was meant to shed load
-becomes a load generator. See [guarded rejection](deep-dives/guarded-rejection.md).
+### Why is telemetry off for hand-built policies but on for registered ones?
+Setting `OnEvent = null` ensures that telemetry is "free when unused." Since policies registered via dependency injection are typically used in production environments, the registration automatically attaches a listener. You can disable this using `telemetry: false` or `ResilienceOptions.Telemetry = false`.
 
-### Why is telemetry off for a hand-built policy but on for a registered one?
-
-`OnEvent = null` costs nothing, and that is what makes free-when-unused meaningful. A registered
-policy is part of an application that runs in production, so the registration attaches the listener.
-`telemetry: false` and `ResilienceOptions.Telemetry = false` are the switches.
+## Compatibility and performance
 
 ### Is it AOT and trimming safe?
-
-Yes. AOT (ahead-of-time compilation, which compiles to native code at publish time rather than
-generating it at runtime) and trimming (removing unused code at publish time to shrink the binary)
-are both CI-enforced: `dotnet publish -p:PublishAot=true` with warnings as errors, plus a
-published binary that executes a policy - including DI, configuration binding and the meter - and
-re-checks the allocation budgets. There is no reflection anywhere in the core.
+Yes. Both ahead-of-time (AOT) compilation and trimming are enforced in CI. The build process runs `dotnet publish -p:PublishAot=true` with warnings treated as errors and verifies that the resulting binary executes a policy - including dependency injection, configuration binding, and the meter - while respecting allocation budgets. The core contains no reflection.
 
 ### Which frameworks are supported?
-
-`net8.0` and `net10.0`. Both are tested, both are gated, and "no allocation cliff on net8" is a claim
-with a test behind it.
+NResilience supports `net8.0` and `net10.0`. Both frameworks are tested and gated; specifically, the library ensures there is no "allocation cliff" on `net8.0`.
 
 ### Does it work with `IHttpClientFactory`?
-
-Yes - `.AddResilience()` on the client builder. Note the two-minute handler rotation for configuration
-reload, described under [dependency injection](di/index.md).
-
+Yes. You can use `.AddResilience()` on the client builder. For more information about the two-minute handler rotation for configuration reloads, see [Dependency injection](../di/index.md).

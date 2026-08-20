@@ -1,22 +1,25 @@
 ---
 title: Dependency injection
-description: AddResilience() on a client or a service collection, named policies, and hot reload.
+description: Integrate NResilience with DI containers using named policies and hot reload.
 order: 5
 ---
 
 # Dependency injection
 
-`ResilienceHttp.CreateClient()` builds a client with a handler and keeps it for the life of the
-process. In an application with a DI container, you want the container to own that wiring: the
-handler should be part of the `IHttpClientFactory` pipeline, the policy should be named so a
-dashboard can tell clients apart, and configuration changes should reach the policy without a
-redeploy. The extensions package adds that.
+NResilience integrates with dependency injection (DI) containers to simplify the management of resilience policies in production applications. The `NResilience.Extensions` package allows you to:
+- Integrate handlers into the `IHttpClientFactory` pipeline.
+- Name policies to distinguish clients in monitoring dashboards.
+- Apply configuration changes without redeploying your application.
+
+To get started, add the extensions package:
 
 ```bash
 dotnet add package NResilience.Extensions
 ```
 
-## The one line
+## Use resilience with HttpClient
+
+You can add resilience to a typed or named `HttpClient` with a single method call.
 
 <!-- snippet: di-http-client -->
 ```csharp
@@ -30,11 +33,15 @@ services.AddHttpClient("payments").AddResilience("api", o => o.RetryUnsafeMethod
 ```
 <!-- endsnippet -->
 
-That adds the [handler](../http/index.md), stops `HttpClient.Timeout` competing with the deadline,
-names the policy after the client so a dashboard can tell four clients apart, and attaches the
-[meter](telemetry.md).
+Calling `AddResilience` performs the following actions:
+- Adds the [resilience handler](../http/index.md).
+- Configures the client so that `HttpClient.Timeout` does not compete with the policy deadline.
+- Names the policy after the client for better observability.
+- Attaches the [telemetry](telemetry.md) meter.
 
-## Named policies
+## Register named policies
+
+Named policies allow you to define the resilience requirements for a dependency in one place and reuse them across the application.
 
 <!-- snippet: di-register-named -->
 ```csharp
@@ -51,9 +58,11 @@ services.AddResilience("reports", o =>
 ```
 <!-- endsnippet -->
 
-Registration validates eagerly, so `Attempts = 0` fails at startup rather than on the first request.
+Policy registration is validated eagerly. For example, setting `Attempts = 0` causes a failure at startup rather than during the first request.
 
-Inject the **roster** (the set of named policies registered at startup), not a policy:
+### Inject the policy roster
+
+Inject `IResiliencePolicies` (the roster of registered policies) instead of a specific policy instance.
 
 <!-- snippet: di-inject -->
 ```csharp
@@ -71,31 +80,27 @@ public sealed class Orders(IResiliencePolicies policies)
 <!-- endsnippet -->
 
 > [!IMPORTANT]
-> Resolve on every call. A policy captured into a `readonly` field at construction time is a
-> snapshot, and a configuration reload will never reach it. The indexer is a dictionary lookup.
+> Resolve the policy from the roster on every call. If you capture a policy in a `readonly` field during construction, you create a snapshot. This prevents configuration reloads from reaching the policy.
 
-`TryGet` is the non-throwing form; `Names` is the roster, which is also what the exception message
-lists when a name is missing.
+Use `TryGet` for a non-throwing lookup. The `Names` property returns the list of all registered policy names.
 
-## What reloads, and what survives it
+## Hot reload and state persistence
 
-Hot reload (changing policy settings without a redeploy) works because a policy is an immutable
-value, so a reload is a reference swap: `IOptionsMonitor` fires, the
-section is projected onto a new `Resilience`, and the roster hands out the new one. There is no
-in-flight execution to drain and no pipeline to rebuild.
+Hot reload allows you to change policy settings without redeploying. Because policies are immutable values, a reload is a simple reference swap: `IOptionsMonitor` triggers, the configuration section projects onto a new `Resilience` instance, and the roster provides the new instance to callers.
 
-**Live breakers and budgets are not replaced**, because their state is what matters. A breaker that
-opened because a dependency is down stays open across a configuration edit, and the automatic retry
-budget keeps the traffic history it has accumulated - it is pinned to the registration name rather
-than to the policy instance for exactly that reason.
+### Persisting breaker and budget state
 
-An `HttpClient` sees a reloaded policy at the next handler rotation (the `IHttpClientFactory`
-default is to rebuild handler chains every two minutes) - rather than on the next request. The
-handler holds the per-host state, and rebuilding it per request to make reload instant would throw
-that state away on every call.
+Circuit breaker and retry budget states are not replaced during a reload because their internal state is critical for stability.
+- A **circuit breaker** that is open because a dependency is down remains open across a configuration edit.
+- A **retry budget** preserves its traffic history.
 
-## Next
+Budgets and breakers are pinned to the registration name rather than the policy instance to ensure this continuity.
 
-- [Configuration](configuration.md) - the bindable shape, and what JSON cannot hold.
-- [Telemetry](telemetry.md) - what is on by default here, and how to turn it off.
+### HttpClient reload timing
 
+An `HttpClient` observes a reloaded policy at the next handler rotation. By default, `IHttpClientFactory` rebuilds handler chains every two minutes. Handlers hold per-host state; rebuilding them on every request to achieve instant reloads would discard this state.
+
+## Next steps
+
+- [Configuration](configuration.md): Learn about the bindable configuration shape and JSON limitations.
+- [Telemetry](telemetry.md): Learn which metrics are enabled by default and how to manage them.

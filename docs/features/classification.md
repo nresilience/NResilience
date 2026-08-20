@@ -1,32 +1,26 @@
 ---
 title: Classification
-description: One classifier says what counts as a failure, and retry, the breaker and the budget all read it.
+description: Define what counts as a failure to coordinate retry, circuit breaker, and retry budget behavior.
 order: 3
 ---
 
 # Classification
 
-When a call fails, the library has to decide what to do next - retry, give up, or treat the failure
-as permanent. That decision is called a **verdict**, and a **classifier** is the rule that turns an
-outcome into one. It is **on by default**: `Classifier.Default` on `Resilience.Default`,
-`Classifier.Http` on `Resilience.Http`.
+When a call fails, NResilience must decide whether to retry, give up, or treat the failure as permanent. This decision is called a **verdict**, and a **classifier** is the rule that turns an outcome into a verdict.
 
-The point of having one rule is that retry, the backoff curve, the attempt log, the circuit breaker
-and the retry budget all read the same answer, so there is no way for them to disagree about what a
-failure was. A classifier that does not recognize an exception type treats it as `Permanent` by
-default - retrying a programming error (a null reference, a validation failure) turns a fast, clear
-failure into a slow, confusing one, so the safe default is to not retry what you did not tell it
-about.
+Classification is enabled by default. `Resilience.Default` uses `Classifier.Default`, and `Resilience.Http` uses `Classifier.Http`.
 
-## The shipped classifiers
+By using a single classifier, NResilience ensures that retry logic, backoff curves, the attempt log, the circuit breaker, and the retry budget all agree on whether a failure occurred. If a classifier does not recognize an exception type, it treats it as `Permanent` by default. This prevents the library from retrying programming errors (such as null references or validation failures), which would turn a fast failure into a slow, confusing one.
 
-| Classifier | Knows about | Unrecognized exception |
-| --- | --- | --- |
-| `Classifier.Default` | `TimeoutException`, `IOException`, `SocketException` are `Transient` | `Permanent` |
-| `Classifier.Http` | The above, plus `HttpRequestException` and HTTP status codes | `Permanent` |
-| `Classifier.RetryEverything` | Nothing - every exception is `Transient` | `Transient` |
+## Built-in classifiers
 
-`Classifier.Http` reads status codes the way they are meant:
+| Classifier | Transient exceptions | Unrecognized exceptions |
+| :--- | :--- | :--- |
+| `Classifier.Default` | `TimeoutException`, `IOException`, `SocketException` | `Permanent` |
+| `Classifier.Http` | The above, plus `HttpRequestException` and specific HTTP status codes | `Permanent` |
+| `Classifier.RetryEverything` | Every exception | `Transient` |
+
+`Classifier.Http` classifies HTTP status codes according to standard semantics:
 
 <!-- snippet: classifier-http-table -->
 ```csharp
@@ -39,16 +33,17 @@ Verdict answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotF
 <!-- endsnippet -->
 
 | Status | Verdict |
-| --- | --- |
-| 429 | `Throttled`, carrying `Retry-After` when the server sent one |
-| 503 with a `Retry-After` | `Throttled`, carrying it |
-| Any other 5xx, or 408 | `Transient` |
-| 404, and every other 4xx | `Ok` - an answer, not a failure |
+| :--- | :--- |
+| 429 | `Throttled` (includes `Retry-After` if provided by the server) |
+| 503 with `Retry-After` | `Throttled` (includes `Retry-After`) |
+| Other 5xx or 408 | `Transient` |
+| 404 and other 4xx | `Ok` (treated as a valid answer, not a failure) |
 
-A 404 is an answer, so it is not retried. If a status really is transient for your API, add a rule
-for it - [migrating a predicate](../migrating-from-polly.md#predicates) shows the shape.
+A 404 is considered an answer and is not retried. If a specific status is transient for your API, you can add a custom rule for it. For more information, see [migrating a predicate](../migrating-from-polly.md#predicates).
 
-## Teaching it about your exceptions
+## Add custom exception rules
+
+You can teach a classifier about your specific exception types using the `On` method.
 
 <!-- snippet: classifier-custom-exception -->
 ```csharp
@@ -63,12 +58,9 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-Rules are evaluated most-recently-added first, so a rule you add always beats one it was derived
-from. Exception types match including subclasses. Every `On` and `OnResult` returns a **new**
-classifier, so the shipped statics can never be mutated by a caller deriving from them.
+Rules are evaluated in reverse order of addition (most recently added first), so your custom rules override derived ones. Exception type matching includes subclasses. Every call to `On` or `OnResult` returns a **new** classifier, ensuring that the built-in static classifiers remain immutable.
 
-The predicate overload can inspect the exception - the natural home for "this SQL error number is
-transient and that one is not":
+You can also use a predicate to inspect the exception for more granular control:
 
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
@@ -81,9 +73,9 @@ var api = Resilience.Http with { Classify = classify };
 ```
 <!-- endsnippet -->
 
-## Classifying what a call returned
+## Classify returned results
 
-Plenty of dependencies report failure in their own envelope rather than by throwing.
+Some dependencies report failures in a response envelope rather than by throwing exceptions. You can create rules to classify these results.
 
 <!-- snippet: classifier-result-rule -->
 ```csharp
@@ -101,13 +93,13 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-Result rules match the static result type of the call **exactly**, not by assignability. A type with
-no rule registered is a success.
+Result rules match the static result type of the call exactly, not by assignability. Any type without a registered rule is treated as a success.
 
-An exception cannot be turned into a value, so a classifier that calls an exception `Ok` is read as
-"stop, do not retry" rather than as a success.
+Note that an exception cannot be converted into a value. If a classifier marks an exception as `Ok`, the library treats it as "stop, do not retry" rather than a successful result.
 
-## Asking what it will do
+## Inspect classifier rules
+
+You can print a classifier to see all active rules and their evaluation order.
 
 <!-- snippet: classifier-print -->
 ```csharp
@@ -116,7 +108,4 @@ Console.WriteLine(Classifier.Http);
 ```
 <!-- endsnippet -->
 
-`ToString` dumps every rule in evaluation order, including what happens to an unrecognized
-exception. That is the answer to "what will this actually retry?" without reading the library's
-source.
-
+The `ToString` method lists every rule in evaluation order, including the default behavior for unrecognized exceptions.

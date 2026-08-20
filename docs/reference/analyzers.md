@@ -1,161 +1,119 @@
 ---
 title: Analyzers
-description: The seven diagnostics that ship inside the package, what each one reports, and how to turn one off.
+description: Reference for the built-in diagnostics that help ensure correct and efficient use of NResilience.
 order: 12
 ---
 
 # Analyzers
 
-Installing `NResilience` installs seven diagnostics. They ship inside the package rather than beside
-it, in `analyzers/dotnet/cs`, because the first two catch a failure that has no symptom: work that
-never sees the attempt's cancellation token cannot be stopped by the attempt timeout, and the call
-looks correct in review either way.
+Installing `NResilience` automatically includes seven diagnostics. These analyzers are shipped within the package to catch common reliability and performance issues - such as failures to propagate cancellation tokens - that might otherwise be invisible during code review.
 
-Nothing to configure. A project that does not reference the library resolves no symbols and
-registers no callbacks.
+| Rule | Description | Category | Default Severity |
+| :--- | :--- | :--- | :--- |
+| [NRES001](#nres001) | The attempt's cancellation token is not passed to the work. | Reliability | Warning |
+| [NRES002](#nres002) | A different cancellation token is passed inside the callback. | Reliability | Warning |
+| [NRES003](#nres003) | The policy will not pass validation. | Usage | Warning |
+| [NRES004](#nres004) | `AttemptTimeout` is longer than `Deadline`. | Usage | Warning |
+| [NRES005](#nres005) | A breaker or retry budget is created per call. | Reliability | Warning |
+| [NRES006](#nres006) | A resilient `HttpClient` is created per call. | Reliability | Info |
+| [NRES007](#nres007) | The callback does not need to be `async`. | Performance | Info |
 
-| Rule | Reports | Category | Default |
-| --- | --- | --- | --- |
-| [NRES001](#nres001) | The attempt's cancellation token is not passed to the work | Reliability | Warning |
-| [NRES002](#nres002) | A different cancellation token is passed inside the callback | Reliability | Warning |
-| [NRES003](#nres003) | The policy will not pass `Validate()` | Usage | Warning |
-| [NRES004](#nres004) | `AttemptTimeout` is longer than `Deadline` | Usage | Warning |
-| [NRES005](#nres005) | A breaker or retry budget is created per call | Reliability | Warning |
-| [NRES006](#nres006) | A resilient `HttpClient` is created per call | Reliability | Info |
-| [NRES007](#nres007) | The callback does not need to be `async` | Performance | Info |
+Rules `NRES001` and `NRES002` include automated code fixes.
 
-NRES001 and NRES002 come with a code fix.
+## NRES001: Token not passed to work
 
-## NRES001
-
-**The attempt's cancellation token is not passed to the work.**
-
-Reported when a callback never mentions its `CancellationToken` parameter and something inside it
-takes one and was not given it.
+This rule is reported when a resilience callback fails to pass its `CancellationToken` parameter to an internal call that accepts one. Without this token, the [executor](index.md) cannot stop the work when an attempt timeout occurs.
 
 ```csharp
-// Reported: GetFromJsonAsync takes a token, and did not get one.
+// Reported: GetFromJsonAsync takes a token, but none is provided.
 await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url), cancellationToken);
 
-// Not reported: there is nothing to pass it to.
+// Not reported: the internal call does not accept a token.
 await api.RunAsync(attempt => Task.FromResult(cached), cancellationToken);
 ```
 
-The rule is deliberately quiet once the token is used anywhere in the callback: a body that threads
-it into one call and forgets a second is [CA2016](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2016)'s
-subject, and guessing which of the two omissions was meant is how a rule earns a `NoWarn`.
+The analyzer is quiet if the token is used anywhere within the callback. A body that threads it into one call and forgets a second is [CA2016](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2016)'s subject, and guessing which of the two omissions was meant is how a rule earns a `NoWarn`. For comprehensive token propagation, see CA2016.
 
-## NRES002
+## NRES002: Incorrect token passed
 
-**A different cancellation token is passed inside the callback.**
-
-Reported when a callback never mentions its own token and hands some other one - the caller's,
-`CancellationToken.None`, `default` - to a call inside it.
+This rule is reported when a callback ignores its own token and instead passes a different token - such as the caller's token, `CancellationToken.None`, or `default` - to an internal call. This renders the attempt timeout ineffective.
 
 ```csharp
 // Reported: the attempt timeout has no effect on this call.
 await api.RunAsync(attempt => client.GetAsync(url, cancellationToken), cancellationToken);
 
-// The fix.
+// The fix: pass the 'attempt' token.
 await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 ```
 
-Where the parameter was written as `_`, the fix names it first, because a token you cannot refer to
-cannot be passed.
+Where the parameter was written as `_`, the fix names it first, because a token you cannot refer to cannot be passed.
 
-Both rules read the lambda handed to `RunAsync` or `TryRunAsync`. A method group -
-`api.RunAsync(FetchAsync, cancellationToken)` - is left alone: the body may be in another assembly,
-and a diagnostic that appears only when the source happens to be visible is worse than one that
-stays quiet. See [the cancellation contract](../deep-dives/cancellation.md) for what the two tokens
-are.
+Both `NRES001` and `NRES002` analyze lambdas passed to `RunAsync` or `TryRunAsync`. Method groups (e.g., `api.RunAsync(FetchAsync, cancellationToken)`) are ignored because the analyzer cannot guarantee visibility of the method body. For more information, see the [cancellation contract](../deep-dives/cancellation.md).
 
-## NRES003
+## NRES003: Validation failure
 
-**The policy will not pass validation.**
-
-The literal half of [`Validate()`](resilience.md), at build time: `Attempts` below 1, and a
-`Deadline` or `AttemptTimeout` that is neither positive nor `Timeout.InfiniteTimeSpan`.
+This rule performs a build-time check for the same logic used in [`Validate()`](resilience.md). It reports policies with `Attempts` below 1, or a `Deadline` or `AttemptTimeout` that is neither positive nor `Timeout.InfiniteTimeSpan`.
 
 ```csharp
-// Reported twice, and it throws ResilienceConfigurationException on first execution.
+// Reported: Attempts must be at least 1, and Deadline must be positive.
 var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(-1) };
 ```
 
-`TimeSpan.FromSeconds(2)`, `new TimeSpan(0, 0, 30)`, `TimeSpan.Zero` and `Timeout.InfiniteTimeSpan`
-are folded; a value the compiler cannot see is left to `Validate()`.
+The analyzer folds constants like `TimeSpan.FromSeconds(2)`, `new TimeSpan(0, 0, 30)`, `TimeSpan.Zero`, and `Timeout.InfiniteTimeSpan`. Values the compiler cannot resolve are left to the runtime `Validate()` method.
 
-## NRES004
+## NRES004: Attempt timeout exceeds deadline
 
-**`AttemptTimeout` is longer than `Deadline`.**
-
-Legal, validates, and cannot do what it looks like it does: the deadline covers the whole call and
-caps every attempt inside it, so an attempt timeout above it is never reached.
+This rule is reported when `AttemptTimeout` is longer than `Deadline`. While this is technically legal and passes validation, it is misleading: the overall deadline caps every single attempt, meaning an attempt timeout larger than the deadline can never be reached.
 
 ```csharp
-// Reported: the attempt is capped at 5 seconds, not 10.
+// Reported: the attempt is effectively capped at 5 seconds, not 10.
 var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(5), AttemptTimeout = TimeSpan.FromSeconds(10) };
 ```
 
-Only reported when both are set in the same expression. Reaching back through a preset for the
-inherited deadline would mean guessing which one it came from. See
-[deadlines](../features/deadlines.md).
+This is only reported when both properties are set within the same expression.
 
-## NRES005
+## NRES005: Guard created per call
 
-**A breaker or retry budget created per call keeps no state.**
-
-A breaker counts consecutive failures; a budget counts deposits over a window. Both exist to outlive
-the call, so one built inside a method has never seen a failure and never opens.
+Circuit breakers and retry budgets must outlive the call they protect to be effective. If a breaker is created inside a method body, it will never have seen a prior failure and will never open.
 
 ```csharp
-// Reported: a new breaker per call, which is a breaker that never opens.
+// Reported: a new breaker is created every time the method is called.
 static Resilience Payments() => Resilience.Http with { Breaker = new Breaker() };
 
-// Not reported: one breaker, held.
+// Not reported: the breaker is held in a static field.
 static readonly Resilience Payments = Resilience.Http with { Breaker = new Breaker() };
 ```
 
-Reported only for a guard written directly into a policy's initializer inside a method body. A guard
-that is a local or a parameter first may be on its way to something that keeps it, and startup code
-- the entry point, a static initializer, a field initializer - is doing once what a called method
-would do per call. `RetryBudget.Shared(name)` is looked up by name, so asking for it per call is
-correct and is not reported.
+This rule is reported for guards written directly into a policy's initializer inside a method. It does not report guards that are locals or parameters, as they may be stored elsewhere. `RetryBudget.Shared(name)` is not reported because it is looked up by name.
 
-## NRES006
+## NRES006: HttpClient created per call
 
-**A resilient `HttpClient` created per call discards its per-host state.**
+Creating a resilient `HttpClient` within a `using` block inside a method causes the handler's per-host breakers and budgets to be discarded immediately after the call.
 
 ```csharp
-// Reported: the handler's per-host breakers and budgets die with the client.
+// Reported: the handler's per-host state dies with the client.
 using HttpClient client = ResilienceHttp.CreateClient();
 ```
 
-Reported only for the `using` form, where the client provably does not outlive the method, and never
-in the entry point. A client the method returns is not per call. See
-[the HTTP handler](../http/index.md) and [`AddResilience()`](../di/index.md).
+This is reported only for `using` forms where the client provably does not outlive the method. For the correct approach, see [the HTTP handler](../http/index.md) and [`AddResilience()`](../di/index.md).
 
-## NRES007
+## NRES007: Redundant async callback
 
-**The callback does not need to be `async`.**
+This rule is reported when a callback is marked `async` but only contains a single `await` for a task that matches the delegate's return type. Removing the `async` keyword avoids the allocation of an unnecessary state machine.
 
 ```csharp
-// Reported: a state machine per attempt, for one await.
+// Reported: unnecessary state machine for a single await.
 await api.RunAsync(async attempt => await client.GetAsync(url, attempt), cancellationToken);
 
-// The same call, without it.
+// The fix: return the task directly.
 await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 ```
 
-The execution overloads already take a `Task`-returning delegate, and the [executor](index.md) invokes the
-callback inside the same `try` that classifies its outcome - so a callback that throws
-synchronously is classified exactly as a faulted task is, and dropping `async` changes nothing but
-the allocation. Reported only when the whole body is one `await` whose task is already the
-delegate's return type; a `ValueTask`, or a configured awaiter, is a different type and keeps its
-state machine. Go deeper: [where the allocations are](../deep-dives/allocations.md).
+This is reported only when the entire body consists of one `await` whose task is already the delegate's return type. For details on allocations, see [where the allocations are](../deep-dives/allocations.md).
 
-## Turning one off
+## Manage analyzer severity
 
-Standard Roslyn severity control - per rule, per project, in `.editorconfig`:
+You can control analyzer severity using a `.editorconfig` file:
 
 ```ini
 [*.cs]
@@ -163,13 +121,12 @@ dotnet_diagnostic.NRES006.severity = none
 dotnet_diagnostic.NRES001.severity = error
 ```
 
-Or at a single site, where the code is deliberate:
+Alternatively, you can disable a rule at a specific site using `#pragma` directives:
 
 ```csharp
-#pragma warning disable NRES003 // invalid on purpose: this test asserts the message
+#pragma warning disable NRES003 // invalid on purpose for test assertion
 var api = Resilience.Default with { Attempts = 0 };
 #pragma warning restore NRES003
 ```
 
-The rule ids are a contract: adding, renaming or re-severity-ing one is a reviewed diff in
-`AnalyzerReleases.Unshipped.md`, the way a member is in `PublicAPI.Unshipped.txt`.
+The rule ids are a contract: adding, renaming, or re-severity-ing one is a reviewed diff in `AnalyzerReleases.Unshipped.md`, the way a member is in `PublicAPI.Unshipped.txt`.

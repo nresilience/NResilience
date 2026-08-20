@@ -1,19 +1,18 @@
 ---
 title: Test a policy
-description: A test that proves the retry happened, asserts on the events, and runs in milliseconds.
+description: Learn how to write fast, deterministic tests for resilience policies using sequences and fake time.
 order: 4
 ---
 
 # Test a policy
 
-## Scenario
+Testing resilience logic - such as retries and timeouts - can be slow and flaky if you rely on real-time delays. A test that waits 30 seconds for a timeout takes 30 seconds to run, and timing variations across different machines can cause intermittent failures.
 
-Testing retry and backoff code the naive way means using real delays - a 30-second timeout test
-takes 30 seconds, and a backoff test can pass on one machine and fail on another when timing
-varies. You want a test that proves the call is retried, that the deadline bites, and that neither
-claim depends on a real sleep.
+To avoid this, NResilience provides tools to simulate dependency behavior and manipulate time, allowing you to prove your policies work correctly in milliseconds.
 
-## Complete example
+## Verify retry behavior
+
+The `Sequence<T>` class acts as a test double that serves pre-defined outcomes in a specific order. This allows you to simulate complex scenarios, such as a dependency that fails twice before succeeding.
 
 <!-- snippet: testing-sequence -->
 ```csharp
@@ -31,17 +30,15 @@ Assert.Equal(3, result.Attempts.Count);
 ```
 <!-- endsnippet -->
 
-## What's happening
+### Key testing concepts
 
-- **The script is the double.** A test double (a stand-in for the real dependency) is what
-  `Sequence.For<T>()` provides: it serves outcomes one per call in order, so "fails twice then
-  succeeds" is the test's first three lines rather than a mock framework (a library for setting up
-  call expectations on fake objects).
-- **`Backoff.None`** removes the only thing that would have made this test slow.
-- **The attempt log is the assertion.** `result.Attempts.Count` is deterministic where a stopwatch is
-  not.
+- **Deterministic Doubles**: Instead of using a mock framework to set up expectations, `Sequence.For<T>()` provides a simple script of outcomes.
+- **Removing Delays**: Setting `Backoff = Backoff.None` removes the real-world wait time between retries, making the test execution nearly instantaneous.
+- **Attempt Logs**: Asserting on `result.Attempts.Count` provides a deterministic way to verify that the policy retried the expected number of times.
 
-## Assert on timing without waiting for it
+## Test timeouts without waiting
+
+To test timeouts or deadlines without actually waiting for the clock, provide a `FakeTimeProvider` to both the policy and the sequence. This allows you to "advance" time manually.
 
 <!-- snippet: testing-fake-time -->
 ```csharp
@@ -69,10 +66,11 @@ Assert.IsType<AttemptTimeoutException>(result.Exception);
 ```
 <!-- endsnippet -->
 
-Pass the same `TimeProvider` to the policy and to the sequence, or the scripted delay becomes a real
-one.
+Passing the same `TimeProvider` to the policy and the sequence ensures that scripted delays are processed by the fake clock rather than the system clock.
 
-## Assert on what the policy did
+## Assert on policy events
+
+You can verify that a policy is emitting the correct events in the correct order by using an `EventRecorder`. This is particularly useful for testing telemetry or logging.
 
 <!-- snippet: testing-event-recorder -->
 ```csharp
@@ -95,14 +93,15 @@ Assert.Equal(42, events.Single(CallEventKind.Succeeded).Result);
 ```
 <!-- endsnippet -->
 
-## Run it
+## Run tests
+
+Run your tests using the standard .NET CLI:
 
 ```bash
 dotnet test
 ```
 
-## When to go deeper
+## For more information
 
-- [Testing](../testing/index.md) - the whole package, including the HTTP double.
-- [Telemetry](../features/telemetry.md) - what each event means.
-
+- [Testing](../testing/index.md): Learn about the full testing package, including the HTTP double.
+- [Telemetry](../features/telemetry.md): Understand the meaning of each `CallEventKind`.

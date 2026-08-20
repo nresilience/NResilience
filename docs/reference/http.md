@@ -1,52 +1,53 @@
 ---
 title: HTTP reference
-description: ResilienceHandler, HttpResilienceOptions and ResilienceHttp.
+description: Reference for ResilienceHandler, HttpResilienceOptions, and the ResilienceHttp utility class.
 order: 9
 ---
 
 # HTTP reference
 
-Namespace `NResilience.Http`, package `NResilience`.
+The HTTP components are located in the `NResilience.Http` namespace within the `NResilience` package.
 
 ## `ResilienceHandler`
 
-`sealed class ResilienceHandler : DelegatingHandler`.
+`ResilienceHandler` is a `sealed class` that inherits from `DelegatingHandler`. It manages the execution of resilience policies specifically for HTTP requests.
 
-| Member | Meaning |
-| --- | --- |
-| `ResilienceHandler(Resilience? policy = null, HttpResilienceOptions? options = null)` | A handler whose inner handler is assigned later, as a client factory does. |
-| `ResilienceHandler(HttpMessageHandler innerHandler, Resilience? policy = null, HttpResilienceOptions? options = null)` | A handler in front of a transport. |
-| `Policy` | The policy it runs, before per-host scoping. Defaults to `Resilience.Http`. |
-| `Options` | The switches it was built with. |
-| `BreakersByHost()` | A snapshot of the breakers, by host, for the hosts it has seen. |
-| `BudgetsByHost()` | The same for the retry budgets. |
-| `WillRetry(HttpRequestMessage)` | Whether that request would be retried: more than one attempt, and a repeatable request. |
+| Member | Description |
+| :--- | :--- |
+| `ResilienceHandler(Resilience? policy = null, HttpResilienceOptions? options = null)` | Creates a handler where the inner handler is assigned later (e.g., by a client factory). |
+| `ResilienceHandler(HttpMessageHandler innerHandler, Resilience? policy = null, HttpResilienceOptions? options = null)` | Creates a handler that wraps a specific transport handler. |
+| `Policy` | The policy executed by the handler, before per-host scoping is applied. Defaults to `Resilience.Http`. |
+| `Options` | The `HttpResilienceOptions` used to configure the handler. |
+| `BreakersByHost()` | Returns a snapshot of the circuit breakers currently managed by the handler, keyed by host. |
+| `BudgetsByHost()` | Returns a snapshot of the retry budgets currently managed by the handler, keyed by host. |
+| `WillRetry(HttpRequestMessage)` | Determines if a request would be retried based on whether the policy allows multiple attempts and whether the request is repeatable. |
 
-Both constructors validate the policy. The synchronous `Send` throws `NotSupportedException`.
+Both constructors validate the provided policy. The synchronous `Send` method is not supported and throws a `NotSupportedException`.
 
 ## `HttpResilienceOptions`
 
-`sealed class`. Mutable, because it is what an options callback configures.
+`HttpResilienceOptions` is a `sealed class` used to configure the `ResilienceHandler`. It is mutable to allow configuration via options callbacks.
 
-| Property | Default | Meaning |
-| --- | --- | --- |
-| `RetryUnsafeMethods` | `false` | Whether POST and PATCH are retried. |
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `RetryUnsafeMethods` | `false` | Determines whether `POST` and `PATCH` methods are retried. |
 | `OwnTransportTimeout` | `true` | Whether the client's `Timeout` is set to `Timeout.InfiniteTimeSpan`. Honored by whoever builds the client. |
-| `BreakerPerHost` | `true` | One breaker per host. A policy carrying an explicit `Breaker` keeps it. |
-| `BreakerSettings` | null | The settings per-host breakers are created with. |
-| `BudgetPerHost` | `true` | One retry budget per host. An explicit `Budget` wins, including `None`. |
-| `DetectNestedRetries` | `true` | Whether the nested-retry header is stamped and nesting reported. |
+| `BreakerPerHost` | `true` | Enables per-host circuit breakers. If the policy already carries an explicit `Breaker`, that breaker is used instead. |
+| `BreakerSettings` | `null` | The settings used to create per-host breakers. |
+| `BudgetPerHost` | `true` | Enables per-host retry budgets. An explicit `Budget` on the policy (including `RetryBudget.None`) takes precedence. |
+| `DetectNestedRetries` | `true` | Determines whether the nested-retry header is added to requests and whether nesting is reported. |
 
 ## `ResilienceHttp`
 
-`static class`.
+`ResilienceHttp` is a `static class` providing utility methods and constants for HTTP resilience.
 
-| Member | Meaning |
-| --- | --- |
-| `CreateClient(policy = null, options = null, innerHandler = null)` | An `HttpClient` with the handler in front of it, built the way the DI registration builds one. Disposing it disposes the chain. |
-| `Repeatable` | `HttpRequestOptionsKey<bool>`. Per-request override of the [idempotency](../http/idempotency.md) decision; wins in both directions. |
-| `NestedRetryHeader` | `"X-NResilience-Retrying"`. |
+| Member | Description |
+| :--- | :--- |
+| `CreateClient(policy = null, options = null, innerHandler = null)` | Creates an `HttpClient` with a `ResilienceHandler` in its pipeline. Disposing the client also disposes the handler chain. |
+| `Repeatable` | An `HttpRequestOptionsKey<bool>` used to override the idempotency decision for a specific request. |
+| `NestedRetryHeader` | The constant value for the nested-retry header: `"X-NResilience-Retrying"`. |
 
-Retried methods: GET, HEAD, PUT, DELETE, OPTIONS, TRACE. Not retried: POST, PATCH, and any method the
-library does not recognize.
+### Default retryable methods
+The handler retries the following methods by default: `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`, and `TRACE`. 
 
+The following are not retried unless configured otherwise: `POST`, `PATCH`, and any HTTP method not recognized by the library.

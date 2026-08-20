@@ -1,67 +1,68 @@
 ---
 title: Classifier and verdicts
-description: The classifier's members, the four verdict kinds, and what the shipped classifiers know.
+description: Reference for the Classifier class, the Verdict structure, and how different outcomes are categorized.
 order: 3
 ---
 
 # `Classifier`
 
-`sealed class Classifier`. Immutable: every derivation returns a new instance.
+The `Classifier` is a `sealed class` used to categorize the outcome of an attempt. It is immutable; every modification returns a new instance.
 
-| Member | Meaning |
-| --- | --- |
-| `Classifier.Default` | `TimeoutException`, `IOException` and `SocketException` are `Transient`. Anything unrecognized is `Permanent`. |
-| `Classifier.Http` | `Default` plus `HttpRequestException` as `Transient` and a status-code rule for `HttpResponseMessage`. |
-| `Classifier.RetryEverything` | No rules; every exception is `Transient`. |
-| `On<TException>(Verdict)` | A fixed verdict for an exception type, matched including subclasses. |
-| `On<TException>(Func<TException, Verdict>)` | A predicate that can inspect the exception. |
-| `OnResult<T>(Func<T, Verdict>)` | A rule for a returned value. `T` is matched exactly, not by assignability. |
-| `ClassifyException(Exception)` | The verdict for an exception. |
-| `ClassifyResult<T>(T)` | The verdict for a returned value, or `Verdict.Ok` when nothing is registered for `T`. |
-| `ToString()` | Every rule, in evaluation order, including the unrecognized-exception verdict. |
+| Member | Description |
+| :--- | :--- |
+| `Classifier.Default` | Classifies `TimeoutException`, `IOException`, and `SocketException` as `Transient`. All other exceptions are `Permanent`. |
+| `Classifier.Http` | Extends `Default` by adding `HttpRequestException` as `Transient` and including a status-code rule for `HttpResponseMessage`. |
+| `Classifier.RetryEverything` | Contains no specific rules; every exception is classified as `Transient`. |
+| `On<TException>(Verdict)` | Assigns a fixed verdict to a specific exception type and its subclasses. |
+| `On<TException>(Func<TException, Verdict>)` | Assigns a verdict based on a predicate that can inspect the exception. |
+| `OnResult<T>(Func<T, Verdict>)` | Assigns a verdict to a returned value. The type `T` must match exactly. |
+| `ClassifyException(Exception)` | Returns the verdict for a given exception. |
+| `ClassifyResult<T>(T)` | Returns the verdict for a given result. Returns `Verdict.Ok` if no rule is registered for type `T`. |
+| `ToString()` | Returns a list of all rules in evaluation order, including the default verdict for unrecognized exceptions. |
 
-Rules are evaluated most-recently-added first, so a rule you add beats one it was derived from.
+Rules are evaluated in reverse order of addition; the most recently added rule takes precedence.
 
-`Classifier.Http`'s status-code rule:
+### HTTP status-code rules
+`Classifier.Http` uses the following rules for `HttpResponseMessage` outcomes:
 
 | Status | Verdict |
-| --- | --- |
-| 429 | `Throttled`, carrying `Retry-After` when present |
-| 503 with `Retry-After` | `Throttled`, carrying it |
-| Other 5xx, and 408 | `Transient` |
-| Everything else | `Ok` |
+| :--- | :--- |
+| 429 | `Throttled` (includes `Retry-After` if present) |
+| 503 with `Retry-After` | `Throttled` (includes `Retry-After`) |
+| Other 5xx and 408 | `Transient` |
+| All other statuses | `Ok` |
 
-`Retry-After` is read in both forms: a delta in seconds, and an HTTP date, which is converted to a
-delay and floored at zero.
+The `Retry-After` value is supported as both a delta-seconds value and an HTTP date. Both are converted to a `TimeSpan` and floored at zero.
 
 ## `Verdict`
 
-`readonly struct Verdict`.
+`Verdict` is a `readonly struct` that describes the outcome of an attempt.
 
-| Member | Meaning |
-| --- | --- |
-| `Kind` | The `VerdictKind`. |
-| `RetryAfter` | Server pushback, honored in preference to any backoff curve. Null when the server said nothing. |
-| `Verdict.Ok` | The call worked. |
+| Member | Description |
+| :--- | :--- |
+| `Kind` | The `VerdictKind` of the outcome. |
+| `RetryAfter` | A server-provided delay that is honored over the standard backoff curve. This is `null` if the server provided no pushback. |
+| `Verdict.Ok` | The call succeeded. |
 | `Verdict.Transient` | A failure that may not recur. |
 | `Verdict.Permanent` | A failure that will recur. |
-| `Verdict.Throttled(TimeSpan?)` | The dependency is defending itself, with optional pushback. |
+| `Verdict.Throttled(TimeSpan?)` | The dependency is defending itself, potentially with a suggested retry delay. |
 
-Value equality; `ToString()` prints `Throttled (retry after 2s)`.
+`Verdict` implements value equality. `ToString()` prints a human-readable summary, such as `Throttled (retry after 2s)`.
 
 ## `VerdictKind`
 
-| Value | Retried? | Counts against the breaker? |
-| --- | --- | --- |
-| `Ok` | Returned | Sampled as a success |
-| `Transient` | Yes, short curve | Yes |
-| `Throttled` | Yes, long curve or `Retry-After` | No - the dependency is working correctly |
-| `Permanent` | Never | No - overwhelmingly a client-side fact |
+`VerdictKind` determines how the [executor](index.md) handles the outcome.
 
-Two verdicts are produced by the [executor](index.md) rather than by a classifier, and no classifier can override
-either: its own attempt timeout, which is `Transient`, and caller cancellation, which is not a failure
-at all.
+| Value | Retried? | Counted against the breaker? |
+| :--- | :--- | :--- |
+| `Ok` | No (returned) | Yes (sampled as success) |
+| `Transient` | Yes (short backoff curve) | Yes |
+| `Throttled` | Yes (long backoff curve or `Retry-After`) | No (dependency is working as intended) |
+| `Permanent` | No | No (treated as a client-side error) |
 
-A classifier that calls an *exception* `Ok` is read as `Permanent`, because an exception cannot be
-turned into a value.
+### Special cases
+Two specific verdicts are produced by the [executor](index.md) itself and cannot be overridden by a classifier:
+1. **Attempt Timeout**: Classified as `Transient`.
+2. **Caller Cancellation**: Not classified as a failure.
 
+**Note**: If a classifier identifies an *exception* as `Ok`, the executor treats it as `Permanent`, because an exception cannot be converted into a return value.

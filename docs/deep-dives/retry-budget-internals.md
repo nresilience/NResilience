@@ -1,64 +1,56 @@
 ---
 title: Retry budget internals
-description: Why retries are bounded as a fraction of traffic, why the state is per process, and what the bucket holds.
+description: A deep dive into the token-bucket mechanism, the reasoning for traffic-based bounding, and implementation details of the retry budget.
 order: 5
 ---
 
 # Retry budget internals
 
-## The arithmetic that makes attempt limits insufficient
+Retry budgets prevent request amplification in distributed systems. This guide explains why bounding retries as a fraction of traffic is more effective than using fixed attempt limits.
 
-Retries compose multiplicatively. A frontend that retries three times, calling a backend that retries
-three times, calling a database that retries three times, turns one user action into up to 4³ = 64
-database attempts. Every layer is configured reasonably. The aggregate is not, and no layer can see it.
+## The problem with attempt limits
 
-A budget expressed as a fraction of traffic fixes that without coordination: if every client
-independently funds retries at 10% of its successful traffic, fleet-wide amplification is bounded at
-1.1 times whatever the topology looks like. That is the whole mechanism, and it is why the budget is on
-by default while the attempt count is merely a bound.
+Retries compose multiplicatively across service boundaries. For example, if a frontend service retries a call three times, a backend service retries three times, and a database retries three times, a single user action can result in up to $4^3 = 64$ database attempts. 
 
-## The bucket
+While each layer's configuration may seem reasonable in isolation, the aggregate effect is an amplification storm. Because no single layer can see the entire call chain, fixed attempt limits cannot prevent this.
 
-A success deposits `fraction` tokens; a retry spends one. `minimumPerSecond` refills regardless of
-traffic, so a client too quiet to fund retries from its own successes can still retry at all. Capacity
-is ten seconds of the floor rate, which bounds the *burst* a recovering client can spend at once
-without touching the sustained rate.
+A budget expressed as a fraction of traffic solves this without requiring coordination. If every client independently funds retries at 10% of its successful traffic, fleet-wide amplification is bounded at 1.1 times the original traffic volume, regardless of the system topology. This is why the retry budget is enabled by default, while the attempt count serves only as a maximum bound.
 
-A cold process starts full. Throttling the first retries a fresh instance makes would penalize
-deployment rather than a storm.
+## The token-bucket mechanism
 
-Only retries are charged. The first attempt of every call always runs - a budget is not a rate limiter,
-and refusing traffic rather than refusing amplification is a different mechanism with a different
-failure mode.
+The retry budget uses a token-bucket algorithm to track and fund retries:
 
-## Why the state is per process, and unshared by default
+- **Deposits**: Every successful attempt deposits tokens into the bucket based on the `fraction` value.
+- **Spending**: Every retry attempt spends one token.
+- **Floor Rate**: The `minimumPerSecond` parameter refills the bucket at a constant rate. This ensures that a quiet client can still perform retries even without successful traffic.
+- **Burst Bound**: The bucket capacity is limited to ten seconds of the floor rate. This limits the burst of retries a recovering client can spend at once without impacting the sustained rate.
+- **Cold Start**: A new process starts with a full bucket. This prevents new deployments from being penalized by throttling the first few retries of a fresh instance.
 
-There is no coordination between pods, and that is not a defect: the argument is statistical, and
-needing no protocol is the feature. It does follow that a budget which cannot observe enough traffic to
-mean anything is worthless - so a budget allocated per `HttpClient` instance, or resolved from a scoped
-container, is decoration. Share one instance, or use `RetryBudget.Shared(name)`.
+**Note**: Only retries are charged. The first attempt of every call always executes. The retry budget is not a rate limiter; its purpose is to refuse amplification, not to refuse traffic.
 
-Sharing is opt-in for the same reason breakers are scoped rather than global: a single process-wide
-budget would let a storm against payments throttle retries to search, which is the blast-radius
-inversion a resilience library exists to prevent.
+## State and scope
 
-## Two implementation details that are load-bearing
+### Per-process state
+Retry budgets are maintained per process. Because the mechanism is statistical, it does not require coordination between pods. 
 
-**The automatic budget cannot live in a field on the policy.** A record's synthesized equality compares
-every instance field, so a lazily-created budget would make two identically-configured policies stop
-being equal as a side effect of one of them having executed. It lives in a `ConditionalWeakTable` keyed
-by policy identity instead.
+However, a budget that does not observe enough traffic is ineffective. A budget allocated per `HttpClient` instance or resolved from a scoped container provides little value. To ensure the budget is effective, you should share one instance or use `RetryBudget.Shared(name)`.
 
-**A DI registration pins the automatic budget to the registration name.** `Budget = null` keys the
-automatic budget by policy *instance*, and a configuration reload produces a new instance - so the
-accumulated traffic history would be discarded on every configuration edit, silently, on the default
-configuration that nearly everybody runs. Pinning it to the name changes its lifetime and nothing about
-its behavior.
+### Opt-in sharing
+Sharing is opt-in to prevent "blast-radius inversion." A single process-wide budget would allow a failure storm against one dependency (e.g., a payment gateway) to throttle retries for an entirely different, healthy dependency (e.g., a search index).
 
-## Reading it
+## Implementation details
 
-`Utilisation` is the number for a dashboard, and a budget sitting near 1 is a client whose retries are
-being refused: a symptom to alert on rather than a steady state. The metric that says the same thing
-across a fleet is `nresilience.attempts ÷ nresilience.calls` - the retry fraction. See
-[telemetry](../features/telemetry.md).
+### Policy equality and lifetime
+The automatic budget cannot be stored as a field within the `Resilience` record. Since records use synthesized equality to compare instance fields, a lazily created budget would cause two identically configured policies to be unequal simply because one had been executed. Instead, the budget is stored in a `ConditionalWeakTable` keyed by policy identity.
 
+### DI registration and persistence
+When using dependency injection, the automatic budget is pinned to the registration name rather than the policy instance. This ensures that when a configuration reload produces a new policy instance, the accumulated traffic history is not discarded.
+
+## Monitoring the budget
+
+The `Utilisation` property provides a value for dashboards. A budget consistently near 1 indicates that retries are being refused, which is a symptom that should trigger an alert.
+
+To monitor the retry fraction across a fleet, use the following metric:
+`nresilience.attempts ÷ nresilience.calls`
+
+For more information on available metrics, see [Telemetry](../features/telemetry.md).

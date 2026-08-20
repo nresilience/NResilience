@@ -1,48 +1,42 @@
 ---
 title: Nested retries
-description: How the handler notices that it is already inside a retrying client, and why it reports rather than intervenes.
+description: Learn how NResilience detects nested retry loops across process boundaries and how to use this information to prevent request amplification.
 order: 3
 ---
 
 # Nested retries
 
-Retries compose multiplicatively, and the amplification is invisible from any single layer. If a
-frontend retries 3 times, calls a backend that retries 3 times, which calls a database that retries
-3 times, one user action becomes 3 x 3 x 3 = 27 attempts at the bottom - and every layer believes it
-is being reasonable, because each one only sees its own 3 attempts.
+Retries compose multiplicatively, which can lead to a phenomenon called "request amplification." If a frontend retries a call three times, calls a backend that retries three times, which calls a database that retries three times, a single user action can result in 27 attempts at the bottom of the stack (3 x 3 x 3). This amplification is often invisible to each individual layer because every service believes it is behaving reasonably by only attempting three retries.
 
-The fix is to reduce the inner attempt count: the layer closest to the failing dependency is the
-one that should retry, and the layers above it should hand the call through with little or no retry
-of their own. The handler helps you see when that is needed, and reports it rather than intervening.
+The best way to resolve request amplification is to reduce the attempt count in the inner layers. The layer closest to the failing dependency should handle the majority of the retries, while the layers above it should pass the call through with minimal or no retries of their own.
 
-`DetectNestedRetries` is **on by default** and costs one header on a request that is already being
-retried.
+The NResilience handler helps you identify these nested loops by detecting and reporting them.
 
-## What it does
+## How nested retries are detected
 
-Within one process, a flag on the current execution context says whether this send is running inside
-a retrying handler's attempt. Across a process boundary, the header does the same job:
+`DetectNestedRetries` is enabled by default. The handler uses two mechanisms to detect nesting:
+
+- **Within a single process**: A flag in the current execution context tracks whether the send operation is already running inside a retrying handler's attempt.
+- **Across process boundaries**: The handler adds a specific HTTP header to every request it sends:
 
 ```
 X-NResilience-Retrying: 1
 ```
 
-A retrying handler stamps it on every request it sends. A service that reads it off an inbound request
-knows its caller will retry, which is the information it needs to stop retrying again underneath.
-`ResilienceHttp.NestedRetryHeader` is the constant.
+You can use the `ResilienceHttp.NestedRetryHeader` constant to refer to this header in your code.
 
-When nesting is detected, a `NestedRetry` [event](../features/telemetry.md) fires and the call
-proceeds. The library reports it and does nothing else: silently dropping the retries you configured
-would be a bigger surprise than the amplification.
+When the handler detects nesting, it fires a `NestedRetry` [event](../features/telemetry.md) and then proceeds with the call. The library reports the nesting but does not intervene; silently dropping configured retries would be an unexpected behavior that could lead to difficult-to-debug failures.
 
-## Reading it on the inbound side
+## Handle nested retries on the inbound side
+
+If you are building a service that receives requests, you can check for the nested retry header to determine if the caller will retry the operation.
 
 ```csharp
 bool callerWillRetry = request.Headers.ContainsKey(ResilienceHttp.NestedRetryHeader);
 ```
 
-A service that reads this header knows its caller will retry. The useful reaction is usually to
-reduce the inner attempt count to one, or to shorten the inner deadline so the caller's retry has
-budget left to be useful. That decision belongs to your service, so the library states the fact
-rather than acting on it.
+When you detect that a caller will retry, you can implement one of the following strategies to reduce amplification:
+- **Reduce attempts**: Set the inner attempt count to one.
+- **Shorten deadlines**: Reduce the inner deadline so that the caller's retry budget remains useful.
 
+Because the optimal response depends on your specific service architecture, NResilience provides the detection logic and leaves the decision on how to react to your application.

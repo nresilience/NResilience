@@ -1,59 +1,59 @@
 ---
 title: Breaker
-description: The breaker object, its settings, and its four states.
+description: Reference for the Breaker class, its settings, and the possible states of a circuit breaker.
 order: 5
 ---
 
 # `Breaker`
 
-`sealed class Breaker`. A live object: construct it, hold it, and share it exactly as widely as you
-intend.
+The `Breaker` is a `sealed class` that implements the circuit breaker pattern. It is a live object; create it and share it across the calls you intend to protect.
 
-| Member | Meaning |
-| --- | --- |
-| `Breaker(BreakerSettings? settings = null)` | Creates one. Validates the settings, throwing `ResilienceConfigurationException`. |
-| `Name` | `init`-only. Used in diagnostics and health endpoints. |
-| `Settings` | The settings it was built with. |
-| `State` | What it is doing now. An open breaker whose break has elapsed reports `HalfOpen`, because that is what the next call will find. Reading it never consumes a probe slot. |
-| `OpenedAt` | When it last opened, or null while closed. |
-| `Isolate()` | Force it open. Never self-heals. |
-| `Reset()` | Close it and forget the history. |
+| Member | Description |
+| :--- | :--- |
+| `Breaker(BreakerSettings? settings = null)` | Creates a new breaker. This constructor validates the settings and throws a `ResilienceConfigurationException` if they are invalid. |
+| `Name` | An `init`-only property used for diagnostics and health endpoints. |
+| `Settings` | The `BreakerSettings` used to configure the breaker. |
+| `State` | The current state of the breaker. If a breaker is open but the break duration has elapsed, it reports `HalfOpen` because the next call will be treated as a probe. Reading this property does not consume a probe slot. |
+| `OpenedAt` | The timestamp of when the breaker last opened, or `null` if it is currently closed. |
+| `Isolate()` | Forces the breaker into the `Isolated` state. An isolated breaker does not self-heal. |
+| `Reset()` | Closes the breaker and clears its failure history. |
 
-`Isolate` and `Reset` raise no events, because there is no call to attribute them to.
+`Isolate` and `Reset` do not raise events because they are administrative actions and not triggered by a specific call.
 
 ## `BreakerState`
 
-| Value | Meaning |
-| --- | --- |
-| `Closed` | Calls pass through. Outcomes are being sampled. |
-| `Open` | Calls are refused until the break duration expires. |
-| `HalfOpen` | A trickle of trial calls is allowed through. |
-| `Isolated` | Forced open by `Isolate`. |
+The `BreakerState` enum defines the possible states of the circuit breaker:
+
+| Value | Description |
+| :--- | :--- |
+| `Closed` | The breaker is operating normally. Calls pass through, and outcomes are sampled. |
+| `Open` | The breaker has tripped. Calls are refused until the break duration expires. |
+| `HalfOpen` | The break duration has expired. A limited number of trial calls (probes) are allowed through. |
+| `Isolated` | The breaker has been forced open via the `Isolate` method. |
 
 ## `BreakerSettings`
 
-`sealed record`. Every property is `init`-only.
+`BreakerSettings` is a `sealed record` used to configure the breaker's trip and reset logic. All properties are `init`-only.
 
-| Property | Default | Meaning |
-| --- | --- | --- |
-| `ConsecutiveFailures` | 5 | Consecutive failures before opening. |
-| `FailureRatio` | null | Optional rate-based trip, in (0, 1]. Evaluated alongside the counter. |
-| `MinimumCalls` | 20 | Sampled calls in the window before any rate is evaluated. |
-| `Window` | 30 s | The sliding window rates are measured over. |
-| `SlowCallThreshold` | null | An attempt slower than this counts as slow, even when it succeeded. |
-| `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that opens it. |
-| `BreakDuration` | 15 s | How long the first break lasts. |
-| `MaxBreakDuration` | 2 min | The break doubles per consecutive open, up to this. Set equal to `BreakDuration` to disable growth. |
-| `HalfOpenProbes` | 1 | Concurrent trial calls while in `HalfOpen`. |
-| `ProbeSuccesses` | 2 | Successful probes required to close. |
-| `Time` | `TimeProvider.System` | The clock. A breaker owns its own, because its state is read from health endpoints that hold no policy. |
-| `Validate()` | | Throws `ResilienceConfigurationException` listing every problem at once. |
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `ConsecutiveFailures` | 5 | The number of consecutive failures required to trip the breaker. |
+| `FailureRatio` | `null` | An optional rate-based trip threshold in the range (0, 1]. This is evaluated alongside the consecutive failure counter. |
+| `MinimumCalls` | 20 | The minimum number of sampled calls in the window before a rate-based trip is evaluated. |
+| `Window` | 30 s | The sliding window duration over which rates are measured. |
+| `SlowCallThreshold` | `null` | The duration above which an attempt is considered "slow," even if it succeeded. |
+| `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that will trip the breaker. |
+| `BreakDuration` | 15 s | The duration of the first break. |
+| `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set this equal to `BreakDuration` to disable growth. |
+| `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while in the `HalfOpen` state. |
+| `ProbeSuccesses` | 2 | The number of successful probes required to return the breaker to the `Closed` state. |
+| `Time` | `TimeProvider.System` | The clock used for timing. The breaker maintains its own clock so its state can be read by health endpoints that do not have access to a policy. |
+| `Validate()` | N/A | Validates the settings and throws a `ResilienceConfigurationException` listing all found problems. |
 
-Nothing rate-based, `SlowCallThreshold` included, is evaluated until `MinimumCalls` outcomes have
-landed in the window. The window arrays are allocated only when a rate-based trip is configured: a
-consecutive-failures breaker is three fields and no array.
+### Implementation details
 
-The breaker samples individual attempts, and only `Transient` outcomes count as failure evidence.
+- **Evaluation**: Rate-based trips (including the `SlowCallThreshold`) are not evaluated until `MinimumCalls` have occurred within the window.
+- **Resource Efficiency**: Window arrays are only allocated if a rate-based trip is configured. A breaker relying solely on consecutive failures requires no arrays.
+- **Sampling**: The breaker samples individual attempts. Only `Transient` outcomes are counted as evidence of failure.
 
-Go deeper: [Breaker internals](../deep-dives/breaker-internals.md).
-
+For a detailed explanation of the logic, see [Breaker internals](../deep-dives/breaker-internals.md).

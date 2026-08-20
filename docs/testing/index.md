@@ -1,24 +1,24 @@
 ---
 title: Testing
-description: Scripted callbacks, a recording listener, and a clock you control - so a policy test is neither slow nor flaky.
+description: Learn how to write fast, deterministic tests for resilience policies using scripted callbacks, a recording listener, and fake time.
 order: 6
 ---
 
 # Testing
 
-Testing retry and backoff code the naive way means using real delays - a 30-second timeout test
-takes 30 seconds, and a backoff test can pass on one machine and fail on another when timing
-varies. The testing package fixes that: it gives you scripted callbacks (so the dependency's
-behavior is deterministic), a recording listener (so you assert on what the policy did, not on
-elapsed time), and a clock you control (so a 30-second deadline runs in microseconds).
+Testing resilience logic - such as retries and timeouts - can be slow and flaky if you rely on real-time delays. A test that waits 30 seconds for a timeout takes 30 seconds to run, and timing variations across different machines can cause intermittent failures.
+
+The `NResilience.Testing` package addresses these issues by providing tools to make your tests deterministic and fast. It allows you to script dependency behavior, capture policy events for assertion, and manipulate time to run long-duration tests in microseconds.
 
 ```bash
 dotnet add package NResilience.Testing
 ```
 
-Two types, and the platform's own `FakeTimeProvider`. The package adds nothing to the execution path.
+The testing package is a separate dependency and does not impact the performance of the core library in production.
 
 ## Script the callback
+
+Use the `Sequence<T>` class to create a script of outcomes (returns, throws, or delays) that are served one by one as the policy makes attempts.
 
 <!-- snippet: testing-sequence -->
 ```csharp
@@ -36,16 +36,17 @@ Assert.Equal(3, result.Attempts.Count);
 ```
 <!-- endsnippet -->
 
-`Sequence.For<T>()` builds a script of `Returns`, `Throws` and `Delays` steps served one per call, in
-order. `Sequence.ForVoid()` scripts the void execution overloads. `CallCount` counts every call
-including the one that ran off the end of the script, and running off the end throws an
-`InvalidOperationException` that says so.
+`Sequence.For<T>()` allows you to chain `Returns`, `Throws`, and `Delays` steps. For void execution overloads, use `Sequence.ForVoid()`. 
 
-A step with no delay completes **synchronously**, which is what makes the synchronous-completion path
-scriptable at all. A step with a delay suspends and honors the cancellation token, which is what makes
-attempt timeouts and deadlines testable.
+### Sequence behavior
+- **Deterministic Outcomes**: Every call to `NextAsync` serves the next step in the script.
+- **Synchronous Completion**: A step with no delay completes synchronously, allowing you to test synchronous paths.
+- **Async Delays**: A step with a delay suspends execution and observes the provided cancellation token, making it possible to test attempt timeouts and deadlines.
+- **Bounds**: If the script is exhausted, the sequence throws an `InvalidOperationException` specifying the script length and the call number.
 
 ## Control the clock
+
+To test timeouts or deadlines without actually waiting for the clock, provide a `FakeTimeProvider` to both the policy and the sequence. This allows you to "advance" time manually.
 
 <!-- snippet: testing-fake-time -->
 ```csharp
@@ -74,12 +75,11 @@ Assert.IsType<AttemptTimeoutException>(result.Exception);
 <!-- endsnippet -->
 
 > [!IMPORTANT]
-> Pass the same `TimeProvider` to the policy and to the sequence. A scripted delay served against the
-> system clock is a real sleep, and a real sleep is what makes timing tests slow and flaky.
+> You must pass the same `TimeProvider` instance to both the policy and the sequence. If the sequence uses the system clock while the policy uses a fake clock, the scripted delay becomes a real sleep, making your tests slow and flaky.
 
-A test with a fake clock and no real delays runs the whole 30-second deadline in microseconds.
+## Verify policy behavior
 
-## Assert on what the policy did
+You can verify that a policy is emitting the correct events in the correct order by using an `EventRecorder`. This is more reliable than asserting on elapsed time.
 
 <!-- snippet: testing-event-recorder -->
 ```csharp
@@ -102,13 +102,11 @@ Assert.Equal(42, events.Single(CallEventKind.Succeeded).Result);
 ```
 <!-- endsnippet -->
 
-`EventRecorder` records every [`CallEvent`](../reference/events.md) in order. `Kinds` is the usual
-assertion surface, and asserting on the whole sequence is worth the extra characters: if a
-telemetry surface raises the right events in the wrong order, the log it produces is misleading
-even though every event is present. `Single(kind)`, `OfKind(kind)`, `CountOf(kind)`,
-`Contains(kind)` and `Clear()` are there for the narrower assertions.
+The `EventRecorder` captures every [`CallEvent`](../reference/events.md) in order. While you can use methods like `CountOf(kind)` or `Contains(kind)` for simple checks, asserting on the entire `Kinds` sequence is recommended to ensure that telemetry is reported in the correct order.
 
-## Testing an HTTP client
+## Test an HTTP client
+
+You can test resilient `HttpClient` configurations by providing a scripted `HttpMessageHandler` as the inner handler.
 
 <!-- snippet: testing-http-handler -->
 ```csharp
@@ -127,14 +125,9 @@ Assert.Equal(2, transport.Requests.Count);
 ```
 <!-- endsnippet -->
 
-The handler needs no container: `ResilienceHttp.CreateClient` takes an inner handler, so a scripted
-`HttpMessageHandler` is the whole test double.
+## Testing best practices
 
-## Two habits worth having
+To keep your tests fast and deterministic, follow these practices:
 
-**Turn backoff off, or fake the clock.** `Backoff = Backoff.None` makes a retry test instant without
-a clock. Anything that asserts on timing wants `FakeTimeProvider` instead.
-
-**Assert on the attempt log, not on the elapsed time.** `result.Attempts` says how many attempts ran,
-how each was classified and what delay preceded it. It is deterministic; a stopwatch is not.
-
+- **Disable backoff or fake the clock**. Use `Backoff = Backoff.None` to make retry tests instantaneous. If your test specifically asserts on timing or delays, use `FakeTimeProvider`.
+- **Assert on the attempt log**. Instead of using a stopwatch to verify retries, inspect `result.Attempts`. This log provides a deterministic record of how many attempts ran, their classifications, and the delays that preceded them.

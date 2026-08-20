@@ -1,21 +1,24 @@
 ---
 title: Troubleshooting
-description: Symptoms, the literal fix, and then why it happens.
+description: Common symptoms, their solutions, and the technical reasoning behind them.
 order: 11
 ---
 
 # Troubleshooting
 
-### Nothing was retried, and the exception came straight out
+This guide helps you diagnose and resolve common issues when using NResilience.
 
-> [!CAUTION] Quick fix
-> ```csharp
-> Classify = Classifier.Default.On<MyDbException>(Verdict.Transient)
-> ```
+## Retries not occurring
 
-`Classifier.Default` treats an exception type it does not recognize as `Permanent`. That is deliberate:
-retrying a programming error converts a fast, clear failure into a slow, confusing one and hides the
-bug. The cost is one line per exception type you know to be transient.
+### Symptom: No retries occur, and the exception is thrown immediately.
+
+**Solution**: Configure the classifier to treat your exception as transient.
+
+```csharp
+Classify = Classifier.Default.On<MyDbException>(Verdict.Transient)
+```
+
+**Why this happens**: `Classifier.Default` treats unrecognized exception types as `Permanent`. This prevents programming errors from being converted into slow, confusing failures. You must explicitly define which exception types are transient.
 
 <!-- snippet: troubleshoot-not-retried -->
 ```csharp
@@ -29,26 +32,25 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-Attach a listener and the `NotRetried` event names the type that was not recognized.
+To identify which exception type is not being recognized, attach a telemetry listener and monitor the `NotRetried` event.
 
-See [classification](features/classification.md) for the shipped rules, and
-`Classifier.RetryEverything` if you genuinely want the old broad behavior.
+For a list of shipped rules, see [Classification](../features/classification.md). If you require the broad behavior of retrying all exceptions, use `Classifier.RetryEverything`.
 
-### A 404 or a 400 is not being retried
+### Symptom: HTTP 400 or 404 responses are not retried.
 
-That is correct. `Classifier.Http` treats every 4xx except 408 and 429 as an answer rather than a
-failure - a 404 is an answer, not a transient error. If a particular status really is transient for
-your API, add a rule: [migrating a predicate](migrating-from-polly.md#predicates) shows the shape.
+**Why this happens**: This is the intended behavior. `Classifier.Http` treats all 4xx status codes as answers rather than failures, except for 408 and 429. A 404 response is an answer, not a transient error.
 
-### My POST is not being retried
+If a specific status code is transient for your API, add a custom rule. For an example, see [Configure predicates](../migrating-from-polly.md#configure-predicates).
 
-> [!CAUTION] Quick fix
-> ```csharp
-> request.Options.Set(ResilienceHttp.Repeatable, true);
-> ```
+### Symptom: POST requests are not retried.
 
-POST and PATCH are not retried by default, because a retried POST is a duplicate order, message or
-charge.
+**Solution**: Mark the request as repeatable.
+
+```csharp
+request.Options.Set(ResilienceHttp.Repeatable, true);
+```
+
+**Why this happens**: `POST` and `PATCH` requests are not retried by default to prevent duplicate orders, messages, or charges.
 
 <!-- snippet: troubleshoot-post-not-retried -->
 ```csharp
@@ -57,79 +59,56 @@ request.Options.Set(ResilienceHttp.Repeatable, true);   // this one carries an i
 ```
 <!-- endsnippet -->
 
-Set it only on a request that is safe to repeat, which in practice means one carrying an idempotency
-key. `HttpResilienceOptions.RetryUnsafeMethods = true` is the per-client version, and it is a much
-broader statement. See [idempotency](http/idempotency.md).
+Only set this option for requests that are safe to repeat, such as those carrying an idempotency key. To enable this behavior for all requests on a client, set `HttpResilienceOptions.RetryUnsafeMethods = true`. For more details, see [Idempotency](../http/idempotency.md).
 
-### The call gave up after about 100 seconds, not at my deadline
+## Timeouts and deadlines
 
-> [!CAUTION] Quick fix
-> ```csharp
-> client.Timeout = Timeout.InfiniteTimeSpan;
-> ```
+### Symptom: The call times out after approximately 100 seconds instead of at the configured deadline.
 
-`HttpClient.Timeout` defaults to 100 seconds and covers the **entire** send, retries and backoff
-included, so it silently caps any longer deadline. A `DelegatingHandler` cannot reach the client in
-front of it.
+**Solution**: Set the `HttpClient.Timeout` to infinite.
 
-<!-- snippet: troubleshoot-transport-timeout -->
 ```csharp
-// HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence, so it
-// silently caps any deadline longer than that. On a client you build yourself, hand the
-// bound to the policy.
+client.Timeout = Timeout.InfiniteTimeSpan;
+```
+
+**Why this happens**: `HttpClient.Timeout` defaults to 100 seconds and covers the entire operation, including all retries and backoff delays. This silently caps any deadline longer than 100 seconds. Because a `DelegatingHandler` cannot modify the client that precedes it in the pipeline, you must configure this on the client itself.
+
+```csharp
+// HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence.
+// On a client you build yourself, set the bound to the policy.
 using var client = new HttpClient(new ResilienceHandler(new HttpClientHandler()))
 {
     Timeout = Timeout.InfiniteTimeSpan,
 };
 ```
-<!-- endsnippet -->
 
-`ResilienceHttp.CreateClient` and the DI registration do this for you unless
-`OwnTransportTimeout` is false. See [HTTP](http/index.md#the-transport-timeout).
+`ResilienceHttp.CreateClient` and the dependency injection registration handle this for you unless `OwnTransportTimeout` is set to `false`. See [The transport timeout](../http/index.md#the-transport-timeout).
 
-### Retries are being refused with `BudgetExhausted`
+### Symptom: The attempt timeout fires, but the call continues to run.
 
-The [retry budget](features/retry-budget.md) is working. Retries are funded at 10% of successful
-traffic, and a dependency that is failing outright funds nothing - which is the whole point, because
-the alternative is a client that turns an outage into a load test.
+**Why this happens**: The callback is ignoring its cancellation token. A timeout cannot stop work that does not observe cancellation, and the executor must await the task. Check for calls inside the callback that do not accept a token or use `CancellationToken.None`.
 
-If the refusals are in a test that hammers a dead dependency, set `Budget = RetryBudget.None` for that
-test. If they are in production, the budget is telling you the retry fraction has left the range where
-retrying helps.
+When the work eventually returns, an `OrphanedWork` event fires and names the associated policy. For more information, see [The cancellation contract](../deep-dives/cancellation.md).
 
-### A configuration value in `appsettings.json` had no effect
+## Configuration and registration
 
-Check that you are binding to `ResilienceOptions` - through `services.AddResilience(name, section)` -
-and not onto `Resilience` yourself. Direct binding onto the record is **silently partial**:
-`Backoff:Max` is dropped, `Classify` is ignored, and `Breaker:ConsecutiveFailures` constructs a
-default-settings breaker while ignoring your value. See
-[why the binding target is a DTO (data transfer object)](di/configuration.md#why-the-binding-target-is-a-dto).
+### Symptom: A configuration value in `appsettings.json` has no effect.
 
-Also check the property is bindable at all: a classifier, `BeforeAttempt` and `OnEvent` are lambdas and
-belong in the `configure` callback.
+**Solution**: Ensure you are binding to `ResilienceOptions` via `services.AddResilience(name, section)` rather than binding directly to the `Resilience` record.
 
-### A configuration reload did not reach my client
+**Why this happens**: Direct binding to the `Resilience` record is silently partial. For example, `Backoff:Max` is dropped, `Classify` is ignored, and `Breaker:ConsecutiveFailures` creates a breaker with default settings while ignoring your specified value.
 
-A policy resolved by name on an `HttpClient` is read when the handler chain is built, which
-`IHttpClientFactory` does every two minutes by default. The lag is deliberate: the handler holds the
-per-host breakers and budgets, and rebuilding it per request would discard that state on every call.
+For more information, see [Why the binding target is a DTO](../di/configuration.md#why-the-binding-target-is-a-dto). Additionally, verify that the property is bindable; classifiers, `BeforeAttempt`, and `OnEvent` are lambdas and must be configured in the `configure` callback.
 
-If you are holding a policy in a `readonly` field, the reload will never reach it at all. Resolve from
-[`IResiliencePolicies`](reference/options.md) per call.
+### Symptom: A configuration reload does not reach the client.
 
-### The attempt timeout fired but the call kept running
+**Why this happens**: A policy resolved by name on an `HttpClient` is read when the handler chain is built. `IHttpClientFactory` rebuilds this chain every two minutes by default. This lag is intentional because the handler maintains per-host breakers and budgets; rebuilding the handler per request would discard this state.
 
-The callback is ignoring its cancellation token. A timeout cannot kill work that does not observe
-cancellation, and the executor is awaiting that very task. Look for a call inside the callback that
-takes no token, or is passed `CancellationToken.None`.
+If you store a policy in a `readonly` field, configuration reloads will never reach it. Instead, resolve policies from [`IResiliencePolicies`](../reference/options.md) on a per-call basis.
 
-An `OrphanedWork` event fires when the work eventually returns, naming the policy. See
-[the cancellation contract](deep-dives/cancellation.md).
+### Symptom: `ResilienceConfigurationException` occurs at startup.
 
-### `ResilienceConfigurationException` at startup
-
-> [!CAUTION] Quick fix
-> Read `Problems` - it lists every problem at once, not just the first.
+**Solution**: Read the `Problems` property of the exception. It lists all configuration errors at once rather than just the first one.
 
 <!-- snippet: troubleshoot-validate -->
 ```csharp
@@ -143,18 +122,29 @@ Console.WriteLine(string.Join(Environment.NewLine, problem.Problems));
 ```
 <!-- endsnippet -->
 
-Registration validates eagerly, which is what turns a configuration mistake into a startup failure
-rather than a first-request failure. Where the values are literals, [NRES003](reference/analyzers.md)
-says the same thing at build time.
+Dependency injection validates policies eagerly to ensure configuration mistakes cause startup failures rather than request failures. If you use literals, the [NRES003](../reference/analyzers.md) analyzer identifies these issues at build time.
 
-### A test is slow, or flaky
+## Performance and testing
 
-Set `Backoff = Backoff.None` for tests that only assert that a retry happened, and use
-`FakeTimeProvider` (a test clock from `Microsoft.Extensions.TimeProvider.Testing` that you advance
-manually instead of waiting) for tests that assert on timing - passing the same clock to the policy
-**and** to the scripted sequence. See [testing](testing/index.md).
+### Symptom: Retries are refused with `BudgetExhausted`.
 
-### I need to see what actually happened
+**Why this happens**: The [retry budget](../features/retry-budget.md) is functioning correctly. Retries are funded at 10% of successful traffic. If a dependency fails completely, it funds no retries, preventing the client from turning an outage into a load test.
+
+If this occurs during a test that hammers a dead dependency, set `Budget = RetryBudget.None`. In production, this symptom indicates that the retry fraction has exceeded the range where retrying is effective.
+
+### Symptom: A test is slow or flaky.
+
+**Solution**:
+- Set `Backoff = Backoff.None` for tests that only verify that a retry occurred.
+- Use `FakeTimeProvider` (from `Microsoft.Extensions.TimeProvider.Testing`) to advance time manually for tests that assert timing. Pass the same clock to both the policy and the scripted sequence.
+
+For more details, see [Testing](../testing/index.md).
+
+## Observability
+
+### Symptom: You need to see the actual sequence of events for a call.
+
+**Solution**: Use the `AttemptLog` to inspect the history of a call.
 
 <!-- snippet: troubleshoot-attempt-log -->
 ```csharp
@@ -172,6 +162,4 @@ foreach (Attempt attempt in result.Attempts)
 ```
 <!-- endsnippet -->
 
-For an exception the library rethrew unchanged, `AttemptLog.Of(exception)` reads the log off
-`Exception.Data`.
-
+For exceptions rethrown by the library, use `AttemptLog.Of(exception)` to read the log from `Exception.Data`.

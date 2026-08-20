@@ -1,17 +1,16 @@
 ---
 title: Retry
-description: Attempt counts, the backoff curves, jitter, and the hook that runs before every attempt.
+description: Configure attempt counts, backoff curves, jitter, and the hook that runs before every attempt.
 order: 1
 ---
 
 # Retry
 
-Retry is **on by default**: `Resilience.Default` and `Resilience.Http` make up to three attempts
-with exponential backoff (each delay is larger than the last) and full jitter (each delay is
-randomized so that multiple clients do not all retry at the same instant). Whether an outcome is
-retried at all is the [classifier's](classification.md) decision, not the retry loop's.
+Retry is enabled by default. For example, `Resilience.Default` and `Resilience.Http` make up to three attempts using exponential backoff and full jitter. Exponential backoff increases the delay between each attempt, and full jitter randomizes the delay to prevent multiple clients from retrying simultaneously. The [classifier](classification.md) determines whether an outcome is retried.
 
-## Attempts
+## Configure attempts
+
+The `Attempts` property specifies the total number of attempts, including the first call. For example, `Attempts = 1` means no retries occur. Attempt numbers in the attempt log, events, and `NextAttempt` are 1-based.
 
 <!-- snippet: retry-attempts -->
 ```csharp
@@ -22,20 +21,16 @@ int value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellation
 ```
 <!-- endsnippet -->
 
-`Attempts` is the **total**, including the first. `Attempts = 1` means no retry. Attempt numbers in
-the attempt log, in events and in `NextAttempt` are 1-based.
+## Configure backoff
 
-## Backoff
+NResilience provides two base delays to handle throttling and transient failures differently. A delay tuned for connection resets might be too aggressive for a rate limiter.
 
-Two base delays, because throttling and transient failure need curves an order of magnitude apart:
-a delay tuned for connection resets is a hostile retry rate against a rate limiter.
-
-| Setting | Default | What it does |
-| --- | --- | --- |
-| `transientBase` | 100 ms | First delay after a `Transient` verdict |
-| `throttledBase` | 1 s | First delay after a `Throttled` verdict |
-| `factor` | 2.0 | Growth per attempt |
-| `max` | 30 s | Hard cap on any single delay |
+| Setting | Default | Description |
+| :--- | :--- | :--- |
+| `transientBase` | 100 ms | The first delay after a `Transient` verdict |
+| `throttledBase` | 1 s | The first delay after a `Throttled` verdict |
+| `factor` | 2.0 | The growth rate per attempt |
+| `max` | 30 s | The maximum limit for any single delay |
 
 <!-- snippet: retry-backoff-tuning -->
 ```csharp
@@ -50,19 +45,13 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-Server pushback wins over every curve. When a verdict carries a `RetryAfter` - which
-`Classifier.Http` reads off a `Retry-After` header on a 429, or a 503 that supplied one - that value
-is honored verbatim, capped only by `max` and by the time left on the deadline, and no jitter is
-applied to it. A server telling you when to come back is better information than a client-side guess.
+Server pushback overrides the backoff curve. If a verdict contains a `RetryAfter` value - which `Classifier.Http` extracts from the `Retry-After` header on 429 or 503 responses - NResilience honors that value exactly. The only limits are the `max` setting and the remaining time on the deadline; no jitter is applied.
 
-`Backoff.Constant(delay)` and `Backoff.None` are the other shipped shapes. `Backoff.None` retries
-immediately, and is only correct when you know the dependency is not shared.
+You can also use `Backoff.Constant(delay)` or `Backoff.None`. Use `Backoff.None` only if you know the dependency is not shared.
 
-## Jitter
+## Configure jitter
 
-When many clients retry at the same time - say, after a brief outage clears - they can all hit the
-dependency at the same instant, causing a second spike that looks like the first. Jitter spreads
-those retries out by adding a random component to each delay.
+When many clients retry simultaneously - for example, after a brief outage - they can create a second spike of traffic. Jitter prevents this by adding a random component to each delay.
 
 <!-- snippet: retry-jitter -->
 ```csharp
@@ -74,11 +63,11 @@ var deterministic = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-`Jitter.Full` - `random(0, computed)` - is the default and the only shape that actually destroys the
-correlation between clients. `Jitter.Equal` keeps a floor under the delay. `Jitter.None` leaves a
-synchronized fleet retrying in step.
+`Jitter.Full` is the default. It calculates a random value between 0 and the computed delay, which effectively removes correlation between clients. `Jitter.Equal` maintains a minimum delay, and `Jitter.None` results in synchronized retries.
 
-## Computing the delay yourself
+## Compute custom delays
+
+Use `Backoff.Custom` to define your own delay logic.
 
 <!-- snippet: retry-custom-backoff -->
 ```csharp
@@ -91,14 +80,11 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-`Backoff.Custom` receives the attempt that is about to happen: its number, the verdict and exception
-that ended the previous one, the time left on the deadline, and the caller's token. A custom curve
-ignores `max` and jitter - it is the whole calculation.
+The `Backoff.Custom` function receives the details of the next attempt, including its number, the previous verdict and exception, the remaining deadline time, and the cancellation token. Custom curves ignore the `max` setting and jitter.
 
-## Rebuilding work between attempts
+## Rebuild work between attempts
 
-A retry re-invokes your callback from the top, so anything single-use has to be rebuilt inside it.
-`BeforeAttempt` is the hook for the work that surrounds it.
+A retry re-invokes your callback from the beginning, so you must rebuild any single-use objects inside the callback. Use the `BeforeAttempt` hook to perform setup work.
 
 <!-- snippet: retry-before-attempt -->
 ```csharp
@@ -111,14 +97,10 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-It runs before every attempt, including the first, and its time counts against the deadline. The
-HTTP handler uses the same principle internally: it clones the request for each attempt, because an
-`HttpRequestMessage` may be sent once.
+The `BeforeAttempt` hook runs before every attempt, including the first, and its execution time counts toward the deadline. This is the same principle the HTTP handler uses internally to clone requests, as an `HttpRequestMessage` can only be sent once.
 
-## Reading what happened
+## Analyze retry results
 
-Every retry raises a `Retrying` event carrying the delay it is about to serve, and every attempt
-lands in the [attempt log](../reference/call-result.md#attemptlog).
+Every retry triggers a `Retrying` event that includes the delay. You can also find every attempt in the [attempt log](../reference/call-result.md#attemptlog).
 
-Go deeper: [Why one flat executor](../deep-dives/one-executor.md).
-
+For a more detailed explanation of the architecture, see [Why one flat executor](../deep-dives/one-executor.md).

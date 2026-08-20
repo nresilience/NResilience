@@ -1,40 +1,29 @@
 ---
 title: Guarded rejection
-description: Why a refused call pauses before it reports, and why the pause is not configurable.
+description: Learn why NResilience introduces a mandatory delay when a call is refused by a guard.
 order: 6
 ---
 
 # Guarded rejection
 
-An open breaker and a depleted budget both refuse calls. The obvious implementation returns the
-refusal immediately, and that is a mistake with a name.
+Both an open circuit breaker and a depleted retry budget refuse calls. While the intuitive implementation is to return the refusal immediately, doing so can create a significant performance problem.
 
-A cheap rejection inside a caller's `while (true)` polling loop is a CPU spin. Without a forced pause,
-a tripped breaker turns into errors returned at the speed of a method call, spiking client CPU and
-generating more traffic than the call it refused would have. The guard designed to shed load becomes a
-load generator. AWS carves out an explicit exception for exactly this on its long-polling operations.
+If a caller places a resilient call inside a tight polling loop, an immediate rejection results in a CPU spin. Without a forced pause, a tripped breaker generates errors at the speed of a method call, spiking the client's CPU usage and potentially generating more traffic than the original call would have. In this scenario, the guard intended to shed load instead becomes a load generator. AWS carves out an explicit exception for exactly this on its long-polling operations.
 
-So a refusal serves 100 milliseconds before it is reported. **Guarded rejection is not fail-fast**, and
-the difference matters most in precisely the situation the guard exists for.
+To prevent this, NResilience introduces a 100-millisecond pause before reporting a refusal. **Guarded rejection is not a "fail-fast" mechanism**, and this distinction is critical in the exact scenarios where guards are most needed.
 
-## The bounds on the pause
+## Pause constraints
 
-It is bounded by the time left on the [deadline](../features/deadlines.md), so a refusal can never make
-a call overrun the budget its caller set. If 40 milliseconds remain, the pause is 40 milliseconds.
+The rejection pause is subject to the following constraints:
 
-It observes the caller's cancellation token, so cancelling during a rejection pause aborts immediately.
+- **Deadline bound**: The pause is capped by the time remaining on the [deadline](../features/deadlines.md). A refusal will never cause a call to exceed the budget set by the caller. For example, if only 40 milliseconds remain on the deadline, the pause is 40 milliseconds.
+- **Cancellation**: The pause observes the caller's cancellation token. Cancelling the operation during a rejection pause causes it to abort immediately.
+- **Telemetry**: The pause is announced before it is served. The `Rejected` [event](../reference/events.md) includes the pause duration in the `Delay` field, allowing listeners to report the impending delay.
 
-It is announced before it is served: the `Rejected` [event](../reference/events.md) carries the pause in
-`Delay`, so a listener reports what is about to happen rather than discovering it afterwards.
+## Why the pause is not configurable
 
-## Why it is not configurable
+The rejection pause is not configurable because its purpose is to establish a minimum floor for the rate of a rejection loop, not to be a tunable performance parameter. 
 
-Because there is no value anyone needs it to be. It exists to put a floor under the rate of a rejection
-loop, not to be tuned, and 100 milliseconds is short enough to be invisible to a call that was refused
-and long enough to make a spin impossible. A knob here would be a knob whose only correct setting is
-the default, and each of those has to be documented, defended and kept working forever.
+A 100-millisecond delay is short enough to be negligible for most refused calls, yet long enough to make a CPU spin impossible. Adding a configuration option for this value would introduce unnecessary complexity without providing a practical benefit.
 
-Callers who schedule their own retries have something better than a delay to inspect:
-`CallRejectedException.RetryAfter` carries the breaker's remaining break, or the time until the budget's
-floor rate accrues a whole token.
-
+For callers who manage their own retries, `CallRejectedException.RetryAfter` provides a more useful value: it contains the remaining break duration of the circuit breaker or the time required for the retry budget's floor rate to accrue a new token.

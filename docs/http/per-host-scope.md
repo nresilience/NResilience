@@ -1,27 +1,25 @@
 ---
 title: Per-host scope
-description: One breaker and one budget per host, so a dead host does not trip calls to the healthy ones.
+description: Use per-host circuit breakers and retry budgets to prevent a single failing host from affecting calls to other healthy hosts.
 order: 2
 ---
 
 # Per-host scope
 
-If one `HttpClient` talks to several hosts and one of them goes down, a single shared breaker would
-trip calls to all the healthy hosts too - a problem in one place taking down everything. The handler
-solves this by keeping a separate breaker and retry budget per host, so a dead host only affects
-calls to that host.
+When a single `HttpClient` communicates with multiple hosts, a shared circuit breaker can create a "blast radius" problem: if one host fails, the breaker trips and blocks requests to all other healthy hosts. 
 
-`BreakerPerHost` and `BudgetPerHost` are **on by default**. The handler keeps one breaker and one
-retry budget per authority it has seen, created on first use.
+The NResilience handler prevents this by maintaining a separate circuit breaker and retry budget for every host it encounters. This ensures that a failure at one endpoint only affects requests sent to that specific host.
+
+## Default behavior
+
+`BreakerPerHost` and `BudgetPerHost` are enabled by default. The handler automatically creates a breaker and a retry budget for each authority it sees upon the first request to that host.
 
 > [!WARNING]
-> The registry is unbounded: the set of hosts one `HttpClient` talks to is a property of the
-> application rather than of its traffic, and an eviction policy over a dozen entries would be a cache
-> with a bug in it. A client that talks to an **unbounded** set of hosts - a proxy, a crawler, a
-> webhook dispatcher - should set `BreakerPerHost` and `BudgetPerHost` to false and scope the guards on
-> the policy instead.
+> The host registry is unbounded. This is intended for applications where the set of hosts is stable. If you are building a proxy, a web crawler, or a webhook dispatcher that talks to an **unbounded** set of hosts, you must set `BreakerPerHost` and `BudgetPerHost` to `false`. In these cases, you should define the scope of the guards directly on the policy.
 
-## Reading it
+## Monitor host state
+
+You can inspect the state of breakers and budgets for all hosts seen by the handler. This is useful for implementing health endpoints or monitoring dashboards.
 
 <!-- snippet: http-per-host -->
 ```csharp
@@ -36,35 +34,29 @@ foreach ((string host, Breaker breaker) in breakers)
 ```
 <!-- endsnippet -->
 
-Both return a snapshot of the hosts this handler has actually seen, which is what a health endpoint
-needs. The dictionaries are empty until the first request to a host, and empty for good when the
-switch is off and the policy carries no breaker of its own.
+These methods return a snapshot of the hosts currently tracked. The dictionaries are empty until the first request is made to a host, and remain empty if the per-host switches are disabled and the policy does not provide its own breaker or budget.
 
-## When you want a different scope
+## Configure a different scope
 
-A policy that already carries a [`Breaker`](../features/circuit-breaker.md) keeps it: an explicit
-breaker is a scope decision and the switch does not overrule it. The same is true of an
-explicit `Budget`, including `RetryBudget.None`.
+If you provide an explicit [`Breaker`](../features/circuit-breaker.md) or `Budget` on your policy, the handler respects that decision and does not apply per-host scoping to those guards.
 
-So the three scopes available are:
+Depending on your requirements, you can achieve the following scopes:
 
-| You want | Do this |
-| --- | --- |
-| One breaker per host (the default) | Nothing |
-| One breaker for the whole client, across hosts | Set `Breaker` on the policy |
-| No breaking | Leave `Breaker` null and set `BreakerPerHost = false` |
+| Desired Scope | Configuration |
+| :--- | :--- |
+| One breaker per host (default) | No change required. |
+| One breaker for the entire client (across all hosts) | Set the `Breaker` property on the policy. |
+| No circuit breaking | Leave `Breaker` as `null` and set `BreakerPerHost = false`. |
 
-## Two details worth knowing
+## Implementation details
 
-**The per-host policy is renamed.** A policy called `orders` reports as `orders:orders.example` in
-events and telemetry tags, and the breaker itself is named after the host. That is what lets one
-dashboard separate a client's hosts.
+### Telemetry and naming
+To allow dashboards to separate hosts, the handler renames the policy for the specific request. For example, a policy named `orders` will appear as `orders:orders.example` in events and telemetry tags. The breaker itself is also named after the host.
 
-**A non-repeatable request runs the same policy with one attempt**, rather than no policy. The breaker
-still sees the outcome and the budget still receives its deposit, and nothing is sent twice.
+### Non-repeatable requests
+When a request is marked as non-repeatable, the handler still runs the resilience policy but limits it to a single attempt. This ensures that the circuit breaker still observes the outcome and the retry budget still receives its deposit, but the request is never sent twice.
 
-Handler lifetime decides how long that state lives. `IHttpClientFactory` rotates handler chains every
-two minutes by default, so the breakers and budgets of a factory-built client are rotated with them;
-a client from `ResilienceHttp.CreateClient` that you hold for the life of the process keeps its state
-for the life of the process.
-
+### State lifetime
+The lifetime of the host state is tied to the lifetime of the handler:
+- **`IHttpClientFactory`**: Rotates handler chains every two minutes by default. Per-host state is reset when the handler is rotated.
+- **`ResilienceHttp.CreateClient`**: If you maintain the client for the lifetime of the process, the per-host state persists for the lifetime of the process.

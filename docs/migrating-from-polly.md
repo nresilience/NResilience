@@ -1,41 +1,38 @@
 ---
 title: Migrating from Polly
-description: What each Polly concept becomes here, in before-and-after pairs, and the four behavior differences worth knowing before you switch.
+description: A translation guide and behavioral comparison for users migrating from Polly to NResilience.
 order: 9
 ---
 
 # Migrating from Polly
 
-Polly is a good library and this is not a list of its faults. It is a translation table, plus the
-handful of places where the two libraries would do different things to the same call - which are the
-part worth reading before you switch anything.
+NResilience provides a different approach to resilience than Polly. This guide provides a translation table for core concepts and explains the behavioral differences you will encounter during migration.
 
-Polly snippets below are illustrative and are not compiled by this repository. Every NResilience
-snippet is.
+The Polly snippets below are illustrative. All NResilience snippets are compiled and verified.
 
-## The translation table
+## Concept translation
 
-| Polly | Here |
-| --- | --- |
-| `ResiliencePipeline` | [`Resilience`](reference/resilience.md) - a value, not a built pipeline |
-| `ResiliencePipelineBuilder` … `Build()` | `with` on a policy |
+| Polly | NResilience |
+| :--- | :--- |
+| `ResiliencePipeline` | [`Resilience`](reference/resilience.md) (a value, not a built pipeline) |
+| `ResiliencePipelineBuilder` ... `Build()` | `with` expression on a policy |
 | `AddRetry` | [`Attempts`, `Backoff`](features/retry.md) |
 | `AddTimeout` (per attempt) | [`AttemptTimeout`](features/deadlines.md) |
 | `AddTimeout` (outer) | `Deadline` |
-| `AddCircuitBreaker` | [`Breaker`](features/circuit-breaker.md) - an object you hold |
-| `AddFallback` | An `if` on a [`CallResult<T>`](reference/call-result.md) |
+| `AddCircuitBreaker` | [`Breaker`](features/circuit-breaker.md) (an object you maintain) |
+| `AddFallback` | `if` logic on a [`CallResult<T>`](reference/call-result.md) |
 | `AddHedging` | Not implemented. See the [FAQ](faq.md) |
-| `ShouldHandle` predicates | One [`Classifier`](features/classification.md), read by everything |
-| `ResilienceContext`, `ResilienceProperties` | Nothing. Use the `TState` execution overloads |
+| `ShouldHandle` predicates | One [`Classifier`](features/classification.md) used by all strategies |
+| `ResilienceContext`, `ResilienceProperties` | `TState` execution overloads |
 | `ResiliencePipelineProvider<string>` | [`IResiliencePolicies`](reference/options.md) |
-| `AddResiliencePipeline("name", …)` | `services.AddResilience("name", …)` |
+| `AddResiliencePipeline("name", ...)` | `services.AddResilience("name", ...)` |
 | `AddStandardResilienceHandler()` | `.AddResilience()` |
-| `OnRetry`, `OnTimeout`, `OnOpened`, … | One [`OnEvent`](features/telemetry.md) listener |
+| `OnRetry`, `OnTimeout`, `OnOpened`, etc. | One [`OnEvent`](features/telemetry.md) listener |
 | `resilience.polly.*` metrics | `nresilience.*` metrics |
 
-## A retry, a timeout and a breaker
+## Implement a retry, timeout, and breaker
 
-Before:
+### Before (Polly)
 
 ```csharp
 var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
@@ -55,7 +52,7 @@ var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
 var response = await pipeline.ExecuteAsync(ct => Send(ct), cancellationToken);
 ```
 
-After:
+### After (NResilience)
 
 <!-- snippet: migration-pipeline -->
 ```csharp
@@ -71,14 +68,11 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-Three things changed shape. `Attempts` is the **total**, so `MaxRetryAttempts = 2` becomes
-`Attempts = 3`. The status-code and exception predicates become one
-[classifier](features/classification.md), which is already correct for HTTP in the preset. And the
-breaker sees attempts whichever order you read the code in, because there is no order.
+In this migration, `Attempts` represents the total number of calls, so `MaxRetryAttempts = 2` becomes `Attempts = 3`. The status-code and exception predicates are handled by a [classifier](features/classification.md), which is pre-configured for HTTP in the `Resilience.Http` preset.
 
-## A fallback
+## Implement a fallback
 
-Before:
+### Before (Polly)
 
 ```csharp
 .AddFallback(new FallbackStrategyOptions<string>
@@ -87,7 +81,7 @@ Before:
 })
 ```
 
-After:
+### After (NResilience)
 
 <!-- snippet: migration-fallback -->
 ```csharp
@@ -96,18 +90,17 @@ string value = result.TryGetValue(out string? fetched) ? fetched : "cached";
 ```
 <!-- endsnippet -->
 
-A fallback is an `if` on the result. Writing it at the call site keeps the answer to "did this
-value come from the dependency or from the fallback?" visible where the call is made.
+A fallback is implemented as an `if` check on the `CallResult`. Implementing this at the call site makes it clear whether the value came from the dependency or from the fallback.
 
-## Registration
+## Register the policy
 
-Before:
+### Before (Polly)
 
 ```csharp
 services.AddHttpClient<Client>().AddStandardResilienceHandler();
 ```
 
-After:
+### After (NResilience)
 
 <!-- snippet: migration-registration -->
 ```csharp
@@ -115,16 +108,16 @@ services.AddHttpClient<Client>().AddResilience();
 ```
 <!-- endsnippet -->
 
-## Predicates
+## Configure predicates
 
-Before:
+### Before (Polly)
 
 ```csharp
 ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
     .HandleResult(r => r.StatusCode == HttpStatusCode.Conflict),
 ```
 
-After:
+### After (NResilience)
 
 <!-- snippet: migration-predicate -->
 ```csharp
@@ -140,10 +133,12 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-## Exceptions and context
+## Handle exceptions and state
 
-Before, `ExecuteAsync` wraps some failures and passes state through a `ResilienceContext` you rent and
-return. After:
+### Before (Polly)
+`ExecuteAsync` wraps failures and passes state through a rented `ResilienceContext`.
+
+### After (NResilience)
 
 <!-- snippet: migration-exceptions -->
 ```csharp
@@ -161,32 +156,17 @@ catch (HttpRequestException e)
 ```
 <!-- endsnippet -->
 
-The original exception comes back unchanged, with its stack intact, so existing `catch` blocks keep
-working. There is no context object: the `TState` execution overloads hand your own state to the
-callback, which is also what lets the lambda be `static`.
+The original exception is returned unchanged, so existing `catch` blocks continue to work. Instead of a context object, use the `TState` execution overloads to pass your own state to the callback, which also allows the lambda to be `static`.
 
-## Four behavior differences worth knowing
+## Behavioral differences
 
-**A 404 is not retried, and a POST is not either.** `Classifier.Http` treats every 4xx except 408 and
-429 as an answer. The [HTTP handler](http/idempotency.md) does not retry POST or PATCH unless you say
-that a particular request is repeatable. Both are changes in the safe direction, and both are visible
-in the [attempt log](reference/call-result.md#attemptlog) when they surprise you.
+When migrating, be aware of these four behavioral differences:
 
-**An unrecognized exception is not retried.** `Classifier.Default` treats an exception type it has never
-heard of as `Permanent`. If you were relying on a broad `Handle<Exception>`, either name your types or
-use `Classifier.RetryEverything`, which is named so that choosing it is visible.
+- **Limited HTTP retries**: `Classifier.Http` treats all 4xx status codes as answers, except 408 and 429. The [HTTP handler](http/idempotency.md) does not retry `POST` or `PATCH` requests unless you explicitly mark the request as repeatable.
+- **Unrecognized exceptions**: `Classifier.Default` treats unknown exception types as `Permanent`. If you require a broad handler, use `Classifier.RetryEverything`.
+- **Active retry budget**: By default, retries are capped at 10% of successful traffic per policy. A load test against a dead dependency will return `StopReason.BudgetExhausted`. Use `RetryBudget.None` to disable this. See the [Retry budget](features/retry-budget.md) guide for details.
+- **Refusal pause**: An open circuit breaker pauses for 100 milliseconds before reporting a failure. This prevents the breaker from becoming a load generator. See [Guarded rejection](deep-dives/guarded-rejection.md).
 
-**A retry budget is already running.** Retries are capped at 10% of successful traffic per policy, on
-by default. A load test that hammers a dead dependency will see retries refused with
-`StopReason.BudgetExhausted`, which is the mechanism working. [Retry budget](features/retry-budget.md)
-explains the arithmetic; `RetryBudget.None` turns it off.
+## Run NResilience and Polly together
 
-**A refused call pauses for 100 milliseconds before it reports.** An open breaker is not fail-fast, on
-purpose. See [guarded rejection](deep-dives/guarded-rejection.md).
-
-## Running both at once
-
-Nothing stops you. The metric names, tag names and event names share nothing with Polly's
-vocabulary, so a process running both is legible in a dashboard - which is what makes migrating one
-client at a time practical.
-
+You can run both libraries in the same process. Because the metric names, tag names, and event names do not overlap with Polly's vocabulary, you can distinguish between them in your dashboards. This allows you to migrate clients one at a time.

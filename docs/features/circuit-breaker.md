@@ -1,19 +1,18 @@
 ---
 title: Circuit breaker
-description: An object you construct and share exactly as widely as you intend, tripping on failures, rates or brownouts.
+description: Prevent cascading failures by stopping calls to a failing dependency.
 order: 4
 ---
 
 # Circuit breaker
 
-When a dependency is failing, calling it again on every request only makes things worse - you are
-hammering something that cannot keep up, and every caller doing the same thing piles on load it
-cannot handle. A **circuit breaker** stops calling the dependency in that state, gives it time to
-recover, and lets only a small number of trial calls through to check whether it has. It is
-**opt-in**, and it is an object rather than a setting, because its scope - how widely the "stop
-calling" decision is shared - is a decision only you can make.
+When a dependency fails, continuing to call it on every request can overwhelm the service and exacerbate the outage. A **circuit breaker** prevents this by stopping calls to the dependency, allowing it time to recover, and periodically letting a small number of trial calls through to test for recovery.
 
-## Turning it on
+Circuit breakers are opt-in and are implemented as objects rather than settings. This allows you to define the scope of the "stop calling" decision based on your application's architecture.
+
+## Enable the circuit breaker
+
+Create a `Breaker` object and assign it to your policy.
 
 <!-- snippet: breaker-construct -->
 ```csharp
@@ -26,43 +25,37 @@ var paymentsWrites = payments with { Attempts = 1 };
 ```
 <!-- endsnippet -->
 
-The breaker is an object you hold, so its scope is wherever you hold it. `with` copies the
-*reference*, never the state, so two policies derived from a common ancestor share whatever breaker
-that ancestor held.
+The scope of the breaker is determined by where you hold the reference. Because the `with` keyword copies the reference and not the state, two policies derived from a common ancestor share the same breaker.
 
-For HTTP, the handler scopes a breaker per host for you. See
-[per-host scope](../http/per-host-scope.md).
+For HTTP calls, the handler can scope a breaker per host automatically. For more information, see [per-host scope](../http/per-host-scope.md).
 
-## The four states
+## Breaker states
 
-A breaker is always in one of four states:
+A circuit breaker is always in one of these four states:
 
-| State | What it means |
-| --- | --- |
-| `Closed` | Normal operation. Calls go through. Failures are counted. |
-| `Open` | The dependency is failing. Calls are refused for the break duration. |
-| `HalfOpen` | The break has elapsed. A small number of trial calls (probes) are let through to test recovery. |
-| `Isolated` | Forced open by an operator via `Isolate()`. Stays open until someone calls `Reset()`. |
+| State | Description |
+| :--- | :--- |
+| `Closed` | Normal operation. Calls are allowed, and failures are tracked. |
+| `Open` | The dependency is failing. Calls are refused for the duration of the break. |
+| `HalfOpen` | The break duration has elapsed. A small number of trial calls (probes) are allowed to test for recovery. |
+| `Isolated` | Forced open by an operator via `Isolate()`. The breaker stays open until `Reset()` is called. |
 
-## What trips it
+## Trip conditions
 
-The most common real degradation is not a dependency returning errors - it is a dependency returning
-200s at 30 times normal latency while your thread pool and connection pool fill up. The settings
-below cover both: consecutive failures is the default trip, and the slow-call settings catch the case
-where the dependency is answering correctly but too slowly.
+A circuit breaker can trip based on consecutive failures or based on rates of failure and slowness. For example, a dependency might return successful responses but with such high latency that it exhausts your thread and connection pools.
 
-| Setting | Default | What it does |
-| --- | --- | --- |
-| `ConsecutiveFailures` | 5 | Consecutive failures before opening |
-| `FailureRatio` | null | Optional rate-based trip, evaluated alongside the counter |
-| `MinimumCalls` | 20 | Sampled calls a rate needs before it means anything |
-| `Window` | 30 s | The sliding window rates are measured over |
-| `SlowCallThreshold` | null | An attempt slower than this counts against `SlowCallRatio`, even when it succeeded |
-| `SlowCallRatio` | 0.5 | The proportion of slow calls that opens it |
-| `BreakDuration` | 15 s | How long the first break lasts |
-| `MaxBreakDuration` | 2 min | The break doubles on each consecutive open, up to this |
-| `HalfOpenProbes` | 1 | Concurrent trial calls while recovering |
-| `ProbeSuccesses` | 2 | Successful probes required to close |
+| Setting | Default | Description |
+| :--- | :--- | :--- |
+| `ConsecutiveFailures` | 5 | The number of consecutive failures before the breaker opens. |
+| `FailureRatio` | null | An optional rate-based trip condition, evaluated alongside the consecutive failure counter. |
+| `MinimumCalls` | 20 | The minimum number of calls required before a ratio-based trip is evaluated. |
+| `Window` | 30 s | The sliding window over which rates are measured. |
+| `SlowCallThreshold` | null | The latency threshold; any attempt slower than this counts as a slow call. |
+| `SlowCallRatio` | 0.5 | The proportion of slow calls within the window that trips the breaker. |
+| `BreakDuration` | 15 s | The duration of the first break. |
+| `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles on each consecutive open. |
+| `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while in the `HalfOpen` state. |
+| `ProbeSuccesses` | 2 | The number of successful probes required to close the breaker. |
 
 <!-- snippet: breaker-slow-calls -->
 ```csharp
@@ -86,15 +79,11 @@ var breaker = new Breaker(new BreakerSettings
 ```
 <!-- endsnippet -->
 
-Consecutive failures is the default trip condition because it is the reading most people have of
-"circuit breaker", and because a rate-based trip needs traffic a median .NET service does not have.
+The breaker samples individual **attempts**. Only `Transient` outcomes count as evidence of failure. `Throttled` responses indicate the dependency is functioning and defending itself, and `Permanent` outcomes are typically client-side issues.
 
-The breaker samples individual **attempts**, always - so "does it see attempts or whole operations?"
-has one answer rather than depending on composition order. Only `Transient` outcomes count as
-evidence: a `Throttled` response means the dependency is working correctly and defending itself, and
-a `Permanent` one is overwhelmingly a client-side fact.
+## Handle refused calls
 
-## What a refused call looks like
+When a circuit breaker refuses a call, it serves a short pause before returning. This prevents callers in tight polling loops from busy-spinning and wasting CPU.
 
 <!-- snippet: breaker-rejection -->
 ```csharp
@@ -109,14 +98,13 @@ if (result.Exception is CallRejectedException rejection)
 ```
 <!-- endsnippet -->
 
-A refusal is not fail-fast: it serves a short pause first, because without that pause a caller in
-a tight polling loop would busy-spin (repeatedly calling and being rejected without waiting),
-burning CPU for nothing. `StopReason.DependencyUnavailable` is the breaker's refusal;
-`BudgetExhausted` is the [budget's](retry-budget.md).
+The breaker uses `StopReason.DependencyUnavailable` for refusals. The [retry budget](retry-budget.md) uses `BudgetExhausted`.
 
-Go deeper: [Guarded rejection](../deep-dives/guarded-rejection.md).
+For more information, see [Guarded rejection](../deep-dives/guarded-rejection.md).
 
-## Reading and driving it
+## Manage the breaker
+
+You can monitor the state of the breaker or manually control its behavior.
 
 <!-- snippet: breaker-admin -->
 ```csharp
@@ -128,13 +116,8 @@ breaker.Reset();                            // close it and forget the history
 ```
 <!-- endsnippet -->
 
-`State` reports `HalfOpen` for an open breaker whose break has already elapsed, because that is what
-the next call will find - and reading it never consumes the probe slot a real call needs. `Isolate`
-forces it open until someone calls `Reset`; neither raises an event, because there is no call to
-attribute them to.
+`State` reports `HalfOpen` for an open breaker whose break duration has elapsed. Reading the state does not consume a probe slot. `Isolate` and `Reset` do not raise events because they are not triggered by a call.
 
-Transitions arrive as `BreakerOpened`, `BreakerClosed` and `BreakerHalfOpened`
-[events](telemetry.md) on the call that caused them.
+Transitions trigger `BreakerOpened`, `BreakerClosed`, and `BreakerHalfOpened` [events](telemetry.md) on the call that caused the transition.
 
-Go deeper: [Breaker internals](../deep-dives/breaker-internals.md).
-
+For a deeper dive, see [Breaker internals](../deep-dives/breaker-internals.md).

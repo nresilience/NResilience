@@ -1,77 +1,56 @@
 ---
 title: Where the allocations are
-description: What a call costs, why the synchronous floor is 72 bytes rather than zero, and how the budgets are enforced.
+description: A detailed breakdown of the memory costs associated with resilience calls and how those costs are minimized and enforced.
 order: 2
 ---
 
 # Where the allocations are
 
-Every figure below is a ceiling the build enforces, measured with
-`GC.GetAllocatedBytesForCurrentThread()` in a plain xunit project that depends on no benchmark
-harness, on both target frameworks, in Release, under workstation non-concurrent GC. The measured
-values per framework and the gate constants are in
-[`Budgets.cs`](../../tests/NResilience.Gates/Budgets.cs).
+Performance in NResilience is managed through strict allocation budgets. Every figure below represents a ceiling enforced by the build process. These measurements are taken using `GC.GetAllocatedBytesForCurrentThread()` in a Release build on target frameworks, using workstation non-concurrent GC.
 
-| Scenario | Ceiling above an identical un-wrapped callback |
-| --- | ---:|
-| `Resilience.None`, any callback | **0** |
-| Sync-completing, no attempt timeout, static lambda with state | **0** |
+For detailed measurements and gate constants, see [`Budgets.cs`](../../tests/NResilience.Gates/Budgets.cs).
+
+| Scenario | Allocation ceiling (above unwrapped callback) |
+| :--- | :---: |
+| `Resilience.None` (any callback) | **0 B** |
+| Sync-completing, no attempt timeout, static lambda with state | **0 B** |
 | Sync-completing, full policy | 72 B |
 | Suspending, full policy | 448 B |
-| Suspending, full policy, with a caller token that can be cancelled | 464 B |
+| Suspending, full policy (with cancellable caller token) | 464 B |
 | `TryRunAsync`, full policy | 640 B |
-| A listener attached, delta | 72 B |
+| With a telemetry listener attached (delta) | 72 B |
 
-A regression fails CI rather than drifting the docs. The ceilings carry roughly 15% headroom over
-the measured figure, because allocation is deterministic but not identical across architectures.
+To prevent performance drift, any regression in these figures fails the continuous integration (CI) pipeline. The ceilings include approximately 15% headroom to account for deterministic but non-identical allocation patterns across different hardware architectures.
 
-## Why the synchronous floor is 72 bytes, not zero
+## The synchronous allocation floor
 
-A full policy on the synchronous path cannot be free, and the reason is a constraint rather than an
-implementation failure.
+A full policy on the synchronous path cannot be completely allocation-free due to a critical safety constraint.
 
-The callback must receive a token the attempt timeout can cancel. Whether the timeout was needed
-cannot be known until *after* the callback returns, so the source cannot be created lazily. And the
-pooled timer source's own token must never be handed to user code, because `TryReset` preserves token
-identity - a callback that outlived its attempt would observe the next operation's cancellation. One
-linked source per attempt is therefore the floor, and the floor measures 64 bytes (the ceiling is 72).
+To support attempt timeouts, the callback must receive a token that can be cancelled. The executor cannot determine if a timeout will be necessary until after the callback returns, meaning the cancellation source must be created before the call. 
 
-A design that hands out its pooled token reaches 24 bytes here, which is the exact hazard this
-design refuses.
+Furthermore, the executor cannot hand out the pooled timer source's own token because `TryReset` preserves token identity. If a callback outlived its attempt, it would observe the cancellation of the *next* operation. To prevent this, the executor creates one linked source per attempt. This linked source constitutes the allocation floor of 64 bytes (with a 72-byte ceiling).
 
-## Why a listener costs 48 bytes and not zero
+A design that hands out its pooled token reaches 24 bytes here, which is the exact hazard this design refuses.
 
-`CallEvent` is a struct passed by value to an `Action<CallEvent>`, so raising one allocates nothing.
-The 48 bytes are two boxed attempt results, and they exist only because a genuinely cross-cutting
-listener has no `T` to be generic over. With `OnEvent = null` the executor raises nothing and pays
-nothing, which is what free-when-unused has to mean if it is to mean anything.
+## Telemetry costs
 
-## The things that were measured rather than reasoned about
+Raising a `CallEvent` is allocation-free because it is a struct passed by value to an `Action<CallEvent>`. 
 
-**A pooled cancellation source plus a linked one beats one fresh linked source.** The tempting shortcut
-- create one linked source from the caller's token and call `CancelAfter` on it, dodging the second
-source - measures 96 bytes per call **worse**. A pooled source keeps its timer across `TryReset`, so
-its `CancelAfter` allocates nothing, and a fresh source's cannot.
+The observed cost of 48–72 bytes when a listener is attached comes from boxing two attempt results. Because a cross-cutting listener cannot be generic over the return type `T`, values must be boxed. When `OnEvent` is `null`, the executor suppresses all event logic, ensuring that the telemetry system is "free when unused."
 
-**Never implement a timeout by racing `Task.Delay`.** `CancelAfter` costs 96 bytes against roughly 408
-for a created-then-cancelled delay.
+## Implementation decisions based on measurement
 
-**A `Task`-returning `BeforeAttempt` is cheaper than a `ValueTask`-returning one**, by 16 bytes on
-every suspending call whether the hook is set or not, because Roslyn shares one hoisted awaiter field
-between await sites of the same awaiter type and the attempt and the backoff delay already need that
-field.
+Several design choices were made based on empirical measurement rather than intuition:
 
-**The breaker and the budget together cost 8 bytes** of state-machine box. The breaker costs nothing,
-because the policy holding it is already a field; the budget costs one reference field, because it has
-to be resolved before the loop rather than after each await - a continuation resumes on whichever pool
-thread is free, so a per-thread cache would be missed.
+- **Pooled vs. Fresh Sources**: Using a pooled cancellation source combined with a linked source is 96 bytes per call cheaper than creating a fresh linked source and calling `CancelAfter`. This is because a pooled source preserves its timer across resets.
+- **Avoid `Task.Delay` for Timeouts**: Using `CancelAfter` on a token is significantly more efficient (approx. 96 bytes) than racing the call against a `Task.Delay` (approx. 408 bytes).
+- **Task vs. ValueTask for Hooks**: A `Task`-returning `BeforeAttempt` hook is 16 bytes cheaper per suspending call than a `ValueTask`-returning one. This is because Roslyn can share a single hoisted awaiter field between the attempt and the backoff delay.
+- **Budget Storage**: The breaker and the retry budget together add 8 bytes to the state-machine box. The breaker costs nothing, because the policy holding it is already a field; the budget costs one reference field, because it must be resolved before the loop rather than cached per-thread (a continuation resumes on whichever pool thread is free, so a per-thread cache would be missed).
 
-## What is not claimed
+## Clarifications on performance claims
 
-"Zero allocation", unqualified. Every `async` method that actually awaits allocates its state machine,
-and no library-side trick removes it. What is claimed is one box instead of one per layer, and that
-claim is gated.
+### Allocation vs. "Zero Allocation"
+NResilience does not claim to be "zero allocation" in an unqualified sense. Every `async` method that suspends must allocate its state machine. The claim is that NResilience uses **one box** instead of one box per layer. This claim is strictly enforced by the build gates.
 
-Latency is published as a trend and never gated. Shared CI runners are noisy enough that a latency
-gate is either loose enough to catch nothing or tight enough to flake weekly, and a flaky gate gets
-disabled within a month. Allocations are deterministic; those are what the build enforces.
+### Latency vs. Allocations
+The library publishes latency as a trend rather than a gated metric. Because shared CI runners are noisy, a latency gate would either be too loose to be useful or too tight to be stable. Since allocations are deterministic, they are the primary metric enforced by the build.

@@ -1,12 +1,14 @@
 ---
 title: Samples
-description: Runnable projects in the repository, and what each one shows.
+description: Runnable projects in the repository and an explanation of what each sample demonstrates.
 order: 10
 ---
 
 # Samples
 
-Three console applications under [`samples/`](../samples), each one runnable on its own.
+The repository includes three standalone console applications in the [`samples/`](../samples) directory.
+
+To run the samples, use the following commands:
 
 ```bash
 dotnet run --project samples/Samples.QuickStart
@@ -14,16 +16,12 @@ dotnet run --project samples/Samples.Http
 dotnet run --project samples/Samples.Worker
 ```
 
-| Sample | Shows |
-| --- | --- |
-| `Samples.QuickStart` | A policy value, a retried call, `TryRunAsync`, and the attempt log printed. No HTTP, no container. |
-| `Samples.Http` | `ResilienceHttp.CreateClient`, a scripted 503 → 200, per-host breakers, and a POST that is not retried until it says it is repeatable. |
-| `Samples.Worker` | A host with `AddResilience` from configuration, `AddHttpClient(…).AddResilience()`, `IResiliencePolicies` injected, and the meter printing the retry fraction. |
+| Sample | Description |
+| :--- | :--- |
+| `Samples.QuickStart` | Demonstrates policy values, retried calls, `TryRunAsync`, and printing the attempt log. This sample does not use HTTP or dependency injection. |
+| `Samples.Http` | Demonstrates `ResilienceHttp.CreateClient`, a simulated 503-200 failure sequence, per-host circuit breakers, and the behavior of non-repeatable `POST` requests. |
+| `Samples.Worker` | Demonstrates a host using `AddResilience` from configuration, `AddHttpClient(...).AddResilience()`, injecting `IResiliencePolicies`, and printing the retry fraction via the meter. |
 
-Each one runs against an in-process fake dependency, so none of them needs the network or a
-subscription to anything.
+Each sample runs against an in-process fake dependency and does not require network access or external subscriptions.
 
-The docs' own snippets are a fourth thing to read: they live in
-[`tests/NResilience.Docs`](../tests/NResilience.Docs) as executing tests, and every code block on
-these pages is inlined from there. If a page shows it, it compiles and runs.
-
+Additionally, the code snippets used throughout this documentation are maintained as executable tests in [`tests/NResilience.Docs`](../tests/NResilience.Docs). Every code block on these pages is inlined from those tests to ensure that all examples compile and run.

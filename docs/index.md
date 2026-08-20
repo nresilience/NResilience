@@ -1,17 +1,47 @@
 ---
 title: NResilience
-description: A dependency that goes slow or starts failing can hang your requests, tie up your threads, and take your own application down - retry, timeouts, and circuit breaking for .NET calls, on by default.
+description: Prevent cascading failures in your .NET applications with built-in retries, timeouts, and circuit breakers.
 order: 0
 ---
 
 # NResilience
 
-A dependency that goes slow or starts failing can hang your requests, tie up your threads, and take
-your own application down with it - and retrying blindly only makes that worse, because every caller
-hits the failing service again at the same time. NResilience adds retry, timeouts, and circuit
-breaking to a .NET call so a struggling dependency degrades your app instead of crashing it - with
-sensible defaults already on, so a working retried HTTP call is one line, and every call you tune
-after that is one `with` expression, not a builder chain.
+Prevent cascading failures in your .NET applications.
+
+A struggling dependency can hang your requests, tie up your threads, and crash your application. Blind retries often worsen the problem by overwhelming the failing service. NResilience wraps your calls in retries, timeouts, and circuit breakers so your application degrades gracefully instead of crashing.
+
+## Why NResilience?
+
+NResilience replaces complex fluent builders, confusing strategy ordering, and mandatory `Build()` calls with values and C# `with` expressions.
+
+- **No fluent builders.** Configure policies using `with` expressions to change one setting while keeping others.
+- **Sensible defaults.** Get a working, retried HTTP call with one line of code.
+- **Unified execution.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
+- **Retry budget.** A cap on retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
+- **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
+- **AOT and trimming safe.** Zero external dependencies and no reflection.
+
+## Get started
+
+To add NResilience to your project, run the following command:
+
+```bash
+dotnet add package NResilience
+```
+
+For most HTTP scenarios, use the pre-configured client:
+
+```csharp
+// Create one client for the application's lifetime
+private static readonly HttpClient Client = ResilienceHttp.CreateClient();
+
+private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
+    await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
+```
+
+Every call this client makes uses 3 attempts with exponential backoff, a 30-second deadline, and HTTP-aware retry logic (for example, it retries a `503` but not a `404`).
+
+## One method for any callback
 
 <!-- snippet: whole-api -->
 ```csharp
@@ -32,30 +62,36 @@ User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGoo
 ```
 <!-- endsnippet -->
 
+The `attempt` token is cancelled when the specific attempt hits its timeout, while the `cancellationToken` cancels the entire operation.
+
+## Handle failures without exceptions
+
+Use `TryRunAsync` to branch on the outcome instead of catching exceptions:
+
+```csharp
+CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGood;
+```
+
+## Performance and correctness
+
+NResilience is built for high-performance .NET applications:
+
+- **Low overhead.** A flat execution path ensures that cost doesn't grow as you add more policy settings.
+- **Built-in analyzers.** Seven diagnostics ship with the package to prevent silent failures.
+- **Native AOT.** Fully compatible with `net8.0` and `net10.0` trimming and AOT publishing.
+
 ## Start here
 
 | If you want | Go to |
-| --- | --- |
-| A retried HTTP call in the next two minutes | [Quick start](getting-started/quick-start.md) |
-| The vocabulary the rest of the docs use | [Key concepts](getting-started/key-concepts.md) |
-| A worked scenario | [Guides](guides/index.md) |
-| One knob explained | [Features](features/index.md) |
+| :--- | :--- |
+| A retried HTTP call in two minutes | [Quick start](getting-started/quick-start.md) |
+| The core terminology | [Key concepts](getting-started/key-concepts.md) |
+| Worked scenarios for common patterns | [Guides](guides/index.md) |
+| Detailed configuration options | [Features](features/index.md) |
 | `AddResilience()` on a client | [Dependency injection](di/index.md) |
 | Every member, in order | [Reference](reference/index.md) |
-| Why it is built this way | [Deep dives](deep-dives/index.md) |
+| Architecture and design decisions | [Deep dives](deep-dives/index.md) |
 | To move off Polly | [Migrating from Polly](migrating-from-polly.md) |
 
-## What it gives you
-
-- Retries when a call fails transiently, with backoff (a short wait before each retry) and jitter
-  (random spacing so clients don't all retry at once)
-- Timeouts so a slow dependency can't hang your application
-- A circuit breaker - a switch that stops calling a dependency when it's failing, so you don't pile
-  on load it can't handle
-- A retry budget - a cap on retries as a fraction of traffic, so a fleet of clients can't overwhelm
-  a struggling dependency
-- HTTP-aware out of the box (knows a 503 is retryable, a 404 is not)
-- Works with zero configuration - sensible defaults are already on
-
-Overhead is one allocation per call, gated in CI. The measured values per framework and the gate
-source are in [where the allocations are](deep-dives/allocations.md).
+Overhead is one allocation per call, gated in CI. For details, see [Where the allocations are](deep-dives/allocations.md).

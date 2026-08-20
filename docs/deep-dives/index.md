@@ -1,20 +1,18 @@
 ---
 title: Deep dives
-description: Why the library is built this way, and what was measured to find out.
+description: Explore the design decisions, measurements, and technical reasoning behind NResilience.
 order: 8
 ---
 
 # Deep dives
 
-Nothing here is needed to use the library. It is the reasoning and the measurements behind the
-decisions the rest of the docs simply state.
+These guides provide the technical reasoning and measurements behind the design of NResilience. While you do not need to read these to use the library, they offer insight into why the system is built this way.
 
-| Page | The question |
-| --- | --- |
-| [One flat executor](one-executor.md) | Why is there no pipeline? |
-| [Where the allocations are](allocations.md) | What does a call cost, and how is that enforced? |
-| [The cancellation contract](cancellation.md) | Which token cancels what, and who decides what a cancellation meant? |
-| [Breaker internals](breaker-internals.md) | Why consecutive failures, two probes, and a growing break? |
-| [Retry budget internals](retry-budget-internals.md) | Why a fraction of traffic, and why per process? |
-| [Guarded rejection](guarded-rejection.md) | Why does refusing a call take 100 milliseconds? |
-
+| Topic | Key question answered |
+| :--- | :--- |
+| [One flat executor](one-executor.md) | Why does the library use a flat execution loop instead of a strategy pipeline? |
+| [Where the allocations are](allocations.md) | What is the cost of a call, and how is that cost minimized? |
+| [The cancellation contract](cancellation.md) | How is cancellation handled, and which token governs each part of the call? |
+| [Breaker internals](breaker-internals.md) | Why use consecutive failures, a specific probe count, and growing break durations? |
+| [Retry budget internals](retry-budget-internals.md) | Why limit retries as a fraction of total traffic, and why maintain the budget per process? |
+| [Guarded rejection](guarded-rejection.md) | Why does the handler introduce a delay when refusing a call? |

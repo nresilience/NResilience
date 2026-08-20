@@ -1,41 +1,45 @@
 ---
 title: Resilience
-description: The policy record, its properties, and the eight execution methods.
+description: Reference for the Resilience record, including its properties and execution methods.
 order: 1
 ---
 
 # `Resilience`
 
-`sealed partial record Resilience`, in namespace `NResilience`. Immutable; `with` derives a variant.
+The `Resilience` type is a `sealed partial record` in the `NResilience` namespace. It is immutable; use the `with` expression to derive a variant.
 
 ## Presets
 
-| Member | Value |
-| --- | --- |
-| `Resilience.None` | Passthrough. One attempt, no bounds, no budget. The [executor](index.md) returns the callback's own task. |
-| `Resilience.Default` | Three attempts, 30 s deadline, 10 s attempt timeout, `Backoff.Default`, `Classifier.Default`. |
-| `Resilience.Http` | `Default` with `Classifier.Http` and `Name = "http"`. |
+NResilience provides several presets for common scenarios:
+
+| Preset | Behavior |
+| :--- | :--- |
+| `Resilience.None` | Passthrough. Executes one attempt with no bounds or budget. The [executor](index.md) returns the callback's own task. |
+| `Resilience.Default` | Three attempts, 30-second deadline, 10-second attempt timeout, `Backoff.Default`, and `Classifier.Default`. |
+| `Resilience.Http` | A `Default` policy configured with `Classifier.Http` and `Name = "http"`. |
 
 ## Properties
 
-| Property | Type | Default | Meaning |
-| --- | --- | --- | --- |
-| `Attempts` | `int` | 3 | Total attempts, including the first. |
-| `Deadline` | `TimeSpan` | 30 s | Wall-clock budget for the whole call. `Timeout.InfiniteTimeSpan` for no bound. |
-| `AttemptTimeout` | `TimeSpan` | 10 s | Ceiling for one attempt. Effective value is `min(this, time left on the deadline)`. |
+| Property | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `Attempts` | `int` | 3 | The total number of attempts, including the first. |
+| `Deadline` | `TimeSpan` | 30 s | The wall-clock budget for the entire call. Use `Timeout.InfiniteTimeSpan` to disable the bound. |
+| `AttemptTimeout` | `TimeSpan` | 10 s | The maximum duration for a single attempt. The effective value is the minimum of this property and the remaining time on the deadline. |
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
-| `Classify` | `Classifier` | `Classifier.Default` | What counts as what. |
-| `Breaker` | `Breaker?` | null | The circuit breaker. Null means no breaking. `with` copies the reference. |
-| `Budget` | `RetryBudget?` | null | Null means an automatic budget private to this policy instance. |
-| `BeforeAttempt` | `Func<NextAttempt, Task>?` | null | Runs before every attempt, including the first. |
-| `OnEvent` | `Action<CallEvent>?` | null | The telemetry listener. Null means nothing is raised and nothing is paid. |
-| `Name` | `string?` | null | Used in diagnostics and telemetry tags. |
-| `Time` | `TimeProvider` | `TimeProvider.System` | The clock. Leave it alone in production. |
+| `Classify` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
+| `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
+| `Budget` | `RetryBudget?` | `null` | The retry budget. A `null` value creates an automatic budget private to this policy instance. |
+| `BeforeAttempt` | `Func<NextAttempt, Task>?` | `null` | A function that runs before every attempt, including the first. |
+| `OnEvent` | `Action<CallEvent>?` | `null` | The telemetry listener. If `null`, no events are raised and no performance cost is incurred. |
+| `Name` | `string?` | `null` | A name used in diagnostics and telemetry tags. |
+| `Time` | `TimeProvider` | `TimeProvider.System` | The clock used for timing. Use the system provider in production. |
 
 ## Methods
 
-| Method | Returns |
-| --- | --- |
+The `Resilience` record provides methods to execute calls with the defined resilience policy.
+
+| Method | Return Type |
+| :--- | :--- |
 | `RunAsync<T>(Func<CancellationToken, Task<T>>, CancellationToken)` | `ValueTask<T>` |
 | `RunAsync(Func<CancellationToken, Task>, CancellationToken)` | `ValueTask` |
 | `RunAsync<TState, T>(Func<TState, CancellationToken, Task<T>>, TState, CancellationToken)` | `ValueTask<T>` |
@@ -44,38 +48,37 @@ order: 1
 | `TryRunAsync(…)` | `ValueTask<CallResult>` |
 | `TryRunAsync<TState, T>(…)` | `ValueTask<CallResult<T>>` |
 | `TryRunAsync<TState>(…)` | `ValueTask<CallResult>` |
-| `Validate()` | `void`. Throws `ResilienceConfigurationException` listing every problem at once. |
+| `Validate()` | `void` |
 
-The `RunAsync` forms throw: the original exception rethrown with its stack intact, or one of the
-[exceptions the library invents](exceptions.md). The `TryRunAsync` forms report instead, and always
-materialize the attempt log.
+### Execution behavior
 
-Every signature carries two `CancellationToken`s and they are different things. The one the callback
-receives is the attempt's: it is cancelled when that attempt hits its `AttemptTimeout`, and when the
-token you passed in is cancelled. The trailing parameter is yours, and cancels the whole call. See
-[the cancellation contract](../deep-dives/cancellation.md).
+`RunAsync` methods throw the original exception with its stack trace intact, or one of the [exceptions defined by the library](exceptions.md). `TryRunAsync` methods return a `CallResult` and always materialize the attempt log.
 
-The `TState` overloads exist so the callback can be `static` and allocate no closure. They are the
-same length as the closure form at the call site.
+#### Cancellation tokens
+Every method signature includes two different `CancellationToken` parameters:
+1. **The callback token**: Passed to the execution callback. It is cancelled when the attempt hits its `AttemptTimeout` or when the caller's token is cancelled.
+2. **The caller token**: The trailing parameter. It cancels the entire operation, including all retries.
 
-`Validate` is not called at construction: a record's `init` setters run after the copy constructor, so
-there is no natural hook. Validation happens when you call it, eagerly at DI registration, and lazily
-on the first execution of each policy instance.
+For more information, see the [cancellation contract](../deep-dives/cancellation.md).
+
+#### State and allocation
+The `TState` overloads allow you to use `static` callbacks, which avoids closure allocations. These overloads provide the same functionality as the closure-based forms.
+
+#### Validation
+The `Validate` method checks the policy configuration for errors and throws a `ResilienceConfigurationException` if any are found. Validation does not occur at construction; it happens when you call `Validate` explicitly, during eager DI registration, or lazily on the first execution of a policy instance.
 
 ## `NextAttempt`
 
-What `BeforeAttempt` and `Backoff.Custom` receive. `readonly struct`.
+The `NextAttempt` `readonly struct` is passed to `BeforeAttempt` and `Backoff.Custom`.
 
-| Member | Meaning |
-| --- | --- |
-| `Number` | 1-based; 1 on the first attempt. |
-| `PreviousVerdict` | How the previous attempt was classified. `Verdict.Ok` on the first. |
-| `PreviousException` | What the previous attempt threw, if anything. |
-| `Remaining` | Time left on the deadline, or `Timeout.InfiniteTimeSpan`. |
-| `CancellationToken` | The caller's token. |
+| Member | Description |
+| :--- | :--- |
+| `Number` | The 1-based index of the attempt (1 for the first attempt). |
+| `PreviousVerdict` | The classification of the previous attempt. Defaults to `Verdict.Ok` for the first attempt. |
+| `PreviousException` | The exception thrown by the previous attempt, if any. |
+| `Remaining` | The time remaining on the deadline, or `Timeout.InfiniteTimeSpan`. |
+| `CancellationToken` | The caller's cancellation token. |
 
 ## Equality
 
-Two policies are equal when every property is. A `Breaker` or a `RetryBudget` compares by reference,
-because it is a live object rather than configuration. `ToString` prints the configuration.
-
+Two policies are considered equal if all their properties are equal. `Breaker` and `RetryBudget` are compared by reference because they are live state objects rather than configuration. `ToString` returns the policy configuration.
