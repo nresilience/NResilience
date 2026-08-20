@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NResilience.Analyzers.Tests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+
+    <!--
+      The suite compiles snippets of user code in-process, so it references the library the way a
+      consumer would and hands the resulting compilation to the analyzers directly. No analyzer
+      test framework: the harness is thirty lines, and it pins the Roslyn version the analyzers
+      claim to support rather than whichever one a test package wants.
+    -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+    <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj" />
+    <ProjectReference Include="../../src/NResilience.CodeFixes/NResilience.CodeFixes.csproj" />
+  </ItemGroup>
+
+</Project>

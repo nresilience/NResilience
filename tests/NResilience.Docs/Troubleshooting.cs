@@ -91,6 +91,9 @@ public sealed class Troubleshooting
     [Fact]
     public void A_bad_policy_lists_every_problem_at_once()
     {
+        // This policy is invalid on purpose: the page is about the message it produces. NRES003 says the
+        // same thing at build time, which is the analyzer working rather than something to fix here.
+        #pragma warning disable NRES003
         // <snippet:troubleshoot-validate>
         var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(-1) };
 
@@ -100,6 +103,7 @@ public sealed class Troubleshooting
         // Attempts must be at least 1; it is 0.
         // Deadline must be positive, or Timeout.InfiniteTimeSpan for no bound; it is -00:00:01.
         // </snippet:troubleshoot-validate>
+        #pragma warning restore NRES003
 
         Assert.Equal(2, problem.Problems.Count);
     }

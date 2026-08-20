@@ -83,7 +83,8 @@ This is the most-hit footgun in the .NET resilience ecosystem, and the defenses 
 Every execution overload requires a callback that takes a `CancellationToken`, so there is no
 zero-argument form to forget. And when an attempt overruns its ceiling by more than a second, an
 `OrphanedWork` event fires naming the policy - raised retrospectively, when the work finally does
-return, which is the only moment the overrun is observable at all.
+return, which is the only moment the overrun is observable at all. Handing a call the wrong token, or
+none, is reported at build time by [NRES001 and NRES002](../reference/analyzers.md).
 
 Go deeper: [The cancellation contract](../deep-dives/cancellation.md).
 

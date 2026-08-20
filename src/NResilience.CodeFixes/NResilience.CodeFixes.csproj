@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      A separate assembly from the analyzers, because RS1038 is right: a code fix references
+      Microsoft.CodeAnalysis.Workspaces, which the command-line compiler does not provide, and an
+      analyzer assembly that reaches for it can fail to load in exactly the build that matters.
+      The IDE loads both; csc loads only the analyzers.
+    -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <RootNamespace>NResilience.Analyzers</RootNamespace>
+    <AssemblyName>NResilience.CodeFixes</AssemblyName>
+
+    <IsPackable>false</IsPackable>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience.Analyzers/NResilience.Analyzers.csproj" />
+  </ItemGroup>
+
+</Project>

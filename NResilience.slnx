@@ -1,6 +1,8 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/NResilience/NResilience.csproj" />
+    <Project Path="src/NResilience.Analyzers/NResilience.Analyzers.csproj" />
+    <Project Path="src/NResilience.CodeFixes/NResilience.CodeFixes.csproj" />
     <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj" />
     <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
   </Folder>
@@ -18,6 +20,7 @@
     <Project Path="tools/NResilience.DocSnippets/NResilience.DocSnippets.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/NResilience.Analyzers.Tests/NResilience.Analyzers.Tests.csproj" />
     <Project Path="tests/NResilience.AotProbe/NResilience.AotProbe.csproj" />
     <Project Path="tests/NResilience.Docs/NResilience.Docs.csproj" />
     <Project Path="tests/NResilience.Gates/NResilience.Gates.csproj" />

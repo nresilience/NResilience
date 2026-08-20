@@ -19,6 +19,7 @@ order: 7
 | [HTTP](http.md) | `ResilienceHandler`, `HttpResilienceOptions`, `ResilienceHttp` |
 | [Options and registration](options.md) | `ResilienceOptions`, `BreakerOptions`, `IResiliencePolicies`, `ResilienceTelemetry`, `AddResilience` |
 | [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder` |
+| [Analyzers](analyzers.md) | NRES001-NRES007, the diagnostics that ship in the package |
 
 The public surface is small on purpose, and it is a checked-in manifest: surface growth is a reviewed
 diff rather than an accident.

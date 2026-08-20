@@ -145,7 +145,8 @@ Console.WriteLine(string.Join(Environment.NewLine, problem.Problems));
 <!-- endsnippet -->
 
 Registration validates eagerly, which is what turns a configuration mistake into a startup failure
-rather than a first-request failure.
+rather than a first-request failure. Where the values are literals, [NRES003](reference/analyzers.md)
+says the same thing at build time.
 
 ### A test is slow, or flaky
 

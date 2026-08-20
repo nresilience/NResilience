@@ -47,8 +47,9 @@ yours, and cancels the whole call. Passing `attempt` into your work is what lets
 actually stop.
 
 > [!TIP]
-> Every execution overload requires a callback that takes a `CancellationToken`. There is no
-> zero-argument form to forget, because a timeout cannot stop work that ignores its token.
+> Every execution overload requires a callback that takes a `CancellationToken`, so there is no
+> zero-argument form to forget - and if the work is handed the wrong token,
+> [an analyzer in the package](../reference/analyzers.md) says so at build time.
 
 ## Name your policies once
 

@@ -57,6 +57,9 @@ worth a diagnostic, so the mitigations are structural instead:
 - **An `OrphanedWork` event names the policy** when an attempt overruns its ceiling by more than a
   second. It is raised retrospectively, the moment the work finally does return, which catches every
   callback that ignores its token and eventually finishes.
+- **Two analyzers say it at build time.** [NRES001 and NRES002](../reference/analyzers.md) read the
+  callback and report a call that takes a cancellation token and was handed the wrong one, or none.
+  They ship inside the package, so nobody has to know they exist.
 
 A callback that never finishes leaves the call itself hanging, and there the diagnostic you need is a
 stack dump rather than an event. The library cannot fix uncooperative code. It can refuse to make

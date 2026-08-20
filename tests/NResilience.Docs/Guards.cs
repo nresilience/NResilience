@@ -115,6 +115,9 @@ public sealed class Guards
     [Fact]
     public void A_budget_is_on_by_default_and_can_be_turned_off()
     {
+        // A snippet is not a call path. The reader holds this policy in a static readonly field, which
+        // is what NRES005 asks for; here it lives in a test method so that the docs gate can run it.
+        #pragma warning disable NRES005
         // <snippet:budget-off>
         // Null - the default - is an automatic budget private to this policy instance, so storm
         // protection needs no configuration. None is the deliberate opt-out, and the only correct
@@ -124,6 +127,7 @@ public sealed class Guards
         // Or tune it, privately to whoever holds the instance.
         var generous = Resilience.Default with { Budget = RetryBudget.Of(fraction: 0.2, minimumPerSecond: 10) };
         // </snippet:budget-off>
+        #pragma warning restore NRES005
 
         Assert.NotNull(unbudgeted.Budget);
         Assert.Equal(0, generous.Budget!.Utilisation);

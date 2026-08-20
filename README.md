@@ -107,6 +107,9 @@ get right.
   status classification, and a retry budget. Nothing to configure for a working retried HTTP call.
 - **Handle failure with an `if`, not a strategy.** `TryRunAsync` gives you the outcome, the reason,
   and the attempt history. Decide what to do at the call site.
+- **Analyzers in the box.** Seven diagnostics ship inside the package, no separate install. The
+  first two catch the failure with no symptom: work handed the wrong cancellation token, which
+  silently turns the attempt timeout off.
 - **Low overhead.** One flat execution path means cost doesn't grow with how much policy you
   configure.
 - **AOT and trimming safe.** No reflection, zero external dependencies, CI-enforced on `net8.0` and
@@ -129,7 +132,7 @@ Go deeper: [where the allocations are](docs/deep-dives/allocations.md).
 
 | Package | When you need it |
 |---|---|
-| `NResilience` | The core library and HTTP handler. Start here. |
+| `NResilience` | The core library, the HTTP handler and the analyzers. Start here. |
 | `NResilience.Extensions` | Dependency injection, configuration binding, metrics. Add this in a hosted app. |
 | `NResilience.Testing` | Helpers for testing your policies. |
 
@@ -140,6 +143,7 @@ Go deeper: [where the allocations are](docs/deep-dives/allocations.md).
 - [Guides](docs/guides/index.md) - worked scenarios.
 - [Features](docs/features/index.md) - one page per knob.
 - [Reference](docs/reference/index.md) - every member, in order.
+- [Analyzers](docs/reference/analyzers.md) - the seven diagnostics that come with the package.
 - [Deep dives](docs/deep-dives/index.md) - why the library is built this way.
 - [Migrating from Polly](docs/migrating-from-polly.md) - a translation table and the behavior
   differences worth knowing.

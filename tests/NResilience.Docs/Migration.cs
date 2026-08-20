@@ -12,6 +12,9 @@ public sealed class Migration
     [Fact]
     public void Retry_with_a_timeout_and_a_breaker()
     {
+        // A snippet is not a call path. The reader holds this policy in a static readonly field, which
+        // is what NRES005 asks for; here it lives in a test method so that the docs gate can run it.
+        #pragma warning disable NRES005
         // <snippet:migration-pipeline>
         // One value. No pipeline, no builder, no ordering to get right - and the breaker samples
         // attempts whichever way you read it.
@@ -23,6 +26,7 @@ public sealed class Migration
             Breaker = new Breaker { Name = "api" },
         };
         // </snippet:migration-pipeline>
+        #pragma warning restore NRES005
 
         Assert.Equal(3, api.Attempts);
         Assert.NotNull(api.Breaker);

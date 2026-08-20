@@ -33,6 +33,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+    <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
     <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj" />
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj" />
   </ItemGroup>
