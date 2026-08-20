@@ -56,7 +56,7 @@ public sealed class TelemetryDocs
     {
         // <snippet:telemetry-with-telemetry>
         // A policy registered in a container is instrumented for you. A policy in a static field
-        // is not, because nothing about it says there is an operations story - this says it.
+        // is not - this says it.
         var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
         // </snippet:telemetry-with-telemetry>
 

@@ -13,9 +13,8 @@ than a setting, because its scope is a decision only you can make.
 
 <!-- snippet: breaker-construct -->
 ```csharp
-// Breaker scope is a variable with a name and a lifetime, not an emergent property of
-// where a pipeline was registered. `with` copies the reference, so every policy derived
-// from `payments` shares this breaker - which is the point.
+// Breaker scope is a variable with a name and a lifetime. `with` copies the reference,
+// so every policy derived from `payments` shares this breaker.
 var breaker = new Breaker { Name = "payments" };
 
 var payments = Resilience.Http with { Breaker = breaker };
@@ -23,11 +22,9 @@ var paymentsWrites = payments with { Attempts = 1 };
 ```
 <!-- endsnippet -->
 
-Breaker scope is the single most confusing thing in the .NET resilience ecosystem, because everywhere
-else it is an emergent property of where a pipeline happened to be registered. Here it is a variable
-with a name and a lifetime, visible at the point you write `new Breaker()`. `with` copies the
+The breaker is an object you hold, so its scope is wherever you hold it. `with` copies the
 *reference*, never the state, so two policies derived from a common ancestor share whatever breaker
-that ancestor held - and that is exactly the intent.
+that ancestor held.
 
 For HTTP, the handler scopes a breaker per host for you. See
 [per-host scope](../http/per-host-scope.md).

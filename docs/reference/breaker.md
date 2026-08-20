@@ -44,7 +44,7 @@ intend.
 | `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that opens it. |
 | `BreakDuration` | 15 s | How long the first break lasts. |
 | `MaxBreakDuration` | 2 min | The break doubles per consecutive open, up to this. Set equal to `BreakDuration` to disable growth. |
-| `HalfOpenProbes` | 1 | Concurrent trial calls while half-open. |
+| `HalfOpenProbes` | 1 | Concurrent trial calls while in `HalfOpen`. |
 | `ProbeSuccesses` | 2 | Successful probes required to close. |
 | `Time` | `TimeProvider.System` | The clock. A breaker owns its own, because its state is read from health endpoints that hold no policy. |
 | `Validate()` | | Throws `ResilienceConfigurationException` listing every problem at once. |

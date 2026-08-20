@@ -10,7 +10,7 @@ Polly is a good library and this is not a list of its faults. It is a translatio
 handful of places where the two libraries would do different things to the same call - which are the
 part worth reading before you switch anything.
 
-Polly snippets below are illustrative v8 and are not compiled by this repository. Every NResilience
+Polly snippets below are illustrative and are not compiled by this repository. Every NResilience
 snippet is.
 
 ## The translation table
@@ -96,8 +96,8 @@ string value = result.TryGetValue(out string? fetched) ? fetched : "cached";
 ```
 <!-- endsnippet -->
 
-A fallback is not a strategy. It is an `if`, and putting it in the pipeline is what makes "did this
-value come from the dependency or from the fallback?" a question you cannot answer at the call site.
+A fallback is an `if` on the result. Writing it at the call site keeps the answer to "did this
+value come from the dependency or from the fallback?" visible where the call is made.
 
 ## Registration
 
@@ -186,7 +186,7 @@ purpose. See [guarded rejection](deep-dives/guarded-rejection.md).
 
 ## Running both at once
 
-Nothing stops you. The metric names, tag names and event names deliberately share nothing with Polly's
+Nothing stops you. The metric names, tag names and event names share nothing with Polly's
 vocabulary, so a process running both is legible in a dashboard - which is what makes migrating one
 client at a time practical.
 

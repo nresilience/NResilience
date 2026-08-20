@@ -24,7 +24,7 @@ order: 2
 
 Caller cancellation is the one thing `TryRunAsync` still throws.
 
-This type is what replaces a fallback strategy:
+On failure, branch on the result to serve an alternate value:
 
 <!-- snippet: fallback-is-an-if -->
 ```csharp

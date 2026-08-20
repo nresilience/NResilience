@@ -37,9 +37,8 @@ See [classification](features/classification.md) for the shipped rules, and
 ### A 404 or a 400 is not being retried
 
 That is correct. `Classifier.Http` treats every 4xx except 408 and 429 as an answer rather than a
-failure - retrying a 404 is in the most-copied retry snippet in .NET, and it is wrong there too. If a
-particular status really is transient for your API, add a rule:
-[migrating a predicate](migrating-from-polly.md#predicates) shows the shape.
+failure - a 404 is an answer, not a transient error. If a particular status really is transient for
+your API, add a rule: [migrating a predicate](migrating-from-polly.md#predicates) shows the shape.
 
 ### My POST is not being retried
 

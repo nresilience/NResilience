@@ -68,9 +68,8 @@ against a breaker or a budget, never converted into a timeout, and no classifier
 `OperationCanceledException` comes straight back out - including from `TryRunAsync`, which is the one
 thing that method still throws.
 
-The one deliberate asymmetry: a token cancelled while an attempt was already succeeding does not
-throw away the completed work. The post-attempt check exists to stop the loop starting *another*
-attempt.
+One asymmetry: a token cancelled while an attempt was already succeeding does not
+throw away the completed work. The post-attempt check stops the loop starting *another* attempt.
 
 ## Work that ignores its token
 
@@ -79,12 +78,12 @@ attempt.
 > the token is cancelled, and a callback that never observes it keeps running - and the policy waits
 > for it, because the executor is awaiting that very task.
 
-This is the most-hit footgun in the .NET resilience ecosystem, and the defenses here are structural.
-Every execution overload requires a callback that takes a `CancellationToken`, so there is no
-zero-argument form to forget. And when an attempt overruns its ceiling by more than a second, an
-`OrphanedWork` event fires naming the policy - raised retrospectively, when the work finally does
-return, which is the only moment the overrun is observable at all. Handing a call the wrong token, or
-none, is reported at build time by [NRES001 and NRES002](../reference/analyzers.md).
+The defenses here are structural. Every execution overload requires a callback that takes a
+`CancellationToken`, so there is no zero-argument form to forget. And when an attempt overruns its
+ceiling by more than a second, an `OrphanedWork` event fires naming the policy - raised
+retrospectively, when the work finally does return, which is the only moment the overrun is observable
+at all. Handing a call the wrong token, or none, is reported at build time by
+[NRES001 and NRES002](../reference/analyzers.md).
 
 Go deeper: [The cancellation contract](../deep-dives/cancellation.md).
 

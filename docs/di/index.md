@@ -77,7 +77,7 @@ A policy is an immutable value, so hot reload is a reference swap: `IOptionsMoni
 section is projected onto a new `Resilience`, and the roster hands out the new one. There is no
 in-flight execution to drain and no pipeline to rebuild.
 
-**Live breakers and budgets are not replaced**, because their state is the point. A breaker that
+**Live breakers and budgets are not replaced**, because their state is what matters. A breaker that
 opened because a dependency is down stays open across a configuration edit, and the automatic retry
 budget keeps the traffic history it has accumulated - it is pinned to the registration name rather
 than to the policy instance for exactly that reason.

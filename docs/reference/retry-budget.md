@@ -1,6 +1,6 @@
 ---
 title: RetryBudget
-description: The token bucket that bounds retries as a fraction of traffic.
+description: The budget that bounds retries as a fraction of traffic.
 order: 6
 ---
 

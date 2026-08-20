@@ -1,41 +1,40 @@
 ---
 title: NResilience
-description: A .NET resilience library built around one flat execution engine, a declarative policy value, and defaults that are correct without configuration.
+description: Retry, timeouts, and circuit breaking for .NET calls - defaults on out of the box, one method for any callback, no builder chain.
 order: 0
 ---
 
 # NResilience
 
-A policy is a value. You derive variants with `with`, run any callback through one method, and get
-defaults that are already right.
+Add retry, timeouts, and circuit breaking to your .NET calls. Defaults are on, so a working retried
+HTTP call is one line - and every call you tune after that is one `with` expression, not a builder
+chain.
 
 <!-- snippet: whole-api -->
 ```csharp
-// 1. A policy is a value. Presets are the entry point.
+// 1. Start from a preset. `Resilience.Http` retries and times out an HTTP call out of the box.
 var api = Resilience.Http;
 
-// 2. Derive with `with`. No builder, no Build(), no ordering to get right.
+// 2. Change one setting, keep the rest: `with` copies everything you did not mention.
 var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
-// 3. Run anything. One method, any return type, nothing to declare.
+// 3. Run any callback through one method. The token handed to your work is the attempt's own.
 User? user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
 HttpResponseMessage response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 await slow.RunAsync(attempt => queue.FlushAsync(attempt), cancellationToken);
 
-// 4. Fallback is not a strategy. It is an `if`.
+// 4. Want the outcome without an exception? `TryRunAsync` hands it back to branch on.
 CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGood;
 ```
 <!-- endsnippet -->
-
-There is no pipeline, no builder, no strategy, no context, no property bag and no ordering.
 
 ## Start here
 
 | If you want | Go to |
 | --- | --- |
 | A retried HTTP call in the next two minutes | [Quick start](getting-started/quick-start.md) |
-| The five words the rest of the docs use | [Key concepts](getting-started/key-concepts.md) |
+| The vocabulary the rest of the docs use | [Key concepts](getting-started/key-concepts.md) |
 | A worked scenario | [Guides](guides/index.md) |
 | One knob explained | [Features](features/index.md) |
 | `AddResilience()` on a client | [Dependency injection](di/index.md) |
@@ -56,17 +55,5 @@ because its scope is a decision only you can make, and
 
 ## What it costs
 
-Bytes above an identical un-wrapped callback, measured in one process on .NET 8 and .NET 10.
-
-| Scenario | Overhead |
-| --- | ---: |
-| `Resilience.None`, any callback | **0** |
-| Sync-completing, full policy | 64 B - one linked cancellation source |
-| Suspending, full policy | **384 B** - one state-machine box plus that source |
-| Suspending, Polly retry + timeout, same harness | 1,291 B |
-
-Every figure is a test that fails the build. "Zero allocation" is never claimed unqualified: every
-`async` method that actually awaits allocates a state machine, and no library-side trick removes it.
-
-Go deeper: [where the allocations are](deep-dives/allocations.md).
-
+Overhead is one allocation per call, gated in CI - the ceilings and the comparison against Polly are
+in [where the allocations are](deep-dives/allocations.md).

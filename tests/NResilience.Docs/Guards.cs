@@ -10,9 +10,8 @@ public sealed class Guards
     public void A_breaker_is_an_object_you_hold()
     {
         // <snippet:breaker-construct>
-        // Breaker scope is a variable with a name and a lifetime, not an emergent property of
-        // where a pipeline was registered. `with` copies the reference, so every policy derived
-        // from `payments` shares this breaker - which is the point.
+        // Breaker scope is a variable with a name and a lifetime. `with` copies the reference,
+        // so every policy derived from `payments` shares this breaker.
         var breaker = new Breaker { Name = "payments" };
 
         var payments = Resilience.Http with { Breaker = breaker };
@@ -120,7 +119,7 @@ public sealed class Guards
         #pragma warning disable NRES005
         // <snippet:budget-off>
         // Null - the default - is an automatic budget private to this policy instance, so storm
-        // protection needs no configuration. None is the deliberate opt-out, and the only correct
+        // protection needs no configuration. None is the opt-out, and the only correct
         // use is a dependency you know is not shared.
         var unbudgeted = Resilience.Default with { Budget = RetryBudget.None };
 

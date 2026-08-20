@@ -11,8 +11,7 @@ method the library has not heard of - retrying something unrecognized is a guess
 to guess in is the one that does not duplicate it.
 
 A retried POST is a duplicate order, a duplicate message or a duplicate charge. Microsoft's standard
-handler retries POST by default; the report that it creates duplicates was declined after 33
-comments, and an opt-out shipped instead.
+handler retries POST by default, which creates duplicates; it offers an opt-out.
 
 ## Per request, which is the finer instrument
 

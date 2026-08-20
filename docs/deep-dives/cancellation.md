@@ -45,8 +45,8 @@ token where the attempt's belongs disables the attempt timeout without any visib
 > running, and the policy does not move on: the executor is awaiting the very task that ignored its
 > token, so a callback that never returns hangs the call along with itself.
 
-This is the single most-hit footgun in the ecosystem - four separate Polly issues, the last of them a
-reviewer pointing out that Polly's own shipped sample demonstrated it.
+This is the failure mode behind a long line of issues filed against every resilience library,
+including ones where the library's own shipped sample demonstrated it.
 
 Moving on regardless would mean racing the attempt against its timeout, and that allocates a promise
 and a registration on every suspending call whether or not anything ever times out. That price is not

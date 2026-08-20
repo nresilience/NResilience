@@ -25,8 +25,8 @@ A call a guard refused. `Exception`.
 | `RetryAfter` | When to come back, when the refusal carried a hint. |
 
 It arrives no sooner than the rejection pause. A rejection reports itself rather than the last
-attempt's exception, because the call it describes was never made; that earlier exception is the inner
-one.
+attempt's exception, because the call it describes was never made; the previous attempt's exception is
+the inner one.
 
 ## `DeadlineExceededException`
 

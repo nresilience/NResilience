@@ -10,7 +10,7 @@ order: 2
 retry budget per authority it has seen, created on first use.
 
 One breaker across every host means a dead host trips calls to the healthy ones, which is the
-blast-radius inversion a breaker exists to prevent.
+failure a per-host breaker prevents.
 
 ## Reading it
 
@@ -34,7 +34,7 @@ switch is off and the policy carries no breaker of its own.
 ## When you want a different scope
 
 A policy that already carries a [`Breaker`](../features/circuit-breaker.md) keeps it: an explicit
-breaker is a deliberate scope decision and the switch does not overrule it. The same is true of an
+breaker is a scope decision and the switch does not overrule it. The same is true of an
 explicit `Budget`, including `RetryBudget.None`.
 
 So the three scopes available are:
@@ -55,7 +55,7 @@ dashboard separate a client's hosts.
 still sees the outcome and the budget still receives its deposit, and nothing is sent twice.
 
 > [!WARNING]
-> The registry is unbounded on purpose: the set of hosts one `HttpClient` talks to is a property of the
+> The registry is unbounded: the set of hosts one `HttpClient` talks to is a property of the
 > application rather than of its traffic, and an eviction policy over a dozen entries would be a cache
 > with a bug in it. A client that talks to an **unbounded** set of hosts - a proxy, a crawler, a
 > webhook dispatcher - should set `BreakerPerHost` and `BudgetPerHost` to false and scope the guards on

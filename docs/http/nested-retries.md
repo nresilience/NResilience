@@ -15,8 +15,8 @@ retried.
 
 ## What it does
 
-Within one process, an `AsyncLocal` flag says whether this send is running inside a retrying
-handler's attempt. Across a process boundary, the header does the same job:
+Within one process, a flag on the current execution context says whether this send is running inside
+a retrying handler's attempt. Across a process boundary, the header does the same job:
 
 ```
 X-NResilience-Retrying: 1
@@ -38,5 +38,5 @@ bool callerWillRetry = request.Headers.ContainsKey(ResilienceHttp.NestedRetryHea
 
 The useful reaction is usually to reduce the inner attempt count to one, or to shorten the inner
 deadline so the caller's retry has budget left to be useful. That decision belongs to your service,
-which is why the library states the fact rather than acting on it.
+so the library states the fact rather than acting on it.
 

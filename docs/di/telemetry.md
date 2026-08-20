@@ -7,10 +7,10 @@ order: 2
 # Telemetry in DI
 
 A policy registered in a container records to the library's meter **by default**. This is the one
-place NResilience is not pay-for-play, and it is deliberate: `Resilience.Http with { … }` in a static
-field costs nothing, but registering a policy in a container is a statement that this is an
-application with an operations story - and a resilience library whose metrics are off unless you find
-the switch is a library whose metrics are off.
+place NResilience is not free-when-unused, and it is deliberate: `Resilience.Http with { … }` in a
+static field costs nothing, but a registered policy is part of an application that runs in
+production - and a resilience library whose metrics are off unless you find the switch is a library
+whose metrics are off.
 
 The switches are `ResilienceOptions.Telemetry = false` in configuration and `telemetry: false` on the
 HTTP registrations.
@@ -45,7 +45,7 @@ when nobody is sampling, which is what makes an always-registered handler afford
 <!-- snippet: telemetry-with-telemetry -->
 ```csharp
 // A policy registered in a container is instrumented for you. A policy in a static field
-// is not, because nothing about it says there is an operations story - this says it.
+// is not - this says it.
 var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 ```
 <!-- endsnippet -->

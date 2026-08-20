@@ -55,7 +55,7 @@ at the call site.
 Not by composition, because there is nothing to compose into: the engine is
 [one flat method](deep-dives/one-executor.md). The extension points are the
 [classifier](features/classification.md), `Backoff.Custom`, `BeforeAttempt` and `OnEvent`. That is
-deliberately a smaller opening than a pipeline, and the argument for it is API stability: the surface
+a smaller opening than a pipeline, and the argument for it is API stability: the surface
 stays small because there is less to get wrong later.
 
 ### Is a `Breaker` thread-safe? Can I share one across policies?
@@ -74,9 +74,9 @@ becomes a load generator. See [guarded rejection](deep-dives/guarded-rejection.m
 
 ### Why is telemetry off for a hand-built policy but on for a registered one?
 
-`OnEvent = null` costs nothing, and that is what makes pay-for-play meaningful. Registering a policy in
-a container is a statement that this application has an operations story, so the registration attaches
-the listener. `telemetry: false` and `ResilienceOptions.Telemetry = false` are the switches.
+`OnEvent = null` costs nothing, and that is what makes free-when-unused meaningful. A registered
+policy is part of an application that runs in production, so the registration attaches the listener.
+`telemetry: false` and `ResilienceOptions.Telemetry = false` are the switches.
 
 ### Is it AOT and trimming safe?
 

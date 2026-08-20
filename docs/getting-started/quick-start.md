@@ -51,32 +51,6 @@ actually stop.
 > zero-argument form to forget - and if the work is handed the wrong token,
 > [an analyzer in the package](../reference/analyzers.md) says so at build time.
 
-## Name your policies once
-
-A policy is a value, so the natural home for one is a `static readonly` field.
-
-<!-- snippet: quick-start-house-policy -->
-```csharp
-public static class Policies
-{
-    public static readonly Resilience Api = Resilience.Http with
-    {
-        Deadline = TimeSpan.FromSeconds(10),
-        AttemptTimeout = TimeSpan.FromSeconds(3),
-    };
-
-    public static readonly Resilience Realtime = Api with
-    {
-        Attempts = 1,
-        AttemptTimeout = TimeSpan.FromMilliseconds(250),
-    };
-}
-```
-<!-- endsnippet -->
-
-`with` copies everything you did not mention, so `Realtime` keeps `Api`'s deadline and classifier.
-There is no `Build()` and no ordering to get right.
-
 ## Read the outcome without an exception
 
 `RunAsync` throws what the call threw. When you would rather branch than catch, use `TryRunAsync`.
@@ -94,12 +68,13 @@ if (!result.TryGetValue(out User? user))
 ```
 <!-- endsnippet -->
 
-That is what replaces a fallback strategy: a fallback is an `if`.
+The `if` is the whole fallback story: on failure, serve whatever you keep for exactly this case -
+a cached value, a default, a retry scheduled by your own code.
 
 ## Next
 
-- [Key concepts](key-concepts.md) - the five words the rest of the docs use.
+- [Key concepts](key-concepts.md) - the vocabulary the rest of the docs use, and how to organize
+  your policies.
 - [Retry an HTTP call](../guides/retry-an-http-call.md) - the same thing, end to end, with the
   handler.
 - [`CallResult<T>`](../reference/call-result.md) - every member of what came back.
-

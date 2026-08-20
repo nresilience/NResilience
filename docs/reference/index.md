@@ -21,6 +21,6 @@ order: 7
 | [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder` |
 | [Analyzers](analyzers.md) | NRES001-NRES007, the diagnostics that ship in the package |
 
-The public surface is small on purpose, and it is a checked-in manifest: surface growth is a reviewed
-diff rather than an accident.
+The public surface is a checked-in manifest: surface growth is a reviewed diff rather than an
+accident.
 

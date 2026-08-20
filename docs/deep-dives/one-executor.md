@@ -21,18 +21,21 @@ roughly the sum of the state that has to live across the awaits rather than the 
 
 ## What that buys, measured
 
-The claim was tested before the library was written, against a hand-written fused loop standing in for
-an executor that did not exist yet, and then re-measured against the shipping executor with every gate
-re-pointed at it. Bytes above an identical un-wrapped suspending callback, one process, one run:
+Bytes above an identical un-wrapped suspending callback, one process, one run. The NResilience
+figures are the ceilings the build enforces; the Polly figures are the published values the same
+harness reproduces within a range. Each ratio is a gate that fails the build: the fused loop must
+stay at least 2.5x cheaper than Polly's equivalent pipeline on the yield harness, and at least 2.0x
+cheaper over a real loopback socket.
 
-| Arm | Overhead | Ratio |
+| Arm | Ceiling | Ratio (gate) |
 | --- | ---: | ---: |
-| NResilience, full policy | 384 B | |
-| Polly retry + timeout, same harness | 1,291 B | **3.36×** |
-| NResilience, over a real loopback socket | 528 B | |
-| Polly, same socket | 1,296 B | **2.45×** |
-| NResilience, trivial policy | 320 B | |
-| Polly, empty pipeline | 304 B | 1.08× |
+| NResilience, full policy | 448 B | |
+| Polly retry + timeout, same harness | ~1,291 B (harness range 1,100-1,600) | **>= 2.5x** (measured 3.2x) |
+| NResilience, trivial policy | 368 B | |
+| Polly, empty pipeline | ~304 B (harness range 250-400) | **<= 1.25x** (measured 1.05x) |
+
+Over a real loopback socket the same comparison measures **2.38x**, and the build gates that ratio
+at 2.0x.
 
 The last row is the honest shape of the result rather than a footnote. **Composition overhead scales
 with layer count and a flat loop's does not**, so the fused design wins in proportion to how much
@@ -62,9 +65,8 @@ Extensibility through composition. You cannot write a strategy and insert it int
 there is no chain. What you can do is classify outcomes ([`Classifier`](../reference/classifier.md)),
 compute your own delays (`Backoff.Custom`), run work before each attempt (`BeforeAttempt`) and observe
 everything (`OnEvent`). That is a deliberately smaller opening, and the argument for it is that a small
-public surface is the only thing that keeps an API stable long enough to be worth adopting: Polly v7
-still accounts for the majority of its lifetime downloads years after v8 shipped, and the rewrite is
-the most-cited reason people did not move.
+public surface is the only thing that keeps an API stable long enough to be worth adopting: a library
+that rewrites its core API loses the users who built on the old one, and the smaller the surface, the
+less there is to get wrong later.
 
 Go deeper: [where the allocations are](allocations.md).
-

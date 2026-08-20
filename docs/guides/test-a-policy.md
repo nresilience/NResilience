@@ -42,7 +42,7 @@ Assert.Equal(3, result.Attempts.Count);
 <!-- snippet: testing-fake-time -->
 ```csharp
 // Pass the same clock to the policy and to the script, or a scripted delay is a real
-// sleep - which is the flakiness this package exists to remove.
+// sleep - and a real sleep is the flakiness this package removes.
 var time = new FakeTimeProvider();
 
 Sequence<int> calls = Sequence.For<int>(time)

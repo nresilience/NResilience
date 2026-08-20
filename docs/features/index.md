@@ -15,7 +15,7 @@ order: 3
 | Circuit breaker | No - it is an object you construct and scope | [Circuit breaker](circuit-breaker.md) |
 | Telemetry | No for a hand-built policy, yes for a registered one | [Telemetry](telemetry.md) |
 
-Two things are not features here, on purpose. **Fallback** is an `if` on a
+Two things are not features here. **Fallback** is an `if` on a
 [`CallResult<T>`](../reference/call-result.md). **Hedging** is not implemented; see the
 [FAQ](../faq.md).
 

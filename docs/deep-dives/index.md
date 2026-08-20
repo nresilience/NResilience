@@ -18,7 +18,3 @@ decisions the rest of the docs simply state.
 | [Retry budget internals](retry-budget-internals.md) | Why a fraction of traffic, and why per process? |
 | [Guarded rejection](guarded-rejection.md) | Why does refusing a call take 100 milliseconds? |
 
-The full design document, including the arguments that did not survive contact with a measurement,
-is in [`plans/nresilience-design-v3.md`](../../plans/nresilience-design-v3.md), with one results
-document per build phase beside it.
-

@@ -18,8 +18,7 @@ calls to anything else, and you want an operator to be able to see the state and
 public sealed class Dependencies
 {
     // One breaker per dependency, held where its lifetime is obvious. A storm against payments
-    // must not trip calls to search, and here that is a property of the code rather than of
-    // where a pipeline happened to be registered.
+    // must not trip calls to search, and here that is a property of the code.
     public Breaker Payments { get; } = new(new BreakerSettings
     {
         ConsecutiveFailures = 5,

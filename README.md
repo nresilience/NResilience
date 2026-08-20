@@ -77,18 +77,18 @@ Here are all four patterns you just saw, together:
 
 <!-- snippet: whole-api -->
 ```csharp
-// 1. A policy is a value. Presets are the entry point.
+// 1. Start from a preset. `Resilience.Http` retries and times out an HTTP call out of the box.
 var api = Resilience.Http;
 
-// 2. Derive with `with`. No builder, no Build(), no ordering to get right.
+// 2. Change one setting, keep the rest: `with` copies everything you did not mention.
 var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
-// 3. Run anything. One method, any return type, nothing to declare.
+// 3. Run any callback through one method. The token handed to your work is the attempt's own.
 User? user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
 HttpResponseMessage response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 await slow.RunAsync(attempt => queue.FlushAsync(attempt), cancellationToken);
 
-// 4. Fallback is not a strategy. It is an `if`.
+// 4. Want the outcome without an exception? `TryRunAsync` hands it back to branch on.
 CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGood;
 ```

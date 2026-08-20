@@ -19,11 +19,10 @@ the state cannot consume the probe slot a real call needs.
 
 ## Every default here differs from Polly's, deliberately
 
-Polly v8 removed classic consecutive-failure breaking, leaving a rate-based trip at `FailureRatio` 0.1
-over a minimum throughput of 100 calls per 30 seconds. That means a service doing fewer than 100 calls
-per 30 seconds can never open its breaker - and that is the median .NET service. So consecutive
-failures is the default trip condition here, and the rate-based trip is opt-in alongside it rather
-than instead of it.
+Polly's default breaker is rate-based: `FailureRatio` 0.1 over a minimum throughput of 100 calls per
+30 seconds. That means a service doing fewer than 100 calls per 30 seconds can never open its breaker
+- and that is the median .NET service. So consecutive failures is the default trip condition here,
+and the rate-based trip is opt-in alongside it rather than instead of it.
 
 **Two probe successes, not one.** Closing a breaker on a single lucky probe, in front of a dependency
 that is still broken and a client fleet whose accumulated retries are waiting, is how breakers

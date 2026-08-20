@@ -44,7 +44,7 @@ attempt timeouts and deadlines testable.
 <!-- snippet: testing-fake-time -->
 ```csharp
 // Pass the same clock to the policy and to the script, or a scripted delay is a real
-// sleep - which is the flakiness this package exists to remove.
+// sleep - and a real sleep is the flakiness this package removes.
 var time = new FakeTimeProvider();
 
 Sequence<int> calls = Sequence.For<int>(time)
@@ -69,7 +69,7 @@ Assert.IsType<AttemptTimeoutException>(result.Exception);
 
 > [!IMPORTANT]
 > Pass the same `TimeProvider` to the policy and to the sequence. A scripted delay served against the
-> system clock is a real sleep, which is the flakiness this package exists to remove.
+> system clock is a real sleep, and a real sleep is the flakiness this package removes.
 
 A test with a fake clock and no real delays runs the whole 30-second deadline in microseconds.
 

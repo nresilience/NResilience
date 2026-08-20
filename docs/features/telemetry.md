@@ -6,10 +6,12 @@ order: 6
 
 # Telemetry
 
-The whole surface is one struct and one delegate: `CallEvent` and `Resilience.OnEvent`. It is
-**opt-in** for a policy you build by hand - `OnEvent = null` means the executor raises nothing and
-pays nothing - and **on by default** for a policy registered in a container, because registering a
-policy is a statement that this application has an operations story.
+Telemetry is one event stream: every attempt, retry, refusal, and outcome is observable through one
+listener. It is **opt-in** for a policy you build by hand - `OnEvent = null` means the executor
+raises nothing and pays nothing - and **on by default** for a policy registered in a container,
+because a registered policy is part of an application that runs in production.
+
+The whole surface is one struct and one delegate: `CallEvent` and `Resilience.OnEvent`.
 
 ## Attaching a listener
 
@@ -47,8 +49,8 @@ Two listeners is `OnEvent = first + second`.
 | `BreakerOpened` / `BreakerClosed` / `BreakerHalfOpened` | A breaker changed state | No |
 | `NestedRetry` | This request is already inside a retrying client | No |
 
-**Every call ends with exactly one terminal event.** That invariant is what makes a count of logical
-operations trustworthy, and it is tested.
+**Every call ends with exactly one terminal event.** The invariant is tested, and it is what makes
+a count of logical operations trustworthy.
 
 <!-- snippet: telemetry-recorder -->
 ```csharp
@@ -81,7 +83,7 @@ Go deeper: [`CallEvent` reference](../reference/events.md).
 <!-- snippet: telemetry-with-telemetry -->
 ```csharp
 // A policy registered in a container is instrumented for you. A policy in a static field
-// is not, because nothing about it says there is an operations story - this says it.
+// is not - this says it.
 var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 ```
 <!-- endsnippet -->

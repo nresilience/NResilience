@@ -22,7 +22,7 @@ independently holding to 10%, total amplification is 1.1 times.
 <!-- snippet: budget-off -->
 ```csharp
 // Null - the default - is an automatic budget private to this policy instance, so storm
-// protection needs no configuration. None is the deliberate opt-out, and the only correct
+// protection needs no configuration. None is the opt-out, and the only correct
 // use is a dependency you know is not shared.
 var unbudgeted = Resilience.Default with { Budget = RetryBudget.None };
 
@@ -48,9 +48,8 @@ var refund = Resilience.Http with { Budget = budget };
 ```
 <!-- endsnippet -->
 
-Sharing is deliberately opt-in. A single process-wide budget would let a storm against payments
-throttle retries to search, which is the blast-radius inversion a resilience library exists to
-prevent.
+Sharing is opt-in. A single process-wide budget would let a storm against payments throttle retries
+to search, which is the failure a shared budget exists to prevent.
 
 Budget state is per-process and there is no coordination between pods. That is not a defect - it is
 why the mechanism works at all: every client independently capping retries bounds fleet-wide

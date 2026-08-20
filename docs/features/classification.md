@@ -10,7 +10,7 @@ A classifier turns an outcome into a [verdict](../getting-started/key-concepts.m
 It is **on by default**: `Classifier.Default` on `Resilience.Default`, `Classifier.Http` on
 `Resilience.Http`.
 
-Saying it once is the point. Retry, the backoff curve, the attempt log, the circuit breaker and the
+You say it once. Retry, the backoff curve, the attempt log, the circuit breaker and the
 retry budget all read the same answer, so there is no way for them to disagree about what a failure
 was.
 
@@ -41,8 +41,8 @@ Verdict answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotF
 | Any other 5xx, or 408 | `Transient` |
 | 404, and every other 4xx | `Ok` - an answer, not a failure |
 
-Retrying a 404 is in the most-copied retry snippet in .NET. Shipping the correct thing in the box is
-the only defense, because that snippet is what people paste.
+A 404 is an answer, so it is not retried. If a status really is transient for your API, add a rule
+for it - [migrating a predicate](../migrating-from-polly.md#predicates) shows the shape.
 
 ## Teaching it about your exceptions
 

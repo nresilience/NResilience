@@ -1,12 +1,15 @@
 ---
 title: Key concepts
-description: Policy, verdict, deadline, attempt timeout and call result - the five words the rest of the docs use.
+description: Policy, verdict, deadline, attempt timeout, and call result - the vocabulary the rest of the docs use.
 order: 2
 ---
 
 # Key concepts
 
 ## A policy is a value
+
+A **policy** is the value that holds your retry, timeout, and breaker settings. You start from a
+preset and derive variants with `with`, which copies everything you did not mention.
 
 <!-- snippet: key-concepts-policy-value -->
 ```csharp
@@ -21,6 +24,30 @@ Console.WriteLine(once.Deadline);                       // 00:01:00 - `with` cop
 
 One policy covers every return type: the result type is a property of the call, not of the policy.
 `Resilience` is not generic and there is no generic variant.
+
+A policy is a good fit for a `static readonly` field, because it is a value rather than a built
+pipeline. Name your policies once, where their lifetime is obvious, and derive variants from them:
+
+<!-- snippet: quick-start-house-policy -->
+```csharp
+public static class Policies
+{
+    public static readonly Resilience Api = Resilience.Http with
+    {
+        Deadline = TimeSpan.FromSeconds(10),
+        AttemptTimeout = TimeSpan.FromSeconds(3),
+    };
+
+    public static readonly Resilience Realtime = Api with
+    {
+        Attempts = 1,
+        AttemptTimeout = TimeSpan.FromMilliseconds(250),
+    };
+}
+```
+<!-- endsnippet -->
+
+`with` copies everything you did not mention, so `Realtime` keeps `Api`'s deadline and classifier.
 
 Go deeper: [`Resilience` reference](../reference/resilience.md).
 
@@ -37,8 +64,8 @@ var api = Resilience.Http with
 <!-- endsnippet -->
 
 The effective ceiling for an attempt is the smaller of `AttemptTimeout` and the time left on the
-`Deadline`, so "is that per attempt or total?" has no answer to get wrong. The docs never write bare
-"timeout": ambiguity there is what this library exists to remove.
+`Deadline`, so "is that per attempt or total?" has no answer to get wrong. The two bounds have
+different names everywhere in this library, and the docs keep them apart the same way.
 
 Go deeper: [Deadlines and attempt timeouts](../features/deadlines.md).
 

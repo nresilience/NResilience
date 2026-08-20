@@ -1,6 +1,6 @@
 ---
 title: Getting started
-description: Install the package, make one retried call, and learn the five words the rest of the docs use.
+description: Install the package, make one retried call, and learn the vocabulary the rest of the docs use.
 order: 1
 ---
 
