@@ -163,3 +163,30 @@ foreach (Attempt attempt in result.Attempts)
 <!-- endsnippet -->
 
 For exceptions rethrown by the library, use `AttemptLog.Of(exception)` to read the log from `Exception.Data`.
+
+### Symptom: A call is not being retried and you cannot see why.
+
+> [!CAUTION] Quick fix
+> Increase the resilience category log level: `"Logging": { "LogLevel": { "NResilience": "Debug" } }`.
+
+Event 1007 warns the first time a policy declines to retry an exception type and names the type. If your sink does not support `Debug`, set `"Logging": "Verbose"` in the policy section to raise traffic records to `Information`.
+
+See [Logging in DI](di/logging.md) and [the event IDs](reference/events.md#log-event-ids).
+
+### Symptom: Your configuration section does not seem to apply.
+
+> [!CAUTION] Quick fix
+> Read event 1020 at the `Debug` level. This event names the effective policy for every registration once per resolution.
+
+Binding a section is silently partial. A reload produces a new log entry, showing what changed.
+
+See [Configuration](di/configuration.md) for the bindable shape and [Logging in DI](di/logging.md#provenance) for the record.
+
+### Symptom: Your logs are full of resilience records.
+
+> [!CAUTION] Quick fix
+> Decrease the log level for the noisy policy: `"Logging": { "LogLevel": { "NResilience.reports": "Warning" } }`.
+
+Each policy logs under `NResilience.<name>`, so you can silence one client without affecting others. To disable the listener for a policy, set `"Logging": "Off"` in its section.
+
+See [Filter per policy](di/logging.md#filter-per-policy).

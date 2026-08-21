@@ -1,6 +1,7 @@
 // The probe namespace is nested inside NResilience and defines its own Verdict, Backoff and
 // AttemptBuffer as Phase 0a stand-ins, so an unqualified name here would bind to the stand-in
 // rather than to the shipping type. `Lib` makes every reference to the library unambiguous.
+using NResilience.Extensions;
 using Lib = NResilience;
 
 namespace NResilience.Probes;
@@ -80,6 +81,22 @@ public static class ShippingScenarios
     };
 
     public static ValueTask<int> DefaultListenerSuspending() => DefaultWithListener.RunAsync(SuspendCallback);
+
+    /// <summary>
+    /// The same policy with the shipping log listener chained on behind the do-nothing one, and a
+    /// logger whose every level is disabled.
+    ///
+    /// <para>
+    /// This is the arm that prices the promise: a call whose logging levels are all off must allocate
+    /// exactly what the same call allocates with a listener alone. What is being measured is the
+    /// listener's own path - one <c>switch</c> and one <c>IsEnabled</c> call per event, and the
+    /// generated <c>[LoggerMessage]</c> guard that returns before it formats anything.
+    /// </para>
+    /// </summary>
+    public static readonly Lib.Resilience DefaultWithLogging =
+        DefaultWithListener.WithLogging(SilentLogger.Instance);
+
+    public static ValueTask<int> DefaultLoggingSuspending() => DefaultWithLogging.RunAsync(SuspendCallback);
 
     // ---- Synchronous fast path: where the 0-byte budgets live. ----
 

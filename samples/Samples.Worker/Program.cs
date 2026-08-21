@@ -3,6 +3,7 @@ using System.Net;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NResilience;
 using NResilience.Extensions;
 
@@ -11,6 +12,14 @@ using NResilience.Extensions;
 IConfigurationRoot configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
 
 var services = new ServiceCollection();
+
+// A registered policy logs, so this is the whole of it. Debug is what a retried call writes at; the
+// default filter would show only the incident warnings. Each policy logs under NResilience.<name>,
+// so "NResilience.reports": "Warning" would quieten one client without silencing the rest.
+services.AddLogging(b => b
+    .AddSimpleConsole(o => o.SingleLine = true)
+    .SetMinimumLevel(LogLevel.Debug));
+
 services.AddResilience(configuration.GetSection("Resilience"));
 services.AddHttpClient("orders")
     .AddResilience("api")
@@ -75,6 +84,7 @@ Console.WriteLine($"     retry budget spent: {budget.Utilisation:P0} - a refusal
 
 Console.WriteLine();
 Console.WriteLine("nresilience.attempts / nresilience.calls is the retry fraction - the number to alert on.");
+Console.WriteLine("The dbug: lines above are the log records. Every event ID is tabled in docs/reference/events.md.");
 
 internal sealed class FakeTransport : HttpMessageHandler
 {

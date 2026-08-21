@@ -49,6 +49,9 @@ public static class Baseline
     public const string LibDefaultCancellable = "lib: Default, cancellable token";
     public const string LibTryRunDefault = "lib: TryRunAsync, Default";
     public const string LibDefaultListener = "lib: Default + listener";
+
+    /// <summary>The same arm with the shipping log listener chained on, at a logger that carries nothing.</summary>
+    public const string LibDefaultLogging = "lib: Default + listener + logging";
     public const string LibRetry = "lib: retry x2 -> success";
 
     public const string LibLimited = "lib: limited x2 -> success";

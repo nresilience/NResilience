@@ -33,6 +33,8 @@ The listener is synchronous and runs on the same thread as the executor. To avoi
 
 To use multiple listeners, combine them using the `+` operator: `OnEvent = first + second`.
 
+A lambda is still the right answer for anything that is not an `ILogger`. If it is, a ready-made listener already exists and says what each event means: see [Logging in DI](../di/logging.md).
+
 ## Event types
 
 | Kind | Description | Terminal? |

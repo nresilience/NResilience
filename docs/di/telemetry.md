@@ -54,6 +54,8 @@ The `WithTelemetry` method chains the instrumentation after any existing `OnEven
 
 ## Logging
 
-NResilience does not provide built-in `ILogger` integration. Because `OnEvent` accepts a lambda, you can easily implement your own logging. This approach avoids the need for a library-maintained vocabulary of event IDs and message templates.
+A registered policy also writes `ILogger` records, under a category of `NResilience.<policy>` so you can filter them per policy from `appsettings.json`. Nothing above `Trace` is written while your dependencies are healthy.
 
-For an example of how to implement a log listener, see the [Telemetry](../features/telemetry.md) page.
+The records carry what each event means rather than a generic dump of the event fields, which is the difference between a log that resolves an incident and one that adds to it.
+
+See [Logging in DI](logging.md).

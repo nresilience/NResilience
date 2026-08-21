@@ -4,26 +4,24 @@ namespace NResilience.Extensions;
 /// The bindable shape of a policy: flat, mutable, and made of primitives, <see cref="TimeSpan"/>s
 /// and enums.
 /// <para>
-/// This type exists because binding a configuration section straight onto <see cref="Resilience"/>
+/// This type exists because binding a configuration section directly to <see cref="Resilience"/>
 /// is <b>silently partial</b>. Measured against
 /// <c>Microsoft.Extensions.Configuration.Binder</c> 10.0.0 on both target frameworks: simple
-/// <c>init</c> scalars such as <c>Attempts</c> and <c>Deadline</c> do bind, <c>Backoff:Max</c> is
-/// dropped because the cap is a computed property, <c>Classify</c> is ignored — leaving a policy
-/// that does not retry a 503 — and <c>Breaker:ConsecutiveFailures</c> constructs a live circuit
+/// <c>init</c> scalars such as <c>Attempts</c> and <c>Deadline</c> bind, but <c>Backoff:Max</c> is
+/// dropped because the cap is a computed property, <c>Classify</c> is ignored (leaving a policy
+/// that does not retry a 503), and <c>Breaker:ConsecutiveFailures</c> constructs a live circuit
 /// breaker with default settings while ignoring the configured value.
 /// </para>
 /// <para>
-/// The middle case is the dangerous one: a section where <c>Backoff:Jitter</c> works and
-/// <c>Backoff:Max</c> beside it does not is not a bug people find, because the half that worked is
-/// the evidence they use to conclude the other half did too. That is precisely the class of
-/// silent-wrong-behaviour this library exists to remove, so the binding target is a DTO and
-/// <see cref="ToPolicy(Resilience?)"/> does the projection by hand. All three failures are gated by
-/// <c>Binding_onto_the_record_is_silently_partial</c>.
+/// Partial binding can lead to unexpected behavior; for example, if <c>Backoff:Jitter</c> is
+/// applied but <c>Backoff:Max</c> is ignored, the configuration appears to work while the
+/// resulting policy is incorrect. To eliminate this class of silent failures, the binding
+/// target is a DTO and <see cref="ToPolicy(Resilience?)"/> performs the projection manually.
+/// All three failures are gated by <c>Binding_onto_the_record_is_silently_partial</c>.
 /// </para>
 /// <para>
-/// Everything here is nullable, and null means "say nothing" rather than "set the default". A
-/// section that mentions only <c>Attempts</c> changes only the attempt count, whatever the base
-/// policy was.
+/// All properties are nullable. A null value indicates that the property should not be overridden,
+/// preserving the value of the base policy.
 /// </para>
 /// </summary>
 /// <example>
@@ -108,6 +106,20 @@ public sealed class ResilienceOptions
     /// asking to be able to see it.
     /// </summary>
     public bool? Telemetry { get; set; }
+
+/// <summary>
+/// Whether the registered policy writes log records: <c>"Off"</c>, <c>"Default"</c> or
+/// <c>"Verbose"</c> (case-insensitive). At <c>"Default"</c>, the policy writes nothing above
+/// <see cref="Microsoft.Extensions.Logging.LogLevel.Trace"/> while the dependency is healthy -
+/// see <see cref="ResilienceLogging"/>.
+/// <para>
+/// A string is used instead of an enum to ensure that typos produce a message naming the valid
+/// values rather than a binder stack trace. A string is used instead of a <see cref="bool"/> because
+/// logging has multiple levels; for instance, <c>"Logging": "Verbose"</c> provides the necessary
+/// detail to diagnose why a call is not being retried.
+/// </para>
+/// </summary>
+    public string? Logging { get; set; }
 
     /// <summary>
     /// Projects onto a policy. Applies <see cref="Preset"/> first when it is set, then every

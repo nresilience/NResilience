@@ -46,6 +46,15 @@
     <PackageReference Include="Microsoft.Extensions.Http" />
 
     <!--
+      Already in this project's transitive graph on both target frameworks by way of
+      Microsoft.Extensions.Http, at the same pinned version - so the log listener costs no new
+      package. Referenced directly because [LoggerMessage] lives here, and it is the only permitted
+      way to write a record: the generator emits concrete code with no reflection, which is what
+      keeps this project AOT clean.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+
+    <!--
       The limiters themselves. Referenced here rather than in the core package because it is an
       out-of-band NuGet package; see the note in Directory.Packages.props.
     -->

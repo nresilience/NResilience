@@ -37,7 +37,7 @@ Calling `AddResilience` performs the following actions:
 - Adds the [resilience handler](../http/index.md).
 - Configures the client so that `HttpClient.Timeout` does not compete with the policy deadline.
 - Names the policy after the client for better observability.
-- Attaches the [telemetry](telemetry.md) meter.
+- Attaches the [telemetry](telemetry.md) meter and the [log listener](logging.md).
 
 ## Register named policies
 
@@ -104,3 +104,4 @@ An `HttpClient` observes a reloaded policy at the next handler rotation. By defa
 
 - [Configuration](configuration.md): Learn about the bindable configuration shape and JSON limitations.
 - [Telemetry](telemetry.md): Learn which metrics are enabled by default and how to manage them.
+- [Logging](logging.md): Learn what a registered policy writes through `ILogger` and how to filter it per policy.

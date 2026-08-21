@@ -19,6 +19,7 @@ Use these methods to register resilience policies within the dependency injectio
 | `AddResilience(name, IConfiguration section, configure = null)` | Registers a policy bound to a configuration section. Supports live reloading. |
 | `AddResilience(IConfiguration section)` | Registers every child of the configuration section as a policy, using the keys as names. |
 | `AddResilience()` | Registers the `IResiliencePolicies` service without any initial policies. |
+| `AddResilienceLogging(Action<ResilienceLoggingOptions>? configure = null)` | Sets the process-wide log listener settings. A registered policy already logs, so this does not turn logging on. |
 
 The optional `configure` parameter is a `Func<Resilience, Resilience>` that runs last, after the configuration section is processed and live objects are re-attached.
 
@@ -28,8 +29,10 @@ Use these methods to add the `ResilienceHandler` to an `HttpClient` pipeline.
 
 | Overload | Description |
 | :--- | :--- |
-| `AddResilience(Resilience? policy = null, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true)` | Adds the handler using the provided policy value, defaulting to `Resilience.Http`. |
-| `AddResilience(string policyName, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true)` | Adds the handler using a registered policy, which is resolved when the handler chain is built. |
+| `AddResilience(Resilience? policy = null, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true, ResilienceLogProfile? logging = null)` | Adds the handler using the provided policy value, defaulting to `Resilience.Http`. |
+| `AddResilience(string policyName, Action<HttpResilienceOptions>? configureOptions = null, bool telemetry = true, ResilienceLogProfile? logging = null)` | Adds the handler using a registered policy, which is resolved when the handler chain is built. |
+
+If `logging` is `null`, the process default is used. Registered policies log under their registration's own profile, so this parameter only affects policies that the registration left unlogged.
 
 If the policy does not have its own name, it is named after the client. This prevents multiple clients using `Resilience.Http` from all reporting under the same name in telemetry.
 
@@ -50,10 +53,11 @@ The `IResiliencePolicies` service provides access to registered policies.
 `ResilienceOptions` is a `sealed class` used for binding configuration to a policy. All properties are nullable; a `null` value indicates that the property should not be overridden.
 
 **Properties**:
-`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Telemetry`.
+`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Telemetry`, `Logging`.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. This method does not perform validation; validation occurs at registration or execution.
 - **Budget Disabling**: Setting `BudgetFraction = 0` disables the retry budget.
+- **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string is used instead of an enum so that typos name the valid values (similar to `Preset`). Values outside this set fail at registration.
 
 For more information on the configuration structure, see [Configuration](../di/configuration.md).
 
@@ -118,3 +122,30 @@ Call `AcquireOrThrowAsync` inside the callback you hand to `RunAsync`, so the pe
 | `WithTelemetry(this Resilience policy)` | An extension method that chains the `Listener` to the policy's `OnEvent` handler. This operation is idempotent. |
 
 For a list of available instruments, see [Telemetry](../features/telemetry.md).
+
+## `ResilienceLogging`
+
+The `ResilienceLogging` static class holds the log listener and category derivation.
+
+| Member | Description |
+| :--- | :--- |
+| `CategoryPrefix` | The prefix every category starts with: `"NResilience"`. |
+| `CategoryFor(string? policyName)` | The category a policy logs under based on its name. If the name is null or empty, it uses `NResilience`; otherwise, it uses `NResilience.<name>`. |
+| `Listener(ILogger logger, ResilienceLoggingOptions? options = null, TimeProvider? time = null)` | An `Action<CallEvent>` that writes to the logger. This listener is stateful due to rejection suppression, so create one per policy. |
+| `WithLogging(this Resilience policy, ILogger logger, ResilienceLoggingOptions? options = null)` | Chains a listener onto the policy, or returns it unchanged when one is already attached. |
+| `WithLogging(this Resilience policy, ILoggerFactory loggerFactory, ResilienceLoggingOptions? options = null)` | The same, but creates the logger under the policy's own category. |
+
+At most one log listener attaches per policy. The first listener attached takes precedence.
+
+## `ResilienceLoggingOptions`
+
+| Member | Default | Description |
+| :--- | :--- | :--- |
+| `Profile` | `Default` | The level at which each record is emitted: `Off`, `Default`, or `Verbose`. |
+| `RepeatWindow` | 30 seconds | How often a repeated rejection may warn. `TimeSpan.Zero` warns every time. |
+| `IncludeStackTracesOnRetry` | `false` | Attaches the exception object to per-attempt and retry records, not only terminal ones. |
+| `Level` | `null` | `Func<EventId, CallEvent, LogLevel?>`. Returns the level for one record, `null` to keep the profile's, or `LogLevel.None` to drop it. |
+
+Because `ResilienceLogProfile.Off` is the enum's zero value, an unset profile is silent.
+
+For the event IDs and the filter, see [Logging in DI](../di/logging.md).

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NResilience;
 using NResilience.Extensions;
@@ -8,13 +9,13 @@ using NResilience.Extensions.Internal;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Registers named policies, so an application says what its dependencies are worth once and
-/// injects <see cref="IResiliencePolicies"/> everywhere else.
+/// Registers named policies, allowing an application to define its dependency resilience
+/// requirements once and inject <see cref="IResiliencePolicies"/> throughout the application.
 /// </summary>
 /// <remarks>
-/// In <c>Microsoft.Extensions.DependencyInjection</c> rather than <c>NResilience.Extensions</c>,
-/// which is where every registration method in the ecosystem lives and therefore where people look
-/// for one. The types these methods take and return are in their own namespaces.
+/// Provided in <c>Microsoft.Extensions.DependencyInjection</c> rather than <c>NResilience.Extensions</c>
+/// to align with common registration patterns in the .NET ecosystem. The types these methods
+/// take and return are in their own namespaces.
 /// </remarks>
 public static class ResilienceServiceCollectionExtensions
 {
@@ -154,10 +155,52 @@ public static class ResilienceServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Sets the process-wide log listener settings: the profile, the rejection repeat window, and the
+    /// level delegate.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Sets the settings.</param>
+    /// <returns>The service collection.</returns>
+    /// <example>
+    /// <code>
+    /// services.AddResilienceLogging(o => o.Profile = ResilienceLogProfile.Verbose);
+    /// </code>
+    /// </example>
+/// <remarks>
+/// This does not enable logging: a policy registered in a container logs by default. This method
+/// allows the process-wide settings to be discoverable via IntelliSense when calling <c>services.AddResilience</c>.
+/// A single policy can override the profile using <see cref="ResilienceOptions.Logging"/>.
+/// </remarks>
+    public static IServiceCollection AddResilienceLogging(
+        this IServiceCollection services,
+        Action<ResilienceLoggingOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        Register(services, name: null);
+
+        if (configure is not null)
+        {
+            services.Configure(configure);
+        }
+
+        return services;
+    }
+
     private static void Register(IServiceCollection services, string? name)
     {
         services.AddOptions();
-        services.TryAddSingleton<IResiliencePolicies, ResiliencePolicies>();
+
+        // A factory rather than a constructor-injected registration, because both logging services
+        // are optional: GetService, not GetRequiredService, so a container with no logging at all
+        // starts and runs.
+        services.TryAddSingleton<IResiliencePolicies>(static provider => new ResiliencePolicies(
+            provider.GetRequiredService<IOptionsMonitor<ResilienceOptions>>(),
+            provider.GetRequiredService<IOptionsMonitor<ResiliencePolicyRegistration>>(),
+            provider.GetRequiredService<ResilienceNames>(),
+            provider.GetService<ILoggerFactory>(),
+            provider.GetService<IOptions<ResilienceLoggingOptions>>()?.Value));
 
         ResilienceNames names = Names(services);
         if (name is not null)

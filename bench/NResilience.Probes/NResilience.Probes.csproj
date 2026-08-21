@@ -13,6 +13,13 @@
       they replaced.
     -->
     <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+
+    <!--
+      The log listener's arm. Referenced so the "a disabled level allocates nothing" gate is a
+      difference against the telemetry-only arm measured in the same sweep, rather than a subtraction
+      across two harnesses.
+    -->
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj" />
   </ItemGroup>
 
 </Project>

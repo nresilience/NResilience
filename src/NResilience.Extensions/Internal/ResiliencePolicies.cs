@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace NResilience.Extensions.Internal;
@@ -43,6 +44,8 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
     private readonly IOptionsMonitor<ResilienceOptions> _options;
     private readonly IOptionsMonitor<ResiliencePolicyRegistration> _registrations;
     private readonly ResilienceNames _names;
+    private readonly ILoggerFactory? _loggerFactory;
+    private readonly ResilienceLoggingOptions _logging;
     private readonly ConcurrentDictionary<string, Resilience> _projected = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, LiveState> _live = new(StringComparer.Ordinal);
     private readonly IDisposable? _subscription;
@@ -50,11 +53,18 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
     public ResiliencePolicies(
         IOptionsMonitor<ResilienceOptions> options,
         IOptionsMonitor<ResiliencePolicyRegistration> registrations,
-        ResilienceNames names)
+        ResilienceNames names,
+        ILoggerFactory? loggerFactory = null,
+        ResilienceLoggingOptions? logging = null)
     {
         _options = options;
         _registrations = registrations;
         _names = names;
+
+        // Optional, both of them: a container that does not do logging gets no listener and no
+        // exception, which is what makes logging on-by-default safe to be on by default.
+        _loggerFactory = loggerFactory;
+        _logging = logging ?? new ResilienceLoggingOptions();
 
         // The whole of hot reload. The projection cache is dropped for the changed name and the
         // next resolve rebuilds it; _live is untouched, which is what carries a breaker's state
@@ -150,14 +160,58 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             policy = configure(policy) ?? policy;
         }
 
-        if (options.Telemetry ?? true)
+        bool telemetry = options.Telemetry ?? true;
+        if (telemetry)
         {
             policy = policy.WithTelemetry();
+        }
+
+        // After the configure callback, so a callback that assigns OnEvent does not lose logging and
+        // one that calls WithLogging itself wins under the first-attach-wins rule.
+        ResilienceLogProfile profile = ResilienceLogging.ProfileFor(options.Logging, self._logging.Profile);
+        if (profile != ResilienceLogProfile.Off && self._loggerFactory is { } factory)
+        {
+            ResilienceLoggingOptions logging = self.LoggingFor(profile);
+            policy = policy.WithLogging(factory, logging);
+
+            // Provenance. Binding a section is silently partial, so one line per policy per
+            // resolution says what actually came out - and a reload produces a fresh one, which is
+            // exactly when somebody wants to know what it changed to.
+            ILogger logger = factory.CreateLogger(ResilienceLogging.CategoryFor(policy.Name));
+            string reported = policy.Name ?? name;
+
+            if (logger.IsEnabled(LogLevel.Debug))
+            {
+                Log.PolicyResolved(logger, LogLevel.Debug, reported, ResilienceLogging.Describe(policy, telemetry, profile));
+            }
+
+            // Classifier.ToString builds a multi-line dump, so the guard is the point rather than a
+            // micro-optimisation: this is the only record that costs a string before it is written.
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+                Log.PolicyClassifier(logger, LogLevel.Trace, reported, policy.Classify.ToString());
+            }
         }
 
         policy.Validate();
         return policy;
     }
+
+    /// <summary>
+    /// The process-wide logging options, or a copy with the profile a section overrode. Copied once
+    /// per policy per reload rather than per call, which is what keeps
+    /// <see cref="ResilienceLoggingOptions"/> a plain mutable options class.
+    /// </summary>
+    private ResilienceLoggingOptions LoggingFor(ResilienceLogProfile profile) =>
+        profile == _logging.Profile
+            ? _logging
+            : new ResilienceLoggingOptions
+            {
+                Profile = profile,
+                RepeatWindow = _logging.RepeatWindow,
+                IncludeStackTracesOnRetry = _logging.IncludeStackTracesOnRetry,
+                Level = _logging.Level,
+            };
 
     /// <summary>
     /// Re-attaches the breaker and the budget this name is already using, or adopts the ones this

@@ -6,6 +6,7 @@ using System.Net.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
+using Microsoft.Extensions.Logging;
 using NResilience.Extensions;
 using NResilience.Http;
 using NResilience.Probes;
@@ -375,10 +376,13 @@ internal static class Program
                 ["Resilience:api:Deadline"] = "00:00:20",
                 ["Resilience:api:MaxDelay"] = "00:00:01",
                 ["Resilience:api:Breaker:ConsecutiveFailures"] = "2",
+                ["Resilience:api:Logging"] = "Verbose",
             })
             .Build();
 
+        var records = new RecordingLoggerProvider();
         var services = new ServiceCollection();
+        services.AddLogging(b => b.AddProvider(records).SetMinimumLevel(LogLevel.Trace));
         services.AddResilience(configuration.GetSection("Resilience"));
         services.AddHttpClient("probe").AddResilience("api", o => o.OwnTransportTimeout = true);
 
@@ -396,6 +400,15 @@ internal static class Program
 
         int result = await api.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("a resolved policy executes under AOT", result == Gate.Value);
+
+        // Publishing proves [LoggerMessage] compiled; only running proves the generator ran and the
+        // record reached a provider. 1004 is CallSucceeded, raised to Information by the Verbose
+        // profile the section asked for.
+        failures += Check("the log listener records under AOT", records.Contains(1004));
+        failures += Check("the effective policy is recorded under AOT", records.Contains(1020));
+        failures += Check(
+            "the log category is the policy's own",
+            records.Categories.Contains(ResilienceLogging.CategoryFor("api")));
 
         // The instruments have to actually record, not merely exist: a MeterListener is the only
         // way to tell a working instrument from a silently inert one.
@@ -580,6 +593,74 @@ internal static class Program
     private static void Log(string message) => Console.WriteLine(message);
 
     /// <summary>An inner handler serving one status per attempt, recording what reached it.</summary>
+    /// <summary>
+    /// Collects event IDs and categories. A real provider rather than a fake logger, because what is
+    /// being checked is that the generated record travels the whole way to one under AOT.
+    /// </summary>
+    private sealed class RecordingLoggerProvider : ILoggerProvider
+    {
+        private readonly HashSet<int> _ids = [];
+        private readonly HashSet<string> _categories = new(StringComparer.Ordinal);
+
+        internal IReadOnlyCollection<string> Categories
+        {
+            get
+            {
+                lock (_categories)
+                {
+                    return [.. _categories];
+                }
+            }
+        }
+
+        public ILogger CreateLogger(string categoryName) => new Recorder(this, categoryName);
+
+        public void Dispose()
+        {
+        }
+
+        internal bool Contains(int id)
+        {
+            lock (_ids)
+            {
+                return _ids.Contains(id);
+            }
+        }
+
+        private void Add(string category, int id)
+        {
+            lock (_ids)
+            {
+                _ids.Add(id);
+            }
+
+            lock (_categories)
+            {
+                _categories.Add(category);
+            }
+        }
+
+        private sealed class Recorder(RecordingLoggerProvider owner, string category) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state)
+                where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(
+                LogLevel logLevel,
+                EventId eventId,
+                TState state,
+                Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                // Formatted, so a template that cannot render fails here rather than silently.
+                _ = formatter(state, exception);
+                owner.Add(category, eventId.Id);
+            }
+        }
+    }
+
     private sealed class SequencedTransport(params HttpStatusCode[] statuses) : HttpMessageHandler
     {
         internal int Sent { get; private set; }

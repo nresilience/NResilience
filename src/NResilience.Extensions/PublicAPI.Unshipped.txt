@@ -49,6 +49,21 @@ NResilience.Extensions.RateLimitOptions.Validate() -> void
 NResilience.Extensions.RateLimitOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.RateLimitOptions.Window.set -> void
 NResilience.Extensions.RateLimiterExtensions
+NResilience.Extensions.ResilienceLogProfile
+NResilience.Extensions.ResilienceLogProfile.Default = 1 -> NResilience.Extensions.ResilienceLogProfile
+NResilience.Extensions.ResilienceLogProfile.Off = 0 -> NResilience.Extensions.ResilienceLogProfile
+NResilience.Extensions.ResilienceLogProfile.Verbose = 2 -> NResilience.Extensions.ResilienceLogProfile
+NResilience.Extensions.ResilienceLogging
+NResilience.Extensions.ResilienceLoggingOptions
+NResilience.Extensions.ResilienceLoggingOptions.IncludeStackTracesOnRetry.get -> bool
+NResilience.Extensions.ResilienceLoggingOptions.IncludeStackTracesOnRetry.set -> void
+NResilience.Extensions.ResilienceLoggingOptions.Level.get -> System.Func<Microsoft.Extensions.Logging.EventId, NResilience.CallEvent, Microsoft.Extensions.Logging.LogLevel?>?
+NResilience.Extensions.ResilienceLoggingOptions.Level.set -> void
+NResilience.Extensions.ResilienceLoggingOptions.Profile.get -> NResilience.Extensions.ResilienceLogProfile
+NResilience.Extensions.ResilienceLoggingOptions.Profile.set -> void
+NResilience.Extensions.ResilienceLoggingOptions.RepeatWindow.get -> System.TimeSpan
+NResilience.Extensions.ResilienceLoggingOptions.RepeatWindow.set -> void
+NResilience.Extensions.ResilienceLoggingOptions.ResilienceLoggingOptions() -> void
 NResilience.Extensions.ResilienceOptions
 NResilience.Extensions.ResilienceOptions.AttemptTimeout.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.AttemptTimeout.set -> void
@@ -66,6 +81,8 @@ NResilience.Extensions.ResilienceOptions.Deadline.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.Deadline.set -> void
 NResilience.Extensions.ResilienceOptions.Jitter.get -> NResilience.Jitter?
 NResilience.Extensions.ResilienceOptions.Jitter.set -> void
+NResilience.Extensions.ResilienceOptions.Logging.get -> string?
+NResilience.Extensions.ResilienceOptions.Logging.set -> void
 NResilience.Extensions.ResilienceOptions.MaxDelay.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.MaxDelay.set -> void
 NResilience.Extensions.ResilienceOptions.Name.get -> string?
@@ -83,18 +100,20 @@ NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseli
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.set -> void
 NResilience.Extensions.ResilienceTelemetry
+const NResilience.Extensions.ResilienceLogging.CategoryPrefix = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.ActivitySourceName = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.MeterName = "NResilience" -> string!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! section) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Action<NResilience.Extensions.RateLimitOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Threading.RateLimiting.RateLimiter! limiter, string? name = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
-static Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, NResilience.Resilience? policy = null, System.Action<NResilience.Http.HttpResilienceOptions!>? configureOptions = null, bool telemetry = true) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
-static Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, string! policyName, System.Action<NResilience.Http.HttpResilienceOptions!>? configureOptions = null, bool telemetry = true) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
+static Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, NResilience.Resilience? policy = null, System.Action<NResilience.Http.HttpResilienceOptions!>? configureOptions = null, bool telemetry = true, NResilience.Extensions.ResilienceLogProfile? logging = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
+static Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, string! policyName, System.Action<NResilience.Http.HttpResilienceOptions!>? configureOptions = null, bool telemetry = true, NResilience.Extensions.ResilienceLogProfile? logging = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, Microsoft.Extensions.Configuration.IConfiguration! section) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, Microsoft.Extensions.Configuration.IConfiguration! section, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, NResilience.Resilience! policy, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<NResilience.Extensions.ResilienceOptions!>! configureOptions, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilienceLogging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<NResilience.Extensions.ResilienceLoggingOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NResilience.Extensions.Limit.Concurrency(int permits, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
 static NResilience.Extensions.Limit.PerSecond(int permits, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
 static NResilience.Extensions.Limit.PerWindow(int permits, System.TimeSpan window, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
@@ -102,6 +121,10 @@ static NResilience.Extensions.RateLimiterExtensions.AcquireOrThrowAsync(this Sys
 static NResilience.Extensions.RateLimiterExtensions.AcquireOrThrowAsync(this System.Threading.RateLimiting.RateLimiter! limiter, string? name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Threading.RateLimiting.RateLimitLease!>
 static NResilience.Extensions.RateLimiterExtensions.AcquireOrThrowAsync<TKey>(this System.Threading.RateLimiting.PartitionedRateLimiter<TKey>! limiter, TKey key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Threading.RateLimiting.RateLimitLease!>
 static NResilience.Extensions.RateLimiterExtensions.AcquireOrThrowAsync<TKey>(this System.Threading.RateLimiting.PartitionedRateLimiter<TKey>! limiter, TKey key, string? name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Threading.RateLimiting.RateLimitLease!>
+static NResilience.Extensions.ResilienceLogging.CategoryFor(string? policyName) -> string!
+static NResilience.Extensions.ResilienceLogging.Listener(Microsoft.Extensions.Logging.ILogger! logger, NResilience.Extensions.ResilienceLoggingOptions? options = null, System.TimeProvider? time = null) -> System.Action<NResilience.CallEvent>!
+static NResilience.Extensions.ResilienceLogging.WithLogging(this NResilience.Resilience! policy, Microsoft.Extensions.Logging.ILogger! logger, NResilience.Extensions.ResilienceLoggingOptions? options = null) -> NResilience.Resilience!
+static NResilience.Extensions.ResilienceLogging.WithLogging(this NResilience.Resilience! policy, Microsoft.Extensions.Logging.ILoggerFactory! loggerFactory, NResilience.Extensions.ResilienceLoggingOptions? options = null) -> NResilience.Resilience!
 static NResilience.Extensions.ResilienceTelemetry.ActivitySource.get -> System.Diagnostics.ActivitySource!
 static NResilience.Extensions.ResilienceTelemetry.Listener.get -> System.Action<NResilience.CallEvent>!
 static NResilience.Extensions.ResilienceTelemetry.Meter.get -> System.Diagnostics.Metrics.Meter!

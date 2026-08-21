@@ -20,7 +20,7 @@ dotnet run --project samples/Samples.Worker
 | :--- | :--- |
 | `Samples.QuickStart` | Demonstrates policy values, retried calls, `TryRunAsync`, and printing the attempt log. This sample does not use HTTP or dependency injection. |
 | `Samples.Http` | Demonstrates `ResilienceHttp.CreateClient`, a simulated 503-200 failure sequence, per-host circuit breakers, and the behavior of non-repeatable `POST` requests. |
-| `Samples.Worker` | Demonstrates a host using `AddResilience` from configuration, `AddHttpClient(...).AddResilience().AddRateLimit(...)`, injecting `IResiliencePolicies`, a limiter refusal that is not charged to the retry budget, and printing the retry fraction via the meter. |
+| `Samples.Worker` | Demonstrates a host using `AddResilience` from configuration, `AddHttpClient(...).AddResilience().AddRateLimit(...)`, injecting `IResiliencePolicies`, a limiter refusal that is not charged to the retry budget, and printing the retry fraction via the meter. It also prints log records to the console so the vocabulary is readable without a table. |
 
 Each sample runs against an in-process fake dependency and does not require network access or external subscriptions.
 

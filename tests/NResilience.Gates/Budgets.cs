@@ -123,6 +123,14 @@ public static class Budgets
     public const double ListenerAllowance = 72;
 
     /// <summary>
+    /// What chaining the log listener onto an already-listening policy may cost when every level is
+    /// disabled. The generated <c>[LoggerMessage]</c> guard returns before it formats anything, and
+    /// the listener's own path is one <c>switch</c> and one <c>IsEnabled</c> call per event - so the
+    /// honest budget is the noise floor and nothing more.
+    /// </summary>
+    public const double DisabledLoggingAllowance = SuspendingNoiseFloor;
+
+    /// <summary>
     /// The shipping executor must not be more expensive than the hand-written stand-in Phase 0a
     /// used to establish the achievable floor. Measured: 393 B against 401 B on .NET 10 — the real
     /// loop is <i>cheaper</i>, while additionally capturing a per-attempt exception, classifying

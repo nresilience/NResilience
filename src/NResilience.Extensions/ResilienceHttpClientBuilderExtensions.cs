@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
 using NResilience;
 using NResilience.Extensions;
 using NResilience.Extensions.Internal;
@@ -6,8 +8,8 @@ using NResilience.Http;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// <c>AddResilience()</c> on an <see cref="IHttpClientBuilder"/> — the one line most people need,
-/// and the highest-leverage API in the library.
+/// <c>AddResilience()</c> on an <see cref="IHttpClientBuilder"/> provides the primary way to integrate
+/// resilience policies into an <see cref="HttpClient"/> pipeline.
 /// </summary>
 /// <example>
 /// <code>
@@ -23,13 +25,15 @@ public static class ResilienceHttpClientBuilderExtensions
     /// <param name="policy">The policy. Defaults to <see cref="Resilience.Http"/>.</param>
     /// <param name="configureOptions">The HTTP-specific switches — idempotency, per-host scoping, transport-timeout ownership.</param>
     /// <param name="telemetry">Whether this client records to <see cref="ResilienceTelemetry"/>. On by default.</param>
+    /// <param name="logging">The log level for this client's records. If null, the process default is used, which is <see cref="ResilienceLoggingOptions.Profile"/> when <c>AddResilienceLogging</c> was called and <see cref="ResilienceLogProfile.Default"/> otherwise.</param>
     /// <returns>The client builder.</returns>
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
     public static IHttpClientBuilder AddResilience(
         this IHttpClientBuilder builder,
         Resilience? policy = null,
         Action<HttpResilienceOptions>? configureOptions = null,
-        bool telemetry = true)
+        bool telemetry = true,
+        ResilienceLogProfile? logging = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -37,7 +41,11 @@ public static class ResilienceHttpClientBuilderExtensions
 
         effective.Validate();
 
-        return Add(builder, _ => telemetry ? effective.WithTelemetry() : effective, configureOptions, telemetry);
+        return Add(
+            builder,
+            services => Logged(telemetry ? effective.WithTelemetry() : effective, services, logging),
+            configureOptions,
+            telemetry);
     }
 
     /// <summary>
@@ -48,6 +56,7 @@ public static class ResilienceHttpClientBuilderExtensions
     /// <param name="policyName">The registered policy's name.</param>
     /// <param name="configureOptions">The HTTP-specific switches.</param>
     /// <param name="telemetry">Whether this client records to <see cref="ResilienceTelemetry"/>. On by default; a registration whose <see cref="ResilienceOptions.Telemetry"/> is false stays off either way.</param>
+    /// <param name="logging">The log level for this client's records. Registered policies log under their registration's own category and profile, so this parameter only affects policies that the registration left unlogged.</param>
     /// <returns>The client builder.</returns>
     /// <remarks>
     /// The policy is read when the handler chain is built, which
@@ -60,7 +69,8 @@ public static class ResilienceHttpClientBuilderExtensions
         this IHttpClientBuilder builder,
         string policyName,
         Action<HttpResilienceOptions>? configureOptions = null,
-        bool telemetry = true)
+        bool telemetry = true,
+        ResilienceLogProfile? logging = null)
     {
         ArgumentNullException.ThrowIfNull(builder);
         ArgumentNullException.ThrowIfNull(policyName);
@@ -75,7 +85,7 @@ public static class ResilienceHttpClientBuilderExtensions
 
                 // Not renamed: a policy resolved by name was already named by its registration, and
                 // that name is what the rest of the process reports it under.
-                return telemetry ? resolved.WithTelemetry() : resolved;
+                return Logged(telemetry ? resolved.WithTelemetry() : resolved, services, logging);
             },
             configureOptions,
             telemetry);
@@ -90,6 +100,38 @@ public static class ResilienceHttpClientBuilderExtensions
     /// is looking for.
     /// </para>
     /// </summary>
+/// <summary>
+/// Attaches the log listener using the category derived from the policy's name. For a client
+/// registered here, this is the client name; consequently, an <c>appsettings.json</c> filter
+/// for <c>NResilience.&lt;clientName&gt;</c> matches every host the client contacts.
+/// <para>
+/// First-attach-wins: a policy that is already logging (via a named registration or a
+/// <c>configure</c> callback that called <c>WithLogging</c>) retains its existing listener.
+/// </para>
+/// </summary>
+    private static Resilience Logged(Resilience policy, IServiceProvider services, ResilienceLogProfile? profile)
+    {
+        if (services.GetService<ILoggerFactory>() is not { } factory)
+        {
+            return policy;
+        }
+
+        ResilienceLoggingOptions? process = services.GetService<IOptions<ResilienceLoggingOptions>>()?.Value;
+
+        if (profile is null)
+        {
+            return policy.WithLogging(factory, process);
+        }
+
+        return policy.WithLogging(factory, new ResilienceLoggingOptions
+        {
+            Profile = profile.Value,
+            RepeatWindow = process?.RepeatWindow ?? new ResilienceLoggingOptions().RepeatWindow,
+            IncludeStackTracesOnRetry = process?.IncludeStackTracesOnRetry ?? false,
+            Level = process?.Level,
+        });
+    }
+
     private static Resilience Named(Resilience policy, string clientName) =>
         policy.Name is null || policy.Name == Resilience.Http.Name
             ? policy with { Name = clientName }

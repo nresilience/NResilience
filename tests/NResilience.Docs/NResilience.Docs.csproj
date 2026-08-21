@@ -29,6 +29,9 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
     <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
   </ItemGroup>
 
   <ItemGroup>
@@ -41,6 +44,8 @@
   <ItemGroup>
     <!-- A configuration sample that is bound and asserted on, not just printed. -->
     <None Include="appsettings.resilience.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="appsettings.logging.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="appsettings.logging-verbose.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
