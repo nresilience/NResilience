@@ -120,6 +120,34 @@ public static class ShippingScenarios
     /// </summary>
     public static RetryArm BuildRetry(int failures = 2) => new(failures);
 
+    /// <summary>
+    /// Two refusals from local admission control then a success. The retry budget is left <b>on</b>,
+    /// unlike the retry arm: a self-imposed refusal is not charged to it, so it cannot run the arm
+    /// out of budget - which is itself the behaviour under test, at scale.
+    /// </summary>
+    public static LimitArm BuildLimited(int refusals = 2) => new(refusals);
+
+    public sealed class LimitArm
+    {
+        private readonly Gate.LimitCounter _counter;
+        private readonly Lib.Resilience _policy;
+        private readonly Func<Gate.LimitCounter, CancellationToken, Task<int>> _callback = Gate.SuspendThenLimitAsync;
+
+        public LimitArm(int refusals)
+        {
+            _counter = new Gate.LimitCounter(refusals);
+            _policy = Trivial with
+            {
+                Attempts = refusals + 1,
+                Backoff = Lib.Backoff.None,
+            };
+        }
+
+        public void Reset() => _counter.Reset();
+
+        public ValueTask<int> RunAsync() => _policy.RunAsync(_callback, _counter);
+    }
+
     public sealed class RetryArm
     {
         private readonly Gate.FailCounter _counter;

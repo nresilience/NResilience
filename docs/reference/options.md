@@ -63,6 +63,47 @@ For more information on the configuration structure, see [Configuration](../di/c
 
 - **`ToBreaker(string? name = null)`**: Builds a live `Breaker` instance. A configured breaker is created once per policy and persists through configuration reloads to maintain its state.
 
+## `AddRateLimit` on `IHttpClientBuilder`
+
+Adds the rate limit handler. Call it **after** `AddResilience` on the same client; the other order is refused with a `ResilienceConfigurationException`.
+
+| Overload | Description |
+| :--- | :--- |
+| `AddRateLimit(RateLimiter, string?)` | Uses a limiter you own. It is not disposed with the handler, so one limiter can be shared across clients. |
+| `AddRateLimit(Action<RateLimitOptions>)` | Builds a limiter from options, per host by default. |
+| `AddRateLimit(IConfiguration)` | Binds `RateLimitOptions` from a section. Bound once, at registration time - a limiter holds live permits, so it does not reload. |
+
+## `RateLimitOptions`
+
+Set exactly one of `PermitsPerSecond`, `Permits` with `Window`, or `Concurrency`. Anything else is a `ResilienceConfigurationException` listing every problem at once.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `PermitsPerSecond` | `null` | Calls allowed per second, with one second of burst. |
+| `Permits` | `null` | Calls allowed per `Window`. |
+| `Window` | `null` | The window `Permits` applies to. Slides in eight segments. |
+| `Concurrency` | `null` | Calls allowed in flight at once - the bulkhead. |
+| `QueueLimit` | `0` | How many callers may wait for a permit. Zero refuses immediately. |
+| `PerHost` | `true` | Whether each host gets its own quota, scoped by the same `host:port` key the breakers and budgets use. |
+| `Name` | `null` | Reported on `RateLimitedException.Limiter` and in the metrics. Defaults to the client's name. |
+
+| Member | Description |
+| :--- | :--- |
+| `Validate()` | Throws `ResilienceConfigurationException` if the options do not describe exactly one limiter. |
+| `ToLimiter()` | Validates, then builds the limiter. The caller owns it. |
+
+## `Limit` and `AcquireOrThrowAsync`
+
+| Member | Description |
+| :--- | :--- |
+| `Limit.PerSecond(int, int)` | A token bucket: permits per second, with one second of burst. |
+| `Limit.PerWindow(int, TimeSpan, int)` | A sliding window in eight segments. |
+| `Limit.Concurrency(int, int)` | A concurrency limit - the bulkhead. |
+| `RateLimiter.AcquireOrThrowAsync(...)` | Acquires one permit, or throws `RateLimitedException` carrying the limiter's own hint. |
+| `PartitionedRateLimiter<TKey>.AcquireOrThrowAsync(...)` | The same, for one partition. |
+
+Call `AcquireOrThrowAsync` inside the callback you hand to `RunAsync`, so the permit is taken once per attempt.
+
 ## `ResilienceTelemetry`
 
 `ResilienceTelemetry` is a `static class` that provides access to the library's instrumentation.

@@ -351,6 +351,17 @@ public sealed partial record Resilience
                 verdict = Verdict.Transient;
                 error = new AttemptTimeoutException(effective, canceled);
             }
+            catch (RateLimitedException limited)
+            {
+                // Local admission control. It never reaches the classifier either: a refusal this
+                // process imposed on itself is not evidence about the dependency, and a user
+                // predicate that called it Transient would open a circuit against a service that
+                // was never contacted. The verdict is Throttled - so the long backoff curve and the
+                // limiter's own hint apply - and carries the flag that keeps the retry budget from
+                // being charged for a call that never left.
+                verdict = Verdict.Limited(limited.RetryAfter);
+                error = limited;
+            }
             catch (Exception exception)
             {
                 verdict = Classify.ClassifyException(exception);
@@ -379,6 +390,7 @@ public sealed partial record Resilience
                 Time.GetElapsedTime(start, attemptStart).Ticks,
                 duration.Ticks,
                 verdict.Kind,
+                verdict.SelfImposed,
                 error);
 
             if (OnEvent is not null)
@@ -473,7 +485,12 @@ public sealed partial record Resilience
             //     charged for. The per-attempt limit above cannot prevent a retry storm on its own,
             //     because every caller independently believes it is being reasonable; only a budget
             //     expressed as a fraction of traffic bounds the aggregate.
-            if (budget is not null && !budget.TrySpend())
+            //
+            //     A self-imposed refusal is exempt. The budget is a fraction of the traffic that
+            //     actually reached the dependency, and a retry of a call local admission control
+            //     stopped costs the dependency nothing - charging for it would let a burst of
+            //     self-throttling quietly drain the capacity real transient failures need.
+            if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
             {
                 reason = StopReason.BudgetExhausted;
                 TimeSpan refused = GuardDelay(left);

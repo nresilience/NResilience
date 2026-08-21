@@ -159,6 +159,73 @@ public sealed class AttemptTimeoutException : TimeoutException
 }
 
 /// <summary>
+/// Local admission control refused to start the attempt: a rate limiter, a concurrency limit, or
+/// anything else in this process that said no before the call left it. Nothing reached the
+/// dependency.
+/// <para>
+/// Classified <see cref="Verdict.Limited"/> by the executor itself, never by a user predicate, for
+/// the same reason <see cref="AttemptTimeoutException"/> is: a classifier that turned this into
+/// <see cref="VerdictKind.Transient"/> would feed the breaker evidence about a dependency that was
+/// never called, and open a circuit against a healthy service because this process throttled
+/// itself.
+/// </para>
+/// <para>
+/// It lives here, in the core package, rather than beside any particular limiter. That is what lets
+/// <i>any</i> limiter - the platform's, a distributed one, a hand-rolled semaphore - compose with
+/// the backoff curve, the breaker's evidence rule and the retry budget without the core taking a
+/// dependency on any of them.
+/// </para>
+/// </summary>
+public sealed class RateLimitedException : Exception
+{
+    /// <summary>Creates a refusal.</summary>
+    /// <param name="limiter">The limiter that refused, for diagnostics.</param>
+    /// <param name="retryAfter">When the limiter said a permit would be available, if it said.</param>
+    /// <param name="innerException">The cause, when the limiter surfaced one.</param>
+    public RateLimitedException(string? limiter = null, TimeSpan? retryAfter = null, Exception? innerException = null)
+        : base(Describe(limiter, retryAfter), innerException)
+    {
+        Limiter = limiter;
+        RetryAfter = retryAfter;
+    }
+
+    /// <summary>Creates a refusal.</summary>
+    public RateLimitedException()
+        : this(null, null, null)
+    {
+    }
+
+    /// <summary>Creates a refusal with a message.</summary>
+    /// <param name="message">The message.</param>
+    public RateLimitedException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates a refusal with a message and a cause.</summary>
+    /// <param name="message">The message.</param>
+    /// <param name="innerException">The cause.</param>
+    public RateLimitedException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    /// <summary>The limiter that refused, when it was named. Null otherwise.</summary>
+    public string? Limiter { get; }
+
+    /// <summary>When to come back, when the limiter said. Honoured verbatim by the backoff.</summary>
+    public TimeSpan? RetryAfter { get; }
+
+    private static string Describe(string? limiter, TimeSpan? retryAfter)
+    {
+        string who = limiter is null ? "A rate limiter" : $"Rate limiter '{limiter}'";
+        return retryAfter is { } after
+            ? $"{who} refused the attempt; a permit is expected in {after.TotalSeconds:0.###}s."
+            : $"{who} refused the attempt.";
+    }
+}
+
+/// <summary>
 /// A policy that cannot be executed. Lists <b>every</b> problem at once, because fixing
 /// configuration one error per run is a tax with no purpose.
 /// </summary>

@@ -28,25 +28,63 @@ public enum VerdictKind : byte
 
 /// <summary>
 /// One classification of one outcome. Produced by a <see cref="Classifier"/>, or by the executor
-/// itself for the two cases a user predicate must not be able to get wrong: its own attempt
-/// timeout, and caller cancellation.
+/// itself for the three cases a user predicate must not be able to get wrong: its own attempt
+/// timeout, caller cancellation, and local admission control refusing the attempt.
 /// </summary>
 public readonly struct Verdict : IEquatable<Verdict>
 {
-    private Verdict(VerdictKind kind, TimeSpan? retryAfter)
+    /// <summary>
+    /// The top bit of <see cref="_packed"/>, carrying <see cref="SelfImposed"/>.
+    /// <para>
+    /// The flag shares the kind's byte rather than sitting beside it in a <c>bool</c> field. The
+    /// obvious version measured 32 bytes against this one's 24: the runtime's automatic layout does
+    /// not pack a <c>bool</c> into the padding a single-byte enum leaves in front of a nullable
+    /// <see cref="TimeSpan"/>. A verdict is live across the attempt <c>await</c>, so those eight
+    /// bytes would be paid for in the state-machine box of every suspending call in the library,
+    /// whether or not anything is ever rate limited. Gated by
+    /// <c>The_verdict_carries_its_origin_for_free</c>.
+    /// </para>
+    /// <para>
+    /// Four of the byte's 256 values are <see cref="VerdictKind"/> members, which is the same spare
+    /// capacity <c>AttemptRecord</c> exploits to carry the flag in the inline attempt log for
+    /// nothing.
+    /// </para>
+    /// </summary>
+    private const byte SelfImposedFlag = 0x80;
+
+    private readonly byte _packed;
+
+    private Verdict(VerdictKind kind, TimeSpan? retryAfter, bool selfImposed = false)
     {
-        Kind = kind;
+        _packed = (byte)((byte)kind | (selfImposed ? SelfImposedFlag : 0));
         RetryAfter = retryAfter;
     }
 
     /// <summary>What kind of outcome this is.</summary>
-    public VerdictKind Kind { get; }
+    public VerdictKind Kind => (VerdictKind)(byte)(_packed & ~SelfImposedFlag);
 
     /// <summary>
     /// Server pushback, honoured verbatim in preference to any backoff curve, and capped only by
     /// the backoff maximum and the time left on the deadline. Null when the server said nothing.
     /// </summary>
     public TimeSpan? RetryAfter { get; }
+
+    /// <summary>
+    /// True when this verdict came from inside this process rather than from the dependency: local
+    /// admission control refused to start the attempt, so nothing reached the dependency and
+    /// nothing was learned about its health.
+    /// <para>
+    /// The <see cref="RetryBudget"/> is not charged for a self-imposed refusal. A retry that never
+    /// left the process costs the dependency nothing, so funding it out of a budget expressed as a
+    /// fraction of the dependency's own traffic would throttle the retries that do matter.
+    /// </para>
+    /// <para>
+    /// False is the conservative answer, and it is what <c>default</c> reports. That is why the
+    /// property is spelled this way round rather than as "reached the dependency": a
+    /// default-constructed verdict must not be able to claim exemption from the budget.
+    /// </para>
+    /// </summary>
+    public bool SelfImposed => (_packed & SelfImposedFlag) != 0;
 
     /// <summary>The call worked.</summary>
     public static Verdict Ok => new(VerdictKind.Ok, null);
@@ -62,19 +100,33 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// <returns>A throttled verdict carrying the pushback.</returns>
     public static Verdict Throttled(TimeSpan? retryAfter = null) => new(VerdictKind.Throttled, retryAfter);
 
+    /// <summary>
+    /// Local admission control refused the attempt: a rate limiter, a concurrency limit, or anything
+    /// else in this process that said no before the call left it.
+    /// <para>
+    /// Throttling, because that is what it is - retried on the long backoff curve, honouring
+    /// <paramref name="retryAfter"/> verbatim when the limiter supplied one. It is never counted as
+    /// evidence against the dependency, and never charged to the retry budget; see
+    /// <see cref="SelfImposed"/>.
+    /// </para>
+    /// </summary>
+    /// <param name="retryAfter">When the limiter said a permit would be available, if it said.</param>
+    /// <returns>A self-imposed throttled verdict.</returns>
+    public static Verdict Limited(TimeSpan? retryAfter = null) => new(VerdictKind.Throttled, retryAfter, selfImposed: true);
+
     /// <inheritdoc/>
-    public bool Equals(Verdict other) => Kind == other.Kind && RetryAfter == other.RetryAfter;
+    public bool Equals(Verdict other) => _packed == other._packed && RetryAfter == other.RetryAfter;
 
     /// <inheritdoc/>
     public override bool Equals(object? obj) => obj is Verdict other && Equals(other);
 
     /// <inheritdoc/>
-    public override int GetHashCode() => HashCode.Combine(Kind, RetryAfter);
+    public override int GetHashCode() => HashCode.Combine(_packed, RetryAfter);
 
     /// <summary>Value equality.</summary>
     /// <param name="left">The left operand.</param>
     /// <param name="right">The right operand.</param>
-    /// <returns>True when both verdicts have the same kind and pushback.</returns>
+    /// <returns>True when both verdicts have the same kind, pushback and origin.</returns>
     public static bool operator ==(Verdict left, Verdict right) => left.Equals(right);
 
     /// <summary>Value inequality.</summary>
@@ -84,8 +136,11 @@ public readonly struct Verdict : IEquatable<Verdict>
     public static bool operator !=(Verdict left, Verdict right) => !left.Equals(right);
 
     /// <inheritdoc/>
-    public override string ToString() =>
-        RetryAfter is { } after
-            ? $"{Kind} (retry after {after.TotalSeconds:0.###}s)"
-            : Kind.ToString();
+    public override string ToString() => (SelfImposed, RetryAfter) switch
+    {
+        (true, { } after) => $"{Kind} (self-imposed, retry after {after.TotalSeconds:0.###}s)",
+        (true, null) => $"{Kind} (self-imposed)",
+        (false, { } after) => $"{Kind} (retry after {after.TotalSeconds:0.###}s)",
+        _ => Kind.ToString(),
+    };
 }

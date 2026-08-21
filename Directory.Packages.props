@@ -27,6 +27,16 @@
     <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
 
+    <!--
+      Phase 8. First-party but out-of-band: it is a NuGet package rather than part of the shared
+      framework, which is why it is referenced by NResilience.Extensions and never by the core
+      package - "No package dependencies" is a claim core makes in its own description. The
+      vocabulary the engine needs (RateLimitedException, Verdict.Limited) lives in core and costs
+      nothing, so any limiter composes with the executor whether or not this package is present.
+      Same version as the Microsoft.Extensions family above, decided once.
+    -->
+    <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.0" />
+
     <!-- Phase 7. The docs snippets log the way an application logs. -->
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
 

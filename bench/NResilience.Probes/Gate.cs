@@ -47,6 +47,52 @@ public static class Gate
         return Value;
     }
 
+    /// <summary>
+    /// Suspends, then is refused by local admission control for the first
+    /// <c>refusals</c> calls of each operation.
+    /// </summary>
+    /// <remarks>
+    /// A separate arm from <see cref="SuspendThenFailAsync"/> because the refusal path is not the
+    /// transient path: the exception is recognised by the executor rather than by the classifier,
+    /// the verdict carries an origin flag, and the retry budget is not charged. The refusal path is
+    /// by definition not the hot one, so its cost is recorded rather than minimised - the gate
+    /// exists so a change cannot quietly make it several times worse.
+    /// </remarks>
+    public static async Task<int> SuspendThenLimitAsync(LimitCounter counter, CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (counter.Next())
+        {
+            throw counter.Refusal;
+        }
+
+        return Value;
+    }
+
+    /// <summary>Deterministic per-operation refusal sequence. The limiter's own state, without a limiter.</summary>
+    public sealed class LimitCounter
+    {
+        private readonly int _refusals;
+        private int _seen;
+
+        public LimitCounter(int refusals)
+        {
+            _refusals = refusals;
+
+            // A cached instance, so the figure describes the refusal machinery rather than
+            // exception construction.
+            Refusal = new NResilience.RateLimitedException("probe");
+        }
+
+        public NResilience.RateLimitedException Refusal { get; }
+
+        public bool Next() => _seen++ < _refusals;
+
+        public void Reset() => _seen = 0;
+    }
+
     /// <summary>Deterministic per-operation failure sequence. Reset between operations by the caller.</summary>
     public sealed class FailCounter
     {

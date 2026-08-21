@@ -58,6 +58,7 @@ public static class Arms
         Scenarios.RetryArm standInRetry = Scenarios.BuildFusedRetry();
         ShippingScenarios.RetryArm shippingRetry = ShippingScenarios.BuildRetry();
         PollyScenarios.PollyRetryArm pollyRetry = PollyScenarios.BuildRetryArm();
+        ShippingScenarios.LimitArm shippingLimited = ShippingScenarios.BuildLimited();
 
         return
         [
@@ -71,6 +72,7 @@ public static class Arms
             Arm.Of("lib: TryRunAsync, Default", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: Default + listener", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: retry x2 -> success", shippingRetry.RunAsync, AllocationCounter.ProcessWide, shippingRetry.Reset),
+            Arm.Of("lib: limited x2 -> success", shippingLimited.RunAsync, AllocationCounter.ProcessWide, shippingLimited.Reset),
 
             // Phase 0a stand-in: reference rows for the 0a-versus-0b delta.
             Arm.Of("fused: None (passthrough)", Scenarios.NoneSuspending, AllocationCounter.ProcessWide),

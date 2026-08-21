@@ -147,6 +147,20 @@ public static class Budgets
     /// </summary>
     public const double InlineAttemptLogCost = 64;
 
+    /// <summary>
+    /// <c>sizeof(Verdict)</c>: a byte of <c>VerdictKind</c>, a <c>bool</c> of
+    /// <c>SelfImposed</c> and a nullable <see cref="TimeSpan"/>, which the runtime lays out in 24
+    /// bytes.
+    ///
+    /// Phase 8 added the <c>SelfImposed</c> flag on the premise that it packs into the padding the
+    /// single-byte <c>Kind</c> already leaves, and is therefore free. A verdict is live across the
+    /// attempt <c>await</c> and so is paid for in the state-machine box of every suspending call,
+    /// which makes that premise worth asserting rather than assuming: if the struct ever grows, the
+    /// flag has to move into the spare bits of <c>Kind</c> instead - the trick
+    /// <c>AttemptRecord</c> already uses to carry it in the inline log for nothing.
+    /// </summary>
+    public const int VerdictSize = 24;
+
     // ---- The falsification test. ----
 
     /// <summary>
@@ -211,6 +225,19 @@ public static class Budgets
     /// property of the runtime's exception machinery rather than of this design.
     /// </summary>
     public const double RetryTwiceCeiling = 2_900;
+
+    /// <summary>
+    /// Two refusals from local admission control then a success. Measured: 2,056.8 B on .NET 10 and
+    /// 2,344.0 B on .NET 8, against the retry arm's 2,056.8 B and 2,344.6 B in the same sweep - the
+    /// two paths are indistinguishable, which is exactly the claim. Dominated by the same exception
+    /// capture and rethrow the retry arm pays, so it sits at the same ceiling.
+    ///
+    /// The refusal path is by definition not the hot one, and this number is recorded rather than
+    /// minimised. What the gate is for is the shape of the claim: a refusal must cost what a retried
+    /// exception costs and no more - if it ever costs materially more, something on the refusal path
+    /// has started allocating that the retry path does not.
+    /// </summary>
+    public const double LimitedTwiceCeiling = 2_900;
 
     // ---- Cancellation primitives. ----
 

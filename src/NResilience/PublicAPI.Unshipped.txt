@@ -164,6 +164,13 @@ NResilience.NextAttempt.Number.get -> int
 NResilience.NextAttempt.PreviousException.get -> System.Exception?
 NResilience.NextAttempt.PreviousVerdict.get -> NResilience.Verdict
 NResilience.NextAttempt.Remaining.get -> System.TimeSpan
+NResilience.RateLimitedException
+NResilience.RateLimitedException.Limiter.get -> string?
+NResilience.RateLimitedException.RateLimitedException() -> void
+NResilience.RateLimitedException.RateLimitedException(string! message) -> void
+NResilience.RateLimitedException.RateLimitedException(string! message, System.Exception! innerException) -> void
+NResilience.RateLimitedException.RateLimitedException(string? limiter = null, System.TimeSpan? retryAfter = null, System.Exception? innerException = null) -> void
+NResilience.RateLimitedException.RetryAfter.get -> System.TimeSpan?
 NResilience.Resilience
 NResilience.Resilience.<Clone>$() -> NResilience.Resilience!
 NResilience.Resilience.AttemptTimeout.get -> System.TimeSpan
@@ -219,6 +226,7 @@ NResilience.Verdict
 NResilience.Verdict.Equals(NResilience.Verdict other) -> bool
 NResilience.Verdict.Kind.get -> NResilience.VerdictKind
 NResilience.Verdict.RetryAfter.get -> System.TimeSpan?
+NResilience.Verdict.SelfImposed.get -> bool
 NResilience.Verdict.Verdict() -> void
 NResilience.VerdictKind
 NResilience.VerdictKind.Ok = 0 -> NResilience.VerdictKind
@@ -265,6 +273,7 @@ static NResilience.Resilience.operator ==(NResilience.Resilience? left, NResilie
 static NResilience.RetryBudget.None.get -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Of(double fraction = 0.1, int minimumPerSecond = 3, System.TimeProvider? time = null) -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Shared(string! name, double fraction = 0.1, int minimumPerSecond = 3) -> NResilience.RetryBudget!
+static NResilience.Verdict.Limited(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Ok.get -> NResilience.Verdict
 static NResilience.Verdict.Permanent.get -> NResilience.Verdict
 static NResilience.Verdict.Throttled(System.TimeSpan? retryAfter = null) -> NResilience.Verdict

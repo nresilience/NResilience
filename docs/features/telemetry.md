@@ -1,7 +1,7 @@
 ---
 title: Telemetry
 description: Observe policy behavior through a single event stream and integrated metrics.
-order: 6
+order: 7
 ---
 
 # Telemetry
@@ -93,6 +93,8 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.rejections` | `{rejection}` | Calls refused by a guard, tagged `dependency_unavailable` or `budget_exhausted` |
 | `nresilience.call.duration` | s | End-to-end duration of a logical operation |
 | `nresilience.attempt.duration` | s | Duration of a single attempt |
+| `nresilience.limiter.leases` | `{lease}` | Permits a [limiter](rate-limiting.md) was asked for, tagged `acquired` or `denied` |
+| `nresilience.limiter.wait.duration` | s | How long a caller waited on a limiter. Zero unless queueing is enabled |
 
 The **retry fraction** is calculated as `nresilience.attempts ÷ nresilience.calls`. This is the primary metric for monitoring retry feedback loops and identifying potential retry storms.
 

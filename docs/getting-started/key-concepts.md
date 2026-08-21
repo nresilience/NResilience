@@ -111,13 +111,14 @@ A retried call stops when it succeeds, hits a non-retryable failure, runs out of
 
 For more information, see [`CallResult<T>`](../reference/call-result.md) and [exceptions](../reference/exceptions.md).
 
-## The two guards
+## The three guards
 
-To prevent a fleet of clients from overwhelming a struggling dependency, NResilience provides two guards:
+To prevent a fleet of clients from overwhelming a struggling dependency, NResilience provides three guards:
 
 - **Circuit breaker**: Stops calling a dependency that is failing.
 - **Retry budget**: Limits retries as a fraction of total traffic.
+- **Limiter**: Limits the absolute rate, or the concurrency, of what leaves this process.
 
-The retry budget is enabled by default. The circuit breaker is an object that you construct and share across the scope of the dependency.
+The retry budget is enabled by default. The circuit breaker is an object that you construct and share across the scope of the dependency, and a limiter is opt-in.
 
-For more information, see [Circuit breaker](../features/circuit-breaker.md) and [retry budget](../features/retry-budget.md).
+For more information, see [Circuit breaker](../features/circuit-breaker.md), [retry budget](../features/retry-budget.md) and [rate limiting](../features/rate-limiting.md).

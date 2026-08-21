@@ -26,10 +26,14 @@ No. A retry loop that blocks holds a thread through every backoff delay. Offerin
 Hedging is not implemented. Issuing a second request before the first fails is a dangerous default because it multiplies load on a dependency exactly when it is slow. Implementing hedging safely requires a budget, an adaptive latency threshold, and a per-request idempotency strategy. The [retry budget](../features/retry-budget.md) and the [circuit breaker](../features/circuit-breaker.md) provide the necessary groundwork for this feature.
 
 ### Where is a rate limiter?
-`System.Threading.RateLimiting` is available in the .NET platform. Wrapping it in a resilience library would introduce a specific opinion rather than a new capability.
+`NResilience.Extensions` provides one, and it does not reimplement `System.Threading.RateLimiting` - it gives the platform's limiters a correct place to stand. See [Rate limiting](features/rate-limiting.md).
+
+What the library adds is the composition the platform cannot decide for you: the permit is taken once per attempt rather than once per operation, the wait is bounded by the time left on the deadline, and a refusal is classified as self-imposed throttling - so it takes the long backoff curve, never counts as evidence against the dependency, and is never charged to the [retry budget](features/retry-budget.md). For the reasoning, see [Admission control](deep-dives/admission-control.md).
 
 ### Where is bulkhead isolation?
-A bulkhead limits how many concurrent calls can run against one dependency to prevent a failing service from exhausting all available threads. `SemaphoreSlim` or the platform's concurrency limiter provides this functionality. Because the decision of how to handle a full bulkhead occurs at the call site, it does not require a policy.
+`Limit.Concurrency` is the bulkhead: it bounds how many calls run against one dependency at once, per host by default. See [Rate limiting](features/rate-limiting.md).
+
+The decision of how to handle a full bulkhead does happen at the call site - and the call site is where the library already is. A hand-rolled `SemaphoreSlim` has to bound its own wait by the remaining deadline, release the permit when an attempt times out, and produce an outcome that does not open a circuit against a healthy dependency. Those are the four things the limiter gets right for you.
 
 ### Can I add my own policy layer?
 You cannot add layers through composition because the engine is [one flat method](../deep-dives/one-executor.md). Extension points include the [classifier](../features/classification.md), `Backoff.Custom`, `BeforeAttempt`, and `OnEvent`. This restricted surface ensures long-term API stability.

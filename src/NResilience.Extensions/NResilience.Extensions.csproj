@@ -23,8 +23,8 @@
     <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
 
     <PackageId>NResilience.Extensions</PackageId>
-    <Description>Dependency injection, configuration binding with hot reload, and OpenTelemetry-shaped metrics and traces for NResilience. Binds through a mutable DTO because the configuration binder silently ignores init-only properties.</Description>
-    <PackageTags>resilience;retry;dependencyinjection;configuration;opentelemetry;polly</PackageTags>
+    <Description>Dependency injection, configuration binding with hot reload, rate limiting and concurrency limiting, and OpenTelemetry-shaped metrics and traces for NResilience. Binds through a mutable DTO because the configuration binder silently ignores init-only properties.</Description>
+    <PackageTags>resilience;retry;dependencyinjection;configuration;ratelimit;bulkhead;opentelemetry;polly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <!--
@@ -44,6 +44,12 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Microsoft.Extensions.Http" />
+
+    <!--
+      The limiters themselves. Referenced here rather than in the core package because it is an
+      out-of-band NuGet package; see the note in Directory.Packages.props.
+    -->
+    <PackageReference Include="System.Threading.RateLimiting" />
   </ItemGroup>
 
   <ItemGroup>

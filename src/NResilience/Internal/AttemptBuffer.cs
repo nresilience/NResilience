@@ -18,11 +18,19 @@ namespace NResilience.Internal;
 /// the gap between the previous one ending and this one starting, and the deadline remaining is
 /// the deadline minus the start offset.
 /// </para>
+/// <para>
+/// <see cref="Verdict.SelfImposed"/> rides in the top bit of that same verdict byte. Four of its
+/// 256 values are enum members, so the flag is free: the record stays 16 bytes, the inline buffer
+/// stays <c>Capacity * 16</c>, and the suspending-path budget does not move.
+/// </para>
 /// </summary>
 internal struct AttemptRecord
 {
     private const int VerdictShift = 56;
     private const long TicksMask = (1L << VerdictShift) - 1;
+
+    /// <summary>The top bit of the verdict byte. See the note on the packing above.</summary>
+    private const byte SelfImposedFlag = 0x80;
 
     private long _startOffsetTicks;
     private long _elapsedAndVerdict;
@@ -31,14 +39,19 @@ internal struct AttemptRecord
 
     public readonly long ElapsedTicks => _elapsedAndVerdict & TicksMask;
 
-    public readonly VerdictKind Verdict => (VerdictKind)(byte)((ulong)_elapsedAndVerdict >> VerdictShift);
+    public readonly VerdictKind Verdict => (VerdictKind)(byte)(VerdictByte & ~SelfImposedFlag);
+
+    public readonly bool SelfImposed => (VerdictByte & SelfImposedFlag) != 0;
+
+    private readonly byte VerdictByte => (byte)((ulong)_elapsedAndVerdict >> VerdictShift);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Set(long startOffsetTicks, long elapsedTicks, VerdictKind verdict)
+    public void Set(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed)
     {
         _startOffsetTicks = startOffsetTicks < 0 ? 0 : startOffsetTicks;
         long clamped = elapsedTicks < 0 ? 0 : (elapsedTicks > TicksMask ? TicksMask : elapsedTicks);
-        _elapsedAndVerdict = clamped | ((long)(byte)verdict << VerdictShift);
+        byte packed = (byte)((byte)verdict | (selfImposed ? SelfImposedFlag : 0));
+        _elapsedAndVerdict = clamped | ((long)packed << VerdictShift);
     }
 }
 
@@ -83,13 +96,13 @@ internal struct AttemptSink
 
     public readonly int Count => _count;
 
-    public void Record(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, Exception? error)
+    public void Record(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed, Exception? error)
     {
         int index = _count++;
 
         if (index < AttemptBuffer.Capacity)
         {
-            _inline[index].Set(startOffsetTicks, elapsedTicks, verdict);
+            _inline[index].Set(startOffsetTicks, elapsedTicks, verdict, selfImposed);
         }
         else
         {
@@ -103,7 +116,7 @@ internal struct AttemptSink
                 Array.Resize(ref _spill, _spill.Length * 2);
             }
 
-            _spill[spillIndex].Set(startOffsetTicks, elapsedTicks, verdict);
+            _spill[spillIndex].Set(startOffsetTicks, elapsedTicks, verdict, selfImposed);
         }
 
         if (error is not null)
@@ -145,7 +158,7 @@ internal struct AttemptSink
                 i + 1,
                 TimeSpan.FromTicks(record.ElapsedTicks),
                 TimeSpan.FromTicks(delay < 0 ? 0 : delay),
-                new VerdictOf(record.Verdict).Value,
+                new VerdictOf(record.Verdict, record.SelfImposed).Value,
                 error,
                 remaining);
         }
@@ -154,16 +167,19 @@ internal struct AttemptSink
     }
 
     /// <summary>
-    /// Rebuilds a <see cref="Verdict"/> from the kind the buffer stored. Pushback is deliberately
-    /// not round-tripped; see <see cref="Attempt.Verdict"/>.
+    /// Rebuilds a <see cref="Verdict"/> from the kind and the origin flag the buffer stored.
+    /// Pushback is deliberately not round-tripped; see <see cref="Attempt.Verdict"/>.
     /// </summary>
-    private readonly struct VerdictOf(VerdictKind kind)
+    private readonly struct VerdictOf(VerdictKind kind, bool selfImposed)
     {
         public Verdict Value => kind switch
         {
             VerdictKind.Ok => Verdict.Ok,
             VerdictKind.Transient => Verdict.Transient,
-            VerdictKind.Throttled => Verdict.Throttled(),
+
+            // The one place the origin flag matters on the way out: a reader of the log can tell a
+            // limiter this process runs from a 429 the dependency sent.
+            VerdictKind.Throttled => selfImposed ? Verdict.Limited() : Verdict.Throttled(),
             _ => Verdict.Permanent,
         };
     }

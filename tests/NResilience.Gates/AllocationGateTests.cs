@@ -203,6 +203,48 @@ public sealed class AllocationGateTests
                 $"The inline attempt log now costs {cost} B of box ({capacity} x {recordSize} B) against a budget of {Budgets.InlineAttemptLogCost:0} B. Every byte of it is live across the attempt await and is paid by callers whose calls never fail."));
     }
 
+    /// <summary>
+    /// A verdict is live across the attempt <c>await</c>, so every byte of it is paid for in the
+    /// state-machine box of every suspending call.
+    ///
+    /// Phase 8 added <c>SelfImposed</c> - the bit that keeps the retry budget from being charged for
+    /// a refusal local admission control imposed on this process - on the premise that a <c>bool</c>
+    /// packs into the padding the single-byte <c>Kind</c> already leaves beside a nullable
+    /// <see cref="TimeSpan"/>. That premise is the whole reason the flag is not a fifth
+    /// <c>VerdictKind</c>, and it is asserted here rather than assumed.
+    /// </summary>
+    [Fact]
+    public void The_verdict_carries_its_origin_for_free()
+    {
+        int size = Unsafe.SizeOf<Verdict>();
+
+        _output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"Verdict: {size} B; budget {Budgets.VerdictSize} B"));
+
+        Assert.Equal(Budgets.VerdictSize, size);
+    }
+
+    /// <summary>
+    /// The refusal path, priced. Not a hot path, and not asserted tightly for that reason - what it
+    /// asserts is that a refusal costs what a retried exception costs, because the two paths differ
+    /// only in which catch clause runs.
+    /// </summary>
+    [Fact]
+    public void Being_refused_twice_costs_what_failing_twice_costs()
+    {
+        double limited = _baseline.SuspendingBytes(Baseline.LibLimited);
+        double retried = _baseline.SuspendingBytes(Baseline.LibRetry);
+
+        _output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"{Baseline.LibLimited}: {limited:0.0} B/op against retry's {retried:0.0} B/op; ceiling {Budgets.LimitedTwiceCeiling:0} B"));
+
+        Assert.True(
+            limited <= Budgets.LimitedTwiceCeiling,
+            string.Create(CultureInfo.InvariantCulture, $"Being refused twice now allocates {limited:0.0} B/op against a ceiling of {Budgets.LimitedTwiceCeiling:0} B/op."));
+    }
+
     [Fact]
     public void Retrying_twice_stays_within_the_ceiling()
     {

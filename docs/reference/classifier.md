@@ -41,13 +41,15 @@ The `Retry-After` value is supported as both a delta-seconds value and an HTTP d
 | Member | Description |
 | :--- | :--- |
 | `Kind` | The `VerdictKind` of the outcome. |
-| `RetryAfter` | A server-provided delay that is honored over the standard backoff curve. This is `null` if the server provided no pushback. |
+| `RetryAfter` | A server-provided or limiter-provided delay that is honored over the standard backoff curve. This is `null` if there was no pushback. |
+| `SelfImposed` | `true` when the verdict came from local admission control rather than from the dependency. The [retry budget](../features/retry-budget.md) is not charged for a self-imposed verdict. `false` for every other verdict, including `default`. |
 | `Verdict.Ok` | The call succeeded. |
 | `Verdict.Transient` | A failure that may not recur. |
 | `Verdict.Permanent` | A failure that will recur. |
 | `Verdict.Throttled(TimeSpan?)` | The dependency is defending itself, potentially with a suggested retry delay. |
+| `Verdict.Limited(TimeSpan?)` | A [limiter](../features/rate-limiting.md) in this process refused the attempt. `Kind` is `Throttled` and `SelfImposed` is `true`. |
 
-`Verdict` implements value equality. `ToString()` prints a human-readable summary, such as `Throttled (retry after 2s)`.
+`Verdict` implements value equality, and `SelfImposed` is part of it: `Verdict.Throttled()` and `Verdict.Limited()` are not equal. `ToString()` prints a human-readable summary, such as `Throttled (retry after 2s)` or `Throttled (self-imposed, retry after 2s)`.
 
 ## `VerdictKind`
 
@@ -61,8 +63,9 @@ The `Retry-After` value is supported as both a delta-seconds value and an HTTP d
 | `Permanent` | No | No (treated as a client-side error) |
 
 ### Special cases
-Two specific verdicts are produced by the [executor](index.md) itself and cannot be overridden by a classifier:
+Three specific verdicts are produced by the [executor](index.md) itself and cannot be overridden by a classifier:
 1. **Attempt Timeout**: Classified as `Transient`.
 2. **Caller Cancellation**: Not classified as a failure.
+3. **`RateLimitedException`**: Classified as `Verdict.Limited`, so no classifier can turn a refusal this process imposed on itself into evidence against the dependency.
 
 **Note**: If a classifier identifies an *exception* as `Ok`, the executor treats it as `Permanent`, because an exception cannot be converted into a return value.

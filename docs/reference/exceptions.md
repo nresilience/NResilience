@@ -45,6 +45,19 @@ An `AttemptTimeoutException` is thrown when a single attempt exceeds its specifi
 
 The [executor](index.md) always classifies `AttemptTimeoutException` as `Transient`, regardless of the configured classifier.
 
+## `RateLimitedException`
+
+A `RateLimitedException` is thrown when local admission control refuses to start an attempt. Nothing reached the dependency.
+
+| Member | Description |
+| :--- | :--- |
+| `Limiter` | The name of the limiter that refused, or `null` if it was unnamed. |
+| `RetryAfter` | When the limiter said a permit would be available, if it said. Honored over the backoff curve. |
+
+The [executor](index.md) always classifies it as `Verdict.Limited`, regardless of the configured classifier - so it is retried on the throttled curve, is never counted against the breaker, and is never charged to the [retry budget](../features/retry-budget.md). Because the executor handles it directly, a `Classifier` never sees it; calling `ClassifyException` with one returns `Permanent`.
+
+Throw it yourself from any limiter you bring, and it composes the same way. See [Rate limiting](../features/rate-limiting.md).
+
 ## `ResilienceConfigurationException`
 
 A `ResilienceConfigurationException` is thrown when a policy, breaker setting, or budget parameter is invalid.

@@ -104,6 +104,16 @@ public static class ResilienceHttpClientBuilderExtensions
         var options = new HttpResilienceOptions();
         configureOptions?.Invoke(options);
 
+        HandlerOrder order = HandlerOrder.For(builder.Services);
+        if (order.RateLimit.ContainsKey(builder.Name))
+        {
+            throw new ResilienceConfigurationException(
+                $"Client '{builder.Name}' registered AddRateLimit() before AddResilience(). The limiter has to be inner to " +
+                "the resilience handler, or every retry bypasses the quota - call AddResilience() first.");
+        }
+
+        order.Resilience.TryAdd(builder.Name, 0);
+
         if (options.OwnTransportTimeout)
         {
             // HttpClient.Timeout defaults to 100 seconds and applies to the *entire* retry

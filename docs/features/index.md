@@ -15,6 +15,7 @@ NResilience provides several features to improve the resilience of your applicat
 | Classification | `Classifier.Default`, or `Classifier.Http` for the HTTP preset | [Classification](classification.md) |
 | Retry budget | 10% of successful traffic, private per policy | [Retry budget](retry-budget.md) |
 | Circuit breaker | Disabled (requires manual construction and scoping) | [Circuit breaker](circuit-breaker.md) |
+| Rate limiting | Disabled (opt-in, and queueing off when enabled) | [Rate limiting](rate-limiting.md) |
 | Telemetry | Enabled for registered policies; disabled for hand-built policies | [Telemetry](telemetry.md) |
 
 Fallback is handled as a conditional check on a [`CallResult<T>`](../reference/call-result.md). Hedging is not currently implemented; for more information, see the [FAQ](../faq.md).

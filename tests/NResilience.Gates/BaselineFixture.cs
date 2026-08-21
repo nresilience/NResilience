@@ -51,6 +51,8 @@ public static class Baseline
     public const string LibDefaultListener = "lib: Default + listener";
     public const string LibRetry = "lib: retry x2 -> success";
 
+    public const string LibLimited = "lib: limited x2 -> success";
+
     // The Phase 0a stand-in, kept as reference rows.
     public const string NonePassthrough = "fused: None (passthrough)";
     public const string LeanLoop = "fused: lean loop";

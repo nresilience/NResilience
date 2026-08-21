@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using System.Net;
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NResilience;
@@ -13,6 +14,9 @@ var services = new ServiceCollection();
 services.AddResilience(configuration.GetSection("Resilience"));
 services.AddHttpClient("orders")
     .AddResilience("api")
+    // After AddResilience, so the limiter is inner to the retries and takes one permit per
+    // attempt. The other order is refused at registration.
+    .AddRateLimit(configuration.GetSection("RateLimit"))
     .ConfigurePrimaryHttpMessageHandler(() => new FakeTransport());
 
 using ServiceProvider provider = services.BuildServiceProvider();
@@ -47,6 +51,27 @@ Console.WriteLine("A call through the registered HttpClient, which sees a 503 fi
 HttpClient client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders");
 using HttpResponseMessage response = await client.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);
 Console.WriteLine($"  -> {(int)response.StatusCode}");
+
+Console.WriteLine();
+Console.WriteLine("The limiter allows one call in flight per host. A second, while the first is held:");
+
+var budget = RetryBudget.Of(minimumPerSecond: 1);
+Resilience limited = policies["api"] with { Backoff = Backoff.None, Budget = budget };
+
+using RateLimiter limiter = new RateLimitOptions { Concurrency = 1 }.ToLimiter();
+using RateLimitLease held = await limiter.AcquireOrThrowAsync("orders");
+
+CallResult<int> refused = await limited.TryRunAsync(
+    async ct =>
+    {
+        using RateLimitLease lease = await limiter.AcquireOrThrowAsync("orders", ct);
+        return 1;
+    },
+    CancellationToken.None);
+
+Console.WriteLine($"  -> {refused.StopReason} after {refused.Attempts.Count} attempt(s)");
+Console.WriteLine($"     verdict: {refused.Attempts[0].Verdict}");
+Console.WriteLine($"     retry budget spent: {budget.Utilisation:P0} - a refusal that never left the process is not charged");
 
 Console.WriteLine();
 Console.WriteLine("nresilience.attempts / nresilience.calls is the retry fraction - the number to alert on.");

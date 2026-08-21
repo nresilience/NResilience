@@ -437,6 +437,71 @@ internal static class Program
 
         failures += Check("a registered client retries under AOT", response.StatusCode == HttpStatusCode.OK && transport.Sent == 2);
 
+        failures += await RateLimitAsync().ConfigureAwait(false);
+
+        return failures;
+    }
+
+    /// <summary>
+    /// The limiter, under AOT: the options bind through the same source generator, the platform's
+    /// limiters run without reflection, and a refusal is classified by the executor rather than by a
+    /// classifier - which is what keeps it off the retry budget.
+    /// </summary>
+    private static async Task<int> RateLimitAsync()
+    {
+        int failures = 0;
+
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RateLimit:Concurrency"] = "1",
+                ["RateLimit:PerHost"] = "true",
+            })
+            .Build();
+
+        var options = new RateLimitOptions();
+        configuration.GetSection("RateLimit").Bind(options);
+
+        failures += Check("limiter options bind under AOT", options is { Concurrency: 1, PerHost: true, QueueLimit: 0 });
+
+        using System.Threading.RateLimiting.RateLimiter limiter = options.ToLimiter();
+
+        using (await limiter.AcquireOrThrowAsync("probe").ConfigureAwait(false))
+        {
+            bool refused = false;
+            try
+            {
+                using System.Threading.RateLimiting.RateLimitLease _ =
+                    await limiter.AcquireOrThrowAsync("probe").ConfigureAwait(false);
+            }
+            catch (RateLimitedException error)
+            {
+                refused = error.Limiter == "probe";
+            }
+
+            failures += Check("a limiter with no permits left throws under AOT", refused);
+        }
+
+        // The one behaviour the whole phase exists for, re-checked under AOT: the refusal is
+        // throttling that the retry budget is not charged for.
+        var budget = RetryBudget.Of(minimumPerSecond: 1);
+        Resilience policy = Resilience.Default with
+        {
+            Attempts = 3,
+            Backoff = Backoff.None,
+            AttemptTimeout = Timeout.InfiniteTimeSpan,
+            Deadline = Timeout.InfiniteTimeSpan,
+            Budget = budget,
+        };
+
+        CallResult<int> limited = await policy
+            .TryRunAsync(static (CancellationToken _) => Task.FromException<int>(new RateLimitedException("probe")))
+            .ConfigureAwait(false);
+
+        failures += Check("a refusal is retried to exhaustion under AOT", limited.Attempts.Count == 3);
+        failures += Check("a refusal is self-imposed throttling under AOT", limited.Attempts[0].Verdict is { Kind: VerdictKind.Throttled, SelfImposed: true });
+        failures += Check("a refusal does not spend retry budget under AOT", budget.Utilisation == 0);
+
         return failures;
     }
 

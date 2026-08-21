@@ -61,6 +61,16 @@ public static class ResilienceTelemetry
         unit: "s",
         description: "Duration of one attempt.");
 
+    private static readonly Counter<long> LeaseCounter = TheMeter.CreateCounter<long>(
+        "nresilience.limiter.leases",
+        unit: "{lease}",
+        description: "Permits a limiter was asked for, tagged by whether it granted one.");
+
+    private static readonly Histogram<double> LeaseWait = TheMeter.CreateHistogram<double>(
+        "nresilience.limiter.wait.duration",
+        unit: "s",
+        description: "How long a caller waited on a limiter. Zero unless queueing is enabled.");
+
     private static readonly ActivitySource TheActivitySource = new(ActivitySourceName);
 
     /// <summary>The meter every instrument is created on.</summary>
@@ -121,6 +131,25 @@ public static class ResilienceTelemetry
     /// </summary>
     internal static Activity? StartCall(string policyName) =>
         TheActivitySource.StartActivity($"resilience {policyName}", ActivityKind.Internal);
+
+    /// <summary>
+    /// Records one acquisition against a limiter.
+    /// <para>
+    /// Recorded here, by the adapter, rather than by <see cref="Listener"/> from a
+    /// <see cref="CallEvent"/>: the limiter is the only thing that knows how long the caller waited,
+    /// and a refusal that the policy goes on to retry successfully raises no distinguishable event
+    /// at all. Nothing in the existing instruments or their tags changes, so a dashboard built on
+    /// them keeps working.
+    /// </para>
+    /// </summary>
+    internal static void RecordLease(string limiter, bool acquired, TimeSpan waited)
+    {
+        var limiterTag = new KeyValuePair<string, object?>("nresilience.limiter", limiter);
+        var outcome = new KeyValuePair<string, object?>("nresilience.outcome", acquired ? "acquired" : "denied");
+
+        LeaseCounter.Add(1, limiterTag, outcome);
+        LeaseWait.Record(waited.TotalSeconds, limiterTag, outcome);
+    }
 
     private static void Record(CallEvent e)
     {
