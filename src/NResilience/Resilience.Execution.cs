@@ -219,10 +219,10 @@ public sealed partial record Resilience
         bool bounded = Deadline != Timeout.InfiniteTimeSpan;
         TShaper shaper = default;
 
-        // The one local Phase 2 adds to the box, at 8 bytes: either the policy's own budget or the
-        // automatic one private to this policy instance. Resolved once here rather than at each of
-        // the two points that need it, because re-resolving after the attempt await would miss the
-        // per-thread cache - a continuation resumes on whichever pool thread is free.
+        // The one local the breaker and budget add to the box, at 8 bytes: either the policy's own
+        // budget or the automatic one private to this policy instance. Resolved once here rather
+        // than at each of the two points that need it, because re-resolving after the attempt await
+        // would miss the per-thread cache - a continuation resumes on whichever pool thread is free.
         RetryBudget? budget = ExecutionState.BudgetFor(this);
 
         long start = Time.GetTimestamp();

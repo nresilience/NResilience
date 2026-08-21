@@ -42,7 +42,7 @@ public static class Baseline
 {
     public const string RawSuspending = "raw callback (baseline)";
 
-    // The shipping executor (Phase 0b). Every gate asserts against these.
+    // The shipping executor. Every gate asserts against these.
     public const string LibNone = "lib: None (passthrough)";
     public const string LibTrivial = "lib: trivial (no bounds)";
     public const string LibDefault = "lib: Default";
@@ -56,7 +56,7 @@ public static class Baseline
 
     public const string LibLimited = "lib: limited x2 -> success";
 
-    // The Phase 0a stand-in, kept as reference rows.
+    // The stand-in, kept as reference rows.
     public const string NonePassthrough = "fused: None (passthrough)";
     public const string LeanLoop = "fused: lean loop";
     public const string RealNoLogNoTimeout = "fused: real loop, no log, no timeout";
@@ -98,5 +98,5 @@ public static class Baseline
 [CollectionDefinition(Name)]
 public sealed class BaselineCollection : ICollectionFixture<BaselineFixture>
 {
-    public const string Name = "phase-0a baseline";
+    public const string Name = "baseline";
 }

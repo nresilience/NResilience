@@ -7,7 +7,7 @@ namespace NResilience.Http;
 /// <remarks>
 /// A mutable options class rather than a record, because this is the type an options callback
 /// configures — <c>o =&gt; o.RetryUnsafeMethods = true</c> — and that is the shape
-/// <c>Microsoft.Extensions.Options</c> binds to in Phase 6.
+/// <c>Microsoft.Extensions.Options</c> binds to.
 /// </remarks>
 public sealed class HttpResilienceOptions
 {

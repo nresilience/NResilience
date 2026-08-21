@@ -44,11 +44,11 @@ public sealed class Arm
 /// replacement.
 ///
 /// <para>
-/// Phase 0b re-points every gate at the <b>shipping</b> executor. The Phase 0a stand-in arms are
-/// kept and still measured, in the same sweep, because the only trustworthy 0a-versus-0b delta is
-/// one taken in one process under one GC in one tier state — and because the stand-in carries two
-/// things the shipping library does not yet have: a breaker and a budget, whose frame cost Phase 2
-/// will inherit. Reference rows, not gates.
+/// Every gate points at the <b>shipping</b> executor. The stand-in arms are
+/// kept and still measured, in the same sweep, because the only trustworthy stand-in-versus-shipping
+/// delta is one taken in one process under one GC in one tier state — and because the stand-in carries two
+/// things the shipping library does not yet have: a breaker and a budget, whose frame cost the
+/// shipping breaker and budget will inherit. Reference rows, not gates.
 /// </para>
 /// </summary>
 public static class Arms
@@ -75,7 +75,7 @@ public static class Arms
             Arm.Of("lib: retry x2 -> success", shippingRetry.RunAsync, AllocationCounter.ProcessWide, shippingRetry.Reset),
             Arm.Of("lib: limited x2 -> success", shippingLimited.RunAsync, AllocationCounter.ProcessWide, shippingLimited.Reset),
 
-            // Phase 0a stand-in: reference rows for the 0a-versus-0b delta.
+            // Stand-in: reference rows for the stand-in-versus-shipping delta.
             Arm.Of("fused: None (passthrough)", Scenarios.NoneSuspending, AllocationCounter.ProcessWide),
             Arm.Of("fused: lean loop", Scenarios.LeanSuspending, AllocationCounter.ProcessWide),
             Arm.Of("fused: real loop, no log, no timeout", Scenarios.FusedNoTimeoutNoLogSuspending, AllocationCounter.ProcessWide),

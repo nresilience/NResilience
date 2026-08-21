@@ -6,9 +6,9 @@ using Polly;
 namespace NResilience.Baseline;
 
 /// <summary>
-/// The same comparison over a real loopback TCP round trip. Tagged <c>socket</c> so it can be
-/// filtered in or out; its value is as a cross-check on the <c>Task.Yield</c> arms rather than
-/// as a trend line, because socket timings carry noise the yield arms do not.
+/// Performs the same comparison over a real loopback TCP round trip. This benchmark is
+/// tagged <c>socket</c> for filtering; it serves as a cross-check for the <c>Task.Yield</c>
+/// arms rather than a trend line, because socket timings are noisier than yield arms.
 /// </summary>
 [BenchmarkCategory("socket")]
 public class SocketBenchmarks

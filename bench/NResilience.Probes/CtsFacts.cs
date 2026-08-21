@@ -1,14 +1,13 @@
 namespace NResilience.Probes;
 
 /// <summary>
-/// The six measured cancellation facts that drive the executor's timeout implementation, plus
-/// the two behavioural facts about <see cref="TimeProvider"/>, re-run on the exact target TFMs.
+/// Measures six cancellation facts that drive the executor's timeout implementation and two 
+/// behavioral facts about <see cref="TimeProvider"/>, re-run on the target TFMs.
 ///
-/// Phase 0a re-measures these rather than trusting Appendix B, because the whole timeout design
-/// — pool the timer source, link per attempt, and fall back to per-call construction whenever a
-/// custom <see cref="TimeProvider"/> is in play — is downstream of them. If <c>TryReset</c> ever
-/// starts working with a custom provider, or stops working with the system one, the right
-/// arrangement changes.
+/// These are re-measured rather than trusting Appendix B because the timeout design 
+/// - pooling the timer source, linking per attempt, and falling back to per-call construction 
+/// for custom <see cref="TimeProvider"/> instances - depends on them. If <c>TryReset</c> 
+/// changes behavior with custom or system providers, the arrangement must change.
 /// </summary>
 public static class CtsFacts
 {
@@ -55,7 +54,7 @@ public static class CtsFacts
         return new ValueTask<int>(s_sink);
     }
 
-    /// <summary>The arrangement the executor actually uses: pooled timer source, reset and reused.</summary>
+    /// <summary>The arrangement the executor uses: a pooled timer source that is reset and reused.</summary>
     public static ValueTask<int> PooledSourceReused()
     {
         CancellationTokenSource cts = CtsPool.Rent(TimeProvider.System);
@@ -65,7 +64,7 @@ public static class CtsFacts
         return new ValueTask<int>(s_sink);
     }
 
-    /// <summary>Timeout by racing a delay — the implementation the executor deliberately does not use.</summary>
+    /// <summary>Implements timeout by racing a delay - an implementation the executor deliberately avoids.</summary>
     public static ValueTask<int> DelayCreatedThenCancelled()
     {
         using var cts = new CancellationTokenSource();
@@ -76,9 +75,10 @@ public static class CtsFacts
     }
 
     /// <summary>
-    /// <c>TryReset()</c> on a source built with a custom provider. The runtime type-tests
-    /// <c>_timer is TimerQueueTimer</c>, and a custom provider's <c>ITimer</c> is not one, so
-    /// pooling and injectable-<see cref="TimeProvider"/> testability are mutually exclusive.
+    /// Calls <c>TryReset()</c> on a source built with a custom provider. The runtime type-tests 
+    /// for <c>TimerQueueTimer</c>, and a custom provider's <c>ITimer</c> does not match. 
+    /// Consequently, pooling and injectable <see cref="TimeProvider"/> testability 
+    /// are mutually exclusive.
     /// </summary>
     public static bool TryResetWithCustomProvider(TimeProvider provider)
     {
@@ -87,7 +87,7 @@ public static class CtsFacts
         return cts.TryReset();
     }
 
-    /// <summary>The same call on the system provider, which is the case the pool relies on.</summary>
+    /// <summary>Calls the same method on the system provider, which is the case the pool relies on.</summary>
     public static bool TryResetWithSystemProvider()
     {
         using var cts = new CancellationTokenSource();
@@ -95,7 +95,7 @@ public static class CtsFacts
         return cts.TryReset();
     }
 
-    /// <summary>A source that actually fired is poison; the pool must discard rather than reuse it.</summary>
+    /// <summary>A source that has already fired is poison; the pool must discard it rather than reuse it.</summary>
     public static bool TryResetAfterCancellation()
     {
         using var cts = new CancellationTokenSource();
@@ -104,7 +104,7 @@ public static class CtsFacts
     }
 
     /// <summary>
-    /// <c>CancelAfter()</c> does correctly drive an injected provider's timer, so virtual time
+    /// <c>CancelAfter()</c> correctly drives an injected provider's timer, so virtual time 
     /// cancels an attempt in tests even though the source cannot be pooled.
     /// </summary>
     public static CancellationTokenSource CancelAfterOnProvider(TimeProvider provider, TimeSpan timeout)

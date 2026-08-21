@@ -4,18 +4,19 @@ using System.Net.Sockets;
 namespace NResilience.Probes;
 
 /// <summary>
-/// A real loopback TCP round trip, used to cross-check the <c>Task.Yield</c> gate.
+/// A real loopback TCP round trip used to cross-check the <c>Task.Yield</c> gate.
 ///
-/// <c>Task.Yield</c> is the right primitive for a gate — it suspends deterministically, every
-/// time, with nothing to average away — but it is not I/O, and the design's whole performance
-/// argument is about the path real I/O takes. If the two disagree about the ratio between a
-/// fused loop and a composed pipeline, the gate is measuring an artefact. Appendix B of the
-/// design document reports 112 B per frame over a loopback socket, so there is a published
-/// figure to check against.
+/// <c>Task.Yield</c> is the appropriate primitive for a gate because it suspends 
+/// deterministically on every call, without I/O completion ports, synchronization 
+/// with a second thread, or variance. However, it is not I/O, and the design's performance 
+/// argument concerns the path real I/O takes. If a fused loop and a composed pipeline 
+/// disagree on the ratio over a real socket, the gate is measuring an artifact. 
+/// Appendix B of the design document reports 112 B per frame over a loopback socket, 
+/// providing a published figure for verification.
 ///
-/// The callback passes its cancellation token through to the socket calls, as real code does.
-/// That means a wrapper handing down a cancellable token pays for the socket's registration on
-/// it, and that cost is genuine rather than an artefact of the harness.
+/// The callback passes its cancellation token to the socket calls, mimicking real code. 
+/// A wrapper that provides a cancellable token incurs the cost of the socket's 
+/// registration, which is a genuine cost rather than a harness artifact.
 /// </summary>
 public sealed class LoopbackEcho : IAsyncDisposable
 {
@@ -52,7 +53,7 @@ public sealed class LoopbackEcho : IAsyncDisposable
         return new LoopbackEcho(listener, client, server);
     }
 
-    /// <summary>One byte out, one byte back. Two real suspensions.</summary>
+    /// <summary>Sends one byte and receives one byte back, resulting in two real suspensions.</summary>
     public async Task<int> RoundTripAsync(CancellationToken cancellationToken)
     {
         await _client.SendAsync(_send, SocketFlags.None, cancellationToken).ConfigureAwait(false);

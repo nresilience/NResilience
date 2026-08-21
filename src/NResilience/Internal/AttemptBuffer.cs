@@ -6,9 +6,9 @@ namespace NResilience.Internal;
 /// One attempt's timings and verdict, packed into 16 bytes.
 /// <para>
 /// Every byte of this struct is live across the attempt <c>await</c> and is therefore paid for in
-/// the state-machine box of every suspending call, whether or not anything ever fails. Phase 0a
-/// measured the 24-byte version at 96 B of box for a capacity of four — 24% of the executor's
-/// total overhead — and named shrinking it as the single largest lever available to Phase 1.
+/// the state-machine box of every suspending call, whether or not anything ever fails. The
+/// 24-byte version measured 96 B of box for a capacity of four — 24% of the executor's
+/// total overhead — and shrinking it was the single largest lever available.
 /// </para>
 /// <para>
 /// The packing: the attempt's start offset from the beginning of the operation in one 64-bit

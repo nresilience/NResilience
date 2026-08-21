@@ -166,7 +166,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// Phase 5 under AOT. The HTTP handler ships, so it is published and run rather than merely
+    /// The HTTP handler under AOT. It ships, so it is published and run rather than merely
     /// compiled — and the request clone is the part worth running, because building a fresh
     /// message and copying its headers is the closest the library gets to the kind of dynamic work
     /// whole-program compilation is entitled to break.
@@ -210,7 +210,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// Phase 4 under AOT. The testing package ships, so it is gated like everything else that
+    /// The testing package under AOT. It ships, so it is gated like everything else that
     /// ships: a scripted sequence driving a real policy, and a recorder reading the events back.
     /// </summary>
     private static async Task<int> TestingPackageAsync()
@@ -240,7 +240,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// Phase 3 under AOT. The one thing here that whole-program compilation could plausibly break
+    /// Telemetry under AOT. The one thing here that whole-program compilation could plausibly break
     /// is the boxed result on <see cref="CallEvent.Result"/>: it is the only place the executor
     /// converts a generic <c>T</c> to <see cref="object"/>, and the <c>typeof(T)</c> test that
     /// keeps the void entry points from handing out a box of an internal type is folded by the
@@ -286,7 +286,7 @@ internal static class Program
     }
 
     /// <summary>
-    /// The Phase 2 guards under AOT. Both hold mutable state behind a lock and both feed the
+    /// The breaker and budget guards under AOT. Both hold mutable state behind a lock and both feed the
     /// executor's rejection path, so what this checks is that the state machine and the guarded
     /// rejection survive whole-program compilation — including <c>Task.Delay</c> on a
     /// <see cref="TimeProvider"/>, which the guard uses and which nothing else in the probe does.
@@ -345,9 +345,9 @@ internal static class Program
     }
 
     /// <summary>
-    /// The same budgets the JIT gate enforces, against the same shipping executor. Phase 0b
-    /// re-pointed these from the Phase 0a stand-in loop; the stand-in arms stay in the correctness
-    /// section above, where what they prove is that the harness itself survives AOT.
+    /// The same budgets the JIT gate enforces, against the same shipping executor. The stand-in
+    /// arms stay in the correctness section above, where what they prove is that the harness
+    /// itself survives AOT.
     ///
     /// The numbers are duplicated here rather than shared, because this project must not reference
     /// the test project, and because an AOT-specific divergence is exactly what this gate exists to
@@ -356,7 +356,7 @@ internal static class Program
     /// <summary>
     /// The DI, configuration and telemetry surface, in the published binary.
     /// <para>
-    /// This is the phase most entitled to break under whole-program compilation, because
+    /// This is the surface most entitled to break under whole-program compilation, because
     /// configuration binding is reflection by default and a container resolves types by
     /// <c>Type</c>. The binding source generator is what makes it trim-safe, and a generator that
     /// silently declined to run would show up here as a policy full of defaults rather than as a
@@ -523,11 +523,11 @@ internal static class Program
         Console.WriteLine();
         int failures = 0;
 
-        // Phase 0b, .NET 10 / .NET 8, arm64: bytes above an identical un-wrapped callback.
+        // .NET 10 / .NET 8, arm64: bytes above an identical un-wrapped callback.
         const double NoiseFloor = 8;
-        const double TrivialSuspendingBudget = 368;      // measured 328 (320 before Phase 2)
-        const double DefaultSuspendingBudget = 448;      // measured 393 (384 before Phase 2)
-        const double TryRunSuspendingBudget = 640;       // measured 561 (553 before Phase 2)
+        const double TrivialSuspendingBudget = 368;      // measured 328 (320 before the breaker and budget)
+        const double DefaultSuspendingBudget = 448;      // measured 393 (384 before the breaker and budget)
+        const double TryRunSuspendingBudget = 640;       // measured 561 (553 before the breaker and budget)
         const double ListenerAllowance = 72;             // measured 48: two boxed int results
 
         double rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);

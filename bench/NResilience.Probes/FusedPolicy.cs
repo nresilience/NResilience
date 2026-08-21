@@ -1,9 +1,9 @@
 namespace NResilience.Probes;
 
 /// <summary>
-/// Phase 0a stand-in for the shipping <c>Resilience</c> record. Only the fields the executor
-/// frame reads are present — this exists to give the fused loop realistic work to do, not to
-/// prototype the public surface, which Phase 1 owns.
+/// Stand-in for the shipping <c>Resilience</c> record. Only the fields the executor
+/// frame reads are present - this exists to give the fused loop realistic work to do, not to
+/// prototype the public surface.
 /// </summary>
 public sealed record FusedPolicy
 {
@@ -31,7 +31,7 @@ public sealed record FusedPolicy
 
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
-    /// <summary>Passthrough. Every bound is off, so <c>RunAsync</c> can return the callback's task directly.</summary>
+    /// <summary>Passthrough. All bounds are disabled, so <c>RunAsync</c> can return the callback's task directly.</summary>
     public static FusedPolicy None { get; } = new()
     {
         Attempts = 1,
@@ -42,7 +42,7 @@ public sealed record FusedPolicy
         Budget = null,
     };
 
-    /// <summary>Retry and classification, but no timeout source. Isolates the cost of the frame itself.</summary>
+    /// <summary>Implements retry and classification without a timeout source to isolate the cost of the frame.</summary>
     public static FusedPolicy NoTimeout { get; } = new()
     {
         Deadline = Timeout.InfiniteTimeSpan,
@@ -50,13 +50,13 @@ public sealed record FusedPolicy
         Budget = new ProbeBudget(),
     };
 
-    /// <summary>The shape a real caller gets from <c>Resilience.Default</c>: deadline, attempt timeout, budget.</summary>
+    /// <summary>The shape provided by <c>Resilience.Default</c>, including a deadline, attempt timeout, and budget.</summary>
     public static FusedPolicy Default { get; } = new()
     {
         Budget = new ProbeBudget(),
     };
 
-    /// <summary>Everything on, including a breaker. The most expensive frame this design can produce.</summary>
+    /// <summary>The most expensive frame this design can produce, with all features and a breaker enabled.</summary>
     public static FusedPolicy Full { get; } = new()
     {
         Breaker = new ProbeBreaker(),

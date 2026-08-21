@@ -4,13 +4,13 @@ using NResilience.Extensions;
 namespace NResilience.Tests;
 
 /// <summary>
-/// Local admission control: what the executor does with a <see cref="RateLimitedException"/>, and
-/// the one guard that has to behave differently for it.
+/// Tests for local admission control: including how the executor handles a <see cref="RateLimitedException"/> 
+/// and the guards that behave differently for it.
 /// <para>
-/// A refusal this process imposed on itself is throttling - the long backoff curve, the limiter's
-/// own hint honoured verbatim - and it is <b>not</b> evidence about the dependency. The breaker
-/// already ignores anything that is not <see cref="VerdictKind.Transient"/>; the retry budget did
-/// not, and the tests here are what say so.
+/// A refusal the process imposes on itself is considered throttling. This involves the long backoff 
+/// curve and honoring the limiter's hint verbatim, and it is not evidence about the dependency. 
+/// The breaker already ignores anything that is not <see cref="VerdictKind.Transient"/>; the 
+/// retry budget did not, and these tests verify that behavior.
 /// </para>
 /// </summary>
 public sealed class RateLimitTests
@@ -24,8 +24,8 @@ public sealed class RateLimitTests
     };
 
     /// <summary>
-    /// Runs a call that may serve a guarded rejection, moving the fake clock until it lands - the
-    /// shape <c>BudgetTests</c> uses, for the same reason: a rejection is deliberately not instant.
+    /// Runs a call that may serve a guarded rejection and moves the fake clock until it lands. 
+    /// This follows the pattern in <c>BudgetTests</c> because a rejection is not instant.
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {

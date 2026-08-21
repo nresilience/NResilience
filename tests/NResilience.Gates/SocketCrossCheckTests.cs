@@ -19,10 +19,9 @@ namespace NResilience.Gates;
 /// If this ever disagrees with the gate, the gate is measuring an artefact and the design's
 /// central number is not trustworthy. That is worth one slow test.
 ///
-/// Phase 0b re-points it at the shipping executor. Phase 0a found the one thing the yield gate
-/// structurally cannot see — that giving the callback a <i>cancellable</i> token costs 208 B over
-/// real I/O against 65 B over <c>Task.Yield</c> — and that finding is the reason this test exists
-/// rather than being a formality.
+/// The yield gate structurally cannot see one thing — that giving the callback a <i>cancellable</i>
+/// token costs 208 B over real I/O against 65 B over <c>Task.Yield</c> — and that finding is the
+/// reason this test exists rather than being a formality.
 /// </summary>
 [Collection(BaselineCollection.Name)]
 public sealed class SocketCrossCheckTests

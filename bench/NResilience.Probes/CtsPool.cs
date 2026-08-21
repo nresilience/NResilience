@@ -11,7 +11,7 @@ namespace NResilience.Probes;
 ///         callback actually receives, and disposes the link at the end of the attempt;</item>
 ///   <item>the pool is used only when the policy's <see cref="TimeProvider"/> is
 ///         <see cref="TimeProvider.System"/>, because <c>TryReset()</c> always returns false
-///         on a source constructed with a custom provider. Phase 0a re-confirms that on both
+///         on a source constructed with a custom provider. That is re-confirmed on both
 ///         target TFMs; see <c>CtsFacts</c>.</item>
 /// </list>
 /// </summary>

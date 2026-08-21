@@ -4,8 +4,8 @@ using NResilience.Internal;
 namespace NResilience.Tests;
 
 /// <summary>
-/// The retry budget: the token bucket that bounds retries as a fraction of traffic, and the scoping
-/// rules that decide whose traffic it is a fraction of.
+/// Tests for the retry budget: the token bucket that bounds retries as a fraction of traffic, 
+/// and the scoping rules that decide the traffic's origin.
 /// </summary>
 public sealed class BudgetTests
 {
@@ -18,8 +18,8 @@ public sealed class BudgetTests
     };
 
     /// <summary>
-    /// Runs a call that may serve a guarded rejection, moving the fake clock until it lands. A
-    /// rejection is deliberately not instant, so a test that simply awaited it would hang.
+    /// Runs a call that may serve a guarded rejection and moves the fake clock until it lands. 
+    /// Because a rejection is not instant, a test that simply awaited it would hang.
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {

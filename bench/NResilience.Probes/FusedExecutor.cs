@@ -4,15 +4,15 @@ using System.Runtime.ExceptionServices;
 namespace NResilience.Probes;
 
 /// <summary>
-/// The Phase 0a stand-in for the shipping executor: admission, deadline, attempt loop,
-/// per-attempt timeout, classification, breaker, budget, backoff and the inline attempt log,
-/// all in <b>one</b> <c>async</c> method.
+/// A stand-in for the shipping executor. It implements admission, deadline, 
+/// the attempt loop, per-attempt timeout, classification, breaker, budget, backoff, 
+/// and the inline attempt log, all within a single <c>async</c> method.
 ///
-/// This is deliberately not a sketch. Open question 1 in plans/nresilience-design-v3.md asks
-/// whether the fused-frame advantage survives contact with a realistic loop, and it can only
-/// be answered by a loop that hoists a realistic amount of state across the attempt
-/// <c>await</c>. Every local below is live across that await and is therefore paid for in the
-/// state-machine box.
+/// This implementation is deliberately comprehensive. Open question 1 in 
+/// plans/nresilience-design-v3.md asks whether the fused-frame advantage survives contact 
+/// with a realistic loop. This can only be answered by a loop that hoists a realistic 
+/// amount of state across the attempt <c>await</c>. Every local variable below is 
+/// live across that await and is therefore stored in the state-machine box.
 /// </summary>
 public sealed class FusedExecutor
 {
@@ -22,8 +22,9 @@ public sealed class FusedExecutor
 
     /// <param name="policy">The policy the loop enforces.</param>
     /// <param name="recordAttempts">
-    /// Whether the loop keeps the inline attempt log. Always true in the shipping design; false
-    /// exists only so Phase 0a can price the log against the same loop without it.
+    /// Whether the loop keeps the inline attempt log. This is always true in the 
+    /// shipping design. The false option exists so the log can be priced 
+    /// against the same loop without it.
     /// </param>
     public FusedExecutor(FusedPolicy policy, bool recordAttempts = true)
     {

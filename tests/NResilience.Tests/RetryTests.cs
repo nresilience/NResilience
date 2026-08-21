@@ -3,11 +3,12 @@ using Microsoft.Extensions.Time.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-/// The attempt loop: how many times it runs, what stops it, and what it does with the outcome.
+/// Tests for the attempt loop: including the number of runs, stop conditions, 
+/// and outcome handling.
 /// </summary>
 public sealed class RetryTests
 {
-    /// <summary>A policy that retries without ever sleeping, so tests need no clock coordination.</summary>
+    /// <summary>A policy that retries without sleeping to avoid clock coordination in tests.</summary>
     private static Resilience Instant => Resilience.Default with
     {
         Backoff = Backoff.None,

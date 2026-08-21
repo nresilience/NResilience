@@ -6,8 +6,8 @@ using System.Text;
 namespace NResilience;
 
 /// <summary>
-/// Says once what counts as a failure. Retry, backoff selection, the attempt log and — from
-/// Phase 2 — the breaker and the budget all read the same answer, so there is no way for them
+/// Says once what counts as a failure. Retry, backoff selection, the attempt log and the breaker
+/// and the budget all read the same answer, so there is no way for them
 /// to disagree.
 /// <para>
 /// Predicates are synchronous, because a classification is a type test or a status-code

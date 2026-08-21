@@ -18,10 +18,10 @@ public enum StopReason
     /// <summary>The wall-clock budget for the whole operation ran out.</summary>
     DeadlineExceeded,
 
-    /// <summary>The retry budget refused to fund another attempt. Reachable from Phase 2.</summary>
+    /// <summary>The retry budget refused to fund another attempt.</summary>
     BudgetExhausted,
 
-    /// <summary>A circuit breaker refused the call. Reachable from Phase 2.</summary>
+    /// <summary>A circuit breaker refused the call.</summary>
     DependencyUnavailable,
 }
 

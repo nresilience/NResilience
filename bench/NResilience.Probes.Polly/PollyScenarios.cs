@@ -6,25 +6,24 @@ using Polly.Timeout;
 namespace NResilience.Probes.Polly;
 
 /// <summary>
-/// The competitive arms, on the same harness, over the same gate, with the same suspension
-/// count as every other arm.
+/// Competitive arms that use the same harness, gate, and suspension count as every other arm.
 ///
-/// Fairness rules, stated because a rigged baseline would make the whole exercise worthless:
+/// Fairness rules ensure the baseline is not rigged:
 ///
 /// <list type="bullet">
-///   <item>Polly is given its <b>native</b> callback shape. Its pipeline takes
-///   <c>Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt;</c>, so the callback wraps the shared gate's
-///   <c>Task&lt;int&gt;</c> in a <c>ValueTask&lt;int&gt;</c> struct rather than in an extra
-///   <c>async</c> frame. Writing <c>async ct =&gt; await Gate.SuspendAsync(ct)</c> would have
-///   charged Polly a whole state-machine box that its design does not require.</item>
+///   <item>Polly uses its native callback shape. Its pipeline takes 
+///   <c>Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt;</c>, so the callback wraps the shared 
+///   gate's <c>Task&lt;int&gt;</c> in a <c>ValueTask&lt;int&gt;</c> struct instead of an extra 
+///   <c>async</c> frame. Using <c>async ct =&gt; await Gate.SuspendAsync(ct)</c> would have 
+///   charged Polly for a state-machine box its design does not require.</item>
 ///
-///   <item>The delegates are cached statics, so no arm pays for a closure another avoids.</item>
+///   <item>Delegates are cached statics to ensure no arm incurs a closure cost that another avoids.</item>
 ///
-///   <item>The retry+timeout pipeline is configured to match the fused policy it is compared
-///   against: three total attempts, constant zero delay, no jitter, one 10-second timeout.</item>
+///   <item>The retry+timeout pipeline matches the fused policy: three total attempts, 
+///   constant zero delay, no jitter, and one 10-second timeout.</item>
 ///
-///   <item>No telemetry listener is registered, which is Polly's cheapest configuration. Its
-///   own benchmarks put telemetry at 6.9x, and measuring it here would flatter this design.</item>
+///   <item>No telemetry listener is registered, as this is Polly's cheapest configuration. 
+///   Polly's own benchmarks report telemetry at 6.9x; measuring it here would flatter this design.</item>
 /// </list>
 /// </summary>
 public static class PollyScenarios

@@ -10,11 +10,11 @@ namespace NResilience.Gates;
 /// fast, and they fail with a byte count.
 ///
 /// <para>
-/// Phase 0b re-pointed every assertion here from the Phase 0a stand-in loop to the shipping
-/// <see cref="Resilience"/> executor. The stand-in is still measured in the same sweep, and one
-/// gate below compares the two: if the real loop ever becomes more expensive than the hand-written
-/// floor Phase 0a established, that is the design's central mechanism failing, and it should fail
-/// a build rather than be inferred from a document.
+/// Every assertion here points at the shipping <see cref="Resilience"/> executor. The stand-in is
+/// still measured in the same sweep, and one gate below compares the two: if the real loop ever
+/// becomes more expensive than the hand-written floor the stand-in established, that is the
+/// design's central mechanism failing, and it should fail a build rather than be inferred from a
+/// document.
 /// </para>
 /// </summary>
 [Collection(BaselineCollection.Name)]
@@ -154,7 +154,7 @@ public sealed class AllocationGateTests
     /// must cost exactly what it cost before telemetry existed.
     ///
     /// <see cref="The_default_policy_stays_within_budget_on_the_suspending_path"/> already gates the
-    /// absolute figure, and Phase 3 moved it by zero bytes — the delegate is a field on a record the
+    /// absolute figure, and the telemetry work moved it by zero bytes — the delegate is a field on a record the
     /// state-machine box already holds a reference to, so reading it is free, and every event site
     /// is behind a null test. This asserts the comparison the budget cannot: that the silent path
     /// has not drifted toward the listening one.
@@ -177,20 +177,20 @@ public sealed class AllocationGateTests
     }
 
     /// <summary>
-    /// Phase 0b's own falsification test. Phase 0a measured a hand-written fused loop to establish
+    /// The falsification test for the shipping executor. The stand-in measured a hand-written fused loop to establish
     /// what was achievable before any library existed; the shipping executor has to match it while
     /// doing strictly more — capturing a per-attempt exception, classifying results, and awaiting a
     /// pre-attempt hook. Both arms are measured in this sweep, so the comparison is not inferred.
     /// </summary>
     [Fact]
-    public void The_shipping_executor_is_no_more_expensive_than_the_phase_0a_stand_in()
+    public void The_shipping_executor_is_no_more_expensive_than_the_stand_in()
     {
         double shipping = _baseline.SuspendingOverhead(Baseline.LibDefault);
         double standIn = _baseline.SuspendingOverhead(Baseline.RealDefault);
 
         _output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
-            $"shipping executor {shipping:0.0} B/op vs Phase 0a stand-in {standIn:0.0} B/op (allowance {Budgets.ShippingVersusStandInAllowance:0} B)"));
+            $"shipping executor {shipping:0.0} B/op vs stand-in {standIn:0.0} B/op (allowance {Budgets.ShippingVersusStandInAllowance:0} B)"));
 
         Assert.True(
             shipping <= standIn + Budgets.ShippingVersusStandInAllowance,
@@ -198,7 +198,7 @@ public sealed class AllocationGateTests
                 CultureInfo.InvariantCulture,
                 $"""
                  The shipping executor now costs {shipping:0.0} B/op above the raw callback against the
-                 Phase 0a stand-in's {standIn:0.0} B/op. The stand-in is the floor Phase 0a established
+                 stand-in's {standIn:0.0} B/op. The stand-in is the floor established
                  for a fused loop doing less work than this one, so the real executor exceeding it means
                  the frame has grown state that the design does not account for.
                  """));
@@ -209,10 +209,10 @@ public sealed class AllocationGateTests
     /// box, and it is paid on the happy path by every suspending call whether or not anything ever
     /// fails.
     ///
-    /// Phase 0a priced it by differencing two stand-in loops, one with the log removed. The shipping
+    /// The stand-in priced it by differencing two stand-in loops, one with the log removed. The shipping
     /// executor has no log-less variant — the log is not optional — so this asserts the layout that
     /// determines the cost: capacity times record size, both of which a change would have to move.
-    /// Phase 1 shrank the record from 24 bytes to 16 and kept the capacity at 4, taking the log from
+    /// The record shrank from 24 bytes to 16 and the capacity stayed at 4, taking the log from
     /// 96 B of box to 64 B.
     /// </summary>
     [Fact]
@@ -238,8 +238,8 @@ public sealed class AllocationGateTests
     /// A verdict is live across the attempt <c>await</c>, so every byte of it is paid for in the
     /// state-machine box of every suspending call.
     ///
-    /// Phase 8 added <c>SelfImposed</c> - the bit that keeps the retry budget from being charged for
-    /// a refusal local admission control imposed on this process - on the premise that a <c>bool</c>
+    /// <c>SelfImposed</c> - the bit that keeps the retry budget from being charged for
+    /// a refusal local admission control imposed on this process - was added on the premise that a <c>bool</c>
     /// packs into the padding the single-byte <c>Kind</c> already leaves beside a nullable
     /// <see cref="TimeSpan"/>. That premise is the whole reason the flag is not a fifth
     /// <c>VerdictKind</c>, and it is asserted here rather than assumed.

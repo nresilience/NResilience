@@ -4,9 +4,9 @@ using System.Runtime.CompilerServices;
 namespace NResilience.Probes;
 
 /// <summary>
-/// Exponential backoff with full jitter and a hard cap, and separate base delays for
-/// transient and throttled verdicts. Jitter draws from a thread-static xoshiro128** so the
-/// hot path takes no lock and touches no shared <see cref="Random"/>.
+/// Implements exponential backoff with full jitter, a hard cap, and separate base delays
+/// for transient and throttled verdicts. Jitter draws from a thread-static xoshiro128**
+/// to ensure the hot path takes no lock and touches no shared <see cref="Random"/>.
 /// </summary>
 public static class ProbeBackoff
 {

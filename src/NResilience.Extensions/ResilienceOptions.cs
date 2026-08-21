@@ -107,18 +107,18 @@ public sealed class ResilienceOptions
     /// </summary>
     public bool? Telemetry { get; set; }
 
-/// <summary>
-/// Whether the registered policy writes log records: <c>"Off"</c>, <c>"Default"</c> or
-/// <c>"Verbose"</c> (case-insensitive). At <c>"Default"</c>, the policy writes nothing above
-/// <see cref="Microsoft.Extensions.Logging.LogLevel.Trace"/> while the dependency is healthy -
-/// see <see cref="ResilienceLogging"/>.
-/// <para>
-/// A string is used instead of an enum to ensure that typos produce a message naming the valid
-/// values rather than a binder stack trace. A string is used instead of a <see cref="bool"/> because
-/// logging has multiple levels; for instance, <c>"Logging": "Verbose"</c> provides the necessary
-/// detail to diagnose why a call is not being retried.
-/// </para>
-/// </summary>
+    /// <summary>
+    /// Whether the registered policy writes log records: <c>"Off"</c>, <c>"Default"</c> or
+    /// <c>"Verbose"</c> (case-insensitive). At <c>"Default"</c>, the policy writes nothing above
+    /// <see cref="Microsoft.Extensions.Logging.LogLevel.Trace"/> while the dependency is healthy -
+    /// see <see cref="ResilienceLogging"/>.
+    /// <para>
+    /// A string is used instead of an enum to ensure that typos produce a message naming the valid
+    /// values rather than a binder stack trace. A string is used instead of a <see cref="bool"/> because
+    /// logging has multiple levels; for instance, <c>"Logging": "Verbose"</c> provides the necessary
+    /// detail to diagnose why a call is not being retried.
+    /// </para>
+    /// </summary>
     public string? Logging { get; set; }
 
     /// <summary>

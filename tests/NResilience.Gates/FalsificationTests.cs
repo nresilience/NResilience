@@ -4,7 +4,7 @@ using Xunit;
 namespace NResilience.Gates;
 
 /// <summary>
-/// Phase 0a is not benchmarking infrastructure. It is the falsification test for the whole
+/// This is not benchmarking infrastructure. It is the falsification test for the whole
 /// design, and this class is where that test lives.
 ///
 /// The claim under test: fusing the pipeline into one async frame substantially cuts allocation
@@ -13,8 +13,8 @@ namespace NResilience.Gates;
 /// by subtracting across two harnesses. That subtraction is the failure mode the design document
 /// criticises, and it produced the 4-8x figure these tests exist to check.
 ///
-/// Phase 0a ran these against a hand-written stand-in, because the point of running them first was
-/// that no library code existed to bias them. Phase 0b re-points them at the shipping executor,
+/// These tests first ran against a hand-written stand-in, because the point of running them first was
+/// that no library code existed to bias them. They now point at the shipping executor,
 /// which is the version that has to hold from here on.
 /// </summary>
 [Collection(BaselineCollection.Name)]

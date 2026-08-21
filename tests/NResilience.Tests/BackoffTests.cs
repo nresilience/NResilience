@@ -1,6 +1,6 @@
 namespace NResilience.Tests;
 
-/// <summary>The delay between one attempt and the next.</summary>
+/// <summary>Tests for the delay between one attempt and the next.</summary>
 public sealed class BackoffTests
 {
     [Fact]

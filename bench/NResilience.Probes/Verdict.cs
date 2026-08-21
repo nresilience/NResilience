@@ -1,9 +1,8 @@
 namespace NResilience.Probes;
 
 /// <summary>
-/// Phase 0a stand-in for the shipping <c>VerdictKind</c>. Values and semantics match
-/// plans/nresilience-design-v3.md so the fused loop branches the same number of times
-/// the real executor will.
+/// A stand-in for the shipping <c>VerdictKind</c>. The values and semantics match
+/// plans/nresilience-design-v3.md so the fused loop branches identically to the real executor.
 /// </summary>
 public enum VerdictKind : byte
 {
@@ -13,7 +12,7 @@ public enum VerdictKind : byte
     Permanent,
 }
 
-/// <summary>Phase 0a stand-in for the shipping <c>Verdict</c>.</summary>
+/// <summary>A stand-in for the shipping <c>Verdict</c>.</summary>
 public readonly record struct Verdict(VerdictKind Kind, TimeSpan? RetryAfter = null)
 {
     public static Verdict Ok => new(VerdictKind.Ok);
@@ -26,9 +25,9 @@ public readonly record struct Verdict(VerdictKind Kind, TimeSpan? RetryAfter = n
 }
 
 /// <summary>
-/// The classification rules of <c>Classifier.Default</c>, hard-coded. Phase 0a measures the
-/// executor frame, not the classifier's storage, so the rule lookup is a synchronous type
-/// switch — which is what the shipping classifier compiles down to on the hot path anyway.
+/// Implements the classification rules of <c>Classifier.Default</c> using a hard-coded switch. 
+/// This project measures the executor frame rather than classifier storage, so rule lookup is 
+/// a synchronous type switch - the same approach the shipping classifier uses on the hot path.
 /// </summary>
 public static class ProbeClassifier
 {

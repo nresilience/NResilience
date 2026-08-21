@@ -4,17 +4,17 @@ using Microsoft.Extensions.Time.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-/// Telemetry: <see cref="CallEvent"/> and <see cref="Resilience.OnEvent"/>.
+/// Tests for telemetry: including <see cref="CallEvent"/> and <see cref="Resilience.OnEvent"/>.
 /// <para>
-/// The claim under test is not "events fire" but "the events describe what actually happened",
-/// so most of these assert on the whole sequence a call produced rather than on the presence of
-/// one kind in it. A telemetry surface that emits the right events in the wrong order, or emits
-/// a <c>Retrying</c> for a retry that never ran, is worse than none: it is a log people believe.
+/// These tests verify that events accurately describe the outcome, rather than just checking 
+/// that they fire. A telemetry surface that emits events in the wrong order or reports a 
+/// <c>Retrying</c> event for a retry that never ran is misleading and therefore worse than 
+/// having no telemetry.
 /// </para>
 /// </summary>
 public sealed class TelemetryTests
 {
-    /// <summary>Collects a call's events in order, and is safe to hand to a listener from any thread.</summary>
+    /// <summary>Collects call events in order. This recorder is thread-safe for listeners.</summary>
     private sealed class Recorder
     {
         private readonly ConcurrentQueue<CallEvent> _events = new();
@@ -66,9 +66,9 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// A listener is the one thing that takes a policy out of passthrough. Handing back the
-    /// callback's own task would be cheaper and would silently raise nothing, and a listener that
-    /// never fires is a worse surprise than a policy that stopped being free the moment it was
+    /// A listener is the only feature that takes a policy out of passthrough. Handing back 
+    /// the callback's own task is cheaper and would raise no events, but a listener that 
+    /// never fires is a worse surprise than a policy that stops being free once 
     /// explicitly instrumented.
     /// </summary>
     [Fact]
@@ -113,8 +113,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// The design's own example: "log every retry with the status code that caused it". A
-    /// cross-cutting listener has no <c>T</c> to be generic over, so the value arrives boxed.
+    /// Implements the design example: "log every retry with the status code that caused it". 
+    /// Because a cross-cutting listener is not generic over <c>T</c>, the value is boxed.
     /// </summary>
     [Fact]
     public async Task The_result_that_was_classified_a_failure_is_on_the_event()
@@ -134,8 +134,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// A void call has no result to report, and the internal no-result placeholder must never be
-    /// what a listener sees instead.
+    /// A void call has no result to report. The internal no-result placeholder must not 
+    /// be visible to the listener.
     /// </summary>
     [Fact]
     public async Task A_void_call_reports_no_result_rather_than_a_placeholder()
@@ -169,9 +169,9 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// <c>Retrying</c> is raised before the backoff is served and names the attempt that is about
-    /// to run, so a listener can say "retrying attempt 2 in 500 ms" rather than reporting it
-    /// afterwards.
+    /// <c>Retrying</c> is raised before the backoff is served and identifies the attempt 
+    /// that is about to run. This allows a listener to report, for example, "retrying 
+    /// attempt 2 in 500 ms".
     /// </summary>
     [Fact]
     public async Task Retrying_carries_the_backoff_and_the_number_of_the_attempt_it_precedes()
@@ -200,13 +200,10 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Running out of attempts is terminal and says so.
-    /// <para>
-    /// This is the ordinary way a retried call fails, and the event exists so that
-    /// <i>every</i> call ends with exactly one terminal event. A listener counting logical
-    /// operations that skipped this kind would count only the calls that succeeded — which is the
-    /// denominator of the retry fraction, and the one number the metric set exists to produce.
-    /// </para>
+    /// Running out of attempts is a terminal state. This event ensures that every call 
+    /// ends with exactly one terminal event. A listener counting logical operations 
+    /// that skips this event would only count successful calls, which would invalidate 
+    /// the retry fraction metric.
     /// </summary>
     [Fact]
     public async Task Exhausting_the_attempts_is_a_terminal_event()
@@ -227,8 +224,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Every call ends with exactly one terminal event, whatever it did on the way — the invariant
-    /// a stateless listener needs in order to count logical operations at all.
+    /// Every call ends with exactly one terminal event, regardless of the path taken. 
+    /// This invariant allows a stateless listener to count logical operations.
     /// </summary>
     [Theory]
     [InlineData(0, CallEventKind.Succeeded, StopReason.Succeeded)]
@@ -263,10 +260,9 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// The two refusals a <see cref="CallEventKind.Rejected"/> event covers are the difference
-    /// between "the dependency is down" and "we are retrying too hard" — two facts that call for
-    /// opposite responses, and that a stateless listener cannot tell apart from any other field on
-    /// the event.
+    /// A <see cref="CallEventKind.Rejected"/> event can cover two types of refusals: 
+    /// "the dependency is down" or "we are retrying too hard". These require opposite 
+    /// responses, and the reason field distinguishes them.
     /// </summary>
     [Fact]
     public async Task A_rejection_says_which_guard_refused_the_call()
@@ -281,7 +277,7 @@ public sealed class TelemetryTests
         Assert.Equal(StopReason.DependencyUnavailable, recorder.Single(CallEventKind.Rejected).Reason);
     }
 
-    /// <summary>Non-terminal events carry no stop reason, because nothing has stopped.</summary>
+    /// <summary>Non-terminal events do not carry a stop reason because the operation has not stopped.</summary>
     [Fact]
     public async Task A_non_terminal_event_carries_no_reason()
     {
@@ -298,9 +294,8 @@ public sealed class TelemetryTests
     // ---- Not retried ----
 
     /// <summary>
-    /// The event that makes <see cref="Classifier.Default"/> not retrying an unrecognised
-    /// exception type visible rather than mysterious. The type is on the event, which is the whole
-    /// reason this kind exists.
+    /// An unrecognized exception type raises a <see cref="CallEventKind.NotRetried"/> event 
+    /// that names the type, making the failure visible rather than mysterious.
     /// </summary>
     [Fact]
     public async Task An_unrecognised_exception_type_raises_NotRetried_naming_the_type()
@@ -521,10 +516,9 @@ public sealed class TelemetryTests
     // ---- Orphaned work ----
 
     /// <summary>
-    /// A callback that ignores the token it was handed keeps running after the attempt timeout
-    /// gave up on it. The executor is blocked on that very task, so this is reported the moment
-    /// the work finally does return — see plans/phase-3-results.md for why it cannot be reported
-    /// any sooner without changing what an attempt costs.
+    /// A callback that ignores its token continues running after the attempt timeout expires. 
+    /// Because the executor is blocked on that task, the event is reported when the work 
+    /// finally returns.
     /// </summary>
     [Fact]
     public async Task Work_that_outlives_its_attempt_timeout_raises_OrphanedWork()
@@ -580,8 +574,8 @@ public sealed class TelemetryTests
     // ---- The listener itself ----
 
     /// <summary>
-    /// Telemetry that can fail the operation it is observing is worse than no telemetry, so a
-    /// listener that throws is swallowed rather than allowed to become the call's outcome.
+    /// Telemetry that can fail the operation it observes is worse than no telemetry. 
+    /// Therefore, a listener that throws is swallowed to avoid affecting the call's outcome.
     /// </summary>
     [Fact]
     public async Task A_listener_that_throws_does_not_fail_the_call()
@@ -602,9 +596,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Caller cancellation is never a failure and never a retry, so it produces no terminal event
-    /// of its own — there is no <c>Cancelled</c> kind and inventing one would make cancellation
-    /// look like something the policy decided.
+    /// Caller cancellation is neither a failure nor a retry and produces no terminal event. 
+    /// This prevents cancellation from appearing as a policy-driven decision.
     /// </summary>
     [Fact]
     public async Task Caller_cancellation_raises_no_terminal_event()
@@ -620,10 +613,7 @@ public sealed class TelemetryTests
         Assert.Empty(recorder.Events);
     }
 
-    /// <summary>
-    /// Every event carries the policy name, so one listener registered across many policies can
-    /// tell which one produced a line.
-    /// </summary>
+    /// <summary>Every event carries the policy name, allowing a single listener to distinguish between multiple policies.</summary>
     [Fact]
     public async Task Every_event_carries_the_policy_name()
     {

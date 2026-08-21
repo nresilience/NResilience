@@ -1,5 +1,5 @@
 // The probe namespace is nested inside NResilience and defines its own Verdict, Backoff and
-// AttemptBuffer as Phase 0a stand-ins, so an unqualified name here would bind to the stand-in
+// AttemptBuffer as stand-ins, so an unqualified name here would bind to the stand-in
 // rather than to the shipping type. `Lib` makes every reference to the library unambiguous.
 using NResilience.Extensions;
 using Lib = NResilience;
@@ -7,21 +7,20 @@ using Lib = NResilience;
 namespace NResilience.Probes;
 
 /// <summary>
-/// The Phase 0b arms: the same measurements Phase 0a took against a hand-written stand-in, taken
-/// against the shipping <see cref="Lib.Resilience"/> executor.
+/// The shipping arms: these measurements repeat the stand-in tests against the shipping 
+/// <see cref="Lib.Resilience"/> executor.
 ///
 /// <para>
-/// Phase 0a's split into 0a and 0b existed to break a circularity — 0a needed no library code, so
-/// a stand-in loop established both the Polly figure and the achievable floor before anything was
-/// built on it, and 0b re-runs the identical harness against the real thing. Nothing about the
-/// instrument changes here: the same <see cref="Gate"/>, the same <see cref="AllocationProbe"/>,
-/// the same process, the same run. Only the executor under test is different, so any movement is
-/// attributable to it.
+/// The stand-in phase was split into two to break a circularity: the first required no library 
+/// code, allowing a stand-in loop to establish the Polly baseline and the achievable floor. 
+/// The second re-runs the identical harness against the real implementation. The 
+/// instrument remains identical: the same <see cref="Gate"/>, <see cref="AllocationProbe"/>, 
+/// process, and run. Any performance difference is therefore attributable to the executor.
 /// </para>
 /// <para>
-/// The stand-in arms in <see cref="Scenarios"/> are kept and still measured, because a 0a-versus-0b
-/// delta is only meaningful if both sides were taken in one process under one GC in one tier state.
-/// They are reference rows now; the gates assert against the arms here.
+/// Stand-in arms from <see cref="Scenarios"/> are still measured because a stand-in-versus-shipping 
+/// delta is only meaningful if both sides are captured in one process under one GC 
+/// and one tier state. These serve as reference rows; the gates assert against the arms here.
 /// </para>
 /// </summary>
 public static class ShippingScenarios
@@ -30,10 +29,10 @@ public static class ShippingScenarios
     private static readonly Func<CancellationToken, Task<int>> CompleteCallback = Gate.CompleteAsync;
 
     /// <summary>
-    /// The trivial shipping shape: retry and classification, with no deadline and no attempt
-    /// timeout. This is as small as a non-passthrough policy gets, and it is the arm the
-    /// trivial-policy comparison uses — the inline attempt log is not optional in the shipping
-    /// executor, so there is no "no log" variant to measure.
+    /// The trivial shipping shape: implements retry and classification without a deadline 
+    /// or attempt timeout. This is the smallest non-passthrough policy possible and is 
+    /// used for the trivial-policy comparison. The inline attempt log is mandatory in 
+    /// the shipping executor, so no "no log" variant exists.
     /// </summary>
     public static readonly Lib.Resilience Trivial = Lib.Resilience.Default with
     {
@@ -57,22 +56,22 @@ public static class ShippingScenarios
     public static ValueTask<int> DefaultSuspendingCancellable() => Lib.Resilience.Default.RunAsync(SuspendCallback, Scenarios.CallerSource.Token);
 
     /// <summary>
-    /// <c>TryRunAsync</c> always materialises the attempt log, because its caller has explicitly
-    /// asked for a result object. Measured so the cost of asking is a published number rather than
-    /// a surprise.
+    /// <c>TryRunAsync</c> always materializes the attempt log because the caller explicitly 
+    /// requests a result object. This is measured so the cost of this request is published 
+    /// rather than unexpected.
     /// </summary>
     public static ValueTask<Lib.CallResult<int>> TryRunDefaultSuspending() => Lib.Resilience.Default.TryRunAsync(SuspendCallback);
 
     /// <summary>
-    /// <see cref="Lib.Resilience.Default"/> with a listener attached: the price of telemetry when
-    /// somebody is actually listening.
+    /// <see cref="Lib.Resilience.Default"/> with an attached listener, representing the cost 
+    /// of telemetry when a listener is active.
     ///
     /// <para>
-    /// The listener does nothing, on purpose. What is being priced is the executor's side of the
-    /// contract — raising the events and boxing each attempt's result for a cross-cutting listener
-    /// that has no <c>T</c> to be generic over — not whatever a real listener would then do with
-    /// them. The delegate is a cached static, because a lambda written inline at the call site
-    /// would allocate a delegate per operation and charge telemetry for the caller's own style.
+    /// The listener is intentionally empty. The benchmark measures the executor's side 
+    /// of the contract: raising events and boxing each attempt's result for a 
+    /// cross-cutting listener that is not generic over <c>T</c>. The delegate is a 
+    /// cached static to avoid allocating a delegate per operation, which would 
+    /// incorrectly charge telemetry for the caller's coding style.
     /// </para>
     /// </summary>
     public static readonly Lib.Resilience DefaultWithListener = Lib.Resilience.Default with
@@ -83,14 +82,15 @@ public static class ShippingScenarios
     public static ValueTask<int> DefaultListenerSuspending() => DefaultWithListener.RunAsync(SuspendCallback);
 
     /// <summary>
-    /// The same policy with the shipping log listener chained on behind the do-nothing one, and a
-    /// logger whose every level is disabled.
+    /// This arm uses the shipping log listener chained behind the empty listener, with a 
+    /// logger where all levels are disabled.
     ///
     /// <para>
-    /// This is the arm that prices the promise: a call whose logging levels are all off must allocate
-    /// exactly what the same call allocates with a listener alone. What is being measured is the
-    /// listener's own path - one <c>switch</c> and one <c>IsEnabled</c> call per event, and the
-    /// generated <c>[LoggerMessage]</c> guard that returns before it formats anything.
+    /// This arm verifies the performance promise: a call with disabled logging levels 
+    /// must allocate exactly the same amount as a call with a listener alone. This 
+    /// measures the listener's own path - one <c>switch</c> and one <c>IsEnabled</c> 
+    /// call per event, and the <c>[LoggerMessage]</c> guard that returns before 
+    /// formatting strings.
     /// </para>
     /// </summary>
     public static readonly Lib.Resilience DefaultWithLogging =
@@ -111,8 +111,8 @@ public static class ShippingScenarios
 
     /// <summary>
     /// The same call with an attempt timeout in the policy. The difference between this and
-    /// <see cref="TrivialSyncState"/> is the per-attempt linked source — the reason "full policy,
-    /// sync-completing, 0 bytes" needs a qualifier rather than a fix.
+    /// <see cref="TrivialSyncState"/> is the per-attempt linked source - the reason "full policy,
+    /// completes synchronously, 0 bytes" needs a qualifier rather than a fix.
     /// </summary>
     public static ValueTask<int> DefaultSyncState() =>
         Lib.Resilience.Default.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0);
@@ -120,27 +120,28 @@ public static class ShippingScenarios
     // ---- Retry. ----
 
     /// <summary>
-    /// Two transient failures then a success, matched to the Polly retry arm: three total
-    /// attempts, zero delay, no timeout source. The fault is a cached exception instance, so the
-    /// figure describes the retry machinery rather than exception construction, which both arms
-    /// pay identically.
+    /// Simulates two transient failures followed by a success, matching the Polly retry arm. 
+    /// This uses three total attempts, zero delay, and no timeout source to isolate the 
+    /// retry machinery. The fault uses a cached exception instance to avoid measuring 
+    /// exception construction, which both arms incur identically.
     ///
     /// <para>
-    /// The retry budget is turned <b>off</b> on this arm, and that is a finding rather than a
-    /// convenience. An arm that retries twice per operation, thousands of times a second, with no
-    /// intervening success to fund it, is precisely the traffic pattern the budget exists to refuse -
-    /// so with the shipping default it stops retrying after about thirty operations and the arm
-    /// measures rejections instead of retries. Polly has no budget to disable, so leaving it on would
-    /// also make the A/B a comparison of two different behaviours. What the budget costs when it is
-    /// on is measured by the Default arms, whose successful attempts each take the deposit path.
+    /// The retry budget is disabled for this arm. An arm that retries twice per operation 
+    /// thousands of times per second without intervening success is exactly the pattern 
+    /// the budget prevents. With shipping defaults, such an arm would stop retrying 
+    /// after approximately thirty operations and measure rejections instead. Because 
+    /// Polly has no budget to disable, the budget is turned off here to ensure the 
+    /// comparison reflects identical behaviors. The cost of the budget is measured 
+    /// by the Default arms.
     /// </para>
     /// </summary>
     public static RetryArm BuildRetry(int failures = 2) => new(failures);
 
     /// <summary>
-    /// Two refusals from local admission control then a success. The retry budget is left <b>on</b>,
-    /// unlike the retry arm: a self-imposed refusal is not charged to it, so it cannot run the arm
-    /// out of budget - which is itself the behaviour under test, at scale.
+    /// Simulates two refusals from local admission control followed by a success. Unlike 
+    /// the retry arm, the retry budget remains enabled. A self-imposed refusal is not 
+    /// charged to the budget, meaning the budget cannot be exhausted by this arm - 
+    /// this behavior is the primary subject of the scale tests.
     /// </summary>
     public static LimitArm BuildLimited(int refusals = 2) => new(refusals);
 

@@ -1,6 +1,6 @@
 namespace NResilience.Tests;
 
-/// <summary>The policy value itself: presets, derivation, equality and validation.</summary>
+/// <summary>Tests for the policy value: including presets, derivation, equality, and validation.</summary>
 public sealed class PolicyTests
 {
     [Fact]

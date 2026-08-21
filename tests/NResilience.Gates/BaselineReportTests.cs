@@ -6,7 +6,7 @@ using Xunit;
 namespace NResilience.Gates;
 
 /// <summary>
-/// Not a gate. This prints the full Phase 0a table so the numbers in
+/// Not a gate. This prints the full measurement table so the numbers in
 /// plans/phase-0a-results.md are produced by a command anyone can re-run, rather than
 /// transcribed from a session that no longer exists.
 ///

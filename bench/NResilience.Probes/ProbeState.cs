@@ -3,9 +3,10 @@ using System.Runtime.CompilerServices;
 namespace NResilience.Probes;
 
 /// <summary>
-/// Consecutive-failure breaker, reduced to the state the executor frame actually touches:
-/// one admission check per attempt and one counter update per outcome. Phase 2 owns the
-/// real thing; what matters here is that the fused loop pays for a breaker the way it will.
+/// A consecutive-failure breaker reduced to the state the executor frame actually touches:
+/// one admission check per attempt and one counter update per outcome. The full version
+/// is implemented in the shipping library; this stand-in ensures the fused loop incurs
+/// the same cost as the shipping version.
 /// </summary>
 public sealed class ProbeBreaker
 {
@@ -61,8 +62,9 @@ public sealed class ProbeBreaker
 }
 
 /// <summary>
-/// Client-side retry token bucket. One <see cref="TrySpend"/> per retry decision and one
-/// <see cref="Refund"/> per success, which is the whole of what the executor frame sees.
+/// A client-side retry token bucket. It implements one <see cref="TrySpend"/> per retry 
+/// decision and one <see cref="Refund"/> per success, which is the total state the 
+/// executor frame accesses.
 /// </summary>
 public sealed class ProbeBudget
 {
@@ -112,7 +114,7 @@ public sealed class ProbeBudget
     public void Reset() => Volatile.Write(ref _tokens, _capacity);
 }
 
-/// <summary>Thrown when the breaker refuses admission. Stand-in for the shipping exception.</summary>
+/// <summary>Thrown when the breaker refuses admission. This is a stand-in for the shipping exception.</summary>
 public sealed class ProbeBreakerOpenException : Exception
 {
     public ProbeBreakerOpenException()
@@ -121,7 +123,7 @@ public sealed class ProbeBreakerOpenException : Exception
     }
 }
 
-/// <summary>Thrown when every attempt has been used. Stand-in for the shipping exception.</summary>
+/// <summary>Thrown when every attempt has been used. This is a stand-in for the shipping exception.</summary>
 public sealed class ProbeExhaustedException : Exception
 {
     public ProbeExhaustedException(int attempts)
@@ -131,7 +133,7 @@ public sealed class ProbeExhaustedException : Exception
     public int Attempts { get; }
 }
 
-/// <summary>Thrown when the operation-wide deadline expires. Stand-in for the shipping exception.</summary>
+/// <summary>Thrown when the operation-wide deadline expires. This is a stand-in for the shipping exception.</summary>
 public sealed class ProbeDeadlineException : Exception
 {
     public ProbeDeadlineException()

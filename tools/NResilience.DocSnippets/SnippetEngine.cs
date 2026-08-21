@@ -1,21 +1,22 @@
 namespace NResilience.DocSnippets;
 
-/// <summary>One snippet extracted from a source file.</summary>
+/// <summary>A single snippet extracted from a source file.</summary>
 public sealed record Snippet(string Name, string Language, string Text, string Source);
 
-/// <summary>A markdown file whose snippet blocks do not match the sources.</summary>
+/// <summary>A markdown file where snippet blocks do not match the sources.</summary>
 public sealed record Drift(string File, string Detail);
 
 /// <summary>
-/// The docs gate: snippets live in a compiled, executing test project and are inlined into the
-/// markdown from there. Nothing in the docs is hand-maintained C#.
+/// The documentation gate: snippets live in a compiled, executing test project and are 
+/// inlined into the markdown. This ensures that no C# code in the documentation is 
+/// maintained by hand.
 /// </summary>
 public static class SnippetEngine
 {
     private const string OpenPrefix = "<!-- snippet:";
     private const string CloseMarker = "<!-- endsnippet -->";
 
-    /// <summary>Reads every snippet out of a source tree.</summary>
+    /// <summary>Reads all snippets from a source tree.</summary>
     public static Dictionary<string, Snippet> Collect(string sourceRoot)
     {
         var snippets = new Dictionary<string, Snippet>(StringComparer.Ordinal);
@@ -38,7 +39,7 @@ public static class SnippetEngine
         return snippets;
     }
 
-    /// <summary>Rewrites every snippet block in a markdown tree, and reports what changed.</summary>
+    /// <summary>Rewrites all snippet blocks in a markdown tree and reports changes.</summary>
     public static IReadOnlyList<Drift> Sync(string docsRoot, Dictionary<string, Snippet> snippets, bool write)
     {
         var drift = new List<Drift>();

@@ -5,15 +5,15 @@ namespace NResilience.Gates;
 /// and .NET 8.0.22, arm64, Release, workstation non-concurrent GC, and is recorded with its
 /// measured value beside it so a failure reads as "this moved" rather than "this is wrong".
 ///
-/// Phase 2 added the breaker and the retry budget and moved every suspending figure by exactly
+/// The breaker and the retry budget moved every suspending figure by exactly
 /// <b>8 bytes</b> — one reference field in the state-machine box, for the budget the call will
 /// charge. No budget was widened for it; the design's open question 1 allowed 64 B of headroom for
-/// Phase 2 and this used an eighth of it. The breaker costs nothing in the box at all, because the
+/// the breaker and budget and this used an eighth of it. The breaker costs nothing in the box at all, because the
 /// policy holding it is already a field.
 ///
-/// Phase 0b re-pointed every budget at the <b>shipping</b> executor. Where a figure changed, the
-/// Phase 0a stand-in value is kept in the comment, because the delta is the answer to the question
-/// Phase 0 exists to ask.
+/// Every budget points at the <b>shipping</b> executor. Where a figure changed, the
+/// stand-in value is kept in the comment, because the delta is the answer to the question
+/// the stand-in exists to ask.
 ///
 /// Budgets carry roughly 15% headroom over the measured figure, because allocation is
 /// deterministic but not identical across architectures. They are ceilings, not targets: a
@@ -42,7 +42,7 @@ public static class Budgets
     /// </summary>
     public const double FullPolicyWithTimeoutSyncOverhead = 72;
 
-    // ---- Suspending path. Measured against the shipping executor in Phase 0b. ----
+    // ---- Suspending path. Measured against the shipping executor. ----
 
     /// <summary>
     /// The instrument's noise floor, applied to every suspending assertion.
@@ -65,23 +65,23 @@ public static class Budgets
 
     /// <summary>
     /// The trivial shipping shape: retry and classification, no deadline and no attempt timeout.
-    /// Measured: 328 B on .NET 10, 313 B on .NET 8, against the Phase 0a stand-in's 336 B.
-    /// (320 B and 308 B before Phase 2.)
+    /// Measured: 328 B on .NET 10, 313 B on .NET 8, against the stand-in's 336 B.
+    /// (320 B and 308 B before the breaker and budget.)
     /// </summary>
     public const double TrivialOverhead = 368;
 
     /// <summary>
     /// The realistic policy — <c>Resilience.Default</c>: three attempts, a deadline, an attempt
     /// timeout, exponential backoff, classification and the inline attempt log.
-    /// Measured: 393 B on .NET 10, 390 B on .NET 8, against the Phase 0a stand-in's 401 B.
-    /// (384 B and 381 B before Phase 2.)
+    /// Measured: 393 B on .NET 10, 390 B on .NET 8, against the stand-in's 401 B.
+    /// (384 B and 381 B before the breaker and budget.)
     /// </summary>
     public const double DefaultOverhead = 448;
 
     /// <summary>
     /// The same call with a caller token that can be cancelled and never is — the production case.
     /// Measured: 408 B on .NET 10, 407 B on .NET 8, against the stand-in's 416 B (400 B and 397 B
-    /// before Phase 2). The extra 15 B over <see cref="DefaultOverhead"/> is the marginal cost of
+    /// before the breaker and budget). The extra 15 B over <see cref="DefaultOverhead"/> is the marginal cost of
     /// linking against a long-lived source whose registration storage already exists; see
     /// <see cref="MinimumSocketRatioVersusPolly"/> for what the same link costs when real I/O
     /// registers on the resulting token.
@@ -91,7 +91,7 @@ public static class Budgets
     /// <summary>
     /// <c>TryRunAsync</c>, which always materialises the attempt log because its caller has
     /// explicitly asked for a result object. Measured: 561 B on .NET 10, 558 B on .NET 8 (553 B and
-    /// 551 B before Phase 2) — so asking for the history costs about 170 B over the throwing form.
+    /// 551 B before the breaker and budget) — so asking for the history costs about 170 B over the throwing form.
     /// Budgeted rather than left to be discovered by a caller who assumed the two were the same
     /// price.
     /// </summary>
@@ -102,7 +102,7 @@ public static class Budgets
     /// .NET 8 — 48 B over <see cref="DefaultOverhead"/>, which is two boxed <c>int</c> results,
     /// one for the attempt and one for the success.
     ///
-    /// Phase 3's whole claim is in that number: raising the events themselves is free, because
+    /// The whole claim is in that number: raising the events themselves is free, because
     /// <c>CallEvent</c> is a struct passed by value to an <see cref="System.Action{T}"/> and the
     /// delegate is a field on a policy the state-machine box already holds. What a listener costs
     /// is the one thing it asked for that cannot be given away — the attempt's result, boxed,
@@ -131,14 +131,14 @@ public static class Budgets
     public const double DisabledLoggingAllowance = SuspendingNoiseFloor;
 
     /// <summary>
-    /// The shipping executor must not be more expensive than the hand-written stand-in Phase 0a
+    /// The shipping executor must not be more expensive than the hand-written stand-in
     /// used to establish the achievable floor. Measured: 393 B against 401 B on .NET 10 — the real
     /// loop is <i>cheaper</i>, while additionally capturing a per-attempt exception, classifying
     /// results, awaiting a pre-attempt hook and carrying the retry budget the stand-in's own
     /// breaker-and-budget arm did not charge for.
     ///
     /// This is the gate that would catch the design's central mechanism failing to survive
-    /// implementation, which is the whole reason Phase 0 was split into 0a and 0b. The allowance is
+    /// implementation. The allowance is
     /// for tier and GC drift between two arms of the same sweep, not for regression headroom.
     /// </summary>
     public const double ShippingVersusStandInAllowance = 16;
@@ -148,7 +148,7 @@ public static class Budgets
     /// <c>AttemptBuffer.Capacity</c> (4) x <c>sizeof(AttemptRecord)</c> (16) = 64 bytes of
     /// state-machine box, paid by every suspending call whether or not anything ever fails.
     ///
-    /// Phase 0a measured this by running the identical stand-in loop with the log removed, and got
+    /// The stand-in measured this by running the identical stand-in loop with the log removed, and got
     /// 96 B for a 24-byte record. The shipping executor has no log-less variant to difference
     /// against — the log is not optional — so the gate asserts the layout instead, which is the
     /// thing a change would actually move.
@@ -160,7 +160,7 @@ public static class Budgets
     /// <c>SelfImposed</c> and a nullable <see cref="TimeSpan"/>, which the runtime lays out in 24
     /// bytes.
     ///
-    /// Phase 8 added the <c>SelfImposed</c> flag on the premise that it packs into the padding the
+    /// The <c>SelfImposed</c> flag was added on the premise that it packs into the padding the
     /// single-byte <c>Kind</c> already leaves, and is therefore free. A verdict is live across the
     /// attempt <c>await</c> and so is paid for in the state-machine box of every suspending call,
     /// which makes that premise worth asserting rather than assuming: if the struct ever grows, the
@@ -179,7 +179,7 @@ public static class Budgets
     /// Measured: 3.2x. The design document predicted 4-8x for a realistic policy, so this gate is
     /// set at the level below which the architectural argument stops paying for itself rather than
     /// at the measured value. If this fails, collapsing composition is no longer worth what it
-    /// costs in flexibility, and that is a Phase 0 answer, not a Phase 6 discovery.
+    /// costs in flexibility, and that is an answer the falsification test exists to give.
     /// </summary>
     public const double MinimumOverheadRatioVersusPolly = 2.5;
 
@@ -199,8 +199,8 @@ public static class Budgets
     /// <summary>
     /// The trivial-policy comparison, which is not a win and is gated as such.
     ///
-    /// The design predicted 2-3x here. Phase 0a falsified it (1.27x for a stripped stand-in), and
-    /// Phase 0b settles it against the shipping executor: the smallest non-passthrough policy the
+    /// The design predicted 2-3x here. The stand-in falsified it (1.27x for a stripped stand-in), and
+    /// the shipping executor settles it: the smallest non-passthrough policy the
     /// library can express costs 320 B against Polly's empty-pipeline 304 B, a ratio of
     /// <b>1.05x the wrong way</b>. The two are not doing the same work — Polly's empty pipeline does
     /// nothing at all, while the fused loop is classifying, retrying and recording attempts — but the
@@ -225,7 +225,7 @@ public static class Budgets
     /// Two transient failures then a success, against the shipping executor, with the retry budget
     /// turned off - see ShippingScenarios.RetryArm for why an arm that retries thousands of times a
     /// second is precisely what the budget exists to refuse. Measured: 2,056 B on .NET 10 and
-    /// 2,344 B on .NET 8, against the Phase 0a stand-in's 2,113 B and 2,848 B — so the
+    /// 2,344 B on .NET 8, against the stand-in's 2,113 B and 2,848 B — so the
     /// real retry path is cheaper than the stand-in on both, and markedly so on .NET 8.
     ///
     /// Dominated by exception capture and rethrow, which both arms pay. Gated loosely on the

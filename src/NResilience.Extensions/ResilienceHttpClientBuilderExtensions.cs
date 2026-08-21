@@ -100,15 +100,15 @@ public static class ResilienceHttpClientBuilderExtensions
     /// is looking for.
     /// </para>
     /// </summary>
-/// <summary>
-/// Attaches the log listener using the category derived from the policy's name. For a client
-/// registered here, this is the client name; consequently, an <c>appsettings.json</c> filter
-/// for <c>NResilience.&lt;clientName&gt;</c> matches every host the client contacts.
-/// <para>
-/// First-attach-wins: a policy that is already logging (via a named registration or a
-/// <c>configure</c> callback that called <c>WithLogging</c>) retains its existing listener.
-/// </para>
-/// </summary>
+    /// <summary>
+    /// Attaches the log listener using the category derived from the policy's name. For a client
+    /// registered here, this is the client name; consequently, an <c>appsettings.json</c> filter
+    /// for <c>NResilience.&lt;clientName&gt;</c> matches every host the client contacts.
+    /// <para>
+    /// First-attach-wins: a policy that is already logging (via a named registration or a
+    /// <c>configure</c> callback that called <c>WithLogging</c>) retains its existing listener.
+    /// </para>
+    /// </summary>
     private static Resilience Logged(Resilience policy, IServiceProvider services, ResilienceLogProfile? profile)
     {
         if (services.GetService<ILoggerFactory>() is not { } factory)

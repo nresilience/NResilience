@@ -7,7 +7,7 @@ namespace NResilience.Tests;
 /// <summary>
 /// Registration, resolution and hot reload.
 /// <para>
-/// The design's claim about this phase is that hot reload is a reference swap rather than a
+/// The design's claim is that hot reload is a reference swap rather than a
 /// machine: a policy is an immutable value, so there is no in-flight execution to drain and no
 /// pipeline to rebuild. The tests that matter here are therefore about what survives the swap — a
 /// breaker's state must, and the configuration must not.

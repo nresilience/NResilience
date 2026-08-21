@@ -167,11 +167,11 @@ public static class ResilienceServiceCollectionExtensions
     /// services.AddResilienceLogging(o => o.Profile = ResilienceLogProfile.Verbose);
     /// </code>
     /// </example>
-/// <remarks>
-/// This does not enable logging: a policy registered in a container logs by default. This method
-/// allows the process-wide settings to be discoverable via IntelliSense when calling <c>services.AddResilience</c>.
-/// A single policy can override the profile using <see cref="ResilienceOptions.Logging"/>.
-/// </remarks>
+    /// <remarks>
+    /// This does not enable logging: a policy registered in a container logs by default. This method
+    /// allows the process-wide settings to be discoverable via IntelliSense when calling <c>services.AddResilience</c>.
+    /// A single policy can override the profile using <see cref="ResilienceOptions.Logging"/>.
+    /// </remarks>
     public static IServiceCollection AddResilienceLogging(
         this IServiceCollection services,
         Action<ResilienceLoggingOptions>? configure = null)

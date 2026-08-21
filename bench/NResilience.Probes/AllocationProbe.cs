@@ -1,24 +1,26 @@
 namespace NResilience.Probes;
 
-/// <summary>How a measurement counts bytes.</summary>
+/// <summary>Defines how a measurement counts bytes.</summary>
 public enum AllocationCounter
 {
     /// <summary>
-    /// <c>GC.GetAllocatedBytesForCurrentThread()</c>. Exact, and the instrument named by the CI
-    /// gate table — but valid <b>only</b> where the measured body never suspends, because a
-    /// continuation resumed on a thread-pool thread allocates against that thread's counter.
+    /// Uses <c>GC.GetAllocatedBytesForCurrentThread()</c>. This is exact and is the 
+    /// instrument named by the CI gate table. It is valid only where the measured 
+    /// body never suspends, because a continuation resumed on a thread-pool thread 
+    /// allocates against that thread's counter.
     /// </summary>
     ThreadLocal,
 
     /// <summary>
-    /// <c>GC.GetTotalAllocatedBytes(precise: true)</c>. Process-wide, and therefore immune to
-    /// the thread hop that every suspending await performs. Requires a quiesced process, which
-    /// is why the gate assembly disables test parallelisation.
+    /// Uses <c>GC.GetTotalAllocatedBytes(precise: true)</c>. This is process-wide and 
+    /// therefore immune to the thread hop that every suspending await performs. 
+    /// It requires a quiesced process, which is why the gate assembly disables 
+    /// test parallelisation.
     /// </summary>
     ProcessWide,
 }
 
-/// <summary>One arm's measured allocation.</summary>
+/// <summary>A single arm's measured allocation.</summary>
 public sealed record AllocationMeasurement(string Name, double BytesPerOperation, AllocationCounter Counter, int Iterations, int Repeats)
 {
     public override string ToString() => $"{Name,-34} {BytesPerOperation,9:0.0} B/op  ({Counter}, {Repeats}x{Iterations})";
@@ -27,30 +29,30 @@ public sealed record AllocationMeasurement(string Name, double BytesPerOperation
 /// <summary>
 /// The allocation instrument behind the hard gate.
 ///
-/// Three things it does that a naive loop does not, each of which changes the answer:
+/// This instrument differs from a naive loop in three ways, each of which changes the result:
 ///
 /// <list type="number">
-///   <item><b>It picks the counter from the shape of the body.</b> The thread-local counter is
-///   exact but wrong the moment an await suspends; the process-wide counter survives thread
-///   hops but needs a quiet process. Sync-completing scenarios use the first, suspending
-///   scenarios the second. Using the thread-local counter for a suspending body silently
-///   under-reports, which would make every number in Phase 0a flattering and false.</item>
+///   <item>It selects the counter based on the shape of the body. The thread-local counter 
+///   is exact but incorrect the moment an await suspends; the process-wide counter survives 
+///   thread hops but needs a quiet process. Sync-completing scenarios use the first, 
+///   and suspending scenarios use the second. Using the thread-local counter for a 
+///   suspending body silently under-reports results.</item>
 ///
-///   <item><b>It warms to tier 1 and waits for it.</b> Tiered compilation promotes on call count
-///   <i>and</i> a background delay (100 ms by default), and tier-1 escape analysis is what
-///   removes allocations. Measuring a tier-0 body reports allocations that production would
+///   <item>It warms to tier 1 and waits for promotion. Tiered compilation promotes based on 
+///   call count and a background delay (100 ms by default). Tier-1 escape analysis removes 
+///   allocations, so measuring a tier-0 body reports allocations that production would 
 ///   never make.</item>
 ///
-///   <item><b>It reports the minimum across repeats, not the mean.</b> Allocation noise is
-///   one-sided: a stray timer or finalizer can only add bytes. The minimum is the estimate
-///   closest to the noise-free truth.</item>
+///   <item>It reports the minimum across repeats rather than the mean. Allocation noise 
+///   is one-sided; a stray timer or finalizer can only add bytes. The minimum provides 
+///   the estimate closest to the noise-free truth.</item>
 /// </list>
 ///
-/// It is generic in the arm's result type, and that is load-bearing rather than tidy: an arm that
-/// returns something other than the shared gate's <c>int</c> — <c>TryRunAsync</c> returns a
-/// <c>CallResult&lt;T&gt;</c> — would otherwise need a conversion wrapper, and a wrapper that
-/// suspends allocates a state-machine box the other arms do not pay. Every arm is awaited directly
-/// by the loop in its own natural shape.
+/// The instrument is generic in the arm's result type. This is load-bearing: an arm that 
+/// returns a type other than the shared gate's <c>int</c> - such as <c>TryRunAsync</c>, 
+/// which returns a <c>CallResult&lt;T&gt;</c> - would otherwise need a conversion wrapper. 
+/// A wrapper that suspends allocates a state-machine box that other arms do not incur. 
+/// Every arm is awaited directly by the loop in its natural shape.
 /// </summary>
 public static class AllocationProbe
 {
@@ -58,7 +60,7 @@ public static class AllocationProbe
     public const int DefaultIterations = 2_000;
     public const int DefaultRepeats = 5;
 
-    /// <summary>Milliseconds to let tiered compilation promote warmed methods before measuring.</summary>
+    /// <summary>The delay in milliseconds to allow tiered compilation to promote warmed methods before measuring.</summary>
     public const int TierUpSettleMs = 300;
 
     public static async Task<AllocationMeasurement> MeasureAsync<TResult>(
@@ -99,8 +101,8 @@ public static class AllocationProbe
     }
 
     /// <summary>
-    /// Warms in two passes separated by a settle delay, so the second pass runs against tier-1
-    /// code and the measurement that follows sees the same code production would.
+    /// Warms in two passes separated by a settle delay. This ensures the second pass runs 
+    /// against tier-1 code and the subsequent measurement sees the same code production would.
     /// </summary>
     public static async Task WarmAsync<TResult>(Func<ValueTask<TResult>> body, int warmup, Action? betweenOperations = null)
     {
