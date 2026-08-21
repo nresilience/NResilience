@@ -12,11 +12,11 @@ NResilience replaces complex fluent builders, confusing strategy ordering, and m
 - **Sensible defaults.** Get a working, retried HTTP call with one line of code.
 - **One method for everything.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
-- **AOT and trimming safe.** Zero external dependencies and no reflection.
+- **Native AOT compatible.** Zero external dependencies and no reflection.
 
 ## Get started
 
-To add NResilience to your project, run this command:
+Add NResilience to your project:
 
 ```bash
 dotnet add package NResilience

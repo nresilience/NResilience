@@ -19,11 +19,11 @@ NResilience replaces complex fluent builders, confusing strategy ordering, and m
 - **Unified execution.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
 - **Retry budget.** A cap on retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
-- **AOT and trimming safe.** Zero external dependencies and no reflection.
+- **Native AOT compatible.** Zero external dependencies and no reflection.
 
 ## Get started
 
-To add NResilience to your project, run the following command:
+Add NResilience to your project:
 
 ```bash
 dotnet add package NResilience
@@ -39,7 +39,7 @@ private static async Task<User?> GetUserAsync(int id, CancellationToken cancella
     await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
 ```
 
-Every call this client makes uses 3 attempts with exponential backoff, a 30-second deadline, and HTTP-aware retry logic (for example, it retries a `503` but not a `404`).
+Every call this client makes uses three attempts with exponential backoff, a 30-second deadline, and HTTP-aware retry logic (for example, it retries a `503` but not a `404`).
 
 ## One method for any callback
 
