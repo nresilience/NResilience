@@ -82,7 +82,7 @@ using RateLimiter inFlight = Limit.Concurrency(20);
 ```
 <!-- endsnippet -->
 
-Set exactly one of them in `RateLimitOptions`. Asking for two is a configuration error rather than a resolution the library performs for you.
+Set exactly one of them in `RateLimitOptions`. Asking for two is a configuration error; the library does not resolve this for you.
 
 <!-- snippet: limit-validate -->
 ```csharp
@@ -113,7 +113,7 @@ Assert.True(refused.Verdict.SelfImposed);
 ```
 <!-- endsnippet -->
 
-Four consequences follow from that verdict, and none of them needs configuring:
+Four consequences follow from that verdict; none require configuration:
 
 | What | Why |
 | :--- | :--- |
@@ -143,6 +143,10 @@ Two instruments, on the same meter as everything else. See [Telemetry](telemetry
 | `nresilience.limiter.wait.duration` | How long a caller waited. Zero unless queueing is enabled. |
 
 The limiter records these itself rather than deriving them from a `CallEvent`, because it is the only thing that knows how long a caller waited, and because a refusal the policy then retries successfully raises no distinguishable event.
+
+## Learn by example
+
+For a step-by-step guide to implementing bulkhead isolation (using `Limit.Concurrency` to prevent resource exhaustion), see [Resource isolation with bulkheads](../guides/resource-isolation.md).
 
 ## Go deeper
 

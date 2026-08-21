@@ -14,5 +14,6 @@ If you are new to NResilience, see [Key concepts](../getting-started/key-concept
 | :--- | :--- |
 | [Retry an HTTP call](retry-an-http-call.md) | Ensure an API call succeeds despite occasional transient failures. |
 | [Protect a dependency](protect-a-dependency.md) | Use a circuit breaker to prevent a flaky dependency from affecting the rest of your application. |
+| [Resource isolation with bulkheads](resource-isolation.md) | Prevent one slow dependency from monopolizing your application's resources. |
 | [Configure from appsettings](configure-from-configuration.md) | Update policy settings, such as deadlines, without redeploying the application. |
 | [Test a policy](test-a-policy.md) | Write fast, reliable tests to verify that your policies behave as expected. |

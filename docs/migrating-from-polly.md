@@ -20,6 +20,7 @@ The Polly snippets below are illustrative. All NResilience snippets are compiled
 | `AddTimeout` (per attempt) | [`AttemptTimeout`](features/deadlines.md) |
 | `AddTimeout` (outer) | `Deadline` |
 | `AddCircuitBreaker` | [`Breaker`](features/circuit-breaker.md) (an object you maintain) |
+| `AddBulkhead` | [`Limit.Concurrency`](features/rate-limiting.md) (bulkhead pattern) |
 | `AddFallback` | `if` logic on a [`CallResult<T>`](reference/call-result.md) |
 | `AddHedging` | Not implemented. See the [FAQ](faq.md) |
 | `ShouldHandle` predicates | One [`Classifier`](features/classification.md) used by all strategies |
@@ -132,6 +133,46 @@ var api = Resilience.Http with
 };
 ```
 <!-- endsnippet -->
+
+## Implement bulkhead isolation
+
+### Before (Polly)
+
+```csharp
+var pipeline = new ResiliencePipelineBuilder<HttpResponseMessage>()
+    .AddBulkhead(handledByEntityKey => 10)  // max 10 concurrent calls
+    .Build();
+```
+
+### After (NResilience)
+
+<!-- snippet: migration-bulkhead -->
+```csharp
+// For HTTP clients via dependency injection
+services.AddHttpClient<PaymentClient>()
+    .AddResilience()
+    .AddRateLimit(options => options.Concurrency = 10);
+
+// For any other callback
+using var limiter = Limit.Concurrency(10);
+
+var result = await policy.RunAsync(async ct =>
+{
+    using var lease = await limiter.AcquireAsync(ct);
+    return await dependency.CallAsync(ct);
+}, cancellationToken);
+```
+
+<!-- endsnippet -->
+
+The bulkhead pattern prevents one slow dependency from monopolizing your thread pool. In NResilience, `Limit.Concurrency` achieves this more efficiently than Polly's thread pool partitioning:
+
+- Zero allocation when unused
+- Each attempt acquires its own permit (retries don't reuse slots)
+- Refusals are classified as `Verdict.Throttled(SelfImposed: true)`, which are retried on the long backoff curve and never open the breaker
+- For HTTP, scoped per host by default (like circuit breakers)
+
+For a complete guide with real-world examples, see [Resource isolation with bulkheads](guides/resource-isolation.md).
 
 ## Handle exceptions and state
 

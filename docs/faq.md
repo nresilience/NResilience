@@ -31,9 +31,37 @@ Hedging is not implemented. Issuing a second request before the first fails is a
 What the library adds is the composition the platform cannot decide for you: the permit is taken once per attempt rather than once per operation, the wait is bounded by the time left on the deadline, and a refusal is classified as self-imposed throttling - so it takes the long backoff curve, never counts as evidence against the dependency, and is never charged to the [retry budget](features/retry-budget.md). For the reasoning, see [Admission control](deep-dives/admission-control.md).
 
 ### Where is bulkhead isolation?
-`Limit.Concurrency` is the bulkhead: it bounds how many calls run against one dependency at once, per host by default. See [Rate limiting](features/rate-limiting.md).
+`Limit.Concurrency` is the bulkhead: it bounds how many calls run against one dependency at once, per host by default. See [Resource isolation with bulkheads](guides/resource-isolation.md) for a complete guide.
 
-The decision of how to handle a full bulkhead does happen at the call site - and the call site is where the library already is. A hand-rolled `SemaphoreSlim` has to bound its own wait by the remaining deadline, release the permit when an attempt times out, and produce an outcome that does not open a circuit against a healthy dependency. Those are the four things the limiter gets right for you.
+```csharp
+using var limiter = Limit.Concurrency(10);  // at most 10 concurrent calls
+
+var result = await policy.RunAsync(async ct =>
+{
+    using var lease = await limiter.AcquireAsync(ct);
+    return await dependency.CallAsync(ct);
+}, cancellationToken);
+```
+
+This approach is correct for several reasons:
+
+1. **Zero allocation when unused** - no limiter object means no overhead
+2. **Per-attempt permits** - each retry acquires its own permit, so retries don't reuse the same slot
+3. **Deadline-aware** - the acquire respects the remaining time on the deadline; no separate timeout to configure
+4. **Correct verdict** - refusals are classified as `Verdict.Throttled(SelfImposed: true)`:
+   - Retried on the long backoff curve (1 second base, not 100 ms) to defend the dependency
+   - Never opens the circuit breaker (this is your own throttling, not evidence the dependency is broken)
+   - Never charged to the retry budget (the call never left this process; no amplification)
+
+**For HTTP via dependency injection**, the handler scopes limiters per host automatically:
+
+```csharp
+services.AddHttpClient("api")
+    .AddResilience()
+    .AddRateLimit(options => options.Concurrency = 10);  // Per-host
+```
+
+The callback-based approach respects NResilience's design philosophy: explicit insertion point, zero cost when unused, and integration with the verdict system. A hand-rolled `SemaphoreSlim` requires manual handling of the deadline, exception flow on timeout, and outcome classification. The limiter handles these for you.
 
 ### Can I add my own policy layer?
 You cannot add layers through composition because the engine is [one flat method](../deep-dives/one-executor.md). Extension points include the [classifier](../features/classification.md), `Backoff.Custom`, `BeforeAttempt`, and `OnEvent`. This restricted surface ensures long-term API stability.
