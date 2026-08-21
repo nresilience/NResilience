@@ -88,4 +88,4 @@ The `ILogger` records a registered policy writes. An event ID is a contract the 
 
 Field names are shared with the metric tag vocabulary wherever both exist (`Policy`, `Verdict`, `Reason`), so a structured record and a metric describe the same call with the same words.
 
-Events 1010, 1011, 1016 and 1018 are rate-limited per policy - see [flood control](../di/logging.md#flood-control). Events 1007, 1012, 1017 and 1019 are the quiet forms the suppressed occurrences take.
+Events 1010, 1011, 1016 and 1018 are rate-limited per policy - see [flood control](../features/logging.md#flood-control). Events 1007, 1012, 1017 and 1019 are the quiet forms the suppressed occurrences take.

@@ -104,4 +104,4 @@ An `HttpClient` observes a reloaded policy at the next handler rotation. By defa
 
 - [Configuration](configuration.md): Learn about the bindable configuration shape and JSON limitations.
 - [Telemetry](telemetry.md): Learn which metrics are enabled by default and how to manage them.
-- [Logging](logging.md): Learn what a registered policy writes through `ILogger` and how to filter it per policy.
+- [Logging](logging.md): Learn what a registered policy writes through `ILogger` and how to filter it per policy. For the profiles and levels, see [Logging](../features/logging.md).

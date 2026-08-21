@@ -17,3 +17,4 @@ These guides provide the technical reasoning and measurements behind the design 
 | [Retry budget internals](retry-budget-internals.md) | Why limit retries as a fraction of total traffic, and why maintain the budget per process? |
 | [Guarded rejection](guarded-rejection.md) | Why does the handler introduce a delay when refusing a call? |
 | [Admission control](admission-control.md) | Why is a limiter refusal not a new verdict kind, and why is the retry budget exempt from it? |
+| [Logging internals](logging-internals.md) | Why are log levels proportional to volume, and what do the records deliberately omit? |

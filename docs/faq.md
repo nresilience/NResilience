@@ -76,7 +76,7 @@ The breaker always samples individual attempts. This provides a consistent behav
 A free rejection inside a polling loop creates a CPU spin, turning a load-shedding guard into a load generator. For more details, see [Guarded rejection](../deep-dives/guarded-rejection.md).
 
 ### Why is telemetry off for hand-built policies but on for registered ones?
-Setting `OnEvent = null` ensures that telemetry is "free when unused." Since policies registered via dependency injection are typically used in production environments, the registration automatically attaches a listener. You can disable this using `telemetry: false` or `ResilienceOptions.Telemetry = false`. Logging works the same way and for the same reason: a registered policy logs, a hand-built one opts in with `WithLogging`, and `ResilienceOptions.Logging = "Off"` turns it off. See [Logging in DI](di/logging.md).
+Setting `OnEvent = null` ensures that telemetry is "free when unused." Since policies registered via dependency injection are typically used in production environments, the registration automatically attaches a listener. You can disable this using `telemetry: false` or `ResilienceOptions.Telemetry = false`. Logging works the same way and for the same reason: a registered policy logs, a hand-built one opts in with `WithLogging`, and `ResilienceOptions.Logging = "Off"` turns it off. See [Logging](features/logging.md).
 
 ## Compatibility and performance
 
