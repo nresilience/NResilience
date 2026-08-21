@@ -158,11 +158,10 @@ using var limiter = Limit.Concurrency(10);
 
 var result = await policy.RunAsync(async ct =>
 {
-    using var lease = await limiter.AcquireAsync(ct);
+    using var lease = await limiter.AcquireOrThrowAsync(ct);
     return await dependency.CallAsync(ct);
 }, cancellationToken);
 ```
-
 <!-- endsnippet -->
 
 The bulkhead pattern prevents one slow dependency from monopolizing your thread pool. In NResilience, `Limit.Concurrency` achieves this more efficiently than Polly's thread pool partitioning:

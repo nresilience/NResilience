@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
+using NResilience.Extensions;
 using NResilience.Http;
 using NResilience.Testing;
 
@@ -108,8 +109,45 @@ public sealed class Migration
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    [Fact]
+    public async Task A_bulkhead_is_a_concurrency_limit()
+    {
+        var services = new ServiceCollection();
+        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        Resilience policy = Resilience.Http with { Backoff = Backoff.None };
+        var dependency = new Dependency();
+
+        // <snippet:migration-bulkhead>
+        // For HTTP clients via dependency injection
+        services.AddHttpClient<PaymentClient>()
+            .AddResilience()
+            .AddRateLimit(options => options.Concurrency = 10);
+
+        // For any other callback
+        using var limiter = Limit.Concurrency(10);
+
+        var result = await policy.RunAsync(async ct =>
+        {
+            using var lease = await limiter.AcquireOrThrowAsync(ct);
+            return await dependency.CallAsync(ct);
+        }, cancellationToken);
+        // </snippet:migration-bulkhead>
+
+        Assert.Equal(1, result);
+    }
+
     internal sealed class Client(HttpClient client)
     {
         internal HttpClient Http { get; } = client;
+    }
+
+    internal sealed class PaymentClient(HttpClient client)
+    {
+        internal HttpClient Http { get; } = client;
+    }
+
+    internal sealed class Dependency
+    {
+        internal Task<int> CallAsync(CancellationToken cancellationToken) => Task.FromResult(1);
     }
 }
