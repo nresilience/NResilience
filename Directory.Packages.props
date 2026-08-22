@@ -57,9 +57,9 @@
       compiler from SDK 8.0.100 onwards, and a compiler extension that cannot load is worse than
       one that does not exist - it warns at every consumer's build and diagnoses nothing.
     -->
-    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0" />
-    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
+    <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0-1.26328.17" />
 
     <!--
       Source link for shipping packages. Referenced by Release.props, so every shipping library
