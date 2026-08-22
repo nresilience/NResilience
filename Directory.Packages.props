@@ -13,9 +13,7 @@
     <PackageVersion Include="NBenchmark" Version="0.48.1" />
 
     <!-- Hard gate. -->
-    <PackageVersion Include="xunit.v3" Version="3.2.2" />
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
     <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.9.0" />
 
     <!--
@@ -23,16 +21,16 @@
       ships no logging assertion helper of its own. Same dotnet/extensions family and version as
       TimeProvider.Testing above, decided once. Test-only, so no consumer sees it.
     -->
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="10.9.0" />
 
     <!-- One version for the whole Microsoft.Extensions family, decided once. -->
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11" />
 
     <!--
       First-party but out-of-band: it is a NuGet package rather than part of the shared
@@ -42,12 +40,12 @@
       nothing, so any limiter composes with the executor whether or not this package is present.
       Same version as the Microsoft.Extensions family above, decided once.
     -->
-    <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.0" />
+    <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.11" />
 
     <!-- The log listener's own dependency, and the one the docs snippets log through. -->
-    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
 
     <!-- Declared here so the version is decided once. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" />
@@ -65,7 +63,7 @@
       Source link for shipping packages. Referenced by Release.props, so every shipping library
       emits source-link metadata and a deterministic build when ContinuousIntegrationBuild is on.
     -->
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
   </ItemGroup>
 
 </Project>

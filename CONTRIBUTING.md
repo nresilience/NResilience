@@ -26,6 +26,11 @@ This file is for contributors. If you are trying to use the library, start with 
 
 ## Running everything
 
+> [!IMPORTANT]
+> Run tests in **Release** configuration (`dotnet test -c Release`). The allocation gate budgets in
+> `tests/NResilience.Gates` were measured against tier-1 code, which only materializes in Release
+> builds. Debug builds over-allocate and will fail the gate regardless of any change you made.
+
 ```bash
 # Behaviour.
 dotnet test tests/NResilience.Tests -c Release
