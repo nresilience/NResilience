@@ -1,11 +1,4 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/NResilience/NResilience.csproj" />
-    <Project Path="src/NResilience.Analyzers/NResilience.Analyzers.csproj" />
-    <Project Path="src/NResilience.CodeFixes/NResilience.CodeFixes.csproj" />
-    <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj" />
-    <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
-  </Folder>
   <Folder Name="/bench/">
     <Project Path="bench/NResilience.Baseline/NResilience.Baseline.csproj" />
     <Project Path="bench/NResilience.Probes/NResilience.Probes.csproj" />
@@ -26,4 +19,9 @@
     <Project Path="tests/NResilience.Gates/NResilience.Gates.csproj" />
     <Project Path="tests/NResilience.Tests/NResilience.Tests.csproj" />
   </Folder>
+  <Project Path="src/NResilience.Analyzers/NResilience.Analyzers.csproj" />
+  <Project Path="src/NResilience.CodeFixes/NResilience.CodeFixes.csproj" />
+  <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj" />
+  <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
+  <Project Path="src/NResilience/NResilience.csproj" />
 </Solution>

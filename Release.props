@@ -34,7 +34,14 @@
     <!-- Readme shown on the nuget.org package page. Each shipping csproj packs its own
          README.md (beside the csproj) and sets PackageReadmeFile accordingly. The root
          README.md is the readme for the core NResilience package. -->
+
+    <!-- Icon shown on the nuget.org package page. Shared across all shipping packages. -->
+    <PackageIcon>icon.png</PackageIcon>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)icon.png" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- Source link. PrivateAssets keeps it out of the consumer's dependency graph; it only
