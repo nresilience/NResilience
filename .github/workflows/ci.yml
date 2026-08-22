@@ -120,31 +120,3 @@ jobs:
             exit 1
           fi
           "$binary"
-
-  # Trend only - latency. Published, never gated.
-  #
-  # Shared runners are noisy enough that a latency gate is either loose enough to catch nothing
-  # or tight enough to flake weekly, and a flaky gate gets disabled within a month. Allocations
-  # are deterministic; those are what the build enforces.
-  trend:
-    name: Latency trend
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Run the baseline harness
-        run: >
-          dotnet run -c Release -f net10.0 --project bench/NResilience.Baseline --
-          --exclude-category socket --launch-count 1 --reporter json --output ./artifacts
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: baseline
-          path: ./artifacts
-          if-no-files-found: warn

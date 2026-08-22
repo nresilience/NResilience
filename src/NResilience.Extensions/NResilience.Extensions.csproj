@@ -27,6 +27,9 @@
     <PackageTags>resilience;retry;dependencyinjection;configuration;ratelimit;bulkhead;opentelemetry;polly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
+    <!-- The nuget.org package page shows this package's own README, not the root one. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
     <!--
       RS0026 forbids overload sets that each carry an optional parameter. Every registration here
       takes an optional configure callback, which is the shape the whole ecosystem uses; the
@@ -34,6 +37,10 @@
     -->
     <NoWarn>$(NoWarn);RS0026</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../NResilience/NResilience.csproj" />
@@ -64,5 +71,8 @@
   <ItemGroup>
     <InternalsVisibleTo Include="NResilience.Tests" />
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, readme. -->
+  <Import Project="../../Release.props" />
 
 </Project>

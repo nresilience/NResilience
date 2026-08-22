@@ -6,7 +6,7 @@ This file is for contributors. If you are trying to use the library, start with 
 ## Layout
 
 | Path | What it is |
-|---|---|
+| --- | --- |
 | `src/NResilience` | The library, including `Http/` - the `HttpClient` handler: request cloning, idempotency, per-host scope. Zero dependencies, `net8.0;net10.0`, AOT-clean, public API manifest checked in. |
 | `src/NResilience.Extensions` | `AddResilience()`, configuration binding, the meter and the activity source. |
 | `src/NResilience.Testing` | Scripted callbacks and a recording listener. |
@@ -22,8 +22,7 @@ This file is for contributors. If you are trying to use the library, start with 
 | `tests/NResilience.Analyzers.Tests` | The analyzer suite: snippets of consumer code compiled in-process and handed to the analyzers. No analyzer test framework - the harness is thirty lines and pins the Roslyn version the analyzers claim to support. |
 | `tools/NResilience.DocSnippets` | The inliner that puts those snippets into the markdown, and the check that fails when they drift. |
 | `samples/` | Three runnable console applications. See [`docs/samples.md`](docs/samples.md). |
-| `docs/` | The published documentation. `docs/STYLE.md` is the contributor-facing style guide. |
-| `plans/` | The design document and per-phase results. Not published with the docs site. |
+| `docs/` | The published documentation. `AGENTS.md` holds the contributor-facing documentation style guide. |
 
 ## Running everything
 
@@ -70,8 +69,3 @@ the page is about the error message) the suppression goes *outside* the snippet 
 `tests/NResilience.Tests` and `tests/NResilience.Gates` are deliberately not analyzed: the
 behavioural suite exercises the footguns on purpose, and a rule that fires on a test asserting the
 footgun's behavior is measuring the wrong thing.
-
-## Design
-
-- Design: [`plans/nresilience-design-v3.md`](plans/nresilience-design-v3.md)
-- Per-phase results: see the `plans/phase-*-results.md` documents, which are not published with the docs site.

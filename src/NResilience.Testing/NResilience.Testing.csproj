@@ -18,10 +18,20 @@
     <Description>Test helpers for NResilience: a scripted callback and a recording telemetry listener. Deliberately small - the core was designed to be testable, so a fake clock and the attempt log already do most of the work.</Description>
     <PackageTags>resilience;retry;testing;polly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!-- The nuget.org package page shows this package's own README, not the root one. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../NResilience/NResilience.csproj" />
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, readme. -->
+  <Import Project="../../Release.props" />
 
 </Project>

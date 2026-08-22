@@ -25,6 +25,9 @@
     <PackageTags>resilience;retry;timeout;circuit-breaker;http;httpclient;polly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
+    <!-- The nuget.org package page shows the root README. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
     <!--
       RS0026 forbids overload sets that each carry an optional parameter. The whole execution
       surface is exactly that on purpose - eight overloads whose last parameter is
@@ -34,6 +37,10 @@
     -->
     <NoWarn>$(NoWarn);RS0026</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <!--
@@ -61,5 +68,8 @@
     -->
     <InternalsVisibleTo Include="NResilience.Gates" />
   </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, readme. -->
+  <Import Project="../../Release.props" />
 
 </Project>

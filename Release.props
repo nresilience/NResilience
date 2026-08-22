@@ -1,0 +1,45 @@
+<!--
+  Shared package metadata for shipping libraries. Imported by each csproj that sets
+  <IsShippingLibrary>true</IsShippingLibrary>. The version is not set here; it is supplied
+  at pack time by the release workflow via -p:Version=<version-from-tag>, so a local
+  `dotnet pack` produces a 1.0.0 placeholder and a tagged release produces the real one.
+-->
+<Project>
+
+  <PropertyGroup>
+    <!-- Authors / ownership -->
+    <Authors>NResilience</Authors>
+    <Company>NResilience</Company>
+    <Copyright>Copyright (c) 2026 NResilience</Copyright>
+
+    <!-- Repository + source link. PublishRepositoryUrl puts the clone URL in the nupkg;
+         EmbedUntrackedSources + ContinuousIntegrationBuild make the build reproducible
+         and source-linkable. ContinuousIntegrationBuild is set by GitHub Actions. -->
+    <RepositoryUrl>https://github.com/nresilience/NResilience</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Project URL + license. PackageLicenseExpression is already set per-csproj; this is
+         a fallback in case a future shipping project forgets to set it. -->
+    <PackageProjectUrl>https://github.com/nresilience/NResilience</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!-- Symbols. snupkg is the modern symbol package format; the release workflow uploads
+         both .nupkg and .snupkg to nuget.org. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+    <!-- Readme shown on the nuget.org package page. Each shipping csproj packs its own
+         README.md (beside the csproj) and sets PackageReadmeFile accordingly. The root
+         README.md is the readme for the core NResilience package. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Source link. PrivateAssets keeps it out of the consumer's dependency graph; it only
+         affects what gets emitted into the nupkg, not what a consumer restores. -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

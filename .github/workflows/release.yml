@@ -1,0 +1,299 @@
+name: Release
+
+# Tag-triggered. Push a tag like `v0.1.0` or `v0.1.0-preview.1` and this runs:
+#   1. The full gate matrix (tests + allocation + analyzers + AOT) so a release
+#      tag never ships from a flaky platform.
+#   2. Pack all three shipping csprojs with the version taken from the tag.
+#   3. Publish the .nupkg and .snupkg to nuget.org via OIDC trusted publishing.
+#   4. Create a GitHub Release, marked as a prerelease when the tag contains a hyphen.
+#
+# The docs deploy step is commented out. Enable it once the docs site repo exists
+# (see the commented `deploy-docs` job at the bottom).
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+      - "v*.*.*-*"
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+
+jobs:
+  gates:
+    name: Gates (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore NResilience.slnx
+
+      - name: Build
+        run: dotnet build NResilience.slnx -c Release --no-restore
+
+      - name: Behavioural suite
+        run: dotnet test tests/NResilience.Tests/NResilience.Tests.csproj -c Release --no-build
+
+      - name: Allocation gate
+        run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build --logger "console;verbosity=detailed"
+
+      - name: Analyzer suite
+        run: dotnet test tests/NResilience.Analyzers.Tests/NResilience.Analyzers.Tests.csproj -c Release --no-build
+
+  docs-gate:
+    name: Docs gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Run the documentation snippets
+        run: dotnet test tests/NResilience.Docs/NResilience.Docs.csproj -c Release
+
+      - name: Check the pages against them
+        run: dotnet run --project tools/NResilience.DocSnippets -c Release -- --check
+
+      - name: Build and run the samples
+        run: |
+          for sample in samples/*/; do
+            dotnet run --project "$sample" -c Release
+          done
+
+  aot:
+    name: Native AOT (${{ matrix.os }}, ${{ matrix.tfm }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        tfm: [net8.0, net10.0]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Install the native toolchain
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+
+      - name: Publish the AOT probe
+        run: dotnet publish tests/NResilience.AotProbe/NResilience.AotProbe.csproj -c Release -f ${{ matrix.tfm }} -warnaserror
+
+      - name: Execute the published binary
+        shell: bash
+        run: |
+          binary=$(find tests/NResilience.AotProbe/bin/Release/${{ matrix.tfm }} -type f \
+                     \( -name 'NResilience.AotProbe' -o -name 'NResilience.AotProbe.exe' \) \
+                     -path '*/publish/*' | head -1)
+          if [ -z "$binary" ]; then
+            echo "No published binary found - the AOT gate cannot pass without one." >&2
+            exit 1
+          fi
+          "$binary"
+
+  pack:
+    name: Pack
+    needs: [gates, docs-gate, aot]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${{ github.ref }}"
+          VERSION="${VERSION#refs/tags/v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Extracted version: ${VERSION}"
+
+      - name: Restore
+        run: dotnet restore NResilience.slnx
+
+      - name: Build
+        # ContinuousIntegrationBuild is read by Release.props; it switches on
+        # deterministic build timestamps and source-link metadata.
+        run: dotnet build NResilience.slnx -c Release --no-restore -p:Version=${{ steps.version.outputs.version }} -p:ContinuousIntegrationBuild=true
+
+      - name: Pack
+        run: |
+          mkdir -p ./artifacts/packages
+          for csproj in \
+            src/NResilience/NResilience.csproj \
+            src/NResilience.Extensions/NResilience.Extensions.csproj \
+            src/NResilience.Testing/NResilience.Testing.csproj; do
+            echo "Packing: $csproj"
+            dotnet pack "$csproj" --no-build -c Release \
+              --output ./artifacts/packages \
+              -p:Version=${{ steps.version.outputs.version }} \
+              -p:ContinuousIntegrationBuild=true
+          done
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./artifacts/packages/*.nupkg
+          retention-days: 30
+
+      - name: Upload symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-symbols
+          path: ./artifacts/packages/*.snupkg
+          retention-days: 30
+
+  publish-nuget:
+    name: Publish to NuGet
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+
+    environment:
+      name: nuget-release
+
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./artifacts/packages
+
+      - name: Download symbols
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-symbols
+          path: ./artifacts/packages
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Get NuGet API key via trusted publishing (OIDC)
+        uses: NuGet/login@v1
+        id: nuget_login
+        with:
+          user: cmjacques
+
+      - name: Publish packages to NuGet
+        run: |
+          find ./artifacts/packages -name "*.nupkg" -not -name "*.symbols.nupkg" | while read pkg; do
+            echo "Publishing: $pkg"
+            dotnet nuget push "$pkg" \
+              --api-key ${{ steps.nuget_login.outputs.NUGET_API_KEY }} \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate \
+              --no-symbols
+          done
+
+      - name: Publish symbols to NuGet
+        run: |
+          find ./artifacts/packages -name "*.snupkg" | while read pkg; do
+            echo "Publishing symbols: $pkg"
+            dotnet nuget push "$pkg" \
+              --api-key ${{ steps.nuget_login.outputs.NUGET_API_KEY }} \
+              --source https://api.nuget.org/v3/index.json \
+              --skip-duplicate
+          done
+
+  create-release:
+    name: Create GitHub Release
+    needs: publish-nuget
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-') }}
+          body: |
+            See [CHANGELOG.md](https://github.com/nresilience/NResilience/blob/main/CHANGELOG.md) for release notes.
+
+# # Deploy the docs site. Enable once the docs site repo exists.
+# #
+# # The job checks out this repo and the docs site repo, copies the published
+# # docs tree over, and pushes. It depends on `pack` (not publish) so a failed
+# # nuget push does not block a docs update, and on `create-release` so the
+# # release notes are available before the site points at them.
+# #
+# # Prerequisites:
+# #   - A docs site repo (e.g. nresilience/docs.nresilience.net) exists.
+# #   - A `DOCS_NRESILIENCE_NET_TOKEN` secret is set on this repo with push access.
+# #
+#   deploy-docs:
+#     name: Deploy Documentation
+#     needs: [pack, create-release]
+#     runs-on: ubuntu-latest
+#     permissions:
+#       contents: read
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+#
+#       - name: Checkout docs.nresilience.net repo
+#         uses: actions/checkout@v4
+#         with:
+#           repository: nresilience/docs.nresilience.net
+#           token: ${{ secrets.DOCS_NRESILIENCE_NET_TOKEN }}
+#           path: ./docs-site
+#
+#       - name: Deploy to docs.nresilience.net
+#         run: |
+#           mkdir -p ./docs-site/docs
+#           find ./docs-site/docs -mindepth 1 -maxdepth 1 \
+#             ! -name '.*' -exec rm -rf {} +
+#           cp -r ./docs/* ./docs-site/docs/
+#
+#           cd ./docs-site
+#           git config user.name "github-actions[bot]"
+#           git config user.email "github-actions[bot]@users.noreply.github.com"
+#
+#           git add -A
+#           if git diff --cached --quiet; then
+#             echo "No changes to commit"
+#           else
+#             git commit -m "docs: update documentation from NResilience release ${{ github.ref }}"
+#             git push origin main
+#           fi
