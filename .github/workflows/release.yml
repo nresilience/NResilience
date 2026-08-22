@@ -30,7 +30,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -59,7 +59,7 @@ jobs:
     name: Docs gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -90,7 +90,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         tfm: [net8.0, net10.0]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -124,7 +124,7 @@ jobs:
     needs: [gates, docs-gate, aot]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -270,10 +270,10 @@ jobs:
 #       contents: read
 #     steps:
 #       - name: Checkout code
-#         uses: actions/checkout@v4
+#         uses: actions/checkout@v7
 #
 #       - name: Checkout docs.nresilience.net repo
-#         uses: actions/checkout@v4
+#         uses: actions/checkout@v7
 #         with:
 #           repository: nresilience/docs.nresilience.net
 #           token: ${{ secrets.DOCS_NRESILIENCE_NET_TOKEN }}
