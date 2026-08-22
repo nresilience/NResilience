@@ -42,7 +42,7 @@ jobs:
         run: dotnet test tests/NResilience.Tests/NResilience.Tests.csproj -c Release --no-build
 
       - name: Run gates
-        run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build --logger "console;verbosity=detailed"
+        run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build -- --output detailed
 
       # The analyzers ship inside the package, so a false positive is a build break in every
       # consumer's project. The suite compiles consumer-shaped snippets and asserts the exact set
