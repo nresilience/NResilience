@@ -65,7 +65,7 @@
       Source link for shipping packages. Referenced by Release.props, so every shipping library
       emits source-link metadata and a deterministic build when ContinuousIntegrationBuild is on.
     -->
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.400" />
   </ItemGroup>
 
 </Project>
