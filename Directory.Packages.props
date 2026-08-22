@@ -23,7 +23,7 @@
       ships no logging assertion helper of its own. Same dotnet/extensions family and version as
       TimeProvider.Testing above, decided once. Test-only, so no consumer sees it.
     -->
-    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="10.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.Testing" Version="10.9.0" />
 
     <!-- One version for the whole Microsoft.Extensions family, decided once. -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
