@@ -1,8 +1,8 @@
 namespace NResilience.Probes;
 
 /// <summary>
-/// A stand-in for the shipping <c>VerdictKind</c>. The values and semantics match
-/// plans/nresilience-design-v3.md so the fused loop branches identically to the real executor.
+/// A stand-in for the shipping <c>VerdictKind</c>. The values and semantics match the
+/// shipping enum so the fused loop branches identically to the real executor.
 /// </summary>
 public enum VerdictKind : byte
 {

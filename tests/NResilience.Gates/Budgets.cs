@@ -32,13 +32,13 @@ public static class Budgets
     /// <summary>
     /// The same call with an attempt timeout. Measured: 64 B — one linked source per attempt.
     ///
-    /// This is a deliberate, documented departure from the CI gate table in
-    /// plans/nresilience-design-v3.md, which budgets 0 bytes for "full policy, sync-completing".
-    /// It is not achievable: the callback must receive a token the attempt timeout can cancel,
-    /// the timeout source cannot be known to be unnecessary until after the callback returns,
-    /// and the pooled source's own token must never be handed to user code because TryReset
-    /// preserves token identity. Polly reaches 24 B here by handing out its pooled token, which
-    /// is the hazard this design refuses. See plans/phase-0a-results.md.
+    /// This is a deliberate, documented departure from the CI gate table, which budgets 0
+    /// bytes for "full policy, sync-completing". It is not achievable: the callback must
+    /// receive a token the attempt timeout can cancel, the timeout source cannot be known to
+    /// be unnecessary until after the callback returns, and the pooled source's own token
+    /// must never be handed to user code because TryReset preserves token identity. Polly
+    /// reaches 24 B here by handing out its pooled token, which is the hazard this design
+    /// refuses.
     /// </summary>
     public const double FullPolicyWithTimeoutSyncOverhead = 72;
 

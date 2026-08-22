@@ -8,11 +8,11 @@ namespace NResilience.Probes;
 /// the attempt loop, per-attempt timeout, classification, breaker, budget, backoff, 
 /// and the inline attempt log, all within a single <c>async</c> method.
 ///
-/// This implementation is deliberately comprehensive. Open question 1 in 
-/// plans/nresilience-design-v3.md asks whether the fused-frame advantage survives contact 
-/// with a realistic loop. This can only be answered by a loop that hoists a realistic 
-/// amount of state across the attempt <c>await</c>. Every local variable below is 
-/// live across that await and is therefore stored in the state-machine box.
+/// This implementation is deliberately comprehensive. The question it exists to answer is
+/// whether the fused-frame advantage survives contact with a realistic loop. This can only
+/// be answered by a loop that hoists a realistic amount of state across the attempt
+/// <c>await</c>. Every local variable below is live across that await and is therefore stored
+/// in the state-machine box.
 /// </summary>
 public sealed class FusedExecutor
 {

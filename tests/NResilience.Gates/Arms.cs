@@ -46,9 +46,9 @@ public sealed class Arm
 /// <para>
 /// Every gate points at the <b>shipping</b> executor. The stand-in arms are
 /// kept and still measured, in the same sweep, because the only trustworthy stand-in-versus-shipping
-/// delta is one taken in one process under one GC in one tier state — and because the stand-in carries two
-/// things the shipping library does not yet have: a breaker and a budget, whose frame cost the
-/// shipping breaker and budget will inherit. Reference rows, not gates.
+/// delta is one taken in one process under one GC in one tier state. The stand-in is a pure
+/// reference floor: a hand-written fused loop that does less work than the shipping executor, so
+/// any growth in the shipping frame is detectable as a regression against it. Reference rows, not gates.
 /// </para>
 /// </summary>
 public static class Arms

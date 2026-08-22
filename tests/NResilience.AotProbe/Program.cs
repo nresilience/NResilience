@@ -495,7 +495,7 @@ internal static class Program
             failures += Check("a limiter with no permits left throws under AOT", refused);
         }
 
-        // The one behaviour the whole phase exists for, re-checked under AOT: the refusal is
+        // The one behaviour this whole block exists for, re-checked under AOT: the refusal is
         // throttling that the retry budget is not charged for.
         var budget = RetryBudget.Of(minimumPerSecond: 1);
         Resilience policy = Resilience.Default with
@@ -540,7 +540,7 @@ internal static class Program
 
         // 64 B, and a floor rather than an implementation failure: one linked source per attempt,
         // because the callback needs a token the attempt timeout can cancel and the pooled source's
-        // own token must never be handed to user code. See plans/phase-0a-results.md.
+        // own token must never be handed to user code.
         failures += Check("no AOT cliff: an attempt timeout still costs exactly one linked source", defaultSync - rawSync <= 72);
 
         double rawSuspending = await MeasureAsync("raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);

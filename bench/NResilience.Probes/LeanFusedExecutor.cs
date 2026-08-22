@@ -2,10 +2,9 @@ namespace NResilience.Probes;
 
 /// <summary>
 /// A toy fused loop that implements only retry and classification, with no attempt buffer, 
-/// breaker, budget, or timeout source. This shape was used for the measurements in 
-/// plans/nresilience-design-v3.md. It exists here to answer open question 1: how much of 
-/// the fused-frame advantage survives when the loop becomes realistic. This is only 
-/// answerable if both shapes are measured on the same harness in the same run.
+/// breaker, budget, or timeout source. It exists to answer how much of the fused-frame
+/// advantage survives when the loop becomes realistic. This is only answerable if both
+/// shapes are measured on the same harness in the same run.
 ///
 /// The gap between this and <see cref="FusedExecutor"/> represents the price of the real loop.
 /// </summary>

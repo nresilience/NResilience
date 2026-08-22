@@ -16,7 +16,7 @@
   <!--
     Measurement conditions, pinned so that a number measured on a laptop and a number
     measured in CI describe the same runtime. Workstation, non-concurrent GC is the
-    configuration every figure in plans/nresilience-design-v3.md was taken under.
+    configuration every allocation figure was taken under.
   -->
   <PropertyGroup>
     <ServerGarbageCollection>false</ServerGarbageCollection>
@@ -26,9 +26,9 @@
   </PropertyGroup>
 
   <!--
-    Public API gate (CI gates, "Hard gate - public API"). Inert until Phase 1 adds the
-    first shipping project; a project opts in with <IsShippingLibrary>true</IsShippingLibrary>
-    and checks in PublicAPI.Shipped.txt / PublicAPI.Unshipped.txt beside its csproj.
+    Public API gate (CI gates, "Hard gate - public API"). Inert until a shipping project
+    opts in with <IsShippingLibrary>true</IsShippingLibrary> and checks in
+    PublicAPI.Shipped.txt / PublicAPI.Unshipped.txt beside its csproj.
   -->
   <ItemGroup Condition="'$(IsShippingLibrary)' == 'true'">
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive" />

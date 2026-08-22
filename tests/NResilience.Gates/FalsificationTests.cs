@@ -53,7 +53,7 @@ public sealed class FalsificationTests
                  (fused {fused:0.0} B/op, Polly {polly:0.0} B/op above an identical raw callback),
                  against a gate of {Budgets.MinimumOverheadRatioVersusPolly:0.0}x.
 
-                 This is the falsification condition described in plans/nresilience-design-v3.md:
+                 This is the falsification condition for the design:
                  below this ratio the argument for collapsing composition no longer pays for the
                  flexibility it gives up, and the architecture needs revisiting rather than the
                  gate needing relaxing.

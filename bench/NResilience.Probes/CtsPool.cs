@@ -1,8 +1,8 @@
 namespace NResilience.Probes;
 
 /// <summary>
-/// The timeout-source arrangement described in plans/nresilience-design-v3.md under
-/// "Cancellation, timeouts and <c>CancellationTokenSource</c>":
+/// The timeout-source arrangement: a pooled source drives the timer, and is never handed to
+/// user code, because <c>TryReset</c> preserves token identity.
 ///
 /// <list type="bullet">
 ///   <item>a pooled source drives the timer, and is never handed to user code, because

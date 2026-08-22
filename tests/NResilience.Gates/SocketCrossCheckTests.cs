@@ -57,8 +57,8 @@ public sealed class SocketCrossCheckTests
         // token, so the socket registers on nothing; the Default arm hands it a linked token that
         // both socket calls must register on. The gap between them is a cost the Task.Yield gate
         // structurally cannot see, because Task.Yield ignores the token it is given, and it is the
-        // price of never handing user code a pooled source's token — see plans/phase-1-results.md
-        // for the arrangement that tried to avoid it and measured worse.
+        // price of never handing user code a pooled source's token - an arrangement that tried to
+        // avoid it measured worse.
         AllocationMeasurement fusedNoTimeoutResult = await AllocationProbe.MeasureAsync(
             "socket: lib, no timeout", () => trivial.RunAsync(callback),
             AllocationCounter.ProcessWide, Warmup, Iterations, Repeats);

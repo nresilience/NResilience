@@ -14,9 +14,8 @@ public struct AttemptRecord
 }
 
 /// <summary>
-/// The inline attempt log described in plans/nresilience-design-v3.md. Attempts accumulate in 
-/// a fixed-size buffer within the executor's frame; only calls that are about to fail copy 
-/// these records to the heap.
+/// The inline attempt log. Attempts accumulate in a fixed-size buffer within the executor's
+/// frame; only calls that are about to fail copy these records to the heap.
 ///
 /// This buffer is the largest contributor to the state-machine box because every byte is 
 /// live across the attempt <c>await</c>. Its size is a design lever; this project measures it 

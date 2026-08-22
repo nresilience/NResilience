@@ -12,7 +12,7 @@ This file is for contributors. If you are trying to use the library, start with 
 | `src/NResilience.Testing` | Scripted callbacks and a recording listener. |
 | `src/NResilience.Analyzers` | The seven diagnostics, `netstandard2.0`, no Workspaces reference. Packed into the `NResilience` package under `analyzers/dotnet/cs`. Rule ids are tracked in `AnalyzerReleases.*.md` the way members are in `PublicAPI.*.txt`. |
 | `src/NResilience.CodeFixes` | The fixes for NRES001 and NRES002. A separate assembly because RS1038 is right: a code fix references Workspaces, which the command-line compiler does not provide. |
-| `bench/NResilience.Probes` | The shared suspension gate, the allocation instrument, the cancellation probes, the shipping-executor arms, and Phase 0a's hand-written fused loop - still measured, as the floor the real executor has to beat. |
+| `bench/NResilience.Probes` | The shared suspension gate, the allocation instrument, the cancellation probes, the shipping-executor arms, and the hand-written fused loop - still measured, as the floor the real executor has to beat. |
 | `bench/NResilience.Probes.Polly` | The competitive arms, in Polly's native callback shape. |
 | `bench/NResilience.Baseline` | Latency trend harness (NBenchmark). Published, never gated. |
 | `tests/NResilience.Tests` | The behavioural suite: what the loop does, and when. |
@@ -71,15 +71,7 @@ the page is about the error message) the suppression goes *outside* the snippet 
 behavioural suite exercises the footguns on purpose, and a rule that fires on a test asserting the
 footgun's behavior is measuring the wrong thing.
 
-## Design and phase results
+## Design
 
 - Design: [`plans/nresilience-design-v3.md`](plans/nresilience-design-v3.md)
-- Phase 0a - the baseline, taken before any library code existed: [`plans/phase-0a-results.md`](plans/phase-0a-results.md)
-- Phase 0b - the same harness, re-run against the real executor: [`plans/phase-0b-results.md`](plans/phase-0b-results.md)
-- Phase 1 - the core: [`plans/phase-1-results.md`](plans/phase-1-results.md)
-- Phase 2 - the breaker and the retry budget: [`plans/phase-2-results.md`](plans/phase-2-results.md)
-- Phase 3 - telemetry, and what a listener costs: [`plans/phase-3-results.md`](plans/phase-3-results.md)
-- Phase 4 - the testing package: [`plans/phase-4-results.md`](plans/phase-4-results.md)
-- Phase 5 - the HTTP handler: [`plans/phase-5-results.md`](plans/phase-5-results.md)
-- Phase 6 - DI, configuration and the meter: [`plans/phase-6-results.md`](plans/phase-6-results.md)
-- Phase 7 - the docs, the samples and the docs gate: [`plans/phase-7-results.md`](plans/phase-7-results.md)
+- Per-phase results: see the `plans/phase-*-results.md` documents, which are not published with the docs site.

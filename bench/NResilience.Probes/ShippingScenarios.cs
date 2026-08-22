@@ -11,8 +11,8 @@ namespace NResilience.Probes;
 /// <see cref="Lib.Resilience"/> executor.
 ///
 /// <para>
-/// The stand-in phase was split into two to break a circularity: the first required no library 
-/// code, allowing a stand-in loop to establish the Polly baseline and the achievable floor. 
+/// The stand-in was built in two passes to break a circularity: the first required no library 
+/// code, allowing a hand-written fused loop to establish the Polly baseline and the achievable floor. 
 /// The second re-runs the identical harness against the real implementation. The 
 /// instrument remains identical: the same <see cref="Gate"/>, <see cref="AllocationProbe"/>, 
 /// process, and run. Any performance difference is therefore attributable to the executor.

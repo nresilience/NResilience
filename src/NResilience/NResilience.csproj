@@ -15,7 +15,7 @@
     <IsAotCompatible>true</IsAotCompatible>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <!-- The AOT claim is CI-enforced from Phase 0; the analysers have to be on at the source. -->
+    <!-- The AOT claim is CI-enforced; the analysers have to be on at the source. -->
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>

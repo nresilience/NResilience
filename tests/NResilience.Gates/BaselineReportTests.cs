@@ -6,9 +6,9 @@ using Xunit;
 namespace NResilience.Gates;
 
 /// <summary>
-/// Not a gate. This prints the full measurement table so the numbers in
-/// plans/phase-0a-results.md are produced by a command anyone can re-run, rather than
-/// transcribed from a session that no longer exists.
+/// Not a gate. This prints the full measurement table so the checked-in allocation budgets are
+/// produced by a command anyone can re-run, rather than transcribed from a session that no
+/// longer exists.
 ///
 /// Run it with:
 ///   dotnet test tests/NResilience.Gates -f net10.0 --filter FullyQualifiedName~BaselineReport -l "console;verbosity=detailed"
