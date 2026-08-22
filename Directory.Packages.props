@@ -42,7 +42,7 @@
       nothing, so any limiter composes with the executor whether or not this package is present.
       Same version as the Microsoft.Extensions family above, decided once.
     -->
-    <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.0" />
+    <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.11" />
 
     <!-- The log listener's own dependency, and the one the docs snippets log through. -->
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
