@@ -48,6 +48,12 @@ The breaker samples **attempts**, not logical operations. This is critical becau
 ### Lock strategy
 The breaker uses a standard `lock` rather than a lock-free scheme. Sliding-window rotation is a multi-word operation; implementing this with `Interlocked` alone could lead to silently incorrect failure ratios. Since an uncontended lock takes approximately 20 nanoseconds and the protected callback is orders of magnitude slower, the lock does not introduce a bottleneck.
 
+### `Reset` and in-flight probes
+
+`Reset` is an administrative operation: it closes the breaker, clears the sliding window, and zeroes the break-duration growth. It takes the lock, so it is atomic with respect to other state mutations.
+
+A probe admitted before `Reset` that completes after it lands in a breaker that is now `Closed`. Its outcome is processed as a regular closed-state sample rather than being discarded: the early return in `RecordCore` guards only `Isolated` and `Open`, not `Closed`, and `Reset` moved the state to `Closed`. The probe's outcome is real evidence about the dependency, so counting it is defensible, but it means a failing probe landing immediately after `Reset` can re-trip the breaker when `ConsecutiveFailures` is low. This is a narrow race - it requires an admin `Reset` while a probe is in flight - and the behavior follows directly from the state machine.
+
 ### Memory efficiency
 To minimize overhead, the window is divided into ten buckets (providing 3-second granularity for a 30-second window). The arrays required for rate-based tracking are only allocated if a rate-based trip is configured. A breaker relying solely on consecutive failures uses only three fields and no arrays.
 
