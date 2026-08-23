@@ -46,8 +46,8 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
     {
         IObjectOrCollectionInitializerOperation? initializer = context.Operation switch
         {
-            IObjectCreationOperation creation when IsPolicy(creation.Type, known) => creation.Initializer,
-            IWithOperation with when IsPolicy(with.Type, known) => with.Initializer,
+            IObjectCreationOperation creation when known.IsPolicy(creation.Type) => creation.Initializer,
+            IWithOperation with when known.IsPolicy(with.Type) => with.Initializer,
             _ => null,
         };
 
@@ -63,9 +63,6 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
         CheckDuration(context, settings, known, "AttemptTimeout");
         CheckTheTwoBounds(context, settings, known);
     }
-
-    private static bool IsPolicy(ITypeSymbol? type, KnownSymbols known) =>
-        SymbolEqualityComparer.Default.Equals(type, known.Resilience);
 
     private static Dictionary<string, IOperation> Settings(IObjectOrCollectionInitializerOperation initializer)
     {
@@ -156,7 +153,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
     private static void Report(
         OperationAnalysisContext context,
         DiagnosticDescriptor descriptor,
-        IOperation at,
+        IOperation setting,
         string message) =>
-        context.ReportDiagnostic(Diagnostic.Create(descriptor, at.Syntax.GetLocation(), message));
+        context.ReportDiagnostic(Diagnostic.Create(descriptor, setting.Syntax.GetLocation(), message));
 }

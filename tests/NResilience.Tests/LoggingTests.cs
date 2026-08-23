@@ -228,7 +228,7 @@ public sealed class LoggingTests
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
 
         // The HTTP path classifies a 404 from a response, so the event arrives with no exception at
-        // all. The warning is for genuine unrecognised exception types.
+        // all. The warning is for genuine unrecognized exception types.
         listener.Record(Event(CallEventKind.NotRetried, verdict: Verdict.Permanent));
 
         Assert.Equal([1006], Ids(logger));
@@ -419,7 +419,7 @@ public sealed class LoggingTests
         Assert.Same(error, logger.Collector.LatestRecord.Exception);
     }
 
-    // ---- Behaviour through the executor ----
+    // ---- Behavior through the executor ----
 
     [Fact]
     public async Task A_cancelled_call_logs_nothing()

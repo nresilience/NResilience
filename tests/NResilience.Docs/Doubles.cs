@@ -7,7 +7,7 @@ namespace NResilience.Docs;
 
 /// <summary>
 /// The scaffolding the samples stand on: a scripted transport, a queue, a cache. None of it is
-/// inside a snippet — a page shows the reader's code, not the harness that makes it run here.
+/// inside a snippet - a page shows the reader's code, not the harness that makes it run here.
 /// </summary>
 internal static class Doubles
 {

@@ -16,7 +16,7 @@ namespace NResilience.Extensions.Internal;
 /// </para>
 /// <para>
 /// The refusal is a <see cref="RateLimitedException"/>, which the executor classifies as
-/// <see cref="Verdict.Limited"/> itself: retried on the throttled curve honouring the limiter's own
+/// <see cref="Verdict.Limited"/> itself: retried on the throttled curve honoring the limiter's own
 /// hint, never counted as evidence against the host, and never charged to the retry budget.
 /// </para>
 /// </summary>

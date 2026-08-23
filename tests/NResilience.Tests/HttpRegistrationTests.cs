@@ -9,7 +9,7 @@ using NResilience.Http;
 namespace NResilience.Tests;
 
 /// <summary>
-/// <c>AddHttpClient(…).AddResilience()</c> — the one line most people need.
+/// <c>AddHttpClient(…).AddResilience()</c> - the one line most people need.
 /// <para>
 /// The handler itself is tested in <c>HttpHandlerTests</c>. What is under test here is the wiring: that
 /// the registration takes ownership of the transport timeout, which a <see cref="DelegatingHandler"/>
@@ -79,7 +79,7 @@ public sealed class HttpRegistrationTests
 
     /// <summary>
     /// The transport timeout. <see cref="HttpClient.Timeout"/> defaults to 100 seconds and applies
-    /// to the <i>whole</i> retry sequence, not per attempt — a silent cap that nothing in the policy
+    /// to the <i>whole</i> retry sequence, not per attempt - a silent cap that nothing in the policy
     /// can see, and the reason a five-minute deadline would otherwise be a lie. The registration is
     /// the only place that can fix it, because a handler cannot reach the client in front of it.
     /// </summary>
@@ -114,7 +114,7 @@ public sealed class HttpRegistrationTests
     /// The client name matters because <see cref="Resilience.Http"/> is itself called "http": left
     /// alone, every client in a process would report under that one name and four of them would be
     /// indistinguishable in the metrics. The host suffix is the per-host scoping showing
-    /// through, and it is the more specific fact — a breaker is per host, so the name that appears
+    /// through, and it is the more specific fact - a breaker is per host, so the name that appears
     /// beside it should be too.
     /// </para>
     /// </summary>

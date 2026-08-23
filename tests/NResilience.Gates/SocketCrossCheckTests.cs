@@ -13,14 +13,14 @@ namespace NResilience.Gates;
 /// The gate suspends on <c>Task.Yield</c> because it needs determinism. The design's argument is
 /// about the path real I/O takes. This test runs the same arms over a loopback TCP round trip
 /// and asserts only that the two agree about the <i>ordering and rough magnitude</i> of the
-/// fused-versus-composed gap — not about the absolute bytes, which a socket cannot produce
+/// fused-versus-composed gap - not about the absolute bytes, which a socket cannot produce
 /// repeatably enough to gate on.
 ///
 /// If this ever disagrees with the gate, the gate is measuring an artefact and the design's
 /// central number is not trustworthy. That is worth one slow test.
 ///
-/// The yield gate structurally cannot see one thing — that giving the callback a <i>cancellable</i>
-/// token costs 208 B over real I/O against 65 B over <c>Task.Yield</c> — and that finding is the
+/// The yield gate structurally cannot see one thing - that giving the callback a <i>cancellable</i>
+/// token costs 208 B over real I/O against 65 B over <c>Task.Yield</c> - and that finding is the
 /// reason this test exists rather than being a formality.
 /// </summary>
 [Collection(BaselineCollection.Name)]

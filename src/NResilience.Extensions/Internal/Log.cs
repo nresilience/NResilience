@@ -19,119 +19,150 @@ namespace NResilience.Extensions.Internal;
 internal static partial class Log
 {
     /// <summary>
+    /// The IDs as constants, so the <c>[LoggerMessage]</c> attributes and the level switches in
+    /// <c>LogListener</c> - both of which need a compile-time constant - name them rather than
+    /// repeat the number.
+    /// </summary>
+    internal static class Codes
+    {
+        internal const int AttemptSucceeded = 1000;
+        internal const int AttemptFailed = 1001;
+        internal const int AttemptLimited = 1002;
+        internal const int Retrying = 1003;
+        internal const int CallSucceeded = 1004;
+        internal const int CallSucceededAfterRetries = 1005;
+        internal const int NotRetried = 1006;
+        internal const int NotRetriedFirstSighting = 1007;
+        internal const int Exhausted = 1008;
+        internal const int DeadlineExceeded = 1009;
+        internal const int RejectedDependencyUnavailable = 1010;
+        internal const int RejectedBudgetExhausted = 1011;
+        internal const int RejectedRepeat = 1012;
+        internal const int BreakerOpened = 1013;
+        internal const int BreakerHalfOpened = 1014;
+        internal const int BreakerClosed = 1015;
+        internal const int OrphanedWork = 1016;
+        internal const int OrphanedWorkRepeat = 1017;
+        internal const int NestedRetry = 1018;
+        internal const int NestedRetryRepeat = 1019;
+        internal const int PolicyResolved = 1020;
+        internal const int PolicyClassifier = 1021;
+    }
+
+    /// <summary>
     /// The IDs, as values, because <see cref="ResilienceLoggingOptions.Level"/> is handed one and a
     /// caller comparing against a literal wants the name beside it.
     /// </summary>
     internal static class Ids
     {
-        internal static readonly EventId AttemptSucceeded = new(1000, nameof(AttemptSucceeded));
-        internal static readonly EventId AttemptFailed = new(1001, nameof(AttemptFailed));
-        internal static readonly EventId AttemptLimited = new(1002, nameof(AttemptLimited));
-        internal static readonly EventId Retrying = new(1003, nameof(Retrying));
-        internal static readonly EventId CallSucceeded = new(1004, nameof(CallSucceeded));
-        internal static readonly EventId CallSucceededAfterRetries = new(1005, nameof(CallSucceededAfterRetries));
-        internal static readonly EventId NotRetried = new(1006, nameof(NotRetried));
-        internal static readonly EventId NotRetriedFirstSighting = new(1007, nameof(NotRetriedFirstSighting));
-        internal static readonly EventId Exhausted = new(1008, nameof(Exhausted));
-        internal static readonly EventId DeadlineExceeded = new(1009, nameof(DeadlineExceeded));
-        internal static readonly EventId RejectedDependencyUnavailable = new(1010, nameof(RejectedDependencyUnavailable));
-        internal static readonly EventId RejectedBudgetExhausted = new(1011, nameof(RejectedBudgetExhausted));
-        internal static readonly EventId RejectedRepeat = new(1012, nameof(RejectedRepeat));
-        internal static readonly EventId BreakerOpened = new(1013, nameof(BreakerOpened));
-        internal static readonly EventId BreakerHalfOpened = new(1014, nameof(BreakerHalfOpened));
-        internal static readonly EventId BreakerClosed = new(1015, nameof(BreakerClosed));
-        internal static readonly EventId OrphanedWork = new(1016, nameof(OrphanedWork));
-        internal static readonly EventId OrphanedWorkRepeat = new(1017, nameof(OrphanedWorkRepeat));
-        internal static readonly EventId NestedRetry = new(1018, nameof(NestedRetry));
-        internal static readonly EventId NestedRetryRepeat = new(1019, nameof(NestedRetryRepeat));
-        internal static readonly EventId PolicyResolved = new(1020, nameof(PolicyResolved));
-        internal static readonly EventId PolicyClassifier = new(1021, nameof(PolicyClassifier));
+        internal static readonly EventId AttemptSucceeded = new(Codes.AttemptSucceeded, nameof(AttemptSucceeded));
+        internal static readonly EventId AttemptFailed = new(Codes.AttemptFailed, nameof(AttemptFailed));
+        internal static readonly EventId AttemptLimited = new(Codes.AttemptLimited, nameof(AttemptLimited));
+        internal static readonly EventId Retrying = new(Codes.Retrying, nameof(Retrying));
+        internal static readonly EventId CallSucceeded = new(Codes.CallSucceeded, nameof(CallSucceeded));
+        internal static readonly EventId CallSucceededAfterRetries = new(Codes.CallSucceededAfterRetries, nameof(CallSucceededAfterRetries));
+        internal static readonly EventId NotRetried = new(Codes.NotRetried, nameof(NotRetried));
+        internal static readonly EventId NotRetriedFirstSighting = new(Codes.NotRetriedFirstSighting, nameof(NotRetriedFirstSighting));
+        internal static readonly EventId Exhausted = new(Codes.Exhausted, nameof(Exhausted));
+        internal static readonly EventId DeadlineExceeded = new(Codes.DeadlineExceeded, nameof(DeadlineExceeded));
+        internal static readonly EventId RejectedDependencyUnavailable = new(Codes.RejectedDependencyUnavailable, nameof(RejectedDependencyUnavailable));
+        internal static readonly EventId RejectedBudgetExhausted = new(Codes.RejectedBudgetExhausted, nameof(RejectedBudgetExhausted));
+        internal static readonly EventId RejectedRepeat = new(Codes.RejectedRepeat, nameof(RejectedRepeat));
+        internal static readonly EventId BreakerOpened = new(Codes.BreakerOpened, nameof(BreakerOpened));
+        internal static readonly EventId BreakerHalfOpened = new(Codes.BreakerHalfOpened, nameof(BreakerHalfOpened));
+        internal static readonly EventId BreakerClosed = new(Codes.BreakerClosed, nameof(BreakerClosed));
+        internal static readonly EventId OrphanedWork = new(Codes.OrphanedWork, nameof(OrphanedWork));
+        internal static readonly EventId OrphanedWorkRepeat = new(Codes.OrphanedWorkRepeat, nameof(OrphanedWorkRepeat));
+        internal static readonly EventId NestedRetry = new(Codes.NestedRetry, nameof(NestedRetry));
+        internal static readonly EventId NestedRetryRepeat = new(Codes.NestedRetryRepeat, nameof(NestedRetryRepeat));
+        internal static readonly EventId PolicyResolved = new(Codes.PolicyResolved, nameof(PolicyResolved));
+        internal static readonly EventId PolicyClassifier = new(Codes.PolicyClassifier, nameof(PolicyClassifier));
     }
 
-    [LoggerMessage(EventId = 1000, EventName = nameof(Ids.AttemptSucceeded), Message = "{Policy} attempt {Attempt} succeeded in {ElapsedMs} ms")]
+    [LoggerMessage(EventId = Codes.AttemptSucceeded, EventName = nameof(Ids.AttemptSucceeded), Message = "{Policy} attempt {Attempt} succeeded in {ElapsedMs} ms")]
     internal static partial void AttemptSucceeded(ILogger logger, LogLevel level, string policy, int attempt, long elapsedMs);
 
-    [LoggerMessage(EventId = 1001, EventName = nameof(Ids.AttemptFailed), Message = "{Policy} attempt {Attempt} failed in {ElapsedMs} ms: {Verdict} {ErrorType}")]
+    [LoggerMessage(EventId = Codes.AttemptFailed, EventName = nameof(Ids.AttemptFailed), Message = "{Policy} attempt {Attempt} failed in {ElapsedMs} ms: {Verdict} {ErrorType}")]
     internal static partial void AttemptFailed(ILogger logger, LogLevel level, Exception? exception, string policy, int attempt, long elapsedMs, string verdict, string errorType);
 
-    [LoggerMessage(EventId = 1002, EventName = nameof(Ids.AttemptLimited), Message = "{Policy} attempt {Attempt} was refused by a local limiter before it left the process")]
+    [LoggerMessage(EventId = Codes.AttemptLimited, EventName = nameof(Ids.AttemptLimited), Message = "{Policy} attempt {Attempt} was refused by a local limiter before it left the process")]
     internal static partial void AttemptLimited(ILogger logger, LogLevel level, string policy, int attempt);
 
-    [LoggerMessage(EventId = 1003, EventName = nameof(Ids.Retrying), Message = "{Policy} waiting {DelayMs} ms before attempt {Attempt} after a {Verdict} outcome")]
+    [LoggerMessage(EventId = Codes.Retrying, EventName = nameof(Ids.Retrying), Message = "{Policy} waiting {DelayMs} ms before attempt {Attempt} after a {Verdict} outcome")]
     internal static partial void Retrying(ILogger logger, LogLevel level, Exception? exception, string policy, long delayMs, int attempt, string verdict);
 
-    [LoggerMessage(EventId = 1004, EventName = nameof(Ids.CallSucceeded), Message = "{Policy} succeeded in {ElapsedMs} ms")]
+    [LoggerMessage(EventId = Codes.CallSucceeded, EventName = nameof(Ids.CallSucceeded), Message = "{Policy} succeeded in {ElapsedMs} ms")]
     internal static partial void CallSucceeded(ILogger logger, LogLevel level, string policy, long elapsedMs);
 
-    [LoggerMessage(EventId = 1005, EventName = nameof(Ids.CallSucceededAfterRetries), Message = "{Policy} succeeded on attempt {Attempt} after {ElapsedMs} ms")]
+    [LoggerMessage(EventId = Codes.CallSucceededAfterRetries, EventName = nameof(Ids.CallSucceededAfterRetries), Message = "{Policy} succeeded on attempt {Attempt} after {ElapsedMs} ms")]
     internal static partial void CallSucceededAfterRetries(ILogger logger, LogLevel level, string policy, int attempt, long elapsedMs);
 
-    [LoggerMessage(EventId = 1006, EventName = nameof(Ids.NotRetried), Message = "{Policy} stopped after attempt {Attempt}: the outcome was classified Permanent")]
+    [LoggerMessage(EventId = Codes.NotRetried, EventName = nameof(Ids.NotRetried), Message = "{Policy} stopped after attempt {Attempt}: the outcome was classified Permanent")]
     internal static partial void NotRetried(ILogger logger, LogLevel level, Exception? exception, string policy, int attempt);
 
     [LoggerMessage(
-        EventId = 1007,
+        EventId = Codes.NotRetriedFirstSighting,
         EventName = nameof(Ids.NotRetriedFirstSighting),
         Message = "{Policy} did not retry {ErrorType} on attempt {Attempt} because the classifier called it Permanent. If it is transient, give the policy a classifier rule for it.")]
     internal static partial void NotRetriedFirstSighting(ILogger logger, LogLevel level, Exception? exception, string policy, string errorType, int attempt);
 
-    [LoggerMessage(EventId = 1008, EventName = nameof(Ids.Exhausted), Message = "{Policy} used all {Attempt} attempts in {ElapsedMs} ms and failed with {ErrorType}")]
+    [LoggerMessage(EventId = Codes.Exhausted, EventName = nameof(Ids.Exhausted), Message = "{Policy} used all {Attempt} attempts in {ElapsedMs} ms and failed with {ErrorType}")]
     internal static partial void Exhausted(ILogger logger, LogLevel level, Exception? exception, string policy, int attempt, long elapsedMs, string errorType);
 
-    [LoggerMessage(EventId = 1009, EventName = nameof(Ids.DeadlineExceeded), Message = "{Policy} ran out of deadline after {ElapsedMs} ms on attempt {Attempt}")]
+    [LoggerMessage(EventId = Codes.DeadlineExceeded, EventName = nameof(Ids.DeadlineExceeded), Message = "{Policy} ran out of deadline after {ElapsedMs} ms on attempt {Attempt}")]
     internal static partial void DeadlineExceeded(ILogger logger, LogLevel level, Exception? exception, string policy, long elapsedMs, int attempt);
 
     [LoggerMessage(
-        EventId = 1010,
+        EventId = Codes.RejectedDependencyUnavailable,
         EventName = nameof(Ids.RejectedDependencyUnavailable),
         Message = "{Policy} refused a call because its circuit breaker is open. Rejections logged quietly since the previous warning: {Suppressed}.")]
     internal static partial void RejectedDependencyUnavailable(ILogger logger, LogLevel level, string policy, int suppressed);
 
     [LoggerMessage(
-        EventId = 1011,
+        EventId = Codes.RejectedBudgetExhausted,
         EventName = nameof(Ids.RejectedBudgetExhausted),
         Message = "{Policy} refused a retry because the retry budget is exhausted, which means this process is retrying harder than the dependency's success rate can fund. Rejections logged quietly since the previous warning: {Suppressed}.")]
     internal static partial void RejectedBudgetExhausted(ILogger logger, LogLevel level, string policy, int suppressed);
 
-    [LoggerMessage(EventId = 1012, EventName = nameof(Ids.RejectedRepeat), Message = "{Policy} refused a call: {Reason}")]
+    [LoggerMessage(EventId = Codes.RejectedRepeat, EventName = nameof(Ids.RejectedRepeat), Message = "{Policy} refused a call: {Reason}")]
     internal static partial void RejectedRepeat(ILogger logger, LogLevel level, string policy, string reason);
 
     [LoggerMessage(
-        EventId = 1013,
+        EventId = Codes.BreakerOpened,
         EventName = nameof(Ids.BreakerOpened),
         Message = "{Policy} opened its circuit breaker on attempt {Attempt}. Calls are refused until the break duration elapses.")]
     internal static partial void BreakerOpened(ILogger logger, LogLevel level, string policy, int attempt);
 
     [LoggerMessage(
-        EventId = 1014,
+        EventId = Codes.BreakerHalfOpened,
         EventName = nameof(Ids.BreakerHalfOpened),
         Message = "{Policy} is probing its dependency: the break duration elapsed and this call is the probe")]
     internal static partial void BreakerHalfOpened(ILogger logger, LogLevel level, string policy);
 
-    [LoggerMessage(EventId = 1015, EventName = nameof(Ids.BreakerClosed), Message = "{Policy} closed its circuit breaker and is taking traffic again")]
+    [LoggerMessage(EventId = Codes.BreakerClosed, EventName = nameof(Ids.BreakerClosed), Message = "{Policy} closed its circuit breaker and is taking traffic again")]
     internal static partial void BreakerClosed(ILogger logger, LogLevel level, string policy);
 
     [LoggerMessage(
-        EventId = 1016,
+        EventId = Codes.OrphanedWork,
         EventName = nameof(Ids.OrphanedWork),
-        Message = "{Policy} attempt {Attempt} kept running after its timeout, so that work is still going unobserved. The callback is not honouring the CancellationToken it was handed; NRES001 and NRES002 diagnose this at compile time.")]
+        Message = "{Policy} attempt {Attempt} kept running after its timeout, so that work is still going unobserved. The callback is not honoring the CancellationToken it was handed; NRES001 and NRES002 diagnose this at compile time.")]
     internal static partial void OrphanedWork(ILogger logger, LogLevel level, string policy, int attempt);
 
-    [LoggerMessage(EventId = 1017, EventName = nameof(Ids.OrphanedWorkRepeat), Message = "{Policy} attempt {Attempt} kept running after its timeout")]
+    [LoggerMessage(EventId = Codes.OrphanedWorkRepeat, EventName = nameof(Ids.OrphanedWorkRepeat), Message = "{Policy} attempt {Attempt} kept running after its timeout")]
     internal static partial void OrphanedWorkRepeat(ILogger logger, LogLevel level, string policy, int attempt);
 
     [LoggerMessage(
-        EventId = 1018,
+        EventId = Codes.NestedRetry,
         EventName = nameof(Ids.NestedRetry),
         Message = "{Policy} is retrying a request that is already inside a retrying client, which multiplies load on the dependency. Remove the retry from one of the two layers.")]
     internal static partial void NestedRetry(ILogger logger, LogLevel level, string policy);
 
-    [LoggerMessage(EventId = 1019, EventName = nameof(Ids.NestedRetryRepeat), Message = "{Policy} is retrying inside another retrying client")]
+    [LoggerMessage(EventId = Codes.NestedRetryRepeat, EventName = nameof(Ids.NestedRetryRepeat), Message = "{Policy} is retrying inside another retrying client")]
     internal static partial void NestedRetryRepeat(ILogger logger, LogLevel level, string policy);
 
-    [LoggerMessage(EventId = 1020, EventName = nameof(Ids.PolicyResolved), Message = "{Policy} resolved: {Effective}")]
+    [LoggerMessage(EventId = Codes.PolicyResolved, EventName = nameof(Ids.PolicyResolved), Message = "{Policy} resolved: {Effective}")]
     internal static partial void PolicyResolved(ILogger logger, LogLevel level, string policy, string effective);
 
-    [LoggerMessage(EventId = 1021, EventName = nameof(Ids.PolicyClassifier), Message = "{Policy} classifier:\n{Rules}")]
+    [LoggerMessage(EventId = Codes.PolicyClassifier, EventName = nameof(Ids.PolicyClassifier), Message = "{Policy} classifier:\n{Rules}")]
     internal static partial void PolicyClassifier(ILogger logger, LogLevel level, string policy, string rules);
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -7,7 +8,7 @@ namespace NResilience.Analyzers;
 
 /// <summary>
 /// Constant folding for the handful of ways a <see cref="TimeSpan"/> is written at a call site.
-/// Anything it does not recognise is reported as unknown, and the analyzer stays quiet - a
+/// Anything it does not recognize is reported as unknown, and the analyzer stays quiet - a
 /// configuration diagnostic that guesses is worse than none.
 /// </summary>
 internal static class TimeSpanValue
@@ -57,7 +58,7 @@ internal static class TimeSpanValue
 
         if (SymbolEqualityComparer.Default.Equals(owner, known.Timeout) && field.Field.Name == "InfiniteTimeSpan")
         {
-            value = System.Threading.Timeout.InfiniteTimeSpan;
+            value = Timeout.InfiniteTimeSpan;
             return true;
         }
 
@@ -119,14 +120,10 @@ internal static class TimeSpanValue
                     return false;
             }
         }
-        catch (OverflowException)
+        catch (Exception error) when (error is OverflowException or ArgumentException)
         {
             // A literal that does not fit a TimeSpan throws at runtime too, and saying so is the job
             // of whoever owns that message rather than of a configuration diagnostic.
-            return false;
-        }
-        catch (ArgumentException)
-        {
             return false;
         }
     }
@@ -191,22 +188,15 @@ internal static class TimeSpanValue
             value = Convert.ToDouble(unwrapped.ConstantValue.Value, CultureInfo.InvariantCulture);
             return true;
         }
-        catch (InvalidCastException)
+        catch (Exception error) when (error is InvalidCastException or OverflowException or FormatException)
         {
-            return false;
-        }
-        catch (OverflowException)
-        {
-            return false;
-        }
-        catch (FormatException)
-        {
+            // Not a number the fold can use, which is the same answer as not being a constant.
             return false;
         }
     }
 
     /// <summary>How the library says "no bound", spelled the same way here.</summary>
-    internal static bool IsUnbounded(this TimeSpan value) => value == System.Threading.Timeout.InfiniteTimeSpan;
+    internal static bool IsUnbounded(this TimeSpan value) => value == Timeout.InfiniteTimeSpan;
 
     private static TimeSpan Negate(this TimeSpan value) => value == TimeSpan.MinValue ? TimeSpan.MaxValue : -value;
 

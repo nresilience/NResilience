@@ -69,10 +69,8 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
         // The whole of hot reload. The projection cache is dropped for the changed name and the
         // next resolve rebuilds it; _live is untouched, which is what carries a breaker's state
         // across the edit.
-        _subscription = options.OnChange((changed, name) =>
+        _subscription = options.OnChange((_, name) =>
         {
-            _ = changed;
-
             if (name is not null)
             {
                 _projected.TryRemove(name, out Resilience? _);
@@ -186,7 +184,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             }
 
             // Classifier.ToString builds a multi-line dump, so the guard is the point rather than a
-            // micro-optimisation: this is the only record that costs a string before it is written.
+            // micro-optimization: this is the only record that costs a string before it is written.
             if (logger.IsEnabled(LogLevel.Trace))
             {
                 Log.PolicyClassifier(logger, LogLevel.Trace, reported, policy.Classify.ToString());
@@ -244,9 +242,9 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             {
                 // A null budget means the core creates an automatic one keyed by policy *instance*,
                 // and reload produces a new instance - so the accumulated traffic history would be
-                // thrown away on every edit, silently, on the default configuration. Materialising
+                // thrown away on every edit, silently, on the default configuration. Materializing
                 // it here pins it to the name instead. RetryBudget.Of's defaults are the automatic
-                // budget's defaults, so nothing about the policy's behaviour changes.
+                // budget's defaults, so nothing about the policy's behavior changes.
                 live.Budget ??= RetryBudget.Of(time: policy.Time);
                 policy = policy with { Budget = live.Budget };
             }

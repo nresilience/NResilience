@@ -27,7 +27,7 @@ public sealed partial record Resilience
 {
     /// <summary>
     /// Passthrough. Every bound is off, so the executor returns the callback's own task and the
-    /// call allocates nothing at all — the only genuinely free configuration in the library.
+    /// call allocates nothing at all - the only genuinely free configuration in the library.
     /// </summary>
     public static Resilience None { get; } = new()
     {
@@ -43,8 +43,8 @@ public sealed partial record Resilience
 
     /// <summary>
     /// The shipped defaults: three attempts, a 30 s deadline, a 10 s attempt ceiling, exponential
-    /// backoff with full jitter, and <see cref="Classifier.Default"/> — which does not retry
-    /// exceptions it does not recognise.
+    /// backoff with full jitter, and <see cref="Classifier.Default"/> - which does not retry
+    /// exceptions it does not recognize.
     /// </summary>
     public static Resilience Default { get; } = new();
 
@@ -108,7 +108,7 @@ public sealed partial record Resilience
 
     /// <summary>
     /// Runs before every attempt, including the first. The place to build a fresh request or
-    /// refresh a token — retry re-invokes the callback, so anything single-use has to be rebuilt.
+    /// refresh a token - retry re-invokes the callback, so anything single-use has to be rebuilt.
     /// <para>
     /// Returns <see cref="Task"/> rather than <see cref="ValueTask"/> for the same reason the
     /// execution callbacks do, plus one of its own: the executor already awaits a
@@ -120,7 +120,7 @@ public sealed partial record Resilience
     public Func<NextAttempt, Task>? BeforeAttempt { get; init; }
 
     /// <summary>
-    /// Told about everything that happens during a call. Null — the default — means the executor
+    /// Told about everything that happens during a call. Null - the default - means the executor
     /// raises nothing and pays nothing, which is what "pay-for-play telemetry" has to mean if it
     /// is to mean anything.
     /// <para>

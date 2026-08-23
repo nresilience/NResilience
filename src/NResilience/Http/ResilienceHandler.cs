@@ -17,7 +17,7 @@ namespace NResilience.Http;
 /// <item><description>It disposes the responses a retry supersedes.</description></item>
 /// </list>
 /// Taking ownership of the transport timeout is the sixth, and it belongs to whoever builds the
-/// <see cref="HttpClient"/> — see <see cref="ResilienceHttp.CreateClient"/> and
+/// <see cref="HttpClient"/> - see <see cref="ResilienceHttp.CreateClient"/> and
 /// <see cref="HttpResilienceOptions.OwnTransportTimeout"/>.
 /// </summary>
 /// <example>
@@ -75,39 +75,15 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// breaker whose scope is a variable with a name is one an operator can be told about.
     /// </summary>
     /// <returns>A snapshot. Empty when <see cref="HttpResilienceOptions.BreakerPerHost"/> is off and the policy carries no breaker.</returns>
-    public IReadOnlyDictionary<string, Breaker> BreakersByHost()
-    {
-        var breakers = new Dictionary<string, Breaker>(StringComparer.OrdinalIgnoreCase);
-        foreach (HostScope scope in _hosts.Scopes)
-        {
-            if (scope.Breaker is { } breaker)
-            {
-                breakers[scope.Host] = breaker;
-            }
-        }
-
-        return breakers;
-    }
+    public IReadOnlyDictionary<string, Breaker> BreakersByHost() => ByHost(static scope => scope.Breaker);
 
     /// <summary>The retry budgets, by host, for the hosts this handler has seen.</summary>
     /// <returns>A snapshot.</returns>
-    public IReadOnlyDictionary<string, RetryBudget> BudgetsByHost()
-    {
-        var budgets = new Dictionary<string, RetryBudget>(StringComparer.OrdinalIgnoreCase);
-        foreach (HostScope scope in _hosts.Scopes)
-        {
-            if (scope.Budget is { } budget)
-            {
-                budgets[scope.Host] = budget;
-            }
-        }
-
-        return budgets;
-    }
+    public IReadOnlyDictionary<string, RetryBudget> BudgetsByHost() => ByHost(static scope => scope.Budget);
 
     /// <summary>
     /// Whether a request will be retried, given this handler's policy and options. The decision
-    /// the handler itself makes, exposed so a test — or a log line — can ask about it.
+    /// the handler itself makes, exposed so a test - or a log line - can ask about it.
     /// </summary>
     /// <param name="request">The request.</param>
     /// <returns>True when the policy allows more than one attempt and the request may be repeated.</returns>
@@ -119,7 +95,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     public bool WillRetry(HttpRequestMessage request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        return _policy.Attempts > 1 && IsRepeatable(request);
+        return ShouldRetry(request);
     }
 
     /// <inheritdoc/>
@@ -128,19 +104,19 @@ public sealed class ResilienceHandler : DelegatingHandler
         ArgumentNullException.ThrowIfNull(request);
 
         HostScope scope = _hosts.For(request.RequestUri?.Authority ?? string.Empty);
-        bool retrying = _policy.Attempts > 1 && IsRepeatable(request);
+        bool retrying = ShouldRetry(request);
         Resilience policy = retrying ? scope.Retrying : scope.Single;
 
-        bool nesting = false;
+        bool nested = false;
         if (retrying && _options.DetectNestedRetries)
         {
-            nesting = InsideRetryingClient.Value || request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
-            if (nesting && policy.OnEvent is { } listener)
+            nested = InsideRetryingClient.Value || request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
+            if (nested && policy.OnEvent is { } listener)
             {
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
             }
 
-            if (!nesting)
+            if (!nested)
             {
                 request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, "1");
             }
@@ -185,6 +161,27 @@ public sealed class ResilienceHandler : DelegatingHandler
         throw new NotSupportedException(
             "NResilience is async-only: a retry loop that blocks holds a thread through every backoff delay. Use SendAsync.");
 
+    /// <summary>
+    /// One host-scoped guard per host that has one, as a snapshot. Both public views are the same
+    /// walk over the same scopes and differ only in which guard they read.
+    /// </summary>
+    private Dictionary<string, T> ByHost<T>(Func<HostScope, T?> guard)
+        where T : class
+    {
+        var found = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
+        foreach (HostScope scope in _hosts.Scopes)
+        {
+            if (guard(scope) is { } value)
+            {
+                found[scope.Host] = value;
+            }
+        }
+
+        return found;
+    }
+
+    private bool ShouldRetry(HttpRequestMessage request) => _policy.Attempts > 1 && IsRepeatable(request);
+
     private bool IsRepeatable(HttpRequestMessage request)
     {
         // An explicit declaration beats everything, in both directions: whoever wrote the request
@@ -194,7 +191,7 @@ public sealed class ResilienceHandler : DelegatingHandler
             return declared;
         }
 
-        // An unrecognised method is treated as unsafe. Retrying something the library has never
+        // An unrecognized method is treated as unsafe. Retrying something the library has never
         // heard of is a guess, and the direction to guess in is the one that does not duplicate it.
         return IsIdempotentMethod(request.Method) || _options.RetryUnsafeMethods;
     }

@@ -92,7 +92,7 @@ public sealed class HttpRateLimitTests
         await Assert.ThrowsAsync<RateLimitedException>(() => client.GetAsync(Thing));
 
         RetryBudget budget = Assert.Single(handler.BudgetsByHost()).Value;
-        Assert.Equal(0, budget.Utilisation);
+        Assert.Equal(0, budget.Utilization);
         Assert.Empty(transport.Requests);
         limiter.Dispose();
     }

@@ -3,8 +3,8 @@ using System.Collections.Concurrent;
 namespace NResilience.Http.Internal;
 
 /// <summary>
-/// The two policies one host is served by — the retrying one, and the single-attempt one a
-/// non-repeatable request gets — with that host's breaker and budget already attached.
+/// The two policies one host is served by - the retrying one, and the single-attempt one a
+/// non-repeatable request gets - with that host's breaker and budget already attached.
 /// </summary>
 /// <remarks>
 /// Derived once per host rather than per request. <c>with</c> on a record is cheap, but it is not

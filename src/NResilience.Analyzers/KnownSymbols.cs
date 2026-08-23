@@ -35,8 +35,7 @@ internal sealed class KnownSymbols
         TimeSpan = timeSpan;
         Timeout = timeout;
 
-        // Deferred, and thread-safe because concurrent execution is on: binding Main is work that
-        // only one rule needs, and every consumer's build would otherwise pay for it.
+        // Thread-safe because concurrent execution is on.
         _entryPoint = new Lazy<IMethodSymbol?>(
             () => compilation.GetEntryPoint(System.Threading.CancellationToken.None),
             LazyThreadSafetyMode.ExecutionAndPublication);
@@ -94,4 +93,18 @@ internal sealed class KnownSymbols
 
     internal bool IsCancellationToken(ITypeSymbol? type) =>
         type is not null && SymbolEqualityComparer.Default.Equals(type, CancellationToken);
+
+    internal bool IsPolicy(ITypeSymbol? type) => Is(type, Resilience);
+
+    internal bool IsBreaker(ITypeSymbol? type) => Is(type, Breaker);
+
+    internal bool IsRetryBudget(ITypeSymbol? type) => Is(type, RetryBudget);
+
+    internal bool IsResilienceHttp(ITypeSymbol? type) => Is(type, ResilienceHttp);
+
+    /// <summary>True when the method is the compilation's entry point.</summary>
+    internal bool IsEntryPoint(IMethodSymbol method) => SymbolEqualityComparer.Default.Equals(method, EntryPoint);
+
+    private static bool Is(ITypeSymbol? type, INamedTypeSymbol? known) =>
+        known is not null && SymbolEqualityComparer.Default.Equals(type, known);
 }

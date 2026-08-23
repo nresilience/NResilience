@@ -15,7 +15,7 @@ public enum AllocationCounter
     /// Uses <c>GC.GetTotalAllocatedBytes(precise: true)</c>. This is process-wide and 
     /// therefore immune to the thread hop that every suspending await performs. 
     /// It requires a quiesced process, which is why the gate assembly disables 
-    /// test parallelisation.
+    /// test parallelization.
     /// </summary>
     ProcessWide,
 }

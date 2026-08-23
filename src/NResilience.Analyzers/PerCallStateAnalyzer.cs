@@ -47,7 +47,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     {
         var creation = (IObjectCreationOperation)context.Operation;
 
-        if (SymbolEqualityComparer.Default.Equals(creation.Type, known.Breaker))
+        if (known.IsBreaker(creation.Type))
         {
             ReportGuardIfPerCall(context, creation, known, "breaker", "open");
         }
@@ -60,15 +60,13 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 
         // RetryBudget.Shared(name) is looked up by name, so calling it per call is correct: it is
         // Of() - a fresh bucket every time - that throws the window away.
-        if (method.Name == "Of" && SymbolEqualityComparer.Default.Equals(method.ContainingType, known.RetryBudget))
+        if (method.Name == "Of" && known.IsRetryBudget(method.ContainingType))
         {
             ReportGuardIfPerCall(context, invocation, known, "retry budget", "refill");
             return;
         }
 
-        if (method.Name == "CreateClient"
-            && known.ResilienceHttp is not null
-            && SymbolEqualityComparer.Default.Equals(method.ContainingType, known.ResilienceHttp))
+        if (method.Name == "CreateClient" && known.IsResilienceHttp(method.ContainingType))
         {
             ReportClientIfPerCall(context, invocation, known);
         }
@@ -83,8 +81,8 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         OperationAnalysisContext context,
         IOperation guard,
         KnownSymbols known,
-        string what,
-        string canNever)
+        string guardKind,
+        string cannotEver)
     {
         if (!IsPolicySetting(guard, known) || !InsideSomethingCalledRepeatedly(context, known, out string container))
         {
@@ -94,9 +92,9 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         context.ReportDiagnostic(Diagnostic.Create(
             Diagnostics.PerCallGuardState,
             guard.Syntax.GetLocation(),
-            what,
+            guardKind,
             container,
-            canNever));
+            cannotEver));
     }
 
     private static void ReportClientIfPerCall(OperationAnalysisContext context, IOperation client, KnownSymbols known)
@@ -126,7 +124,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 
         return parent is ISimpleAssignmentOperation { Target: IPropertyReferenceOperation property }
             && (property.Property.Name == "Breaker" || property.Property.Name == "Budget")
-            && SymbolEqualityComparer.Default.Equals(property.Property.ContainingType, known.Resilience);
+            && known.IsPolicy(property.Property.ContainingType);
     }
 
     /// <summary>
@@ -139,7 +137,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 
         if (context.ContainingSymbol is not IMethodSymbol method
             || method.MethodKind == MethodKind.StaticConstructor
-            || SymbolEqualityComparer.Default.Equals(method, known.EntryPoint))
+            || known.IsEntryPoint(method))
         {
             return false;
         }

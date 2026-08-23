@@ -48,7 +48,7 @@ When using dependency injection, the automatic budget is pinned to the registrat
 
 ## Monitoring the budget
 
-The `Utilisation` property provides a value for dashboards. A budget consistently near 1 indicates that retries are being refused, which is a symptom that should trigger an alert.
+The `Utilization` property provides a value for dashboards. A budget consistently near 1 indicates that retries are being refused, which is a symptom that should trigger an alert.
 
 To monitor the retry fraction across a fleet, use the following metric:
 `nresilience.attempts ÷ nresilience.calls`

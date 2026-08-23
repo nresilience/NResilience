@@ -71,7 +71,7 @@ public sealed class AllocationGateTests
         => AssertSuspendingOverhead(Baseline.LibDefaultCancellable, Budgets.DefaultCancellableOverhead);
 
     /// <summary>
-    /// <c>TryRunAsync</c> always materialises the attempt log. That is a deliberate difference from
+    /// <c>TryRunAsync</c> always materializes the attempt log. That is a deliberate difference from
     /// the throwing form rather than an oversight, so it is budgeted rather than left unpriced.
     /// </summary>
     [Fact]
@@ -80,8 +80,8 @@ public sealed class AllocationGateTests
 
     /// <summary>
     /// Telemetry with a listener attached, budgeted rather than described. The design's stated
-    /// reason for having its own event type at all is that Polly's costs 6.9x when enabled — the
-    /// configuration production actually runs — so what this costs when it is on is the number
+    /// reason for having its own event type at all is that Polly's costs 6.9x when enabled - the
+    /// configuration production actually runs - so what this costs when it is on is the number
     /// that matters.
     /// </summary>
     [Fact]
@@ -93,7 +93,7 @@ public sealed class AllocationGateTests
     /// listener asked for and must not cost anything else.
     ///
     /// Both arms are measured in this sweep, so the difference is a measurement rather than a
-    /// subtraction across two harnesses — which is the failure mode this whole harness exists to
+    /// subtraction across two harnesses - which is the failure mode this whole harness exists to
     /// avoid.
     /// </summary>
     [Fact]
@@ -113,7 +113,7 @@ public sealed class AllocationGateTests
                 $"""
                  Attaching a listener now costs {listening - silent:0.0} B/op, against the {Budgets.ListenerAllowance:0} B
                  that two boxed results plus drift can account for. Something in the event path is
-                 allocating per event — a captured closure, an event object, or a result boxed on a
+                 allocating per event - a captured closure, an event object, or a result boxed on a
                  path that has no listener to hand it to.
                  """));
     }
@@ -154,7 +154,7 @@ public sealed class AllocationGateTests
     /// must cost exactly what it cost before telemetry existed.
     ///
     /// <see cref="The_default_policy_stays_within_budget_on_the_suspending_path"/> already gates the
-    /// absolute figure, and the telemetry work moved it by zero bytes — the delegate is a field on a record the
+    /// absolute figure, and the telemetry work moved it by zero bytes - the delegate is a field on a record the
     /// state-machine box already holds a reference to, so reading it is free, and every event site
     /// is behind a null test. This asserts the comparison the budget cannot: that the silent path
     /// has not drifted toward the listening one.
@@ -179,7 +179,7 @@ public sealed class AllocationGateTests
     /// <summary>
     /// The falsification test for the shipping executor. The stand-in measured a hand-written fused loop to establish
     /// what was achievable before any library existed; the shipping executor has to match it while
-    /// doing strictly more — capturing a per-attempt exception, classifying results, and awaiting a
+    /// doing strictly more - capturing a per-attempt exception, classifying results, and awaiting a
     /// pre-attempt hook. Both arms are measured in this sweep, so the comparison is not inferred.
     /// </summary>
     [Fact]
@@ -210,7 +210,7 @@ public sealed class AllocationGateTests
     /// fails.
     ///
     /// The stand-in priced it by differencing two stand-in loops, one with the log removed. The shipping
-    /// executor has no log-less variant — the log is not optional — so this asserts the layout that
+    /// executor has no log-less variant - the log is not optional - so this asserts the layout that
     /// determines the cost: capacity times record size, both of which a change would have to move.
     /// The record shrank from 24 bytes to 16 and the capacity stayed at 4, taking the log from
     /// 96 B of box to 64 B.

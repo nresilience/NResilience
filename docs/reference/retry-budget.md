@@ -14,7 +14,7 @@ The `RetryBudget` is a `sealed class` that bounds the number of retries based on
 | `RetryBudget.Shared(name, fraction = 0.1, minimumPerSecond = 3)` | Creates or retrieves a process-wide budget looked up by name. Policies that share the same name share the same budget. The parameters provided by the first caller are used. |
 | `RetryBudget.None` | Disables the budget. Every retry allowed by other policy bounds is funded. |
 | `Name` | The name used to look up a shared budget, if applicable. |
-| `Utilisation` | A value from 0 to 1 indicating how much of the current budget has been spent. |
+| `Utilization` | A value from 0 to 1 indicating how much of the current budget has been spent. |
 
 Both factories throw a `ResilienceConfigurationException` if the `fraction` is outside the range (0, 1] or if `minimumPerSecond` is negative. To disable the budget, use `RetryBudget.None` rather than a fraction of zero.
 

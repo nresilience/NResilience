@@ -103,7 +103,7 @@ public static class RateLimitHttpClientBuilderExtensions
 
         return builder.AddHttpMessageHandler(() => new RateLimitHandler(
             PartitionedRateLimiter.Create<HttpRequestMessage, string>(
-                request => RateLimitPartition.Get(Host(request), _ => options.ToLimiter()),
+                request => RateLimitPartition.Get(HostOf(request), _ => options.ToLimiter()),
 
                 // The same comparer the per-host breakers and budgets use, so all three agree on
                 // what one host is.
@@ -115,8 +115,8 @@ public static class RateLimitHttpClientBuilderExtensions
     /// The partition key, derived exactly as <c>ResilienceHandler</c> derives its host scope so the
     /// limiter, the breaker and the budget partition identically.
     /// </summary>
-    private static string Host(HttpRequestMessage request) => request.RequestUri?.Authority ?? string.Empty;
+    private static string HostOf(HttpRequestMessage request) => request.RequestUri?.Authority ?? string.Empty;
 
     private static void Mark(IHttpClientBuilder builder) =>
-        HandlerOrder.For(builder.Services).RateLimit.TryAdd(builder.Name, 0);
+        HandlerOrder.For(builder.Services).RateLimitClients.TryAdd(builder.Name, 0);
 }

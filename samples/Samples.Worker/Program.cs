@@ -80,7 +80,7 @@ CallResult<int> refused = await limited.TryRunAsync(
 
 Console.WriteLine($"  -> {refused.StopReason} after {refused.Attempts.Count} attempt(s)");
 Console.WriteLine($"     verdict: {refused.Attempts[0].Verdict}");
-Console.WriteLine($"     retry budget spent: {budget.Utilisation:P0} - a refusal that never left the process is not charged");
+Console.WriteLine($"     retry budget spent: {budget.Utilization:P0} - a refusal that never left the process is not charged");
 
 Console.WriteLine();
 Console.WriteLine("nresilience.attempts / nresilience.calls is the retry fraction - the number to alert on.");

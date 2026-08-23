@@ -8,7 +8,7 @@ namespace NResilience;
 /// backoff and the inline attempt log, all in <b>one</b> <c>async</c> frame.
 /// <para>
 /// This is the architectural decision the whole design turns on. Every <c>async</c> frame that
-/// suspends heap-allocates its own state-machine box, and depth is a linear multiplier — so a
+/// suspends heap-allocates its own state-machine box, and depth is a linear multiplier - so a
 /// chain of composed strategies pays a box per layer on the path every real I/O call takes.
 /// Collapsing the layers into one method removes all but one of them.
 /// </para>
@@ -104,9 +104,9 @@ public sealed partial record Resilience
 
     /// <summary>
     /// Runs a callback and reports the outcome instead of throwing. This is what replaces a
-    /// fallback strategy — a fallback is an <c>if</c>.
+    /// fallback strategy - a fallback is an <c>if</c>.
     /// <para>
-    /// Unlike the throwing forms, this always materialises the attempt log: its caller has
+    /// Unlike the throwing forms, this always materializes the attempt log: its caller has
     /// explicitly asked for a result object, and a history that vanished on success would make
     /// "assert this succeeded on the third attempt" impossible to write.
     /// </para>
@@ -172,7 +172,7 @@ public sealed partial record Resilience
     /// Drops a <see cref="VoidResult"/> without adding a frame.
     /// <para>
     /// When the core suspended, its <c>ValueTask&lt;VoidResult&gt;</c> is backed by a
-    /// <c>Task&lt;VoidResult&gt;</c>, which <i>is</i> a <see cref="Task"/> — so <c>AsTask()</c>
+    /// <c>Task&lt;VoidResult&gt;</c>, which <i>is</i> a <see cref="Task"/> - so <c>AsTask()</c>
     /// hands back the object that already exists rather than creating one. Awaiting the core here
     /// instead would cost a second state-machine box on the suspending path, which is the whole
     /// thing this design exists to avoid.
@@ -196,7 +196,7 @@ public sealed partial record Resilience
     /// How far past its own attempt timeout a callback has to run before the overrun is reported
     /// as <see cref="CallEventKind.OrphanedWork"/> rather than as ordinary scheduling noise.
     /// <para>
-    /// Not configurable. It is a threshold for a diagnostic, not a bound on behaviour, and a
+    /// Not configurable. It is a threshold for a diagnostic, not a bound on behavior, and a
     /// second is far beyond any delay the thread pool or a cancellation registration can account
     /// for while being short enough that a callback which genuinely ignored its token always
     /// crosses it.
@@ -213,7 +213,7 @@ public sealed partial record Resilience
     {
         // Deliberately almost nothing is hoisted into a local here. Every local live across the
         // attempt await is a field in the state-machine box, and the box is the allocation this
-        // whole design exists to minimise: caching the policy's Backoff in a local costs 56 bytes
+        // whole design exists to minimize: caching the policy's Backoff in a local costs 56 bytes
         // on every suspending call to save a field load that the JIT keeps in a register anyway.
         // `this` is already a field of the box, so reading a property off it is free.
         bool bounded = Deadline != Timeout.InfiniteTimeSpan;
@@ -251,7 +251,7 @@ public sealed partial record Resilience
                 bool admitted = breaker.TryEnter(out BreakerTransition admission);
 
                 // Raised outside the breaker's lock, on purpose: a listener is arbitrary user code
-                // and one slow listener holding that lock would serialise every call through the
+                // and one slow listener holding that lock would serialize every call through the
                 // breaker.
                 if (admission != BreakerTransition.None && OnEvent is not null)
                 {
@@ -439,7 +439,7 @@ public sealed partial record Resilience
                 }
 
                 AttemptLog succeeded = shaper.WantsLogOnSuccess
-                    ? log.Materialise(Time.GetElapsedTime(start), Deadline, bounded)
+                    ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
                     : AttemptLog.Empty;
 
                 return shaper.Success(value, succeeded);
@@ -453,7 +453,7 @@ public sealed partial record Resilience
 
                 if (OnEvent is not null)
                 {
-                    // The event that makes "Classifier.Default did not recognise your exception
+                    // The event that makes "Classifier.Default did not recognize your exception
                     // type" visible rather than mysterious: the type is right there on it.
                     Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue), StopReason.Permanent);
                 }
@@ -529,7 +529,7 @@ public sealed partial record Resilience
             }
         }
 
-        AttemptLog attempts = log.Materialise(Time.GetElapsedTime(start), Deadline, bounded);
+        AttemptLog attempts = log.Materialize(Time.GetElapsedTime(start), Deadline, bounded);
 
         // Read after the guarded delay rather than before it, which is both more accurate - the
         // hint is that much shorter by the time the caller sees it - and keeps a TimeSpan? out of
@@ -585,7 +585,7 @@ public sealed partial record Resilience
     /// Raises one event.
     /// <para>
     /// Every call site is already guarded by a <c>OnEvent is not null</c> test, because the
-    /// arguments — a boxed result, an elapsed-time read — are themselves work not worth doing for
+    /// arguments - a boxed result, an elapsed-time read - are themselves work not worth doing for
     /// a policy nobody is listening to. The delegate is read once here rather than twice, so a
     /// listener detached by another thread between the guard and the raise cannot produce a null
     /// dereference.
@@ -606,8 +606,8 @@ public sealed partial record Resilience
         catch (Exception)
         {
             // Telemetry that can fail the operation it is observing is worse than no telemetry.
-            // There is nowhere honest to report this to — a logger is exactly the thing that just
-            // threw — so it is swallowed, and that is documented on OnEvent rather than hidden.
+            // There is nowhere honest to report this to - a logger is exactly the thing that just
+            // threw - so it is swallowed, and that is documented on OnEvent rather than hidden.
         }
     }
 

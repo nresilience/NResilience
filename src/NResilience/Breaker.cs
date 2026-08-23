@@ -52,7 +52,7 @@ internal enum BreakerTransition : byte
 /// <remarks>
 /// Every default here is a departure from Polly v8, and each one is deliberate. Polly removed
 /// classic consecutive-failure breaking, leaving only a rate-based trip at <c>FailureRatio</c> 0.1
-/// over a minimum throughput of 100 calls per 30 s — which means a service doing fewer than 100
+/// over a minimum throughput of 100 calls per 30 s - which means a service doing fewer than 100
 /// calls per 30 s can never open its breaker, and that is the median .NET service. Consecutive
 /// failures is therefore the default trip condition here, and the rate-based trip is opt-in
 /// alongside it.
@@ -64,7 +64,7 @@ public sealed record BreakerSettings
 
     /// <summary>
     /// Optional rate-based trip, evaluated alongside the consecutive counter. Null disables it, and
-    /// nothing rate-based — including <see cref="SlowCallThreshold"/> — is evaluated until
+    /// nothing rate-based - including <see cref="SlowCallThreshold"/> - is evaluated until
     /// <see cref="MinimumCalls"/> outcomes have landed in <see cref="Window"/>.
     /// </summary>
     public double? FailureRatio { get; init; }
@@ -118,7 +118,7 @@ public sealed record BreakerSettings
     /// <para>
     /// A breaker owns its clock rather than borrowing the executing policy's, because
     /// <see cref="Breaker.State"/> and <see cref="Breaker.OpenedAt"/> are read from health
-    /// endpoints and admin handlers that have no policy in hand — and because one breaker shared by
+    /// endpoints and admin handlers that have no policy in hand - and because one breaker shared by
     /// two policies with different clocks would otherwise have no single answer to "how long have
     /// you been open?".
     /// </para>
@@ -201,11 +201,11 @@ public sealed record BreakerSettings
 /// Here it is a variable with a name and a lifetime, visible at the point you write
 /// <c>new Breaker()</c>. <c>with</c> on a <see cref="Resilience"/> copies the <i>reference</i>,
 /// never the state, so two policies derived from a common ancestor share whatever breaker that
-/// ancestor held — and that is exactly the intent.
+/// ancestor held - and that is exactly the intent.
 /// </para>
 /// <para>
 /// It samples individual <b>attempts</b>, always, because that is the only reading that produces a
-/// useful failure signal — so "does the breaker see attempts or whole operations?" has one answer
+/// useful failure signal - so "does the breaker see attempts or whole operations?" has one answer
 /// rather than depending on composition order. Only <see cref="VerdictKind.Transient"/> counts as
 /// evidence: a <see cref="VerdictKind.Throttled"/> response means the dependency is working
 /// correctly and defending itself, and a <see cref="VerdictKind.Permanent"/> one is overwhelmingly
@@ -229,7 +229,7 @@ public sealed record BreakerSettings
 /// <remarks>
 /// Guarded by an uncontended <c>lock</c> rather than being lock-free. Sliding-window rotation is a
 /// multi-word operation whose failure mode under <c>Interlocked</c> alone is a silently incorrect
-/// failure ratio — far worse than being slow. An uncontended lock is roughly 20 ns and the callback
+/// failure ratio - far worse than being slow. An uncontended lock is roughly 20 ns and the callback
 /// it guards dominates by orders of magnitude.
 /// </remarks>
 public sealed class Breaker
@@ -237,7 +237,7 @@ public sealed class Breaker
     /// <summary>
     /// Buckets in the sliding window. Ten gives a rotation granularity of 3 s on the default 30 s
     /// window, which is finer than any trip decision needs and costs 120 bytes of <c>int</c> per
-    /// breaker — and only when a rate-based trip is actually configured.
+    /// breaker - and only when a rate-based trip is actually configured.
     /// </summary>
     private const int BucketCount = 10;
 
@@ -250,8 +250,8 @@ public sealed class Breaker
     private readonly object _gate = new();
     private readonly BreakerSettings _settings;
     private readonly TimeProvider _time;
-    private readonly long _created;
-    private readonly long _bucketTicks;
+    private readonly long _startedAt;
+    private readonly long _ticksPerBucket;
     private readonly int[]? _calls;
     private readonly int[]? _failures;
     private readonly int[]? _slow;
@@ -281,8 +281,8 @@ public sealed class Breaker
         _settings = settings ?? new BreakerSettings();
         _settings.Validate();
         _time = _settings.Time;
-        _created = _time.GetTimestamp();
-        _bucketTicks = Math.Max(_settings.Window.Ticks / BucketCount, 1);
+        _startedAt = _time.GetTimestamp();
+        _ticksPerBucket = Math.Max(_settings.Window.Ticks / BucketCount, 1);
 
         // The window arrays exist only when something reads them. A consecutive-failures breaker -
         // the default - is three fields and no allocation beyond the object itself.
@@ -365,13 +365,13 @@ public sealed class Breaker
 
     /// <summary>
     /// Admission. True means the call may proceed, and in the half-open state consumes one of the
-    /// probe slots — so every true must be followed by exactly one <see cref="Record"/>.
+    /// probe slots - so every true must be followed by exactly one <see cref="Record"/>.
     /// </summary>
     /// <param name="transition">
     /// The state change this admission caused, for the caller to report. Reported by the caller
     /// rather than raised here because the transition happens under the breaker's lock and a
     /// listener is arbitrary user code: raising inside the lock would let one slow listener
-    /// serialise every call through the breaker.
+    /// serialize every call through the breaker.
     /// </param>
     internal bool TryEnter(out BreakerTransition transition)
     {
@@ -401,7 +401,7 @@ public sealed class Breaker
                     transition = BreakerTransition.HalfOpened;
                     return true;
 
-                default:
+                case BreakerState.HalfOpen:
                     if (_probesInFlight >= _settings.HalfOpenProbes)
                     {
                         return false;
@@ -409,6 +409,9 @@ public sealed class Breaker
 
                     _probesInFlight++;
                     return true;
+
+                default:
+                    throw new InvalidOperationException($"Unknown breaker state '{_state}'.");
             }
         }
     }
@@ -433,83 +436,77 @@ public sealed class Breaker
     /// <summary>The state machine itself, always called with the lock held.</summary>
     private void RecordCore(VerdictKind kind, TimeSpan duration)
     {
+        // An isolated breaker is held open by hand. An outcome that lands after the breaker
+        // re-opened belongs to a generation that no longer exists: counting it would either
+        // double-punish a dependency already broken or credit a probe slot that was reset out
+        // from under it.
+        if (_state is BreakerState.Isolated or BreakerState.Open)
         {
-            if (_state == BreakerState.Isolated)
-            {
-                return;
-            }
+            return;
+        }
 
-            // An outcome that lands after the breaker re-opened belongs to a generation that no
-            // longer exists. Counting it would either double-punish a dependency already broken or
-            // credit a probe slot that was reset out from under it.
-            if (_state == BreakerState.Open)
-            {
-                return;
-            }
+        bool probe = _state == BreakerState.HalfOpen;
+        if (probe && _probesInFlight > 0)
+        {
+            _probesInFlight--;
+        }
 
-            bool probe = _state == BreakerState.HalfOpen;
-            if (probe && _probesInFlight > 0)
-            {
-                _probesInFlight--;
-            }
+        long now = Elapsed();
 
-            long now = Elapsed();
-
-            if (kind == VerdictKind.Ok)
-            {
-                bool slow = _settings.SlowCallThreshold is { } threshold && duration >= threshold;
-                _consecutiveFailures = 0;
-                Bucket(now, failure: false, slow: slow);
-
-                if (probe)
-                {
-                    // A slow probe is not a recovery. Closing on a 200 that took 30 s hands the
-                    // waiting client fleet straight back to a dependency that is still in trouble.
-                    if (slow)
-                    {
-                        OpenCore(now);
-                    }
-                    else if (++_probeSuccesses >= _settings.ProbeSuccesses)
-                    {
-                        CloseCore();
-                    }
-
-                    return;
-                }
-
-                if (slow)
-                {
-                    Evaluate(now);
-                }
-
-                return;
-            }
-
-            // Only Transient is evidence about the dependency's health. Throttled means it is
-            // working correctly and defending itself; Permanent is overwhelmingly a client-side
-            // fact, and five NullReferenceExceptions in your own mapping code must not open a
-            // circuit against a dependency that never misbehaved.
-            if (kind != VerdictKind.Transient)
-            {
-                return;
-            }
-
-            Bucket(now, failure: true, slow: false);
-            _consecutiveFailures++;
+        if (kind == VerdictKind.Ok)
+        {
+            bool slow = _settings.SlowCallThreshold is { } threshold && duration >= threshold;
+            _consecutiveFailures = 0;
+            Bucket(now, failure: false, slow: slow);
 
             if (probe)
             {
-                OpenCore(now);
+                // A slow probe is not a recovery. Closing on a 200 that took 30 s hands the
+                // waiting client fleet straight back to a dependency that is still in trouble.
+                if (slow)
+                {
+                    OpenCore(now);
+                }
+                else if (++_probeSuccesses >= _settings.ProbeSuccesses)
+                {
+                    CloseCore();
+                }
+
                 return;
             }
 
-            Evaluate(now);
+            if (slow)
+            {
+                Evaluate(now);
+            }
+
+            return;
         }
+
+        // Only Transient is evidence about the dependency's health. Throttled means it is
+        // working correctly and defending itself; Permanent is overwhelmingly a client-side
+        // fact, and five NullReferenceExceptions in your own mapping code must not open a
+        // circuit against a dependency that never misbehaved.
+        if (kind != VerdictKind.Transient)
+        {
+            return;
+        }
+
+        Bucket(now, failure: true, slow: false);
+        _consecutiveFailures++;
+
+        if (probe)
+        {
+            OpenCore(now);
+            return;
+        }
+
+        Evaluate(now);
     }
 
     /// <summary>
     /// How long until admission might succeed, for the <see cref="CallRejectedException"/> a
-    /// refusal carries. Null when there is nothing useful to say — an isolated breaker will not
+    /// refusal carries. Null when there is nothing useful to say - an isolated breaker will not
     /// self-heal, and a half-open one is waiting on a probe rather than on a clock.
     /// </summary>
     internal TimeSpan? RetryAfterHint()
@@ -529,7 +526,7 @@ public sealed class Breaker
     private static bool IsWindowed(BreakerSettings settings) =>
         settings.FailureRatio is not null || settings.SlowCallThreshold is not null;
 
-    private long Elapsed() => _time.GetElapsedTime(_created).Ticks;
+    private long Elapsed() => _time.GetElapsedTime(_startedAt).Ticks;
 
     private void Evaluate(long now)
     {
@@ -601,7 +598,7 @@ public sealed class Breaker
             return;
         }
 
-        long epoch = now / _bucketTicks;
+        long epoch = now / _ticksPerBucket;
         if (epoch != _epoch)
         {
             // Every bucket the window has moved onto since the last write holds counts from a

@@ -9,7 +9,7 @@ namespace NResilience.Internal;
 ///     otherwise observe the next operation's cancellation.
 ///   </item>
 ///   <item>
-///     A source that has actually fired is poison — <c>TryReset</c> returns false once cancelled —
+///     A source that has actually fired is poison - <c>TryReset</c> returns false once cancelled -
 ///     so it is disposed rather than returned.
 ///   </item>
 ///   <item>
@@ -23,7 +23,7 @@ namespace NResilience.Internal;
 internal static class CtsPool
 {
     [ThreadStatic]
-    private static CancellationTokenSource? t_cached;
+    private static CancellationTokenSource? t_pooled;
 
     public static bool IsPoolable(TimeProvider time) => ReferenceEquals(time, TimeProvider.System);
 
@@ -37,13 +37,13 @@ internal static class CtsPool
             return new CancellationTokenSource(Timeout.InfiniteTimeSpan, time);
         }
 
-        CancellationTokenSource? cached = t_cached;
+        CancellationTokenSource? cached = t_pooled;
         if (cached is null)
         {
             return new CancellationTokenSource();
         }
 
-        t_cached = null;
+        t_pooled = null;
         return cached;
     }
 
@@ -55,6 +55,6 @@ internal static class CtsPool
             return;
         }
 
-        t_cached = source;
+        t_pooled = source;
     }
 }

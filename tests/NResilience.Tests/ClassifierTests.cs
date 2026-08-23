@@ -19,7 +19,7 @@ public sealed class ClassifierTests
     }
 
     [Fact]
-    public void Default_treats_anything_unrecognised_as_permanent()
+    public void Default_treats_anything_unrecognized_as_permanent()
     {
         Assert.Equal(VerdictKind.Permanent, Classifier.Default.ClassifyException(new InvalidOperationException()).Kind);
         Assert.Equal(VerdictKind.Permanent, Classifier.Default.ClassifyException(new ArgumentNullException()).Kind);
@@ -105,7 +105,7 @@ public sealed class ClassifierTests
     }
 
     [Fact]
-    public void Http_honours_Retry_After_on_a_429()
+    public void Http_honors_Retry_After_on_a_429()
     {
         using var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
         response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(7));

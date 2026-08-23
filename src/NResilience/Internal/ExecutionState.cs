@@ -7,7 +7,7 @@ namespace NResilience.Internal;
 /// <para>
 /// A record's synthesized <c>Equals</c> and <c>GetHashCode</c> compare every instance field, so a
 /// private "already validated" flag would make two identically-configured policies stop being
-/// equal — and change hash code — as a side effect of one of them having executed, silently
+/// equal - and change hash code - as a side effect of one of them having executed, silently
 /// corrupting any <c>Dictionary&lt;Resilience, …&gt;</c>. This table is keyed by reference
 /// identity, which the record's equality cannot see.
 /// </para>
@@ -45,20 +45,11 @@ internal sealed class ExecutionState
 
         // A policy that cannot retry has nothing to spend and nobody to fund, so it gets no budget
         // at all rather than one that is never consulted. An *explicit* budget on such a policy is
-        // still honoured, because a shared one is funded by its successful traffic.
+        // still honored, because a shared one is funded by its successful traffic.
         _automaticBudget = policy.Attempts > 1 ? RetryBudget.Automatic(policy.Time) : null;
 
     /// <summary>Validates the policy on its first execution, and caches the result per thread.</summary>
-    public static void EnsureValidated(Resilience policy)
-    {
-        if (ReferenceEquals(t_lastPolicy, policy))
-        {
-            return;
-        }
-
-        t_lastState = Table.GetValue(policy, Create);
-        t_lastPolicy = policy;
-    }
+    public static void EnsureValidated(Resilience policy) => _ = StateFor(policy);
 
     /// <summary>
     /// The budget this call should charge: the policy's own, or the automatic one private to this
@@ -80,10 +71,23 @@ internal sealed class ExecutionState
 
         // EnsureValidated ran first, from the entry point, so the warm path here is the reference
         // comparison it just primed.
-        ExecutionState state = ReferenceEquals(t_lastPolicy, policy)
-            ? t_lastState!
-            : Table.GetValue(policy, Create);
+        return StateFor(policy)._automaticBudget;
+    }
 
-        return state._automaticBudget;
+    /// <summary>
+    /// The state for a policy: the per-thread cache when this thread just used the same policy,
+    /// the table otherwise. Consulting the table is what validates the policy, once.
+    /// </summary>
+    private static ExecutionState StateFor(Resilience policy)
+    {
+        if (ReferenceEquals(t_lastPolicy, policy))
+        {
+            return t_lastState!;
+        }
+
+        ExecutionState state = Table.GetValue(policy, Create);
+        t_lastState = state;
+        t_lastPolicy = policy;
+        return state;
     }
 }

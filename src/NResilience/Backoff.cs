@@ -7,8 +7,8 @@ public enum Jitter
 {
     /// <summary>
     /// <c>random(0, computed)</c>. The default, and the only shape that actually destroys the
-    /// correlation between clients — a narrow band around a shared base still leaves a
-    /// synchronised pulse.
+    /// correlation between clients - a narrow band around a shared base still leaves a
+    /// synchronized pulse.
     /// </summary>
     Full,
 
@@ -84,28 +84,28 @@ public readonly record struct Backoff
 
     /// <summary>Compute the delay yourself.</summary>
     /// <param name="compute">
-    /// Given the attempt that is about to happen — including the verdict and exception that ended
-    /// the previous one, and the time left on the deadline — returns the delay before it.
+    /// Given the attempt that is about to happen - including the verdict and exception that ended
+    /// the previous one, and the time left on the deadline - returns the delay before it.
     /// </param>
     /// <returns>The configured backoff.</returns>
     public static Backoff Custom(Func<NextAttempt, TimeSpan> compute)
     {
         ArgumentNullException.ThrowIfNull(compute);
-        return new Backoff(BackoffKind.Custom, TimeSpan.Zero, TimeSpan.Zero, DefaultFactor, Timeout.InfiniteTimeSpan, compute);
+        return new(BackoffKind.Custom, TimeSpan.Zero, TimeSpan.Zero, DefaultFactor, Timeout.InfiniteTimeSpan, compute);
     }
 
     /// <summary>How much randomness to apply. <see cref="Jitter.Full"/> by default.</summary>
     public Jitter Jitter { get; init; }
 
     /// <summary>The hard cap on any single delay, or <see cref="Timeout.InfiniteTimeSpan"/> for none.</summary>
-    public TimeSpan Max => _kind == BackoffKind.Custom ? _max : Normalised()._max;
+    public TimeSpan Max => _kind == BackoffKind.Custom ? _max : Normalized()._max;
 
     /// <summary>
     /// The delay before <paramref name="next"/>.
     /// <para>
     /// Server pushback wins over every curve: when the previous verdict carried a
-    /// <see cref="Verdict.RetryAfter"/>, that value is honoured verbatim (capped by
-    /// <see cref="Max"/>) and no jitter is applied — a server telling you when to come back is
+    /// <see cref="Verdict.RetryAfter"/>, that value is honored verbatim (capped by
+    /// <see cref="Max"/>) and no jitter is applied - a server telling you when to come back is
     /// strictly better information than a client-side guess.
     /// </para>
     /// </summary>
@@ -113,36 +113,36 @@ public readonly record struct Backoff
     /// <returns>The delay, never negative.</returns>
     public TimeSpan Compute(in NextAttempt next)
     {
-        Backoff self = Normalised();
+        Backoff effective = Normalized();
 
-        if (self._kind == BackoffKind.Custom)
+        if (effective._kind == BackoffKind.Custom)
         {
-            TimeSpan custom = self._custom!(next);
+            TimeSpan custom = effective._custom!(next);
             return custom > TimeSpan.Zero ? custom : TimeSpan.Zero;
         }
 
         if (next.PreviousVerdict.RetryAfter is { } pushback)
         {
-            TimeSpan capped = self._max != Timeout.InfiniteTimeSpan && pushback > self._max ? self._max : pushback;
+            TimeSpan capped = effective._max != Timeout.InfiniteTimeSpan && pushback > effective._max ? effective._max : pushback;
             return capped > TimeSpan.Zero ? capped : TimeSpan.Zero;
         }
 
-        TimeSpan @base = next.PreviousVerdict.Kind == VerdictKind.Throttled ? self._throttledBase : self._transientBase;
+        TimeSpan @base = next.PreviousVerdict.Kind == VerdictKind.Throttled ? effective._throttledBase : effective._transientBase;
         if (@base <= TimeSpan.Zero)
         {
             return TimeSpan.Zero;
         }
 
-        double ticks = self._kind == BackoffKind.Constant
+        double ticks = effective._kind == BackoffKind.Constant
             ? @base.Ticks
-            : @base.Ticks * Math.Pow(self._factor, Math.Max(0, next.Number - 2));
+            : @base.Ticks * Math.Pow(effective._factor, Math.Max(0, next.Number - 2));
 
-        if (self._max != Timeout.InfiniteTimeSpan)
+        if (effective._max != Timeout.InfiniteTimeSpan)
         {
-            ticks = Math.Min(ticks, self._max.Ticks);
+            ticks = Math.Min(ticks, effective._max.Ticks);
         }
 
-        ticks = self.Jitter switch
+        ticks = effective.Jitter switch
         {
             Jitter.Full => ticks * Rng.NextDouble(),
             Jitter.Equal => (ticks / 2) + (ticks / 2 * Rng.NextDouble()),
@@ -154,36 +154,36 @@ public readonly record struct Backoff
 
     internal void Validate(List<string> problems)
     {
-        Backoff self = Normalised();
-        if (self._kind == BackoffKind.Exponential && self._factor <= 0)
+        Backoff effective = Normalized();
+        if (effective._kind == BackoffKind.Exponential && effective._factor <= 0)
         {
-            problems.Add($"Backoff factor must be greater than zero; it is {self._factor}.");
+            problems.Add($"Backoff factor must be greater than zero; it is {effective._factor}.");
         }
 
-        if (self._transientBase < TimeSpan.Zero)
+        if (effective._transientBase < TimeSpan.Zero)
         {
-            problems.Add($"Backoff transient base delay must not be negative; it is {self._transientBase}.");
+            problems.Add($"Backoff transient base delay must not be negative; it is {effective._transientBase}.");
         }
 
-        if (self._throttledBase < TimeSpan.Zero)
+        if (effective._throttledBase < TimeSpan.Zero)
         {
-            problems.Add($"Backoff throttled base delay must not be negative; it is {self._throttledBase}.");
+            problems.Add($"Backoff throttled base delay must not be negative; it is {effective._throttledBase}.");
         }
 
-        if (self._max < TimeSpan.Zero && self._max != Timeout.InfiniteTimeSpan)
+        if (effective._max < TimeSpan.Zero && effective._max != Timeout.InfiniteTimeSpan)
         {
-            problems.Add($"Backoff maximum delay must not be negative; it is {self._max}.");
+            problems.Add($"Backoff maximum delay must not be negative; it is {effective._max}.");
         }
     }
 
     /// <summary>
     /// <c>default(Backoff)</c> has to behave, because <c>policy with { Backoff = default }</c>
-    /// compiles. An unconstructed value is identified by its zero growth factor — every factory
-    /// sets a positive one — and reads as <see cref="Default"/>.
+    /// compiles. An unconstructed value is identified by its zero growth factor - every factory
+    /// sets a positive one - and reads as <see cref="Default"/>.
     /// </summary>
-    private Backoff Normalised() =>
+    private Backoff Normalized() =>
         _kind == BackoffKind.Exponential && _factor == 0
-            ? new Backoff(BackoffKind.Exponential, DefaultTransientBase, DefaultThrottledBase, DefaultFactor, DefaultMax, null) { Jitter = Jitter }
+            ? new(BackoffKind.Exponential, DefaultTransientBase, DefaultThrottledBase, DefaultFactor, DefaultMax, null) { Jitter = Jitter }
             : this;
 
     private enum BackoffKind

@@ -50,7 +50,7 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// nothing.
     /// </para>
     /// </summary>
-    private const byte SelfImposedFlag = 0x80;
+    internal const byte SelfImposedFlag = 0x80;
 
     private readonly byte _packed;
 
@@ -64,7 +64,7 @@ public readonly struct Verdict : IEquatable<Verdict>
     public VerdictKind Kind => (VerdictKind)(byte)(_packed & ~SelfImposedFlag);
 
     /// <summary>
-    /// Server pushback, honoured verbatim in preference to any backoff curve, and capped only by
+    /// Server pushback, honored verbatim in preference to any backoff curve, and capped only by
     /// the backoff maximum and the time left on the deadline. Null when the server said nothing.
     /// </summary>
     public TimeSpan? RetryAfter { get; }
@@ -104,7 +104,7 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// Local admission control refused the attempt: a rate limiter, a concurrency limit, or anything
     /// else in this process that said no before the call left it.
     /// <para>
-    /// Throttling, because that is what it is - retried on the long backoff curve, honouring
+    /// Throttling, because that is what it is - retried on the long backoff curve, honoring
     /// <paramref name="retryAfter"/> verbatim when the limiter supplied one. It is never counted as
     /// evidence against the dependency, and never charged to the retry budget; see
     /// <see cref="SelfImposed"/>.

@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Operations;
 
@@ -37,7 +39,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
     {
         if (context is null)
         {
-            throw new System.ArgumentNullException(nameof(context));
+            throw new ArgumentNullException(nameof(context));
         }
 
         context.EnableConcurrentExecution();
@@ -67,7 +69,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
 
         foreach (IArgumentOperation argument in TokenArguments(callback.Function.Body, known))
         {
-            context.ReportDiagnostic(Describe(argument, callback.AttemptToken));
+            context.ReportDiagnostic(Diagnose(argument, callback.AttemptToken));
         }
     }
 
@@ -81,7 +83,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
             .OfType<IArgumentOperation>()
             .Where(argument => known.IsCancellationToken(argument.Parameter?.Type));
 
-    private static Diagnostic Describe(IArgumentOperation argument, IParameterSymbol attemptToken)
+    private static Diagnostic Diagnose(IArgumentOperation argument, IParameterSymbol attemptToken)
     {
         ImmutableDictionary<string, string?>.Builder properties = ImmutableDictionary.CreateBuilder<string, string?>();
         properties.Add(AttemptNameProperty, attemptToken.Name);
@@ -137,7 +139,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
         bool isLastParameter = token.Parameter.Ordinal == arguments.Length - 1;
         bool everythingElseWritten = arguments.All(argument =>
             ReferenceEquals(argument, token)
-            || (argument.ArgumentKind == ArgumentKind.Explicit && argument.Syntax is Microsoft.CodeAnalysis.CSharp.Syntax.ArgumentSyntax { NameColon: null }));
+            || (argument.ArgumentKind == ArgumentKind.Explicit && argument.Syntax is ArgumentSyntax { NameColon: null }));
 
         return isLastParameter && everythingElseWritten;
     }

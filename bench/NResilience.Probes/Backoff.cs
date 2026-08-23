@@ -42,7 +42,7 @@ public static class ProbeBackoff
         }
 
         // Full jitter: random(0, computed). A narrow band around a shared base still leaves a
-        // synchronised pulse, which is the thing jitter exists to destroy.
+        // synchronized pulse, which is the thing jitter exists to destroy.
         return TimeSpan.FromTicks((long)(capped * NextDouble()));
     }
 

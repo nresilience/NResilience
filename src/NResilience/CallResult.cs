@@ -27,7 +27,7 @@ public readonly struct CallResult<T>
     /// The last value an attempt returned, or <c>default</c> when every attempt threw.
     /// <para>
     /// This is populated even when <see cref="IsSuccess"/> is false, because an answer the policy
-    /// judged a failure is still an answer — a final <c>503 HttpResponseMessage</c> is a value the
+    /// judged a failure is still an answer - a final <c>503 HttpResponseMessage</c> is a value the
     /// caller needs, not least so it can be disposed. <see cref="HasValue"/> says whether it is
     /// real.
     /// </para>
@@ -55,7 +55,7 @@ public readonly struct CallResult<T>
         return IsSuccess;
     }
 
-    /// <summary>The value, or the failure — rethrown with its original stack intact.</summary>
+    /// <summary>The value, or the failure - rethrown with its original stack intact.</summary>
     /// <returns>The value.</returns>
     public T ValueOrThrow()
     {
@@ -65,9 +65,13 @@ public readonly struct CallResult<T>
         }
 
         ThrowFailure(Exception, StopReason, Attempts);
+
+        // Unreachable: ThrowFailure is [DoesNotReturn], which the compiler's definite-return
+        // analysis does not consult.
         return default!;
     }
 
+    [DoesNotReturn]
     internal static void ThrowFailure(Exception? exception, StopReason stopReason, AttemptLog attempts)
     {
         if (exception is not null)

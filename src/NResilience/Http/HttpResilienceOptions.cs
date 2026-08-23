@@ -6,7 +6,7 @@ namespace NResilience.Http;
 /// </summary>
 /// <remarks>
 /// A mutable options class rather than a record, because this is the type an options callback
-/// configures — <c>o =&gt; o.RetryUnsafeMethods = true</c> — and that is the shape
+/// configures - <c>o =&gt; o.RetryUnsafeMethods = true</c> - and that is the shape
 /// <c>Microsoft.Extensions.Options</c> binds to.
 /// </remarks>
 public sealed class HttpResilienceOptions
@@ -36,8 +36,8 @@ public sealed class HttpResilienceOptions
     /// timeout is expressed in the same vocabulary.
     /// </para>
     /// <para>
-    /// It is honoured by whoever builds the client — <see cref="ResilienceHttp.CreateClient"/>, or
-    /// the DI registration — because a <c>DelegatingHandler</c> cannot reach the client in front
+    /// It is honored by whoever builds the client - <see cref="ResilienceHttp.CreateClient"/>, or
+    /// the DI registration - because a <c>DelegatingHandler</c> cannot reach the client in front
     /// of it. Setting it false on a handler you hand to your own <see cref="HttpClient"/> does
     /// nothing at all.
     /// </para>
@@ -48,7 +48,7 @@ public sealed class HttpResilienceOptions
     /// Whether each host gets its own circuit breaker. On by default.
     /// <para>
     /// One breaker across every host means a dead host trips calls to the healthy ones, which is
-    /// the blast-radius inversion a breaker exists to prevent — and it is the single most
+    /// the blast-radius inversion a breaker exists to prevent - and it is the single most
     /// confusing thing in the .NET resilience ecosystem, because scope is otherwise an emergent
     /// property of where a pipeline happened to be registered.
     /// </para>

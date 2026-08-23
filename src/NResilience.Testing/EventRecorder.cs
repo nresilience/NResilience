@@ -105,7 +105,7 @@ public sealed class EventRecorder
     /// <summary>The single recorded event of one <paramref name="kind"/>.</summary>
     /// <exception cref="InvalidOperationException">
     /// The kind was raised no times, or more than once. The message says which, and lists what was
-    /// actually raised — the assertion that fails here is usually about the shape of the whole call.
+    /// actually raised - the assertion that fails here is usually about the shape of the whole call.
     /// </exception>
     public CallEvent Single(CallEventKind kind)
     {
@@ -145,7 +145,7 @@ public sealed class EventRecorder
     }
 
     /// <summary>
-    /// The recorded kinds in order, comma-separated — a readable assertion-failure message rather
+    /// The recorded kinds in order, comma-separated - a readable assertion-failure message rather
     /// than a type name.
     /// </summary>
     public override string ToString()

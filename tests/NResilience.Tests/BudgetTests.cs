@@ -44,7 +44,7 @@ public sealed class BudgetTests
             Assert.True(RetryBudget.None.TrySpend());
         }
 
-        Assert.Equal(0, RetryBudget.None.Utilisation);
+        Assert.Equal(0, RetryBudget.None.Utilization);
         Assert.True(RetryBudget.None.IsNone);
     }
 
@@ -56,7 +56,7 @@ public sealed class BudgetTests
         // minimumPerSecond 2 banks 10 seconds of the floor rate, so 20 retries are available at once.
         RetryBudget budget = RetryBudget.Of(minimumPerSecond: 2, time: time);
 
-        Assert.Equal(0, budget.Utilisation);
+        Assert.Equal(0, budget.Utilization);
 
         for (int i = 0; i < 20; i++)
         {
@@ -64,7 +64,7 @@ public sealed class BudgetTests
         }
 
         Assert.False(budget.TrySpend());
-        Assert.Equal(1, budget.Utilisation);
+        Assert.Equal(1, budget.Utilization);
     }
 
     [Fact]
@@ -131,19 +131,19 @@ public sealed class BudgetTests
     }
 
     [Fact]
-    public void Utilisation_reports_how_much_is_spent()
+    public void Utilization_reports_how_much_is_spent()
     {
         var time = new FakeTimeProvider();
         RetryBudget budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
 
-        Assert.Equal(0, budget.Utilisation);
+        Assert.Equal(0, budget.Utilization);
 
         for (int i = 0; i < 5; i++)
         {
             Assert.True(budget.TrySpend());
         }
 
-        Assert.Equal(0.5, budget.Utilisation);
+        Assert.Equal(0.5, budget.Utilization);
     }
 
     [Fact]
@@ -281,7 +281,7 @@ public sealed class BudgetTests
         Assert.Equal(2, calls);
         Assert.Equal(StopReason.BudgetExhausted, first.StopReason);
 
-        // The next operation still gets its first attempt — a budget throttles retries, never the
+        // The next operation still gets its first attempt - a budget throttles retries, never the
         // call the caller actually asked for.
         CallResult<int> second = await RunAsync(policy, Failing, time);
         Assert.Equal(3, calls);
@@ -336,7 +336,7 @@ public sealed class BudgetTests
         }
 
         // Twenty operations at four attempts each is eighty attempts, which is the storm a per-call
-        // attempt limit cannot prevent — every caller independently believing it is being
+        // attempt limit cannot prevent - every caller independently believing it is being
         // reasonable. The budget funds one retry in total, so it is twenty-one.
         Assert.Equal(21, attempts);
     }
@@ -427,7 +427,7 @@ public sealed class BudgetTests
             await policy.RunAsync(_ => Task.FromException<int>(new InvalidOperationException("bad request"))));
 
         // The retry never happened, so nothing was spent on it.
-        Assert.Equal(0, budget.Utilisation);
+        Assert.Equal(0, budget.Utilization);
     }
 
     [Fact]
@@ -449,6 +449,6 @@ public sealed class BudgetTests
                 },
                 caller.Token));
 
-        Assert.Equal(0, budget.Utilisation);
+        Assert.Equal(0, budget.Utilization);
     }
 }

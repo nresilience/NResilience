@@ -40,7 +40,7 @@ public sealed class RateLimitOptions
     /// How many callers may wait for a permit. Zero - the default - refuses immediately.
     /// <para>
     /// Off by default because this library is already good at waiting: a refusal becomes a retry on
-    /// the throttled backoff curve, honouring the limiter's own hint, capped by
+    /// the throttled backoff curve, honoring the limiter's own hint, capped by
     /// <c>Backoff.Max</c> and by the time left on the deadline, and visible in telemetry as a retry.
     /// Queue time is instead charged against <see cref="Resilience.AttemptTimeout"/>, where it is
     /// indistinguishable from a slow dependency and can trip a
@@ -69,15 +69,15 @@ public sealed class RateLimitOptions
     {
         var problems = new List<string>();
 
-        int kinds = 0;
+        int kindsConfigured = 0;
         if (PermitsPerSecond is not null)
         {
-            kinds++;
+            kindsConfigured++;
         }
 
         if (Permits is not null || Window is not null)
         {
-            kinds++;
+            kindsConfigured++;
 
             if (Permits is null || Window is null)
             {
@@ -87,14 +87,14 @@ public sealed class RateLimitOptions
 
         if (Concurrency is not null)
         {
-            kinds++;
+            kindsConfigured++;
         }
 
-        if (kinds == 0)
+        if (kindsConfigured == 0)
         {
             problems.Add("Set one of PermitsPerSecond, Permits with Window, or Concurrency.");
         }
-        else if (kinds > 1)
+        else if (kindsConfigured > 1)
         {
             problems.Add("Set only one of PermitsPerSecond, Permits with Window, or Concurrency; they are three different guards.");
         }

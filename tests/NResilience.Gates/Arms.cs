@@ -8,7 +8,7 @@ namespace NResilience.Gates;
 /// <para>
 /// The body is bound behind <see cref="Of{T}"/> rather than stored as a
 /// <c>Func&lt;ValueTask&lt;int&gt;&gt;</c>, so an arm whose natural result is not the shared gate's
-/// <c>int</c> — <c>TryRunAsync</c> returns a <c>CallResult&lt;T&gt;</c> — is measured in its own
+/// <c>int</c> - <c>TryRunAsync</c> returns a <c>CallResult&lt;T&gt;</c> - is measured in its own
 /// shape. A conversion wrapper would suspend, and a wrapper that suspends allocates a
 /// state-machine box the arm it is wrapping does not, which would charge that arm for the harness.
 /// The closure is created once when the list is built, outside every measured region.

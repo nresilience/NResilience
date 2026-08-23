@@ -6,7 +6,7 @@ namespace NResilience.Baseline;
 /// <summary>
 /// Trend tracking, published rather than gated.
 ///
-/// The hard gate lives in tests/NResilience.Gates and depends on no benchmark harness at all —
+/// The hard gate lives in tests/NResilience.Gates and depends on no benchmark harness at all -
 /// it is xunit over allocation counters, which is deterministic and fails with a byte count.
 /// This project exists for the latency picture and for run-to-run trends, which are worth
 /// watching and not worth failing a build over: shared CI runners are noisy enough that a

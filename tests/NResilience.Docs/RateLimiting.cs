@@ -79,7 +79,7 @@ public sealed class RateLimiting
         Assert.True(refused.Verdict.SelfImposed);
         // </snippet:limit-verdict>
 
-        Assert.Equal(0, budget.Utilisation);
+        Assert.Equal(0, budget.Utilization);
     }
 
     [Fact]

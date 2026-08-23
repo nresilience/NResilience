@@ -56,10 +56,10 @@ public sealed class ResilienceOptions
     /// <summary>A name for the policy, used in diagnostics and in every telemetry tag. Defaults to the registration name.</summary>
     public string? Name { get; set; }
 
-    /// <summary><see cref="Resilience.Attempts"/> — TOTAL attempts including the first.</summary>
+    /// <summary><see cref="Resilience.Attempts"/> - TOTAL attempts including the first.</summary>
     public int? Attempts { get; set; }
 
-    /// <summary><see cref="Resilience.Deadline"/>. Use <c>"-00:00:00.0010000"</c> — <see cref="Timeout.InfiniteTimeSpan"/> — for no bound.</summary>
+    /// <summary><see cref="Resilience.Deadline"/>. Use <c>"-00:00:00.0010000"</c> - <see cref="Timeout.InfiniteTimeSpan"/> - for no bound.</summary>
     public TimeSpan? Deadline { get; set; }
 
     /// <summary><see cref="Resilience.AttemptTimeout"/>.</summary>
@@ -77,7 +77,7 @@ public sealed class ResilienceOptions
     /// <summary>The multiplier applied per attempt. 2 doubles; 1 makes the backoff constant.</summary>
     public double? BackoffFactor { get; set; }
 
-    /// <summary>How much of the computed delay is randomised. <see cref="NResilience.Jitter.Full"/> is the default and the right answer for almost everyone.</summary>
+    /// <summary>How much of the computed delay is randomized. <see cref="NResilience.Jitter.Full"/> is the default and the right answer for almost everyone.</summary>
     public Jitter? Jitter { get; set; }
 
     /// <summary>
@@ -86,12 +86,12 @@ public sealed class ResilienceOptions
     /// </summary>
     public double? BudgetFraction { get; set; }
 
-    /// <summary>The floor, in retries per second, below which the fraction does not apply — so a quiet service can still retry at all.</summary>
+    /// <summary>The floor, in retries per second, below which the fraction does not apply - so a quiet service can still retry at all.</summary>
     public int? BudgetMinimumPerSecond { get; set; }
 
     /// <summary>
     /// Names a <see cref="RetryBudget.Shared(string, double, int)"/> budget, so several policies
-    /// throttle against one pool. Null — the default — gives this policy its own, which is the
+    /// throttle against one pool. Null - the default - gives this policy its own, which is the
     /// blast-radius decision the design argues for.
     /// </summary>
     public string? SharedBudget { get; set; }
@@ -101,7 +101,7 @@ public sealed class ResilienceOptions
 
     /// <summary>
     /// Whether the registered policy records to <see cref="ResilienceTelemetry"/>. On by default,
-    /// which is the one place this library is not pay-for-play — see
+    /// which is the one place this library is not pay-for-play - see
     /// <see cref="ResilienceTelemetry"/> for why registering a policy in a container is taken as
     /// asking to be able to see it.
     /// </summary>
@@ -129,7 +129,7 @@ public sealed class ResilienceOptions
     /// What to start from when <see cref="Preset"/> says nothing. Null means
     /// <see cref="Resilience.Default"/>.
     /// </param>
-    /// <returns>The policy. Not validated — the caller validates, so a bad section fails at registration.</returns>
+    /// <returns>The policy. Not validated - the caller validates, so a bad section fails at registration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Preset"/> names something that is not a preset.</exception>
     public Resilience ToPolicy(Resilience? baseline = null)
     {
@@ -244,7 +244,7 @@ public sealed class ResilienceOptions
 /// </summary>
 /// <remarks>
 /// A configured breaker is created per policy and lives as long as the policy does. It is
-/// deliberately <b>not</b> recreated when configuration reloads — its state is the point, and
+/// deliberately <b>not</b> recreated when configuration reloads - its state is the point, and
 /// discarding an open breaker because somebody edited a JSON file would hand the traffic straight
 /// back to the dependency that is down. See <see cref="IResiliencePolicies"/>.
 /// </remarks>
@@ -253,10 +253,10 @@ public sealed class BreakerOptions
     /// <summary><see cref="BreakerSettings.ConsecutiveFailures"/>.</summary>
     public int? ConsecutiveFailures { get; set; }
 
-    /// <summary><see cref="BreakerSettings.FailureRatio"/> — the rate-based trip, for a service with enough traffic to have a rate.</summary>
+    /// <summary><see cref="BreakerSettings.FailureRatio"/> - the rate-based trip, for a service with enough traffic to have a rate.</summary>
     public double? FailureRatio { get; set; }
 
-    /// <summary><see cref="BreakerSettings.MinimumCalls"/> — the sample below which the ratio means nothing.</summary>
+    /// <summary><see cref="BreakerSettings.MinimumCalls"/> - the sample below which the ratio means nothing.</summary>
     public int? MinimumCalls { get; set; }
 
     /// <summary><see cref="BreakerSettings.Window"/>.</summary>
@@ -274,7 +274,7 @@ public sealed class BreakerOptions
     /// <summary><see cref="BreakerSettings.ProbeSuccesses"/>.</summary>
     public int? ProbeSuccesses { get; set; }
 
-    /// <summary><see cref="BreakerSettings.SlowCallThreshold"/> — a call slower than this counts as a failure, because a dependency that has stopped answering in time has failed.</summary>
+    /// <summary><see cref="BreakerSettings.SlowCallThreshold"/> - a call slower than this counts as a failure, because a dependency that has stopped answering in time has failed.</summary>
     public TimeSpan? SlowCallThreshold { get; set; }
 
     /// <summary><see cref="BreakerSettings.SlowCallRatio"/>.</summary>

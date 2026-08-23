@@ -112,8 +112,8 @@ public readonly struct NextAttempt
 /// Everything that happened during one call.
 /// <para>
 /// <see cref="Resilience.RunAsync{T}(Func{CancellationToken, Task{T}}, CancellationToken)"/>
-/// materialises this only when the call is about to fail; the various
-/// <c>TryRunAsync</c> overloads always materialise it, because their caller has explicitly asked
+/// materializes this only when the call is about to fail; the various
+/// <c>TryRunAsync</c> overloads always materialize it, because their caller has explicitly asked
 /// for a result object and a log that vanished on success would make "assert this succeeded on
 /// the third attempt" impossible to write.
 /// </para>
@@ -167,7 +167,9 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
     public static AttemptLog? Of(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
-        return exception.Data.Contains(DataKey) ? exception.Data[DataKey] as AttemptLog : null;
+
+        // `as` covers both the absent key and a key somebody else put there under this name.
+        return exception.Data[DataKey] as AttemptLog;
     }
 
     /// <inheritdoc/>

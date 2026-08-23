@@ -41,7 +41,7 @@ Gaps in the records are intentional to avoid duplication; correlation is more ef
 | :--- | :--- |
 | The request URI, method and status code | `Microsoft.Extensions.Http`'s own `System.Net.Http.HttpClient.<name>.LogicalHandler` category. |
 | The breaker's state and break duration | `Breaker.State`, `Breaker.OpenedAt` and `Breaker.Settings`, which a health endpoint already reads. |
-| The retry budget's utilization | `RetryBudget.Utilisation`, which is the documented dashboard number. |
+| The retry budget's utilization | `RetryBudget.Utilization`, which is the documented dashboard number. |
 | The full attempt history | `AttemptLog.Of(exception)` on the thrown exception. |
 | Anything for a call the caller cancelled | Nothing. Caller cancellation rethrows before any event is raised, so a cancelled call is silent by construction. |
 

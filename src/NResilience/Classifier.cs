@@ -23,32 +23,32 @@ public sealed class Classifier
 {
     private static readonly ExceptionRule[] DefaultRules =
     [
-        new(typeof(TimeoutException), static _ => Verdict.Transient, "TimeoutException") { Constant = Verdict.Transient },
-        new(typeof(IOException), static _ => Verdict.Transient, "IOException") { Constant = Verdict.Transient },
-        new(typeof(SocketException), static _ => Verdict.Transient, "SocketException") { Constant = Verdict.Transient },
+        ExceptionRule.Fixed(typeof(TimeoutException), Verdict.Transient, nameof(TimeoutException)),
+        ExceptionRule.Fixed(typeof(IOException), Verdict.Transient, nameof(IOException)),
+        ExceptionRule.Fixed(typeof(SocketException), Verdict.Transient, nameof(SocketException)),
     ];
 
     private readonly ExceptionRule[] _exceptionRules;
     private readonly ResultRule[] _resultRules;
-    private readonly Verdict _unrecognised;
+    private readonly Verdict _unrecognized;
     private readonly string _name;
 
-    private Classifier(ExceptionRule[] exceptionRules, ResultRule[] resultRules, Verdict unrecognised, string name)
+    private Classifier(ExceptionRule[] exceptionRules, ResultRule[] resultRules, Verdict unrecognized, string name)
     {
         _exceptionRules = exceptionRules;
         _resultRules = resultRules;
-        _unrecognised = unrecognised;
+        _unrecognized = unrecognized;
         _name = name;
     }
 
     /// <summary>
-    /// Curated exception rules — <see cref="TimeoutException"/>, <see cref="IOException"/> and
-    /// <see cref="SocketException"/> are transient — and <b>anything unrecognised is
+    /// Curated exception rules - <see cref="TimeoutException"/>, <see cref="IOException"/> and
+    /// <see cref="SocketException"/> are transient - and <b>anything unrecognized is
     /// <see cref="VerdictKind.Permanent"/></b>.
     /// <para>
     /// Retrying a programming error is worse than not retrying it: it converts a fast, clear
     /// failure into a slow, confusing one and hides the bug. The cost is that a genuinely
-    /// transient exception of your own needs one line —
+    /// transient exception of your own needs one line -
     /// <c>Classifier.Default.On&lt;MyDbException&gt;(Verdict.Transient)</c>.
     /// </para>
     /// </summary>
@@ -76,8 +76,8 @@ public sealed class Classifier
     public Classifier On<TException>(Verdict verdict)
         where TException : Exception
     {
-        var rule = new ExceptionRule(typeof(TException), _ => verdict, typeof(TException).Name) { Constant = verdict };
-        return new Classifier(Prepend(_exceptionRules, rule), _resultRules, _unrecognised, DerivedName());
+        ExceptionRule rule = ExceptionRule.Fixed(typeof(TException), verdict, typeof(TException).Name);
+        return new Classifier(Prepend(_exceptionRules, rule), _resultRules, _unrecognized, DerivedName());
     }
 
     /// <summary>Classifies an exception type with a predicate that can inspect it.</summary>
@@ -90,7 +90,7 @@ public sealed class Classifier
         ArgumentNullException.ThrowIfNull(judge);
 
         var rule = new ExceptionRule(typeof(TException), ex => judge((TException)ex), typeof(TException).Name);
-        return new Classifier(Prepend(_exceptionRules, rule), _resultRules, _unrecognised, DerivedName());
+        return new Classifier(Prepend(_exceptionRules, rule), _resultRules, _unrecognized, DerivedName());
     }
 
     /// <summary>
@@ -108,7 +108,7 @@ public sealed class Classifier
         ArgumentNullException.ThrowIfNull(judge);
 
         var rule = new ResultRule(typeof(T), judge, typeof(T).Name);
-        return new Classifier(_exceptionRules, Prepend(_resultRules, rule), _unrecognised, DerivedName());
+        return new Classifier(_exceptionRules, Prepend(_resultRules, rule), _unrecognized, DerivedName());
     }
 
     /// <summary>
@@ -116,7 +116,7 @@ public sealed class Classifier
     /// add always beats one it was derived from.
     /// </summary>
     /// <param name="exception">The exception an attempt threw.</param>
-    /// <returns>Its verdict, or the unrecognised-exception verdict when no rule matches.</returns>
+    /// <returns>Its verdict, or the unrecognized-exception verdict when no rule matches.</returns>
     public Verdict ClassifyException(Exception exception)
     {
         ArgumentNullException.ThrowIfNull(exception);
@@ -130,7 +130,7 @@ public sealed class Classifier
             }
         }
 
-        return _unrecognised;
+        return _unrecognized;
     }
 
     /// <summary>
@@ -178,7 +178,7 @@ public sealed class Classifier
             text.Append("  result ").Append(rule.Description).Append(" -> (predicate)").Append('\n');
         }
 
-        text.Append("  any other exception -> ").Append(_unrecognised.Kind);
+        text.Append("  any other exception -> ").Append(_unrecognized.Kind);
         text.Append('\n').Append("  any other result -> Ok");
         return text.ToString();
     }
@@ -218,8 +218,15 @@ public sealed class Classifier
 
         public string Description { get; } = description;
 
-        /// <summary>Set only for the fixed-verdict overload, purely so <c>ToString</c> can print it.</summary>
-        public Verdict? Constant { get; init; }
+        /// <summary>Set only by <see cref="Fixed"/>, purely so <c>ToString</c> can print it.</summary>
+        public Verdict? Constant { get; private init; }
+
+        /// <summary>
+        /// A rule that always gives the same verdict. The judge and the printed constant are
+        /// derived from one value here, so they cannot disagree.
+        /// </summary>
+        public static ExceptionRule Fixed(Type exceptionType, Verdict verdict, string description) =>
+            new(exceptionType, _ => verdict, description) { Constant = verdict };
     }
 
     private sealed class ResultRule(Type resultType, object judge, string description)
@@ -262,7 +269,7 @@ public sealed class Classifier
 
                     // A 404 is an answer, not a failure. Retrying one is in the most-copied
                     // retry snippet in .NET, and shipping the correct thing in the box is the
-                    // only defence against that.
+                    // only defense against that.
                     _ => Verdict.Ok,
                 });
 

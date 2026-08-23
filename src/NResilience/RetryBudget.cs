@@ -8,7 +8,7 @@ namespace NResilience;
 /// A per-call attempt limit cannot prevent a retry storm, because every caller independently
 /// believes it is being reasonable. Retries compose multiplicatively: if a frontend, a backend and
 /// a database each permit 3 retries, one user action generates 4³ = 64 database attempts. Only a
-/// budget expressed as a fraction bounds the aggregate — with every client independently holding to
+/// budget expressed as a fraction bounds the aggregate - with every client independently holding to
 /// 10%, total amplification is 1.1×.
 /// </para>
 /// <para>
@@ -20,13 +20,13 @@ namespace NResilience;
 /// <remarks>
 /// <para>
 /// <b>Budget state is per-process and unshared.</b> There is no coordination across pods, and that
-/// is not a defect — it is why the mechanism works at all. The argument is statistical: every client
+/// is not a defect - it is why the mechanism works at all. The argument is statistical: every client
 /// independently capping retries at 10% bounds fleet-wide amplification without any coordination
 /// protocol.
 /// </para>
 /// <para>
 /// It follows that a budget allocated per-<c>HttpClient</c>-instance, or resolved from a scoped DI
-/// container, is worthless — it is thrown away before it can observe enough traffic to mean
+/// container, is worthless - it is thrown away before it can observe enough traffic to mean
 /// anything. Share one instance, or use <see cref="Shared(string, double, int)"/>.
 /// </para>
 /// </remarks>
@@ -64,7 +64,7 @@ public sealed class RetryBudget
         _capacity = Math.Max(minimumPerSecond * BurstSeconds, 1);
 
         // A cold process starts full. Throttling the first few retries a fresh instance makes would
-        // penalise deployment rather than a storm.
+        // penalize deployment rather than a storm.
         _tokens = _capacity;
         _refilledAt = time.GetTimestamp();
     }
@@ -118,7 +118,7 @@ public sealed class RetryBudget
     /// client whose retries are being refused, which is a symptom worth alerting on rather than a
     /// steady state.
     /// </summary>
-    public double Utilisation
+    public double Utilization
     {
         get
         {

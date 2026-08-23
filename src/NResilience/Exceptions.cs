@@ -105,12 +105,12 @@ public sealed class DeadlineExceededException : TimeoutException
     public TimeSpan Deadline { get; }
 
     /// <summary>Everything that happened before it ran out.</summary>
-    public AttemptLog Attempts { get; internal set; } = AttemptLog.Empty;
+    public AttemptLog Attempts { get; }
 }
 
 /// <summary>
 /// One attempt exceeded its own ceiling. Classified <see cref="VerdictKind.Transient"/> by the
-/// executor itself, never by a user predicate — disambiguating the library's own timeout from
+/// executor itself, never by a user predicate - disambiguating the library's own timeout from
 /// caller cancellation is the classic bug in timeout implementations, and it is not something a
 /// classifier should be able to get wrong.
 /// </summary>
@@ -154,7 +154,11 @@ public sealed class AttemptTimeoutException : TimeoutException
     /// <summary>The ceiling the attempt exceeded.</summary>
     public TimeSpan Timeout { get; }
 
-    /// <summary>Everything that happened, set when this is the exception a call ends on.</summary>
+    /// <summary>
+    /// Everything that happened, set when this is the exception a call ends on. Unlike
+    /// <see cref="DeadlineExceededException"/>, this exception is constructed while the attempt is
+    /// still running, so the log can only be attached afterwards.
+    /// </summary>
     public AttemptLog Attempts { get; internal set; } = AttemptLog.Empty;
 }
 
@@ -213,7 +217,7 @@ public sealed class RateLimitedException : Exception
     /// <summary>The limiter that refused, when it was named. Null otherwise.</summary>
     public string? Limiter { get; }
 
-    /// <summary>When to come back, when the limiter said. Honoured verbatim by the backoff.</summary>
+    /// <summary>When to come back, when the limiter said. Honored verbatim by the backoff.</summary>
     public TimeSpan? RetryAfter { get; }
 
     private static string Describe(string? limiter, TimeSpan? retryAfter)

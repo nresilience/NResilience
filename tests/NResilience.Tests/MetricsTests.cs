@@ -8,7 +8,7 @@ namespace NResilience.Tests;
 /// The meter and the activity source.
 /// <para>
 /// The instrument set exists to produce one number: <c>attempts ÷ calls</c>, the retry fraction.
-/// The tests that matter are therefore the ones that establish the denominator is right — one call
+/// The tests that matter are therefore the ones that establish the denominator is right - one call
 /// counted per logical operation, <i>including</i> the ones that failed, because a denominator that
 /// counts only successes inflates the fraction exactly when it is being read in anger.
 /// </para>
@@ -145,7 +145,7 @@ public sealed class MetricsTests
 
     /// <summary>
     /// A rejection is tagged with which guard refused, which is the difference between "the
-    /// dependency is down" and "we are retrying too hard" — two facts with opposite responses.
+    /// dependency is down" and "we are retrying too hard" - two facts with opposite responses.
     /// </summary>
     [Fact]
     public async Task An_open_breaker_records_a_rejection_naming_the_dependency()

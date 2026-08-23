@@ -9,7 +9,7 @@ namespace NResilience.Tests;
 /// The state machine is exercised directly through the admission and recording entry points the
 /// executor uses, because that is where the transitions live and driving them through a policy would
 /// only add a callback between the assertion and the thing being asserted. The executor's own
-/// integration — admission, feeding, and the guarded rejection — is tested end to end at the bottom.
+/// integration - admission, feeding, and the guarded rejection - is tested end to end at the bottom.
 /// </para>
 /// </summary>
 public sealed class BreakerTests
@@ -516,7 +516,7 @@ public sealed class BreakerTests
         await Assert.ThrowsAsync<IOException>(async () =>
             await policy.RunAsync(_ => Task.FromException<int>(new IOException("down"))));
 
-        // One operation, three failing attempts, and the breaker is open — so "does the breaker see
+        // One operation, three failing attempts, and the breaker is open - so "does the breaker see
         // attempts or whole operations?" has one answer here rather than depending on where a
         // strategy was placed relative to the retry.
         Assert.Equal(BreakerState.Open, breaker.State);

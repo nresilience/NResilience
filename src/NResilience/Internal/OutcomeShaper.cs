@@ -7,7 +7,7 @@ namespace NResilience.Internal;
 /// <para>
 /// The design document says the throwing and non-throwing entry points must be two fused methods
 /// rather than one plus a wrapper, because a wrapper would add a second state-machine box on the
-/// suspending path — doubling exactly the overhead this design exists to remove. That is right,
+/// suspending path - doubling exactly the overhead this design exists to remove. That is right,
 /// and it does not follow that the loop itself must be written twice: with the <i>output</i> type
 /// as a second type parameter, one <c>async</c> method serves both, and the shaping happens in a
 /// non-<c>async</c> struct that devirtualizes away. Two closed instantiations either way, one
@@ -19,9 +19,9 @@ namespace NResilience.Internal;
 internal interface IOutcomeShaper<in T, out TOut>
 {
     /// <summary>
-    /// Whether the attempt log has to be materialised on the <i>success</i> path. False for the
+    /// Whether the attempt log has to be materialized on the <i>success</i> path. False for the
     /// throwing entry points, so their happy path allocates nothing for a history nobody can read.
-    /// The failure path always materialises it.
+    /// The failure path always materializes it.
     /// </summary>
     bool WantsLogOnSuccess { get; }
 
@@ -93,7 +93,7 @@ internal readonly struct VoidResultShaper : IOutcomeShaper<VoidResult, CallResul
 /// <summary>
 /// Decides which exception a failure reports.
 /// <para>
-/// The library only invents an exception for failures it invented — a deadline it enforced, a
+/// The library only invents an exception for failures it invented - a deadline it enforced, a
 /// timeout it fired, a call it refused to make. When the operation genuinely failed, the original
 /// exception is reported unchanged, with the attempt history attached to
 /// <see cref="Exception.Data"/> rather than wrapped around it, so <c>catch (HttpRequestException)</c>

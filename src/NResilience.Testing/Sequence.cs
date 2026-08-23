@@ -12,7 +12,7 @@ public static class Sequence
     /// <typeparam name="T">What the scripted callback returns.</typeparam>
     /// <param name="time">
     /// The clock <see cref="Sequence{T}.Delays"/> is served against. Pass the same
-    /// <c>FakeTimeProvider</c> the policy was given, or a scripted delay is a real sleep — which is
+    /// <c>FakeTimeProvider</c> the policy was given, or a scripted delay is a real sleep - which is
     /// the flakiness this package exists to remove. Defaults to <see cref="TimeProvider.System"/>.
     /// </param>
     /// <example>
@@ -54,8 +54,8 @@ public readonly struct Void { }
 /// </para>
 /// <para>
 /// A step with no delay completes synchronously, which is deliberate: it is what makes the
-/// synchronous-completion path — the one the allocation budget cares most about — scriptable.
-/// A step with a delay is the suspending path and honours the cancellation token, which is what
+/// synchronous-completion path - the one the allocation budget cares most about - scriptable.
+/// A step with a delay is the suspending path and honors the cancellation token, which is what
 /// makes attempt timeouts and deadlines testable.
 /// </para>
 /// </remarks>
@@ -72,7 +72,7 @@ public sealed class Sequence<T>
     /// <summary>How many times <see cref="NextAsync"/> has been called.</summary>
     /// <remarks>
     /// Counts calls that threw as well as calls that returned, including the call that runs off the
-    /// end of the script — a double that under-reports the call that broke the test is not worth
+    /// end of the script - a double that under-reports the call that broke the test is not worth
     /// having.
     /// </remarks>
     public int CallCount => Volatile.Read(ref _served);
@@ -161,7 +161,7 @@ public sealed class Sequence<T>
     /// </summary>
     /// <param name="cancellationToken">
     /// Observed while a delay is being served. A step with no delay completes synchronously and
-    /// does not observe it — see the remarks on <see cref="Sequence{T}"/>.
+    /// does not observe it - see the remarks on <see cref="Sequence{T}"/>.
     /// </param>
     /// <exception cref="InvalidOperationException">The script has run out of steps.</exception>
     public Task<T> NextAsync(CancellationToken cancellationToken = default)

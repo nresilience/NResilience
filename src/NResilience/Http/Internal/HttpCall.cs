@@ -6,7 +6,7 @@ namespace NResilience.Http.Internal;
 /// One logical HTTP call: the state a retrying send needs and the send itself.
 /// <para>
 /// It exists because retry re-invokes the callback rather than re-awaiting a task, and an
-/// <see cref="HttpRequestMessage"/> may be sent exactly once — "The request message was already
+/// <see cref="HttpRequestMessage"/> may be sent exactly once - "The request message was already
 /// sent" is what the second attempt gets otherwise. Each attempt therefore builds a fresh request,
 /// and the body is buffered once so that it can.
 /// </para>
@@ -22,9 +22,6 @@ internal sealed class HttpCall(
 
     private byte[]? _body;
     private HttpResponseMessage? _previous;
-
-    /// <summary>How many times <see cref="SendAsync"/> has run. The clone count, for tests.</summary>
-    internal int Sends { get; private set; }
 
     /// <summary>
     /// Buffers the request body, so that every attempt can be given its own copy of it.
@@ -55,15 +52,14 @@ internal sealed class HttpCall(
     /// <remarks>
     /// The superseded response is disposed here rather than by the executor, because the executor
     /// does not know that a discarded result owns a socket. Disposing it at the start of the
-    /// <i>next</i> attempt rather than at the end of this one is what keeps the final response —
+    /// <i>next</i> attempt rather than at the end of this one is what keeps the final response -
     /// the one handed back to the caller, whether it succeeded or is a 503 the policy ran out of
-    /// attempts on — alive.
+    /// attempts on - alive.
     /// </remarks>
     internal async Task<HttpResponseMessage> SendAsync(CancellationToken cancellationToken)
     {
         _previous?.Dispose();
         _previous = null;
-        Sends++;
 
         HttpRequestMessage attempt = Clone();
         try

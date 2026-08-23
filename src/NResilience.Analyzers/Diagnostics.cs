@@ -10,13 +10,21 @@ internal static class Diagnostics
 {
     private const string Help = "https://github.com/nresilience/NResilience/blob/main/docs/reference/analyzers.md#";
 
+    internal const string TokenNotPassedId = "NRES001";
+    internal const string WrongTokenPassedId = "NRES002";
+    internal const string InvalidConfigurationId = "NRES003";
+    internal const string AttemptTimeoutExceedsDeadlineId = "NRES004";
+    internal const string PerCallGuardStateId = "NRES005";
+    internal const string PerCallClientId = "NRES006";
+    internal const string RedundantAsyncCallbackId = "NRES007";
+
     private const string Reliability = "Reliability";
     private const string Usage = "Usage";
     private const string Performance = "Performance";
 
     /// <summary>NRES001: a call inside the callback wants a token and was not given the attempt's.</summary>
     internal static readonly DiagnosticDescriptor TokenNotPassed = Rule(
-        "NRES001",
+        TokenNotPassedId,
         "Pass the attempt's cancellation token to the work",
         "'{0}' takes a cancellation token and was not given one; pass the attempt's token '{1}' so a timed-out attempt can stop",
         Reliability,
@@ -27,7 +35,7 @@ internal static class Diagnostics
 
     /// <summary>NRES002: the callback forwards some other token - usually the caller's.</summary>
     internal static readonly DiagnosticDescriptor WrongTokenPassed = Rule(
-        "NRES002",
+        WrongTokenPassedId,
         "Pass the attempt's cancellation token, not another one",
         "'{0}' is passed inside the callback instead of the attempt's token '{1}'; the attempt timeout has no effect on this call",
         Reliability,
@@ -38,7 +46,7 @@ internal static class Diagnostics
 
     /// <summary>NRES003: the literal configuration cannot pass <c>Validate()</c>.</summary>
     internal static readonly DiagnosticDescriptor InvalidConfiguration = Rule(
-        "NRES003",
+        InvalidConfigurationId,
         "This policy will not pass validation",
         "{0}",
         Usage,
@@ -48,7 +56,7 @@ internal static class Diagnostics
 
     /// <summary>NRES004: an attempt timeout longer than the deadline can never be reached.</summary>
     internal static readonly DiagnosticDescriptor AttemptTimeoutExceedsDeadline = Rule(
-        "NRES004",
+        AttemptTimeoutExceedsDeadlineId,
         "AttemptTimeout is longer than Deadline",
         "AttemptTimeout ({0}) is longer than Deadline ({1}); an attempt is capped by whatever is left of the deadline, so this setting can never be reached",
         Usage,
@@ -59,7 +67,7 @@ internal static class Diagnostics
 
     /// <summary>NRES005: per-call breaker or budget state.</summary>
     internal static readonly DiagnosticDescriptor PerCallGuardState = Rule(
-        "NRES005",
+        PerCallGuardStateId,
         "A breaker or retry budget created per call keeps no state",
         "This {0} is created inside '{1}', so every call gets a new one; a {0} whose state is discarded each call can never {2}",
         Reliability,
@@ -70,7 +78,7 @@ internal static class Diagnostics
 
     /// <summary>NRES006: per-call resilient client.</summary>
     internal static readonly DiagnosticDescriptor PerCallClient = Rule(
-        "NRES006",
+        PerCallClientId,
         "A resilient HttpClient created per call discards its per-host state",
         "This client is created and disposed inside '{0}'; the handler's per-host breakers and budgets are worth nothing to a client that is rebuilt per call",
         Reliability,
@@ -81,7 +89,7 @@ internal static class Diagnostics
 
     /// <summary>NRES007: an async callback that awaits exactly one call.</summary>
     internal static readonly DiagnosticDescriptor RedundantAsyncCallback = Rule(
-        "NRES007",
+        RedundantAsyncCallbackId,
         "The callback does not need to be async",
         "This callback awaits a single call; returning its task directly saves a state-machine allocation on every attempt",
         Performance,

@@ -23,7 +23,7 @@ public static class ResilienceHttpClientBuilderExtensions
     /// <summary>Adds the resilience handler to this client.</summary>
     /// <param name="builder">The client builder.</param>
     /// <param name="policy">The policy. Defaults to <see cref="Resilience.Http"/>.</param>
-    /// <param name="configureOptions">The HTTP-specific switches — idempotency, per-host scoping, transport-timeout ownership.</param>
+    /// <param name="configureOptions">The HTTP-specific switches - idempotency, per-host scoping, transport-timeout ownership.</param>
     /// <param name="telemetry">Whether this client records to <see cref="ResilienceTelemetry"/>. On by default.</param>
     /// <param name="logging">The log level for this client's records. If null, the process default is used, which is <see cref="ResilienceLoggingOptions.Profile"/> when <c>AddResilienceLogging</c> was called and <see cref="ResilienceLogProfile.Default"/> otherwise.</param>
     /// <returns>The client builder.</returns>
@@ -62,7 +62,7 @@ public static class ResilienceHttpClientBuilderExtensions
     /// The policy is read when the handler chain is built, which
     /// <see cref="IHttpClientFactory"/> does afresh every two minutes by default. A configuration
     /// reload therefore reaches an <see cref="HttpClient"/> at the next handler rotation rather than
-    /// on the next request — the handler holds its per-host breakers and budgets, and rebuilding it
+    /// on the next request - the handler holds its per-host breakers and budgets, and rebuilding it
     /// per request to make reload instant would throw that state away on every call.
     /// </remarks>
     public static IHttpClientBuilder AddResilience(
@@ -91,15 +91,6 @@ public static class ResilienceHttpClientBuilderExtensions
             telemetry);
     }
 
-    /// <summary>
-    /// Names the policy after the client unless it carries a name of its own.
-    /// <para>
-    /// A preset's name does not count as a name of its own: <see cref="Resilience.Http"/> is called
-    /// "http", so without this every client in the process would report under one name and four of
-    /// them would be indistinguishable in the metrics. The client name is the identity an operator
-    /// is looking for.
-    /// </para>
-    /// </summary>
     /// <summary>
     /// Attaches the log listener using the category derived from the policy's name. For a client
     /// registered here, this is the client name; consequently, an <c>appsettings.json</c> filter
@@ -132,6 +123,15 @@ public static class ResilienceHttpClientBuilderExtensions
         });
     }
 
+    /// <summary>
+    /// Names the policy after the client unless it carries a name of its own.
+    /// <para>
+    /// A preset's name does not count as a name of its own: <see cref="Resilience.Http"/> is called
+    /// "http", so without this every client in the process would report under one name and four of
+    /// them would be indistinguishable in the metrics. The client name is the identity an operator
+    /// is looking for.
+    /// </para>
+    /// </summary>
     private static Resilience Named(Resilience policy, string clientName) =>
         policy.Name is null || policy.Name == Resilience.Http.Name
             ? policy with { Name = clientName }
@@ -147,22 +147,20 @@ public static class ResilienceHttpClientBuilderExtensions
         configureOptions?.Invoke(options);
 
         HandlerOrder order = HandlerOrder.For(builder.Services);
-        if (order.RateLimit.ContainsKey(builder.Name))
+        if (order.RateLimitClients.ContainsKey(builder.Name))
         {
             throw new ResilienceConfigurationException(
                 $"Client '{builder.Name}' registered AddRateLimit() before AddResilience(). The limiter has to be inner to " +
                 "the resilience handler, or every retry bypasses the quota - call AddResilience() first.");
         }
 
-        order.Resilience.TryAdd(builder.Name, 0);
+        order.ResilienceClients.TryAdd(builder.Name, 0);
 
         if (options.OwnTransportTimeout)
         {
-            // HttpClient.Timeout defaults to 100 seconds and applies to the *entire* retry
-            // sequence, not per attempt - a silent cap nothing in the policy can see. A
-            // DelegatingHandler cannot reach the client in front of it, so this is the only place
-            // the switch can be honoured, and it is the reason the option exists on an options
-            // object rather than on the handler.
+            // See HttpResilienceOptions.OwnTransportTimeout. A DelegatingHandler cannot reach the
+            // client in front of it, so this is the only place the switch can be honored - and the
+            // reason the option lives on an options object rather than on the handler.
             builder.ConfigureHttpClient(client => client.Timeout = Timeout.InfiniteTimeSpan);
         }
 

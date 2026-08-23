@@ -61,19 +61,19 @@ Now:
 
 Add a bulkhead when you have:
 
-- **Multi-dependency systems** — your application calls several external services
-- **Resource contention** — high concurrency (> 1,000 RPS) where one slow dependency could monopolize your resources
-- **Variable performance** — dependencies that are sometimes fast and sometimes slow
-- **Shared resource pools** — database connection pools, OAuth token quotas, or rate limit buckets that must be shared fairly
+- **Multi-dependency systems** - your application calls several external services
+- **Resource contention** - high concurrency (> 1,000 RPS) where one slow dependency could monopolize your resources
+- **Variable performance** - dependencies that are sometimes fast and sometimes slow
+- **Shared resource pools** - database connection pools, OAuth token quotas, or rate limit buckets that must be shared fairly
 
 ## When you don't need bulkheads
 
 You can skip bulkheads if you have:
 
-- **Single dependency** — your application only calls one backend
-- **Low concurrency** — fewer than 100 requests per second
-- **Service mesh** — a service mesh like Istio/Envoy handles isolation at the infrastructure layer
-- **Separate pods per dependency** — each pod connects to only one database or service
+- **Single dependency** - your application only calls one backend
+- **Low concurrency** - fewer than 100 requests per second
+- **Service mesh** - a service mesh like Istio/Envoy handles isolation at the infrastructure layer
+- **Separate pods per dependency** - each pod connects to only one database or service
 
 ## Implement a bulkhead for HTTP
 
@@ -158,14 +158,14 @@ This verdict carries three implications:
 A microservice talks to a database (with 20 connection pool slots) and runs three different queries:
 
 ```csharp
-// Expensive aggregation query — limit concurrency to prevent it from
+// Expensive aggregation query - limit concurrency to prevent it from
 // monopolizing the connection pool
 using var aggregateQueryLimiter = Limit.Concurrency(3);
 
-// Fast point queries — allow higher concurrency
+// Fast point queries - allow higher concurrency
 using var fastQueryLimiter = Limit.Concurrency(15);
 
-// Writes — give them priority by allowing all available connections
+// Writes - give them priority by allowing all available connections
 using var writeQueryLimiter = Limit.Concurrency(20);
 
 public async Task<AggregateResult> GetAggregateAsync(CancellationToken ct)
@@ -369,7 +369,7 @@ try
 
 ## See also
 
-- [Rate limiting](../features/rate-limiting.md) — full reference
-- [Circuit breaker](../features/circuit-breaker.md) — detect and stop calling failures
-- [Retry budget](../features/retry-budget.md) — prevent retry storms
-- [Admission control](../deep-dives/admission-control.md) — deep dive on how refusals are classified
+- [Rate limiting](../features/rate-limiting.md) - full reference
+- [Circuit breaker](../features/circuit-breaker.md) - detect and stop calling failures
+- [Retry budget](../features/retry-budget.md) - prevent retry storms
+- [Admission control](../deep-dives/admission-control.md) - deep dive on how refusals are classified

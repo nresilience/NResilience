@@ -9,14 +9,14 @@ namespace NResilience.Docs;
 public sealed class Troubleshooting
 {
     [Fact]
-    public async Task Nothing_was_retried_because_the_exception_was_not_recognised()
+    public async Task Nothing_was_retried_because_the_exception_was_not_recognized()
     {
         CancellationToken cancellationToken = TestContext.Current.CancellationToken;
         Sequence<int> calls = Sequence.For<int>().Throws(new MyDbException()).Returns(1);
 
         // <snippet:troubleshoot-not-retried>
         // Classifier.Default treats an exception type it has never heard of as Permanent. Teach it
-        // about yours, and the NotRetried event names the type it did not recognise.
+        // about yours, and the NotRetried event names the type it did not recognize.
         var api = Resilience.Default with
         {
             Backoff = Backoff.None,

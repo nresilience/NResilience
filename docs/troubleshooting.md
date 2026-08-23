@@ -23,7 +23,7 @@ Classify = Classifier.Default.On<MyDbException>(Verdict.Transient)
 <!-- snippet: troubleshoot-not-retried -->
 ```csharp
 // Classifier.Default treats an exception type it has never heard of as Permanent. Teach it
-// about yours, and the NotRetried event names the type it did not recognise.
+// about yours, and the NotRetried event names the type it did not recognize.
 var api = Resilience.Default with
 {
     Backoff = Backoff.None,

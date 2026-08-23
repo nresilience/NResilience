@@ -28,7 +28,7 @@ internal sealed class LogListener
     /// <summary>Rejection windows, keyed by policy name and reason - so one bad host does not silence another.</summary>
     private readonly ConcurrentDictionary<string, Window> _windows = new(StringComparer.Ordinal);
 
-    /// <summary>First-sighting keys for the footgun and unrecognised-exception records.</summary>
+    /// <summary>First-sighting keys for the footgun and unrecognized-exception records.</summary>
     private readonly ConcurrentDictionary<string, byte> _seen = new(StringComparer.Ordinal);
 
     internal LogListener(ILogger logger, ResilienceLoggingOptions options, TimeProvider? time = null)
@@ -195,7 +195,7 @@ internal sealed class LogListener
 
     /// <summary>
     /// An open breaker refuses every call for the whole break duration, so the useful record is one
-    /// line saying it is refusing plus a count. Inside the window rejections are demoted to 1012
+    /// line saying it is refusing plus a count. Inside the window rejections are demoted to <c>RejectedRepeat</c>
     /// rather than dropped, and the count reaches the next warning.
     /// </summary>
     private void Rejected(CallEvent e, string policy)
@@ -208,7 +208,7 @@ internal sealed class LogListener
         // not silently reset the suppressed count.
         if (Level(id, e) is { } level && ShouldWarn($"{policy}|{id.Id}", out int suppressed))
         {
-            if (id.Id == Log.Ids.RejectedBudgetExhausted.Id)
+            if (id.Id == Log.Codes.RejectedBudgetExhausted)
             {
                 Log.RejectedBudgetExhausted(_logger, level, policy, suppressed);
             }
@@ -234,7 +234,7 @@ internal sealed class LogListener
     {
         if (Level(first, e) is { } loud && FirstSighting($"{policy}|{first.Id}"))
         {
-            if (first.Id == Log.Ids.OrphanedWork.Id)
+            if (first.Id == Log.Codes.OrphanedWork)
             {
                 Log.OrphanedWork(_logger, loud, policy, e.AttemptNumber);
             }
@@ -248,7 +248,7 @@ internal sealed class LogListener
 
         if (Level(repeat, e) is { } quiet)
         {
-            if (repeat.Id == Log.Ids.OrphanedWorkRepeat.Id)
+            if (repeat.Id == Log.Codes.OrphanedWorkRepeat)
             {
                 Log.OrphanedWorkRepeat(_logger, quiet, policy, e.AttemptNumber);
             }
@@ -289,18 +289,18 @@ internal sealed class LogListener
     /// </summary>
     private static LogLevel Ordinary(int id) => id switch
     {
-        1000 => LogLevel.Trace,
-        1004 => LogLevel.Trace,
-        1019 => LogLevel.Trace,
-        1021 => LogLevel.Trace,
-        1007 => LogLevel.Warning,
-        1010 => LogLevel.Warning,
-        1011 => LogLevel.Warning,
-        1013 => LogLevel.Warning,
-        1016 => LogLevel.Warning,
-        1018 => LogLevel.Warning,
-        1014 => LogLevel.Information,
-        1015 => LogLevel.Information,
+        Log.Codes.AttemptSucceeded => LogLevel.Trace,
+        Log.Codes.CallSucceeded => LogLevel.Trace,
+        Log.Codes.NestedRetryRepeat => LogLevel.Trace,
+        Log.Codes.PolicyClassifier => LogLevel.Trace,
+        Log.Codes.NotRetriedFirstSighting => LogLevel.Warning,
+        Log.Codes.RejectedDependencyUnavailable => LogLevel.Warning,
+        Log.Codes.RejectedBudgetExhausted => LogLevel.Warning,
+        Log.Codes.BreakerOpened => LogLevel.Warning,
+        Log.Codes.OrphanedWork => LogLevel.Warning,
+        Log.Codes.NestedRetry => LogLevel.Warning,
+        Log.Codes.BreakerHalfOpened => LogLevel.Information,
+        Log.Codes.BreakerClosed => LogLevel.Information,
         _ => LogLevel.Debug,
     };
 
@@ -310,7 +310,7 @@ internal sealed class LogListener
     /// </summary>
     private static LogLevel Verbose(int id) => Ordinary(id) switch
     {
-        LogLevel.Trace when id == 1021 => LogLevel.Debug,
+        LogLevel.Trace when id == Log.Codes.PolicyClassifier => LogLevel.Debug,
         LogLevel.Trace => LogLevel.Information,
         LogLevel.Debug => LogLevel.Information,
         LogLevel level => level,

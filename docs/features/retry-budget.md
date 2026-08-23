@@ -78,11 +78,11 @@ if (result.Exception is CallRejectedException rejection)
 
 You can monitor the utilization of a budget to identify when retries are being refused.
 
-<!-- snippet: budget-utilisation -->
+<!-- snippet: budget-utilization -->
 ```csharp
 // For a dashboard: a budget sitting near 1 is a client whose retries are being refused,
 // which is a symptom to alert on rather than a steady state.
-double spent = budget.Utilisation;   // 0 to 1
+double spent = budget.Utilization;   // 0 to 1
 ```
 <!-- endsnippet -->
 

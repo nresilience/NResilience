@@ -4,12 +4,12 @@ using System.Net.Http;
 namespace NResilience.Extensions.Internal;
 
 /// <summary>
-/// Gives one logical operation — the whole retry sequence — a span of its own, outside the
+/// Gives one logical operation - the whole retry sequence - a span of its own, outside the
 /// <see cref="Http.ResilienceHandler"/> so it spans every attempt rather than one of them.
 /// <para>
 /// This is the boundary a per-attempt HTTP span cannot show. Without it, three attempts against a
 /// flaky dependency are three unrelated client spans and the trace never says that they were one
-/// call that eventually succeeded — which is the whole question an operator is asking.
+/// call that eventually succeeded - which is the whole question an operator is asking.
 /// </para>
 /// </summary>
 /// <remarks>

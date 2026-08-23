@@ -9,7 +9,7 @@ namespace NResilience.Tests;
 /// The design justifies this type with a measured claim: that
 /// <c>Microsoft.Extensions.Configuration.Binder</c> does not set <c>init</c>-only properties, so
 /// binding a section onto <see cref="Resilience"/> silently yields the record's defaults. Re-run
-/// against the binder this package depends on, <b>that claim no longer holds</b> — simple
+/// against the binder this package depends on, <b>that claim no longer holds</b> - simple
 /// <c>init</c> scalars now bind. The conclusion survives the correction, and the first two tests
 /// here are why: what binding onto the record does today is not "nothing", it is
 /// <i>partial</i>, and partial without a word of complaint is worse.
@@ -27,7 +27,7 @@ public sealed class ResilienceOptionsTests
     /// <summary>
     /// The correction: <c>init</c>-only scalars <i>do</i> bind now. Kept as a test rather than a
     /// footnote, because it is the premise the whole DTO rests on and the next binder version may
-    /// move it again — in either direction.
+    /// move it again - in either direction.
     /// </summary>
     [Fact]
     public void The_binder_now_does_set_init_only_scalars()
@@ -45,13 +45,13 @@ public sealed class ResilienceOptionsTests
     /// binder does something silently wrong rather than nothing.
     /// <list type="number">
     /// <item><description>
-    /// <c>Backoff:Max</c> is a computed property, so the cap is dropped — while <c>Backoff:Jitter</c>
-    /// beside it in the same section is honoured. A section that half-applies is the worst
+    /// <c>Backoff:Max</c> is a computed property, so the cap is dropped - while <c>Backoff:Jitter</c>
+    /// beside it in the same section is honored. A section that half-applies is the worst
     /// available outcome, because the half that worked is the evidence people use to conclude the
     /// other half did too.
     /// </description></item>
     /// <item><description>
-    /// <c>Classify</c> names a classifier and gets none, silently — so a policy configured
+    /// <c>Classify</c> names a classifier and gets none, silently - so a policy configured
     /// <c>"Http"</c> keeps <see cref="Classifier.Default"/>, which does not retry a 503.
     /// </description></item>
     /// <item><description>
@@ -103,7 +103,7 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(2, policy.Breaker!.Settings.ConsecutiveFailures);
     }
 
-    /// <summary>And the DTO, being mutable, binds — which is the whole of the workaround.</summary>
+    /// <summary>And the DTO, being mutable, binds - which is the whole of the workaround.</summary>
     [Fact]
     public void The_dto_binds()
     {
@@ -164,7 +164,7 @@ public sealed class ResilienceOptionsTests
 
     /// <summary>
     /// Backoff is rebuilt rather than patched, because the shipped shape is a factory rather than a
-    /// bag of knobs — so a section that mentions only the cap keeps every other backoff default.
+    /// bag of knobs - so a section that mentions only the cap keeps every other backoff default.
     /// </summary>
     [Fact]
     public void Backoff_settings_project_onto_an_exponential_backoff()

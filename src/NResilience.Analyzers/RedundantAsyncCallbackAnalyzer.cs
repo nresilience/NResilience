@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -23,7 +24,7 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
     {
         if (context is null)
         {
-            throw new System.ArgumentNullException(nameof(context));
+            throw new ArgumentNullException(nameof(context));
         }
 
         context.EnableConcurrentExecution();
@@ -51,7 +52,7 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (!AwaitsExactlyOneCall(callback, out IAwaitOperation? single) || single is null)
+        if (SingleAwaitedCall(callback) is not { } single)
         {
             return;
         }
@@ -86,19 +87,18 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    /// True when the whole body is one await: <c>async a =&gt; await X(a)</c> in either the
-    /// value-returning or the void-returning shape. Anything longer might need the machine.
+    /// The one await, when the whole body is one await: <c>async a =&gt; await X(a)</c> in either the
+    /// value-returning or the void-returning shape. Anything longer might need the machine, and is
+    /// reported as null.
     /// </summary>
-    private static bool AwaitsExactlyOneCall(Callback callback, out IAwaitOperation? single)
+    private static IAwaitOperation? SingleAwaitedCall(Callback callback)
     {
-        single = null;
-
         if (callback.Function.Body is not IBlockOperation body)
         {
-            return false;
+            return null;
         }
 
-        // A block body ends in a synthesised `return` that was never written down. Counting it
+        // A block body ends in a synthesized `return` that was never written down. Counting it
         // would mean the statement form of the same lambda looks like two statements.
         ImmutableArray<IOperation> written = body.Operations
             .Where(static operation => operation is not IReturnOperation { ReturnedValue: null, IsImplicit: true })
@@ -106,16 +106,14 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
 
         if (written.Length != 1)
         {
-            return false;
+            return null;
         }
 
-        single = written[0] switch
+        return written[0] switch
         {
             IReturnOperation { ReturnedValue: IAwaitOperation await } => await,
             IExpressionStatementOperation { Operation: IAwaitOperation await } => await,
             _ => null,
         };
-
-        return single is not null;
     }
 }

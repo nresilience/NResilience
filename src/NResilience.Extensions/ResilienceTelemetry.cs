@@ -9,7 +9,7 @@ namespace NResilience.Extensions;
 /// <see cref="CallEvent"/>s into both.
 /// <para>
 /// The instrument set is chosen around one number. <c>nresilience.attempts ÷ nresilience.calls</c>
-/// is the <b>retry fraction</b> — the characteristic metric of a retry feedback loop, and the one
+/// is the <b>retry fraction</b> - the characteristic metric of a retry feedback loop, and the one
 /// that tells you whether you are approaching a storm rather than merely serving errors. You cannot
 /// compute it unless the library distinguishes logical operations from wire-level attempts, which
 /// is Finagle's distinction and is why the counters are split.
@@ -34,54 +34,51 @@ public static class ResilienceTelemetry
     /// <summary>The activity source's name, for <c>AddSource</c>.</summary>
     public const string ActivitySourceName = "NResilience";
 
-    private static readonly Meter TheMeter = new(MeterName);
+    /// <summary>The meter every instrument is created on.</summary>
+    /// <remarks>Declared above the instruments: static initializers run in source order.</remarks>
+    public static Meter Meter { get; } = new(MeterName);
 
-    private static readonly Counter<long> CallCounter = TheMeter.CreateCounter<long>(
+    /// <summary>
+    /// The activity source. Used by the HTTP registration to give a logical operation - the whole
+    /// retry sequence - a span of its own, which is the boundary a per-attempt HTTP span cannot
+    /// show you.
+    /// </summary>
+    public static ActivitySource ActivitySource { get; } = new(ActivitySourceName);
+
+    private static readonly Counter<long> CallCounter = Meter.CreateCounter<long>(
         "nresilience.calls",
         unit: "{call}",
-        description: "Logical operations — one per call, whatever happened inside it.");
+        description: "Logical operations - one per call, whatever happened inside it.");
 
-    private static readonly Counter<long> AttemptCounter = TheMeter.CreateCounter<long>(
+    private static readonly Counter<long> AttemptCounter = Meter.CreateCounter<long>(
         "nresilience.attempts",
         unit: "{attempt}",
         description: "Wire-level attempts. Divided by nresilience.calls, this is the retry fraction.");
 
-    private static readonly Counter<long> RejectionCounter = TheMeter.CreateCounter<long>(
+    private static readonly Counter<long> RejectionCounter = Meter.CreateCounter<long>(
         "nresilience.rejections",
         unit: "{rejection}",
         description: "Calls a guard refused to make: an open breaker, or an exhausted retry budget.");
 
-    private static readonly Histogram<double> CallDuration = TheMeter.CreateHistogram<double>(
+    private static readonly Histogram<double> CallDuration = Meter.CreateHistogram<double>(
         "nresilience.call.duration",
         unit: "s",
         description: "End-to-end duration of a logical operation, retries and backoff included.");
 
-    private static readonly Histogram<double> AttemptDuration = TheMeter.CreateHistogram<double>(
+    private static readonly Histogram<double> AttemptDuration = Meter.CreateHistogram<double>(
         "nresilience.attempt.duration",
         unit: "s",
         description: "Duration of one attempt.");
 
-    private static readonly Counter<long> LeaseCounter = TheMeter.CreateCounter<long>(
+    private static readonly Counter<long> LeaseCounter = Meter.CreateCounter<long>(
         "nresilience.limiter.leases",
         unit: "{lease}",
         description: "Permits a limiter was asked for, tagged by whether it granted one.");
 
-    private static readonly Histogram<double> LeaseWait = TheMeter.CreateHistogram<double>(
+    private static readonly Histogram<double> LeaseWait = Meter.CreateHistogram<double>(
         "nresilience.limiter.wait.duration",
         unit: "s",
         description: "How long a caller waited on a limiter. Zero unless queueing is enabled.");
-
-    private static readonly ActivitySource TheActivitySource = new(ActivitySourceName);
-
-    /// <summary>The meter every instrument is created on.</summary>
-    public static Meter Meter => TheMeter;
-
-    /// <summary>
-    /// The activity source. Used by the HTTP registration to give a logical operation — the whole
-    /// retry sequence — a span of its own, which is the boundary a per-attempt HTTP span cannot
-    /// show you.
-    /// </summary>
-    public static ActivitySource ActivitySource => TheActivitySource;
 
     /// <summary>
     /// The listener: records every event to the instruments above, and annotates the current
@@ -89,7 +86,7 @@ public static class ResilienceTelemetry
     /// <para>
     /// Stateless and allocation-free, so attaching it to a hot policy costs the 48 bytes the
     /// executor pays for having a listener at all and nothing more. Safe to attach to any number of
-    /// policies — <see cref="CallEvent.PolicyName"/> is what separates them in the tag set.
+    /// policies - <see cref="CallEvent.PolicyName"/> is what separates them in the tag set.
     /// </para>
     /// </summary>
     public static Action<CallEvent> Listener { get; } = Record;
@@ -130,7 +127,7 @@ public static class ResilienceTelemetry
     /// is what makes an always-registered telemetry handler free.
     /// </summary>
     internal static Activity? StartCall(string policyName) =>
-        TheActivitySource.StartActivity($"resilience {policyName}", ActivityKind.Internal);
+        ActivitySource.StartActivity($"resilience {policyName}", ActivityKind.Internal);
 
     /// <summary>
     /// Records one acquisition against a limiter.
@@ -198,7 +195,7 @@ public static class ResilienceTelemetry
 
     /// <summary>
     /// The five terminal kinds close the logical operation, and the call counter and the call
-    /// duration histogram are recorded exactly once here — which is what makes
+    /// duration histogram are recorded exactly once here - which is what makes
     /// <c>attempts ÷ calls</c> a fraction rather than a coincidence.
     /// </summary>
     private static void Terminal(CallEvent e, string policy)
@@ -264,7 +261,7 @@ public static class ResilienceTelemetry
 
     /// <summary>
     /// The rejection's cause, which is the difference between "the dependency is down" and "we are
-    /// retrying too hard" — two facts that call for opposite responses and that only
+    /// retrying too hard" - two facts that call for opposite responses and that only
     /// <see cref="CallEvent.Reason"/> can tell apart.
     /// </summary>
     private static KeyValuePair<string, object?> Reason(CallEvent e) =>

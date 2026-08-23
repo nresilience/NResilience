@@ -238,7 +238,7 @@ public sealed class TelemetryTests
         Func<CancellationToken, Task<int>> work = shape switch
         {
             0 => static ct => Task.FromResult(1),
-            1 => static ct => Task.FromException<int>(new InvalidOperationException("unrecognised")),
+            1 => static ct => Task.FromException<int>(new InvalidOperationException("unrecognized")),
             _ => static ct => Task.FromException<int>(new IOException("flaky")),
         };
 
@@ -298,7 +298,7 @@ public sealed class TelemetryTests
     /// that names the type, making the failure visible rather than mysterious.
     /// </summary>
     [Fact]
-    public async Task An_unrecognised_exception_type_raises_NotRetried_naming_the_type()
+    public async Task An_unrecognized_exception_type_raises_NotRetried_naming_the_type()
     {
         var recorder = new Recorder();
 
@@ -548,7 +548,7 @@ public sealed class TelemetryTests
     }
 
     [Fact]
-    public async Task An_attempt_that_honours_its_timeout_is_not_reported_as_orphaned()
+    public async Task An_attempt_that_honors_its_timeout_is_not_reported_as_orphaned()
     {
         var recorder = new Recorder();
 

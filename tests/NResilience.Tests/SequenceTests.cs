@@ -135,7 +135,7 @@ public sealed class SequenceTests
     }
 
     [Fact]
-    public async Task A_delayed_step_honours_the_cancellation_token()
+    public async Task A_delayed_step_honors_the_cancellation_token()
     {
         var time = new FakeTimeProvider();
         var calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(5)).Returns(1);

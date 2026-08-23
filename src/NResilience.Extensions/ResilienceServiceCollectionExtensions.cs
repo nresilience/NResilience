@@ -23,7 +23,7 @@ public static class ResilienceServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="name">The name it is resolved by.</param>
     /// <param name="policy">The policy.</param>
-    /// <param name="configure">Runs after configuration binding, for the things JSON cannot hold — a classifier, a hook, a shared breaker.</param>
+    /// <param name="configure">Runs after configuration binding, for the things JSON cannot hold - a classifier, a hook, a shared breaker.</param>
     /// <returns>The service collection.</returns>
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed. Registration validates eagerly, so a bad policy fails at startup rather than on the first request.</exception>
     /// <example>
@@ -114,7 +114,7 @@ public static class ResilienceServiceCollectionExtensions
     /// Registers every child of a section as a policy, each named by its key.
     /// </summary>
     /// <param name="services">The service collection.</param>
-    /// <param name="section">The parent section — one child per policy.</param>
+    /// <param name="section">The parent section - one child per policy.</param>
     /// <returns>The service collection.</returns>
     /// <example>
     /// <code>
@@ -202,7 +202,7 @@ public static class ResilienceServiceCollectionExtensions
             provider.GetService<ILoggerFactory>(),
             provider.GetService<IOptions<ResilienceLoggingOptions>>()?.Value));
 
-        ResilienceNames names = Names(services);
+        ResilienceNames names = NamesFor(services);
         if (name is not null)
         {
             names.Set.TryAdd(name, 0);
@@ -213,11 +213,11 @@ public static class ResilienceServiceCollectionExtensions
     /// Finds the roster already in the collection, or puts one there.
     /// <para>
     /// Registration happens before there is a provider to resolve anything from, and the roster has
-    /// to be written to at registration time — so it is a singleton *instance*, found by looking
+    /// to be written to at registration time - so it is a singleton *instance*, found by looking
     /// through the descriptors, which is the shape the platform's own builders use for exactly this.
     /// </para>
     /// </summary>
-    private static ResilienceNames Names(IServiceCollection services)
+    private static ResilienceNames NamesFor(IServiceCollection services)
     {
         foreach (ServiceDescriptor descriptor in services)
         {

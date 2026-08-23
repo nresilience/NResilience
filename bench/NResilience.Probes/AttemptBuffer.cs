@@ -43,7 +43,7 @@ internal interface IAttemptSink
 {
     void Record(int index, long startedTimestamp, long elapsedTicks, VerdictKind verdict);
 
-    AttemptRecord[] Materialise(int count);
+    AttemptRecord[] Materialize(int count);
 }
 
 /// <summary>The shipping implementation, which uses a fixed-size buffer in the executor's frame.</summary>
@@ -66,7 +66,7 @@ internal struct InlineAttemptSink : IAttemptSink
     }
 
     /// <summary>Called only on the failing path to materialize the log in the shipping design.</summary>
-    public AttemptRecord[] Materialise(int count)
+    public AttemptRecord[] Materialize(int count)
     {
         int n = Math.Min(count, AttemptBuffer.Capacity);
         var result = new AttemptRecord[n];
@@ -92,5 +92,5 @@ internal struct NoAttemptSink : IAttemptSink
     {
     }
 
-    public readonly AttemptRecord[] Materialise(int count) => [];
+    public readonly AttemptRecord[] Materialize(int count) => [];
 }

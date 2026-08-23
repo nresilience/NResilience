@@ -4,7 +4,7 @@ namespace NResilience.Probes;
 /// A non-<c>async</c> generic struct, so the state and stateless entry points share one loop
 /// without adding a frame. Measured: a non-async call through a struct constrained to an
 /// interface devirtualizes and inlines completely. The struct-ness buys nothing if the layer
-/// is <c>async</c> — only the <c>async</c> keyword decides whether a box is allocated.
+/// is <c>async</c> - only the <c>async</c> keyword decides whether a box is allocated.
 /// </summary>
 internal interface IInvoker<in TState, T>
 {

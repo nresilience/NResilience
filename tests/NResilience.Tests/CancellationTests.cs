@@ -117,7 +117,7 @@ public sealed class CancellationTests
 
         await started.Task;
 
-        // CancelAfter honours an injected provider, so virtual time cancels the attempt.
+        // CancelAfter honors an injected provider, so virtual time cancels the attempt.
         time.Advance(TimeSpan.FromSeconds(6));
 
         Assert.Equal(9, await call);

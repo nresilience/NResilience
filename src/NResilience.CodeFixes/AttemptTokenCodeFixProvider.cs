@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Composition;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,7 +28,7 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
 
     /// <inheritdoc />
     public override ImmutableArray<string> FixableDiagnosticIds { get; } =
-        ImmutableArray.Create("NRES001", "NRES002");
+        ImmutableArray.Create(Diagnostics.TokenNotPassedId, Diagnostics.WrongTokenPassedId);
 
     /// <inheritdoc />
     public override FixAllProvider GetFixAllProvider() => WellKnownFixAllProviders.BatchFixer;
@@ -78,7 +79,7 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
 
         diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.AttemptNameProperty, out string? declared);
         ParameterSyntax? parameter = TokenParameter(lambda, declared);
-        string name = declared == Discard || declared is null ? Available(lambda) : declared;
+        string name = declared == Discard || declared is null ? AvailableName(lambda) : declared;
 
         var edits = new Dictionary<SyntaxNode, SyntaxNode>();
 
@@ -87,7 +88,7 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
             edits[parameter] = parameter.WithIdentifier(Identifier(name).WithTriviaFrom(parameter.Identifier));
         }
 
-        if (diagnostic.Id == "NRES002")
+        if (diagnostic.Id == Diagnostics.WrongTokenPassedId)
         {
             edits[reported] = IdentifierName(name).WithTriviaFrom(reported);
         }
@@ -147,21 +148,38 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
         SimpleLambdaExpressionSyntax simple => simple.Parameter,
         ParenthesizedLambdaExpressionSyntax parenthesized => parenthesized.ParameterList.Parameters
             .LastOrDefault(parameter => declared is null || parameter.Identifier.ValueText == declared),
-        AnonymousMethodExpressionSyntax anonymous => anonymous.ParameterList?.Parameters.LastOrDefault(),
+        AnonymousMethodExpressionSyntax anonymous => anonymous.ParameterList?.Parameters
+            .LastOrDefault(parameter => declared is null || parameter.Identifier.ValueText == declared),
         _ => null,
     };
 
     /// <summary>
     /// A name for a parameter that had none. Checked against the whole member rather than the
-    /// lambda, so the new name cannot shadow something the surrounding method is using.
+    /// lambda, so the new name cannot shadow something the surrounding method is using, and every
+    /// candidate is checked so the name handed back is one nothing in scope has taken.
     /// </summary>
-    private static string Available(SyntaxNode lambda)
+    private static string AvailableName(SyntaxNode lambda)
     {
         SyntaxNode scope = lambda.FirstAncestorOrSelf<MemberDeclarationSyntax>() ?? lambda;
         HashSet<string> taken = new(scope.DescendantTokens()
             .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
             .Select(token => token.ValueText));
 
-        return taken.Contains("attempt") ? "attemptToken" : "attempt";
+        if (!taken.Contains("attempt"))
+        {
+            return "attempt";
+        }
+
+        for (int suffix = 0; ; suffix++)
+        {
+            string candidate = suffix == 0
+                ? "attemptToken"
+                : "attemptToken" + suffix.ToString(CultureInfo.InvariantCulture);
+
+            if (!taken.Contains(candidate))
+            {
+                return candidate;
+            }
+        }
     }
 }

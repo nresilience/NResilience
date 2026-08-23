@@ -5,7 +5,7 @@ namespace NResilience.Internal;
 
 /// <summary>
 /// A thread-static xoshiro128** for jitter. No locking, no shared <see cref="Random"/>, and no
-/// contention on <c>Random.Shared</c> — jitter is drawn on a path whose whole purpose is to be
+/// contention on <c>Random.Shared</c> - jitter is drawn on a path whose whole purpose is to be
 /// taken by many threads at once during an incident.
 /// </summary>
 internal static class Rng

@@ -97,7 +97,7 @@ public sealed class RateLimitTests
         Assert.False(result.IsSuccess);
         Assert.Equal(4, result.Attempts.Count);
         Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
-        Assert.Equal(0, budget.Utilisation);
+        Assert.Equal(0, budget.Utilization);
     }
 
     [Fact]
@@ -118,7 +118,7 @@ public sealed class RateLimitTests
             time);
 
         Assert.False(result.IsSuccess);
-        Assert.True(budget.Utilisation > 0, "a server's pushback is still charged to the budget");
+        Assert.True(budget.Utilization > 0, "a server's pushback is still charged to the budget");
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class RateLimitTests
     // ---- The backoff ----
 
     [Fact]
-    public async Task A_limiter_hint_is_honoured_in_preference_to_the_backoff_curve()
+    public async Task A_limiter_hint_is_honored_in_preference_to_the_backoff_curve()
     {
         var time = new FakeTimeProvider();
         var delays = new List<TimeSpan>();

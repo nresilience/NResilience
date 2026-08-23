@@ -8,9 +8,9 @@ namespace NResilience.Gates;
 /// <summary>
 /// The cancellation facts the timeout design is built on, re-run on the exact target TFMs.
 ///
-/// These are gated rather than merely reported because the arrangement they justify — pool the
+/// These are gated rather than merely reported because the arrangement they justify - pool the
 /// timer source, link per attempt, never hand the pooled token to user code, and fall back to
-/// per-call construction under a custom <see cref="TimeProvider"/> — is not obvious from reading
+/// per-call construction under a custom <see cref="TimeProvider"/> - is not obvious from reading
 /// the BCL, and would silently degrade to no benefit at all if any of them changed.
 /// </summary>
 [Collection(BaselineCollection.Name)]
@@ -38,7 +38,7 @@ public sealed class CancellationFactsTests
         => AssertAtMost(Baseline.LinkedNone, Budgets.LinkedFromNone);
 
     /// <summary>
-    /// The 0 B figure the pooling story rests on. It applies to the timer source only — the
+    /// The 0 B figure the pooling story rests on. It applies to the timer source only - the
     /// per-attempt linked child is a separate, non-zero cost, which is why the executor's
     /// suspending budget is not zero.
     /// </summary>
@@ -80,7 +80,7 @@ public sealed class CancellationFactsTests
     /// constructed per call rather than pooled.
     /// </summary>
     [Fact]
-    public void CancelAfter_honours_an_injected_TimeProvider()
+    public void CancelAfter_honors_an_injected_TimeProvider()
     {
         var time = new FakeTimeProvider();
         using CancellationTokenSource cts = CtsFacts.CancelAfterOnProvider(time, TimeSpan.FromSeconds(5));
@@ -95,7 +95,7 @@ public sealed class CancellationFactsTests
     }
 
     /// <summary>
-    /// The executor honours the pooling/testability split: the system provider takes the pooled
+    /// The executor honors the pooling/testability split: the system provider takes the pooled
     /// path, anything else does not. Getting this backwards would mean either a broken test clock
     /// or a pool that silently never hits.
     /// </summary>

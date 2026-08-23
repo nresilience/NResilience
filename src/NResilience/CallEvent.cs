@@ -27,9 +27,9 @@ public enum CallEventKind
     /// The outcome was classified <see cref="VerdictKind.Permanent"/>, so it was not retried.
     /// Terminal.
     /// <para>
-    /// This is the event that makes <see cref="Classifier.Default"/> not retrying an unrecognised
+    /// This is the event that makes <see cref="Classifier.Default"/> not retrying an unrecognized
     /// exception type visible rather than mysterious: <see cref="CallEvent.Exception"/> names the
-    /// type that was not recognised.
+    /// type that was not recognized.
     /// </para>
     /// </summary>
     NotRetried,
@@ -45,7 +45,7 @@ public enum CallEventKind
     DeadlineExceeded,
 
     /// <summary>
-    /// An attempt timed out and the callback kept running well past it — so the work is still
+    /// An attempt timed out and the callback kept running well past it - so the work is still
     /// going, unobserved, after the policy stopped waiting for it.
     /// <para>
     /// This is the single most-hit footgun in the ecosystem, and it is a property of the callback
@@ -74,7 +74,7 @@ public enum CallEventKind
     /// The last attempt failed and there were no attempts left. Terminal.
     /// <para>
     /// This is the ordinary way a retried call gives up, and it exists so that <i>every</i> call
-    /// ends with exactly one terminal event — <see cref="Succeeded"/>, <see cref="NotRetried"/>,
+    /// ends with exactly one terminal event - <see cref="Succeeded"/>, <see cref="NotRetried"/>,
     /// <see cref="Rejected"/>, <see cref="DeadlineExceeded"/> or this. A listener counting logical
     /// operations can only be trusted if the count includes the failures, and those are the calls
     /// worth counting.
@@ -97,7 +97,7 @@ public enum CallEventKind
 /// </code>
 /// </example>
 /// <remarks>
-/// A struct passed by value to an <see cref="Action{T}"/>, so raising an event allocates nothing —
+/// A struct passed by value to an <see cref="Action{T}"/>, so raising an event allocates nothing -
 /// which is what makes leaving a listener attached in production affordable. The one exception is
 /// <see cref="Result"/>, which boxes a value-type result and is populated only when a listener is
 /// actually attached.
@@ -133,7 +133,7 @@ public readonly struct CallEvent
     public string? PolicyName { get; }
 
     /// <summary>
-    /// 1-based. The attempt this event is about — the one that just finished, or, for
+    /// 1-based. The attempt this event is about - the one that just finished, or, for
     /// <see cref="CallEventKind.Retrying"/> and the events raised before an attempt runs, the one
     /// that is about to.
     /// </summary>
@@ -171,21 +171,21 @@ public readonly struct CallEvent
     /// <para>
     /// This is the honest answer to "log every retry with the status code that caused it": a
     /// genuinely cross-cutting listener has no <c>T</c> to be generic over, so the value arrives
-    /// as <see cref="object"/>. It boxes value types — and it is populated only when a listener is
+    /// as <see cref="object"/>. It boxes value types - and it is populated only when a listener is
     /// attached, so the cost is zero for everyone who is not asking for it.
     /// </para>
     /// </summary>
     public object? Result { get; }
 
     /// <summary>
-    /// Why the call stopped, on the four terminal kinds — <see cref="CallEventKind.Succeeded"/>,
+    /// Why the call stopped, on the four terminal kinds - <see cref="CallEventKind.Succeeded"/>,
     /// <see cref="CallEventKind.NotRetried"/>, <see cref="CallEventKind.Rejected"/> and
     /// <see cref="CallEventKind.DeadlineExceeded"/>. Null on every other kind, because nothing has
     /// stopped yet.
     /// <para>
-    /// <see cref="CallEventKind.Rejected"/> covers two different refusals — an open breaker
+    /// <see cref="CallEventKind.Rejected"/> covers two different refusals - an open breaker
     /// (<see cref="StopReason.DependencyUnavailable"/>) and an exhausted retry budget
-    /// (<see cref="StopReason.BudgetExhausted"/>) — and telling them apart is the difference
+    /// (<see cref="StopReason.BudgetExhausted"/>) - and telling them apart is the difference
     /// between "the dependency is down" and "we are retrying too hard". A stateless listener
     /// cannot infer it from the other fields, so the executor states it.
     /// </para>

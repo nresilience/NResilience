@@ -5,7 +5,7 @@ namespace NResilience.Gates;
 
 /// <summary>
 /// Measures every arm once per test run. Sharing one sweep across the gate classes keeps the
-/// comparisons internally consistent — a ratio between two arms is only meaningful if both
+/// comparisons internally consistent - a ratio between two arms is only meaningful if both
 /// were measured in the same process, under the same GC, in the same tier state.
 /// </summary>
 public sealed class BaselineFixture : IAsyncLifetime

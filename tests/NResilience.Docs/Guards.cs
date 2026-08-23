@@ -130,7 +130,7 @@ public sealed class Guards
         #pragma warning restore NRES005
 
         Assert.NotNull(unbudgeted.Budget);
-        Assert.Equal(0, generous.Budget!.Utilisation);
+        Assert.Equal(0, generous.Budget!.Utilization);
     }
 
     [Fact]
@@ -138,11 +138,11 @@ public sealed class Guards
     {
         RetryBudget budget = RetryBudget.Of();
 
-        // <snippet:budget-utilisation>
+        // <snippet:budget-utilization>
         // For a dashboard: a budget sitting near 1 is a client whose retries are being refused,
         // which is a symptom to alert on rather than a steady state.
-        double spent = budget.Utilisation;   // 0 to 1
-        // </snippet:budget-utilisation>
+        double spent = budget.Utilization;   // 0 to 1
+        // </snippet:budget-utilization>
 
         Assert.Equal(0, spent);
     }

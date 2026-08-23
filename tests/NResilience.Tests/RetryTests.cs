@@ -70,7 +70,7 @@ public sealed class RetryTests
     {
         int calls = 0;
 
-        // Classifier.Default does not recognise InvalidOperationException, so it is Permanent.
+        // Classifier.Default does not recognize InvalidOperationException, so it is Permanent.
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await Instant.RunAsync(ct =>
             {

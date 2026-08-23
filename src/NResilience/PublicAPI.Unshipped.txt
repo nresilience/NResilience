@@ -214,7 +214,7 @@ NResilience.ResilienceConfigurationException.ResilienceConfigurationException(st
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException(string! message, System.Exception! innerException) -> void
 NResilience.RetryBudget
 NResilience.RetryBudget.Name.get -> string?
-NResilience.RetryBudget.Utilisation.get -> double
+NResilience.RetryBudget.Utilization.get -> double
 NResilience.StopReason
 NResilience.StopReason.AttemptsExhausted = 2 -> NResilience.StopReason
 NResilience.StopReason.BudgetExhausted = 4 -> NResilience.StopReason
@@ -234,6 +234,7 @@ NResilience.VerdictKind.Permanent = 3 -> NResilience.VerdictKind
 NResilience.VerdictKind.Throttled = 2 -> NResilience.VerdictKind
 NResilience.VerdictKind.Transient = 1 -> NResilience.VerdictKind
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
+const NResilience.Http.ResilienceHttp.NestedRetryHeader = "X-NResilience-Retrying" -> string!
 override NResilience.Attempt.ToString() -> string!
 override NResilience.AttemptLog.ToString() -> string!
 override NResilience.Backoff.GetHashCode() -> int
@@ -263,7 +264,6 @@ static NResilience.Classifier.Default.get -> NResilience.Classifier!
 static NResilience.Classifier.Http.get -> NResilience.Classifier!
 static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
 static NResilience.Http.ResilienceHttp.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
-static NResilience.Http.ResilienceHttp.NestedRetryHeader.get -> string!
 static NResilience.Http.ResilienceHttp.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
 static NResilience.Resilience.Default.get -> NResilience.Resilience!
 static NResilience.Resilience.Http.get -> NResilience.Resilience!

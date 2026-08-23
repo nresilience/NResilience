@@ -6,7 +6,7 @@ namespace NResilience.Gates;
 /// measured value beside it so a failure reads as "this moved" rather than "this is wrong".
 ///
 /// The breaker and the retry budget moved every suspending figure by exactly
-/// <b>8 bytes</b> — one reference field in the state-machine box, for the budget the call will
+/// <b>8 bytes</b> - one reference field in the state-machine box, for the budget the call will
 /// charge. No budget was widened for it; the design's open question 1 allowed 64 B of headroom for
 /// the breaker and budget and this used an eighth of it. The breaker costs nothing in the box at all, because the
 /// policy holding it is already a field.
@@ -30,7 +30,7 @@ public static class Budgets
     public const double FullPolicyNoTimeoutSyncOverhead = 0;
 
     /// <summary>
-    /// The same call with an attempt timeout. Measured: 64 B — one linked source per attempt.
+    /// The same call with an attempt timeout. Measured: 64 B - one linked source per attempt.
     ///
     /// This is a deliberate, documented departure from the CI gate table, which budgets 0
     /// bytes for "full policy, sync-completing". It is not achievable: the callback must
@@ -55,7 +55,7 @@ public static class Budgets
     /// 2,000-iteration batches; 8 B is a floor an actual regression cannot hide beneath, since
     /// the smallest object the runtime can allocate is larger than that.
     ///
-    /// The synchronous assertions use the thread-local counter and get no such allowance —
+    /// The synchronous assertions use the thread-local counter and get no such allowance -
     /// their zeros are exact.
     /// </summary>
     public const double SuspendingNoiseFloor = 8;
@@ -71,7 +71,7 @@ public static class Budgets
     public const double TrivialOverhead = 368;
 
     /// <summary>
-    /// The realistic policy — <c>Resilience.Default</c>: three attempts, a deadline, an attempt
+    /// The realistic policy - <c>Resilience.Default</c>: three attempts, a deadline, an attempt
     /// timeout, exponential backoff, classification and the inline attempt log.
     /// Measured: 393 B on .NET 10, 390 B on .NET 8, against the stand-in's 401 B.
     /// (384 B and 381 B before the breaker and budget.)
@@ -79,7 +79,7 @@ public static class Budgets
     public const double DefaultOverhead = 448;
 
     /// <summary>
-    /// The same call with a caller token that can be cancelled and never is — the production case.
+    /// The same call with a caller token that can be cancelled and never is - the production case.
     /// Measured: 408 B on .NET 10, 407 B on .NET 8, against the stand-in's 416 B (400 B and 397 B
     /// before the breaker and budget). The extra 15 B over <see cref="DefaultOverhead"/> is the marginal cost of
     /// linking against a long-lived source whose registration storage already exists; see
@@ -89,9 +89,9 @@ public static class Budgets
     public const double DefaultCancellableOverhead = 464;
 
     /// <summary>
-    /// <c>TryRunAsync</c>, which always materialises the attempt log because its caller has
+    /// <c>TryRunAsync</c>, which always materializes the attempt log because its caller has
     /// explicitly asked for a result object. Measured: 561 B on .NET 10, 558 B on .NET 8 (553 B and
-    /// 551 B before the breaker and budget) — so asking for the history costs about 170 B over the throwing form.
+    /// 551 B before the breaker and budget) - so asking for the history costs about 170 B over the throwing form.
     /// Budgeted rather than left to be discovered by a caller who assumed the two were the same
     /// price.
     /// </summary>
@@ -99,13 +99,13 @@ public static class Budgets
 
     /// <summary>
     /// <c>Resilience.Default</c> with a listener attached. Measured: 440 B on .NET 10, 439 B on
-    /// .NET 8 — 48 B over <see cref="DefaultOverhead"/>, which is two boxed <c>int</c> results,
+    /// .NET 8 - 48 B over <see cref="DefaultOverhead"/>, which is two boxed <c>int</c> results,
     /// one for the attempt and one for the success.
     ///
     /// The whole claim is in that number: raising the events themselves is free, because
     /// <c>CallEvent</c> is a struct passed by value to an <see cref="System.Action{T}"/> and the
     /// delegate is a field on a policy the state-machine box already holds. What a listener costs
-    /// is the one thing it asked for that cannot be given away — the attempt's result, boxed,
+    /// is the one thing it asked for that cannot be given away - the attempt's result, boxed,
     /// because a cross-cutting listener has no <c>T</c> to be generic over.
     /// </summary>
     public const double DefaultWithListenerOverhead = 512;
@@ -114,7 +114,7 @@ public static class Budgets
     /// The pay-for-play gate, expressed as the thing it actually claims: what a listener adds must
     /// be accounted for by the boxes it asked for, and nothing else.
     ///
-    /// Two events on a successful call carry a result — <c>Attempt</c> and <c>Succeeded</c> — and a
+    /// Two events on a successful call carry a result - <c>Attempt</c> and <c>Succeeded</c> - and a
     /// boxed <c>int</c> is 24 B on both target frameworks, so 48 B is the whole of it. The ceiling
     /// allows one further box for measurement drift; anything beyond that means the executor grew
     /// a per-event allocation, which is exactly the failure mode that makes telemetry something
@@ -132,7 +132,7 @@ public static class Budgets
 
     /// <summary>
     /// The shipping executor must not be more expensive than the hand-written stand-in
-    /// used to establish the achievable floor. Measured: 393 B against 401 B on .NET 10 — the real
+    /// used to establish the achievable floor. Measured: 393 B against 401 B on .NET 10 - the real
     /// loop is <i>cheaper</i>, while additionally capturing a per-attempt exception, classifying
     /// results, awaiting a pre-attempt hook and carrying the retry budget the stand-in's own
     /// breaker-and-budget arm did not charge for.
@@ -150,7 +150,7 @@ public static class Budgets
     ///
     /// The stand-in measured this by running the identical stand-in loop with the log removed, and got
     /// 96 B for a 24-byte record. The shipping executor has no log-less variant to difference
-    /// against — the log is not optional — so the gate asserts the layout instead, which is the
+    /// against - the log is not optional - so the gate asserts the layout instead, which is the
     /// thing a change would actually move.
     /// </summary>
     public const double InlineAttemptLogCost = 64;
@@ -202,8 +202,8 @@ public static class Budgets
     /// The design predicted 2-3x here. The stand-in falsified it (1.27x for a stripped stand-in), and
     /// the shipping executor settles it: the smallest non-passthrough policy the
     /// library can express costs 320 B against Polly's empty-pipeline 304 B, a ratio of
-    /// <b>1.05x the wrong way</b>. The two are not doing the same work — Polly's empty pipeline does
-    /// nothing at all, while the fused loop is classifying, retrying and recording attempts — but the
+    /// <b>1.05x the wrong way</b>. The two are not doing the same work - Polly's empty pipeline does
+    /// nothing at all, while the fused loop is classifying, retrying and recording attempts - but the
     /// claim as written compared the two, and as written it was false.
     ///
     /// So this gate is a ceiling on the fused loop rather than a floor under a ratio: the trivial
@@ -212,7 +212,7 @@ public static class Budgets
     /// configured.
     ///
     /// Measured: 1.05x on .NET 10 and 1.10x on .NET 8. The ceiling sits at 1.25x rather than nearer
-    /// the measurement because the <i>denominator</i> is the unstable half — Polly's empty pipeline
+    /// the measurement because the <i>denominator</i> is the unstable half - Polly's empty pipeline
     /// measures between 290 B and 304 B across runs, while the fused trivial shape holds at 319-320 B
     /// to the byte. <see cref="TrivialOverhead"/> is the strict gate on this arm; this one exists to
     /// catch the loop drifting away from parity, and 1.25x still catches about 30 B of growth.
@@ -225,7 +225,7 @@ public static class Budgets
     /// Two transient failures then a success, against the shipping executor, with the retry budget
     /// turned off - see ShippingScenarios.RetryArm for why an arm that retries thousands of times a
     /// second is precisely what the budget exists to refuse. Measured: 2,056 B on .NET 10 and
-    /// 2,344 B on .NET 8, against the stand-in's 2,113 B and 2,848 B — so the
+    /// 2,344 B on .NET 8, against the stand-in's 2,113 B and 2,848 B - so the
     /// real retry path is cheaper than the stand-in on both, and markedly so on .NET 8.
     ///
     /// Dominated by exception capture and rethrow, which both arms pay. Gated loosely on the
@@ -241,7 +241,7 @@ public static class Budgets
     /// capture and rethrow the retry arm pays, so it sits at the same ceiling.
     ///
     /// The refusal path is by definition not the hot one, and this number is recorded rather than
-    /// minimised. What the gate is for is the shape of the claim: a refusal must cost what a retried
+    /// minimized. What the gate is for is the shape of the claim: a refusal must cost what a retried
     /// exception costs and no more - if it ever costs materially more, something on the refusal path
     /// has started allocating that the retry path does not.
     /// </summary>

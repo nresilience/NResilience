@@ -9,7 +9,7 @@ namespace NResilience.Tests;
 /// <para>
 /// The design's claim is that hot reload is a reference swap rather than a
 /// machine: a policy is an immutable value, so there is no in-flight execution to drain and no
-/// pipeline to rebuild. The tests that matter here are therefore about what survives the swap — a
+/// pipeline to rebuild. The tests that matter here are therefore about what survives the swap - a
 /// breaker's state must, and the configuration must not.
 /// </para>
 /// </summary>
@@ -186,7 +186,7 @@ public sealed class DependencyInjectionTests
 
     /// <summary>
     /// A classifier is a lambda and JSON cannot hold one, so the configure callback is where it
-    /// goes — and it runs last, so it wins.
+    /// goes - and it runs last, so it wins.
     /// </summary>
     [Fact]
     public void The_configure_callback_runs_after_configuration()
@@ -230,7 +230,7 @@ public sealed class DependencyInjectionTests
 
     /// <summary>
     /// The swap. <c>IOptionsMonitor</c> fires, the DTO is projected onto a new
-    /// <see cref="Resilience"/>, and the next resolve hands out the new one — no drain, no rebuild.
+    /// <see cref="Resilience"/>, and the next resolve hands out the new one - no drain, no rebuild.
     /// </summary>
     [Fact]
     public void Editing_configuration_swaps_the_policy()
@@ -302,7 +302,7 @@ public sealed class DependencyInjectionTests
     /// <summary>
     /// The same rule for the budget, including the default one. A budget's whole job is to remember
     /// how much traffic succeeded recently, and a null <see cref="Resilience.Budget"/> means the
-    /// core creates one keyed by policy <i>instance</i> — so reload would silently reset it. The
+    /// core creates one keyed by policy <i>instance</i> - so reload would silently reset it. The
     /// registration pins it to the name instead.
     /// </summary>
     [Fact]
@@ -329,7 +329,7 @@ public sealed class DependencyInjectionTests
 
     /// <summary>
     /// Sharing a breaker between two policies cannot be said in JSON, so the configure callback is
-    /// how it is said — and the registration must not overwrite what it chose.
+    /// how it is said - and the registration must not overwrite what it chose.
     /// </summary>
     [Fact]
     public void A_breaker_shared_through_the_configure_callback_is_kept()

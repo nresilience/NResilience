@@ -5,8 +5,8 @@ namespace NResilience.Internal;
 /// <summary>
 /// How the executor calls the callback.
 /// <para>
-/// A non-<c>async</c> generic struct, so the stateful and stateless entry points — and the typed
-/// and void ones — share one loop without adding a frame. Measured: a non-async call through a
+/// A non-<c>async</c> generic struct, so the stateful and stateless entry points - and the typed
+/// and void ones - share one loop without adding a frame. Measured: a non-async call through a
 /// struct constrained to an interface devirtualizes and inlines completely. Struct-ness buys
 /// nothing if the layer is itself <c>async</c>; only the <c>async</c> keyword decides whether a
 /// box is allocated.

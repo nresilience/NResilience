@@ -19,7 +19,7 @@ namespace NResilience.AotProbe;
 /// result, then re-runs the allocation budgets under AOT.
 ///
 /// Publishing without warnings proves the code is AOT-clean. It does not prove there is no AOT
-/// allocation cliff, and that is the claim worth defending — Polly boxes state per layer per
+/// allocation cliff, and that is the claim worth defending - Polly boxes state per layer per
 /// execution under Native AOT, so its zero-allocation claim is false there. A gate that only
 /// checked for warnings would never have caught that.
 ///
@@ -74,7 +74,7 @@ internal static class Program
             threw = true;
         }
 
-        failures += Check("an unrecognised exception is not retried and propagates", threw);
+        failures += Check("an unrecognized exception is not retried and propagates", threw);
 
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync().ConfigureAwait(false);
@@ -98,7 +98,7 @@ internal static class Program
     ///
     /// "No reflection anywhere in core" is a claim, and the only thing that can check it is a
     /// trimmed, AOT-compiled binary running the real executor. Publishing with the trim and AOT
-    /// analysers on and warnings as errors proves the code is clean; running it proves the
+    /// analyzers on and warnings as errors proves the code is clean; running it proves the
     /// per-result-type judge cache and the generic-struct invoker survive whole-program
     /// compilation, which is where an implementation that reached for reflection would break.
     /// </summary>
@@ -128,7 +128,7 @@ internal static class Program
             threw = true;
         }
 
-        failures += Check("library: an unrecognised exception is not retried and propagates", threw);
+        failures += Check("library: an unrecognized exception is not retried and propagates", threw);
 
         // The result-classification cache is the one place a naive implementation would reach for
         // reflection, so it is exercised over two distinct result types in one process.
@@ -167,7 +167,7 @@ internal static class Program
 
     /// <summary>
     /// The HTTP handler under AOT. It ships, so it is published and run rather than merely
-    /// compiled — and the request clone is the part worth running, because building a fresh
+    /// compiled - and the request clone is the part worth running, because building a fresh
     /// message and copying its headers is the closest the library gets to the kind of dynamic work
     /// whole-program compilation is entitled to break.
     /// </summary>
@@ -288,7 +288,7 @@ internal static class Program
     /// <summary>
     /// The breaker and budget guards under AOT. Both hold mutable state behind a lock and both feed the
     /// executor's rejection path, so what this checks is that the state machine and the guarded
-    /// rejection survive whole-program compilation — including <c>Task.Delay</c> on a
+    /// rejection survive whole-program compilation - including <c>Task.Delay</c> on a
     /// <see cref="TimeProvider"/>, which the guard uses and which nothing else in the probe does.
     /// </summary>
     private static async Task<int> GuardsAsync()
@@ -360,7 +360,7 @@ internal static class Program
     /// configuration binding is reflection by default and a container resolves types by
     /// <c>Type</c>. The binding source generator is what makes it trim-safe, and a generator that
     /// silently declined to run would show up here as a policy full of defaults rather than as a
-    /// build warning — which is why the assertion is on the projected values.
+    /// build warning - which is why the assertion is on the projected values.
     /// </para>
     /// </summary>
     private static async Task<int> ExtensionsAsync()
@@ -495,7 +495,7 @@ internal static class Program
             failures += Check("a limiter with no permits left throws under AOT", refused);
         }
 
-        // The one behaviour this whole block exists for, re-checked under AOT: the refusal is
+        // The one behavior this whole block exists for, re-checked under AOT: the refusal is
         // throttling that the retry budget is not charged for.
         var budget = RetryBudget.Of(minimumPerSecond: 1);
         Resilience policy = Resilience.Default with
@@ -513,7 +513,7 @@ internal static class Program
 
         failures += Check("a refusal is retried to exhaustion under AOT", limited.Attempts.Count == 3);
         failures += Check("a refusal is self-imposed throttling under AOT", limited.Attempts[0].Verdict is { Kind: VerdictKind.Throttled, SelfImposed: true });
-        failures += Check("a refusal does not spend retry budget under AOT", budget.Utilisation == 0);
+        failures += Check("a refusal does not spend retry budget under AOT", budget.Utilization == 0);
 
         return failures;
     }
@@ -558,7 +558,7 @@ internal static class Program
             "no AOT cliff: the real loop stays within its suspending budget",
             defaultSuspending - rawSuspending <= DefaultSuspendingBudget + NoiseFloor);
 
-        // TryRunAsync always materialises the attempt log, and the log is where an AOT-specific
+        // TryRunAsync always materializes the attempt log, and the log is where an AOT-specific
         // divergence would surface: it is the one part of the frame that reaches the heap.
         failures += Check(
             "no AOT cliff: reporting the outcome stays within its suspending budget",

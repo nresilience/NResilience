@@ -40,7 +40,7 @@ public sealed class BaselineReportTests
         await AppendAsync(report, "CANCELLATION PRIMITIVES (thread-local counter)", Arms.Cancellation());
 
         report.AppendLine();
-        report.AppendLine("TIMEPROVIDER / CTS BEHAVIOUR");
+        report.AppendLine("TIMEPROVIDER / CTS BEHAVIOR");
         report.Append(CultureInfo.InvariantCulture, $"  TryReset, system provider      : {CtsFacts.TryResetWithSystemProvider()}");
         report.AppendLine();
         report.Append(CultureInfo.InvariantCulture, $"  TryReset, custom provider      : {CtsFacts.TryResetWithCustomProvider(new Microsoft.Extensions.Time.Testing.FakeTimeProvider())}");

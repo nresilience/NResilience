@@ -7,8 +7,8 @@ namespace NResilience.Internal;
 /// <para>
 /// Every byte of this struct is live across the attempt <c>await</c> and is therefore paid for in
 /// the state-machine box of every suspending call, whether or not anything ever fails. The
-/// 24-byte version measured 96 B of box for a capacity of four — 24% of the executor's
-/// total overhead — and shrinking it was the single largest lever available.
+/// 24-byte version measured 96 B of box for a capacity of four - 24% of the executor's
+/// total overhead - and shrinking it was the single largest lever available.
 /// </para>
 /// <para>
 /// The packing: the attempt's start offset from the beginning of the operation in one 64-bit
@@ -29,9 +29,6 @@ internal struct AttemptRecord
     private const int VerdictShift = 56;
     private const long TicksMask = (1L << VerdictShift) - 1;
 
-    /// <summary>The top bit of the verdict byte. See the note on the packing above.</summary>
-    private const byte SelfImposedFlag = 0x80;
-
     private long _startOffsetTicks;
     private long _elapsedAndVerdict;
 
@@ -39,9 +36,9 @@ internal struct AttemptRecord
 
     public readonly long ElapsedTicks => _elapsedAndVerdict & TicksMask;
 
-    public readonly VerdictKind Verdict => (VerdictKind)(byte)(VerdictByte & ~SelfImposedFlag);
+    public readonly VerdictKind Kind => (VerdictKind)(byte)(VerdictByte & ~Verdict.SelfImposedFlag);
 
-    public readonly bool SelfImposed => (VerdictByte & SelfImposedFlag) != 0;
+    public readonly bool SelfImposed => (VerdictByte & Verdict.SelfImposedFlag) != 0;
 
     private readonly byte VerdictByte => (byte)((ulong)_elapsedAndVerdict >> VerdictShift);
 
@@ -50,7 +47,7 @@ internal struct AttemptRecord
     {
         _startOffsetTicks = startOffsetTicks < 0 ? 0 : startOffsetTicks;
         long clamped = elapsedTicks < 0 ? 0 : (elapsedTicks > TicksMask ? TicksMask : elapsedTicks);
-        byte packed = (byte)((byte)verdict | (selfImposed ? SelfImposedFlag : 0));
+        byte packed = (byte)((byte)verdict | (selfImposed ? Verdict.SelfImposedFlag : 0));
         _elapsedAndVerdict = clamped | ((long)packed << VerdictShift);
     }
 }
@@ -64,14 +61,14 @@ internal struct AttemptRecord
 /// because the obvious implementation is wrong twice: an attempt holds an <see cref="Exception"/>,
 /// making it a managed type <c>stackalloc</c> rejects outright (CS0208); and even with an
 /// unmanaged element type a <see cref="Span{T}"/> cannot live across the <c>await</c> at the
-/// centre of the loop (CS4007).
+/// center of the loop (CS4007).
 /// </remarks>
 [InlineArray(Capacity)]
 internal struct AttemptBuffer
 {
     /// <summary>
     /// Chosen so the shipped default of three attempts, plus one, fits without touching the heap.
-    /// A policy configured beyond it spills to a heap array on the attempt that overflows —
+    /// A policy configured beyond it spills to a heap array on the attempt that overflows -
     /// paying only for the configuration that asked for it.
     /// </summary>
     public const int Capacity = 4;
@@ -109,7 +106,7 @@ internal struct AttemptSink
             int spillIndex = index - AttemptBuffer.Capacity;
             if (_spill is null)
             {
-                _spill = new AttemptRecord[4];
+                _spill = new AttemptRecord[AttemptBuffer.Capacity];
             }
             else if (spillIndex >= _spill.Length)
             {
@@ -124,14 +121,15 @@ internal struct AttemptSink
             _exceptions ??= new Exception?[Math.Max(AttemptBuffer.Capacity, index + 1)];
             if (index >= _exceptions.Length)
             {
-                Array.Resize(ref _exceptions, index + 1);
+                // Doubling, the same rule the spill array grows by.
+                Array.Resize(ref _exceptions, Math.Max(_exceptions.Length * 2, index + 1));
             }
 
             _exceptions[index] = error;
         }
     }
 
-    public AttemptLog Materialise(TimeSpan elapsed, TimeSpan deadline, bool bounded)
+    public AttemptLog Materialize(TimeSpan elapsed, TimeSpan deadline, bool bounded)
     {
         if (_count == 0)
         {
@@ -158,7 +156,7 @@ internal struct AttemptSink
                 i + 1,
                 TimeSpan.FromTicks(record.ElapsedTicks),
                 TimeSpan.FromTicks(delay < 0 ? 0 : delay),
-                new VerdictOf(record.Verdict, record.SelfImposed).Value,
+                new VerdictOf(record.Kind, record.SelfImposed).Value,
                 error,
                 remaining);
         }
