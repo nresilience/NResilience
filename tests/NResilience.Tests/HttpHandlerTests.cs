@@ -351,6 +351,35 @@ public sealed class HttpHandlerTests
     }
 
     [Fact]
+    public async Task Nesting_is_reported_on_every_call_not_just_the_first()
+    {
+        // The AsyncLocal the handler uses to carry nesting state across the call must be restored
+        // to its previous value in the finally block, so a second call through the same handler
+        // is still detected as nested when it runs inside an outer retrying client.
+        var recorder = new EventRecorder();
+        var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        using HttpClient innerClient = Client(inner, policy: Instant with { OnEvent = recorder.Record });
+
+        var outerTransport = new ScriptedTransport(async (request, ct) =>
+            await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
+
+        using HttpClient outerClient = Client(outerTransport);
+
+        // Two sequential calls: each one runs the inner client inside the outer, and each must
+        // report nesting. A finally that cleared the flag unconditionally would leave the second
+        // call unable to detect that it is running inside a retrying context.
+        (await outerClient.GetAsync(new Uri("https://api.test/first"))).Dispose();
+        Assert.True(recorder.Contains(CallEventKind.NestedRetry),
+            "the inner client should report nesting on the first call");
+
+        recorder.Clear();
+
+        (await outerClient.GetAsync(new Uri("https://api.test/second"))).Dispose();
+        Assert.True(recorder.Contains(CallEventKind.NestedRetry),
+            "the inner client should still report nesting on the second call");
+    }
+
+    [Fact]
     public void CreateClient_takes_ownership_of_the_transport_timeout()
     {
         using HttpClient owned = ResilienceHttp.CreateClient(Instant, innerHandler: new ScriptedTransport());

@@ -55,6 +55,11 @@ internal static class CtsPool
             return;
         }
 
+        // Dispose the previous tenant before overwriting the slot, rather than leaving it for
+        // the finalizer: each pooled source holds a TimerQueueTimer, and a leaked timer defers
+        // its disposal to a GC that may not come. Bounded to one per thread, but a thread that
+        // runs many short operations through the pool would otherwise accumulate them.
+        t_pooled?.Dispose();
         t_pooled = source;
     }
 }

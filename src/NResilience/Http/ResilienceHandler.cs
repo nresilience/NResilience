@@ -108,9 +108,11 @@ public sealed class ResilienceHandler : DelegatingHandler
         Resilience policy = retrying ? scope.Retrying : scope.Single;
 
         bool nested = false;
+        bool wasInside = false;
         if (retrying && _options.DetectNestedRetries)
         {
-            nested = InsideRetryingClient.Value || request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
+            wasInside = InsideRetryingClient.Value;
+            nested = wasInside || request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
             if (nested && policy.OnEvent is { } listener)
             {
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
@@ -147,7 +149,11 @@ public sealed class ResilienceHandler : DelegatingHandler
         {
             if (retrying && _options.DetectNestedRetries)
             {
-                InsideRetryingClient.Value = false;
+                // Restore the previous value rather than clearing unconditionally. AsyncLocal value
+                // changes in a child context do not flow back to the parent, so this is a defensive
+                // measure: the handler's own context is left exactly as it found it, which is the
+                // correct invariant regardless of how the runtime flows the value.
+                InsideRetryingClient.Value = wasInside;
             }
         }
     }

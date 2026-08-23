@@ -108,6 +108,43 @@ public sealed class BackoffTests
             Delay(unconstructed with { Jitter = Jitter.None }, Verdict.Transient, 3));
     }
 
+    [Fact]
+    public void An_uncapped_exponential_with_many_attempts_does_not_produce_a_negative_delay()
+    {
+        // max is InfiniteTimeSpan (uncapped), and a very large attempt number pushes
+        // Math.Pow(factor, n) into the infinite range. The runtime clamps (long)infinity to
+        // long.MaxValue, so this does not wrap to negative - but the guard makes the intent
+        // explicit and returns TimeSpan.Zero rather than a 29000-year delay.
+        Backoff uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
+
+        TimeSpan delay = Delay(uncapped, Verdict.Transient, 1100);
+
+        Assert.True(delay >= TimeSpan.Zero, $"expected non-negative delay, got {delay}");
+    }
+
+    [Fact]
+    public void An_uncapped_exponential_saturates_to_a_finite_positive_delay()
+    {
+        // A finite-but-huge ticks value clamps to long.MaxValue ticks, which is a positive TimeSpan,
+        // rather than wrapping or collapsing to zero.
+        Backoff uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
+
+        TimeSpan delay = Delay(uncapped, Verdict.Transient, 1000);
+
+        Assert.True(delay > TimeSpan.Zero, $"expected a positive delay, got {delay}");
+    }
+
+    [Fact]
+    public void A_nan_factor_is_rejected_by_validation()
+    {
+        Backoff nan = Backoff.Exponential(factor: double.NaN);
+
+        var problems = new List<string>();
+        nan.Validate(problems);
+
+        Assert.Contains(problems, p => p.Contains("factor") && p.Contains("NaN"));
+    }
+
     private static TimeSpan Delay(Backoff backoff, Verdict previous, int attemptNumber) =>
         backoff.Compute(new NextAttempt(attemptNumber, previous, null, Timeout.InfiniteTimeSpan, default));
 }

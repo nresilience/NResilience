@@ -149,13 +149,23 @@ public readonly record struct Backoff
             _ => ticks,
         };
 
-        return ticks <= 0 ? TimeSpan.Zero : TimeSpan.FromTicks((long)ticks);
+        // An uncapped exponential (max is InfiniteTimeSpan) with a large attempt count can push
+        // ticks past double.MaxValue's representable range as a TimeSpan, and a NaN factor would
+        // propagate through every operation above. Either reaches TimeSpan.FromTicks as a value
+        // that wraps to a negative duration, so clamp before the conversion rather than after.
+        if (!double.IsFinite(ticks) || ticks <= 0)
+        {
+            return TimeSpan.Zero;
+        }
+
+        long clamped = ticks > long.MaxValue ? long.MaxValue : (long)ticks;
+        return TimeSpan.FromTicks(clamped);
     }
 
     internal void Validate(List<string> problems)
     {
         Backoff effective = Normalized();
-        if (effective._kind == BackoffKind.Exponential && effective._factor <= 0)
+        if (effective._kind == BackoffKind.Exponential && (double.IsNaN(effective._factor) || effective._factor <= 0))
         {
             problems.Add($"Backoff factor must be greater than zero; it is {effective._factor}.");
         }
