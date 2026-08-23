@@ -551,4 +551,150 @@ public sealed class BreakerTests
         Assert.Equal(BreakerState.Closed, breaker.State);
         Assert.Null(breaker.OpenedAt);
     }
+
+    // ---- Probe-slot release ----
+
+    /// <summary>
+    /// Runs a call that may serve a guarded rejection and moves the fake clock until it lands.
+    /// A rejection is deliberately not instant, so a test that simply awaited it would hang.
+    /// </summary>
+    private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
+    {
+        Task<CallResult<int>> call = policy.TryRunAsync(work).AsTask();
+
+        while (!call.IsCompleted)
+        {
+            time.Advance(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(1);
+        }
+
+        return await call;
+    }
+
+    [Fact]
+    public async Task Caller_cancellation_during_a_half_open_probe_releases_the_slot()
+    {
+        var time = new FakeTimeProvider();
+        Breaker breaker = Build(time, new BreakerSettings
+        {
+            ConsecutiveFailures = 1,
+            BreakDuration = TimeSpan.FromSeconds(1),
+            HalfOpenProbes = 1,
+            ProbeSuccesses = 1,
+            Time = time,
+        });
+
+        Resilience single = Instant(time) with { Attempts = 1, Breaker = breaker };
+
+        // Trip it, then wait out the break so the next call becomes a probe.
+        await RunAsync(single, _ => throw new IOException("down"), time);
+        Assert.Equal(BreakerState.Open, breaker.State);
+        time.Advance(TimeSpan.FromSeconds(2));
+
+        // The probe starts, then the caller cancels mid-attempt. Without ReleaseProbe the slot
+        // is leaked and the breaker wedges in HalfOpen forever.
+        using var caller = new CancellationTokenSource();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await single.RunAsync(async ct =>
+            {
+                started.SetResult();
+                await caller.CancelAsync();
+                ct.ThrowIfCancellationRequested();
+                return 1;
+            }, caller.Token));
+
+        Assert.Equal(BreakerState.HalfOpen, breaker.State);
+
+        // The slot came back: the next call is admitted as a probe and succeeds.
+        CallResult<int> probe = await RunAsync(single, _ => Task.FromResult(1), time);
+        Assert.True(probe.IsSuccess);
+        Assert.Equal(BreakerState.Closed, breaker.State);
+    }
+
+    [Fact]
+    public async Task A_deadline_exceeded_after_admission_releases_the_probe_slot()
+    {
+        var time = new FakeTimeProvider();
+        Breaker breaker = Build(time, new BreakerSettings
+        {
+            ConsecutiveFailures = 1,
+            BreakDuration = TimeSpan.FromSeconds(1),
+            HalfOpenProbes = 1,
+            ProbeSuccesses = 1,
+            Time = time,
+        });
+
+        Resilience single = Instant(time) with { Attempts = 1, Breaker = breaker };
+
+        // Trip it, then wait out the break so the next call becomes a probe.
+        await RunAsync(single, _ => throw new IOException("down"), time);
+        Assert.Equal(BreakerState.Open, breaker.State);
+        time.Advance(TimeSpan.FromSeconds(2));
+
+        // The next call is admitted as a probe. The BeforeAttempt hook advances time past the
+        // deadline, so the recheck after the hook breaks the loop without recording - the leak path.
+        Resilience withDeadline = Instant(time) with
+        {
+            Attempts = 1,
+            Breaker = breaker,
+            Deadline = TimeSpan.FromSeconds(1),
+            BeforeAttempt = _ =>
+            {
+                time.Advance(TimeSpan.FromSeconds(2));
+                return Task.CompletedTask;
+            },
+        };
+
+        DeadlineExceededException caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
+            await withDeadline.RunAsync(_ => Task.FromResult(1)));
+
+        // The breaker transitioned to HalfOpen when TryEnter admitted, and the slot was released
+        // because the deadline stopped the call before Record ran.
+        Assert.Equal(BreakerState.HalfOpen, breaker.State);
+
+        // The slot was released, so the next call through a policy with a live deadline can probe.
+        Resilience live = Instant(time) with { Attempts = 1, Breaker = breaker };
+        CallResult<int> probe = await RunAsync(live, _ => Task.FromResult(1), time);
+        Assert.True(probe.IsSuccess);
+        Assert.Equal(BreakerState.Closed, breaker.State);
+    }
+
+    [Fact]
+    public async Task A_before_attempt_hook_that_throws_releases_the_probe_slot()
+    {
+        var time = new FakeTimeProvider();
+        Breaker breaker = Build(time, new BreakerSettings
+        {
+            ConsecutiveFailures = 1,
+            BreakDuration = TimeSpan.FromSeconds(1),
+            HalfOpenProbes = 1,
+            ProbeSuccesses = 1,
+            Time = time,
+        });
+
+        Resilience single = Instant(time) with { Attempts = 1, Breaker = breaker };
+
+        // Trip it, then wait out the break so the next call becomes a probe.
+        await RunAsync(single, _ => throw new IOException("down"), time);
+        Assert.Equal(BreakerState.Open, breaker.State);
+        time.Advance(TimeSpan.FromSeconds(2));
+
+        // The BeforeAttempt hook throws after admission. The probe slot must come back.
+        Resilience withHook = single with
+        {
+            BeforeAttempt = _ => Task.FromException(new InvalidOperationException("hook failed")),
+        };
+
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await withHook.RunAsync(_ => Task.FromResult(1)));
+
+        Assert.Equal(BreakerState.HalfOpen, breaker.State);
+
+        // The next call is admitted as a probe and closes the breaker.
+        CallResult<int> probe = await RunAsync(single, _ => Task.FromResult(1), time);
+        Assert.True(probe.IsSuccess);
+        Assert.Equal(BreakerState.Closed, breaker.State);
+    }
 }

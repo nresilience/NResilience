@@ -433,6 +433,31 @@ public sealed class Breaker
         }
     }
 
+    /// <summary>
+    /// Returns a probe slot that <see cref="TryEnter"/> consumed but <see cref="Record"/> will not
+    /// be called on - because the attempt never ran, or was aborted by caller cancellation or a
+    /// deadline before it reached the recording point.
+    /// </summary>
+    /// <remarks>
+    /// Without this, a probe admitted while half-open but never recorded leaves
+    /// <see cref="_probesInFlight"/> at its cap and the breaker wedged in <see cref="BreakerState.HalfOpen"/>
+    /// forever: every subsequent <see cref="TryEnter"/> sees the slots full and refuses, and the
+    /// breaker has no clock-driven path back to <see cref="BreakerState.Open"/> that would reset them.
+    /// </remarks>
+    internal void ReleaseProbe()
+    {
+        lock (_gate)
+        {
+            // RecordCore already released the slot when it ran, and a probe that closed or re-opened
+            // the breaker moved the state away from HalfOpen. This guard makes the release a no-op
+            // for any path that did record, so the executor can call it unconditionally in its finally.
+            if (_state == BreakerState.HalfOpen && _probesInFlight > 0)
+            {
+                _probesInFlight--;
+            }
+        }
+    }
+
     /// <summary>The state machine itself, always called with the lock held.</summary>
     private void RecordCore(VerdictKind kind, TimeSpan duration)
     {

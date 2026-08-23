@@ -273,6 +273,15 @@ public sealed partial record Resilience
                 }
             }
 
+            // The breaker admitted this attempt. If the attempt never reaches the recording point -
+            // because the deadline expired, the caller cancelled, or the BeforeAttempt hook threw -
+            // the probe slot it consumed must be returned or the breaker wedges in HalfOpen forever.
+            // The flag is set when Record is called, and the finally below releases only when it
+            // was not. A bool live across the await costs one byte in the state-machine box; the
+            // alternative is a liveness bug.
+            bool recorded = false;
+            try
+            {
             TimeSpan remaining = Remaining(Time, start, Deadline, bounded);
             if (remaining == TimeSpan.Zero)
             {
@@ -415,6 +424,7 @@ public sealed partial record Resilience
             if (Breaker is { } sampled)
             {
                 BreakerTransition outcome = sampled.Record(verdict.Kind, duration);
+                recorded = true;
                 if (outcome != BreakerTransition.None && OnEvent is not null)
                 {
                     NotifyBreaker(outcome, log.Count, Time.GetElapsedTime(start));
@@ -526,6 +536,14 @@ public sealed partial record Resilience
             {
                 await Task.Delay(delay, Time, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
+            }
+            }
+            finally
+            {
+                if (Breaker is { } b && !recorded)
+                {
+                    b.ReleaseProbe();
+                }
             }
         }
 
