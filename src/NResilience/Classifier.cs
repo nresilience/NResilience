@@ -147,8 +147,13 @@ public sealed class Classifier
             return Verdict.Ok;
         }
 
-        // A single-entry cache per (result type, classifier). typeof(T) is a JIT constant, so the
-        // steady-state cost is one static read and one reference comparison.
+        // A single-entry cache per result type, guarded by an owner check. The static slot is
+        // shared across all classifiers for a given T, so the Owner field on the entry is what
+        // makes it correct: a hit from a different classifier is a miss, and the slow path
+        // overwrites the slot with this classifier's own judge. typeof(T) is a JIT constant, so
+        // the steady-state cost for a monomorphic call site is one static read and one reference
+        // comparison. Alternating two classifiers for the same T thrashes the slot and falls to
+        // the slow path on every call, which is correct but not free.
         ResultJudge<T>.Entry? cached = ResultJudge<T>.Cache;
         if (cached is not null && ReferenceEquals(cached.Owner, this))
         {
