@@ -21,35 +21,35 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" />
-    <PackageReference Include="Microsoft.Extensions.Http" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
-    <PackageReference Include="Microsoft.Extensions.Logging" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
-    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing" />
+    <PackageReference Include="xunit.v3"/>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
+    <PackageReference Include="Microsoft.Extensions.Http"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+    <PackageReference Include="Microsoft.Extensions.Logging"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console"/>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
-    <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
-    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj" />
-    <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj" />
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all"/>
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj"/>
   </ItemGroup>
 
   <ItemGroup>
     <!-- A configuration sample that is bound and asserted on, not just printed. -->
-    <None Include="appsettings.resilience.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="appsettings.logging.json" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="appsettings.logging-verbose.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="appsettings.resilience.json" CopyToOutputDirectory="PreserveNewest"/>
+    <None Include="appsettings.logging.json" CopyToOutputDirectory="PreserveNewest"/>
+    <None Include="appsettings.logging-verbose.json" CopyToOutputDirectory="PreserveNewest"/>
   </ItemGroup>
 
   <ItemGroup>
     <!-- The inliner's own logic, so the drift check is a test rather than only a CI step. -->
-    <Compile Include="../../tools/NResilience.DocSnippets/SnippetEngine.cs" Link="SnippetEngine.cs" />
+    <Compile Include="../../tools/NResilience.DocSnippets/SnippetEngine.cs" Link="SnippetEngine.cs"/>
   </ItemGroup>
 
 </Project>

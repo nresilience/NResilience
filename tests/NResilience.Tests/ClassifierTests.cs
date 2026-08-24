@@ -49,8 +49,7 @@ public sealed class ClassifierTests
     [Fact]
     public void A_predicate_rule_can_inspect_the_exception()
     {
-        var classifier = Classifier.Default.On<InvalidOperationException>(
-            static e => e.Message == "retry" ? Verdict.Transient : Verdict.Permanent);
+        var classifier = Classifier.Default.On<InvalidOperationException>(static e => e.Message == "retry" ? Verdict.Transient : Verdict.Permanent);
 
         Assert.Equal(VerdictKind.Transient, classifier.ClassifyException(new InvalidOperationException("retry")).Kind);
         Assert.Equal(VerdictKind.Permanent, classifier.ClassifyException(new InvalidOperationException("no")).Kind);

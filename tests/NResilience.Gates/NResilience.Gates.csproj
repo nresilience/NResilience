@@ -9,17 +9,17 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="xunit.v3"/>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../bench/NResilience.Probes/NResilience.Probes.csproj" />
-    <ProjectReference Include="../../bench/NResilience.Probes.Polly/NResilience.Probes.Polly.csproj" />
+    <ProjectReference Include="../../bench/NResilience.Probes/NResilience.Probes.csproj"/>
+    <ProjectReference Include="../../bench/NResilience.Probes.Polly/NResilience.Probes.Polly.csproj"/>
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest"/>
   </ItemGroup>
 
 </Project>

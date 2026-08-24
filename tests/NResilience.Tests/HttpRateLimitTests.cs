@@ -9,8 +9,8 @@ using NResilience.Http;
 namespace NResilience.Tests;
 
 /// <summary>
-/// <c>AddResilience().AddRateLimit(…)</c> - the limiter installed inner to the resilience handler,
-/// which is what makes it acquire one permit per attempt rather than one per operation.
+///     <c>AddResilience().AddRateLimit(…)</c> - the limiter installed inner to the resilience handler,
+///     which is what makes it acquire one permit per attempt rather than one per operation.
 /// </summary>
 public sealed class HttpRateLimitTests
 {
@@ -30,6 +30,7 @@ public sealed class HttpRateLimitTests
     public async Task The_handler_acquires_one_permit_per_attempt()
     {
         var limiter = new ScriptedLimiter();
+
         var transport = new Transport(
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
@@ -37,8 +38,8 @@ public sealed class HttpRateLimitTests
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                                .AddResilience(Instant, telemetry: false)
-                                .AddRateLimit(limiter, "api"),
+                .AddResilience(Instant, telemetry: false)
+                .AddRateLimit(limiter, "api"),
             transport);
 
         using var response = await Client(provider).GetAsync(Thing);
@@ -55,15 +56,16 @@ public sealed class HttpRateLimitTests
     [Fact]
     public async Task A_refused_permit_is_a_retry_rather_than_a_failed_call()
     {
-        var limiter = new ScriptedLimiter(grants: [true, false, true], retryAfter: TimeSpan.Zero);
+        var limiter = new ScriptedLimiter([true, false, true], TimeSpan.Zero);
+
         var transport = new Transport(
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                                .AddResilience(Instant, telemetry: false)
-                                .AddRateLimit(limiter, "api"),
+                .AddResilience(Instant, telemetry: false)
+                .AddRateLimit(limiter, "api"),
             transport);
 
         using var response = await Client(provider).GetAsync(Thing);
@@ -79,11 +81,11 @@ public sealed class HttpRateLimitTests
     [Fact]
     public async Task A_refusal_is_not_charged_to_the_per_host_retry_budget()
     {
-        var limiter = new ScriptedLimiter(grants: [false, false, false], retryAfter: TimeSpan.Zero);
+        var limiter = new ScriptedLimiter([false, false, false], TimeSpan.Zero);
         var transport = new Transport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
         var handler = new ResilienceHandler(Instant, new HttpResilienceOptions());
-        var limitHandler = new RateLimitHandler(limiter, "api", owned: false) { InnerHandler = transport };
+        var limitHandler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };
         handler.InnerHandler = limitHandler;
 
         using var client = new HttpClient(handler);
@@ -110,9 +112,7 @@ public sealed class HttpRateLimitTests
         var transport = new Transport(async (_, ct) =>
         {
             if (calls++ == 0)
-            {
                 await Task.Delay(Timeout.Infinite, ct);
-            }
 
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
@@ -126,8 +126,8 @@ public sealed class HttpRateLimitTests
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                                .AddResilience(policy, telemetry: false)
-                                .AddRateLimit(limiter, "api"),
+                .AddResilience(policy, telemetry: false)
+                .AddRateLimit(limiter, "api"),
             transport);
 
         using var response = await Client(provider).GetAsync(Thing);
@@ -147,8 +147,8 @@ public sealed class HttpRateLimitTests
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                                .AddResilience(Instant, telemetry: false)
-                                .AddRateLimit(limiter, "api"),
+                .AddResilience(Instant, telemetry: false)
+                .AddRateLimit(limiter, "api"),
             transport);
 
         using var response = await Client(provider).GetAsync(Thing);
@@ -162,24 +162,23 @@ public sealed class HttpRateLimitTests
     public async Task Per_host_quotas_are_independent()
     {
         var gate = new TaskCompletionSource();
+
         var transport = new Transport(async (request, _) =>
         {
             if (request.RequestUri == Thing)
-            {
                 await gate.Task;
-            }
 
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                                .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
-                                .AddRateLimit(o =>
-                                {
-                                    o.Concurrency = 1;
-                                    o.PerHost = true;
-                                }),
+                .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
+                .AddRateLimit(o =>
+                {
+                    o.Concurrency = 1;
+                    o.PerHost = true;
+                }),
             transport);
 
         var client = Client(provider);
@@ -201,24 +200,23 @@ public sealed class HttpRateLimitTests
     public async Task A_shared_quota_is_what_PerHost_false_asks_for()
     {
         var gate = new TaskCompletionSource();
+
         var transport = new Transport(async (request, _) =>
         {
             if (request.RequestUri == Thing)
-            {
                 await gate.Task;
-            }
 
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                                .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
-                                .AddRateLimit(o =>
-                                {
-                                    o.Concurrency = 1;
-                                    o.PerHost = false;
-                                }),
+                .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
+                .AddRateLimit(o =>
+                {
+                    o.Concurrency = 1;
+                    o.PerHost = false;
+                }),
             transport);
 
         var client = Client(provider);
@@ -241,10 +239,9 @@ public sealed class HttpRateLimitTests
     {
         var services = new ServiceCollection();
 
-        var error = Assert.Throws<ResilienceConfigurationException>(
-            () => services.AddHttpClient("api")
-                          .AddRateLimit(o => o.PermitsPerSecond = 10)
-                          .AddResilience(Instant, telemetry: false));
+        var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient("api")
+            .AddRateLimit(o => o.PermitsPerSecond = 10)
+            .AddResilience(Instant, telemetry: false));
 
         Assert.Contains("AddRateLimit() before AddResilience()", error.Message, StringComparison.Ordinal);
     }
@@ -255,8 +252,8 @@ public sealed class HttpRateLimitTests
         var services = new ServiceCollection();
 
         services.AddHttpClient("api")
-                .AddResilience(Instant, telemetry: false)
-                .AddRateLimit(o => o.PermitsPerSecond = 10);
+            .AddResilience(Instant, telemetry: false)
+            .AddRateLimit(o => o.PermitsPerSecond = 10);
     }
 
     [Fact]
@@ -281,8 +278,8 @@ public sealed class HttpRateLimitTests
     {
         var services = new ServiceCollection();
 
-        Assert.Throws<ResilienceConfigurationException>(
-            () => services.AddHttpClient("api").AddResilience(Instant, telemetry: false).AddRateLimit(_ => { }));
+        Assert.Throws<ResilienceConfigurationException>(() =>
+            services.AddHttpClient("api").AddResilience(Instant, telemetry: false).AddRateLimit(_ => { }));
     }
 
     // ---- Ownership ----
@@ -293,7 +290,7 @@ public sealed class HttpRateLimitTests
         using var limiter = Limit.Concurrency(1);
         var transport = new Transport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        var handler = new RateLimitHandler(limiter, "api", owned: false) { InnerHandler = transport };
+        var handler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };
         handler.Dispose();
 
         // Still usable: one limiter shared across several clients must not be disposed by the first
@@ -368,15 +365,20 @@ public sealed class HttpRateLimitTests
         private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] _steps;
         private int _index = -1;
 
-        internal Transport(params Func<HttpResponseMessage>[] steps) =>
-            _steps = [.. steps.Select(step => new Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>(
-                (_, _) => Task.FromResult(step())))];
+        internal Transport(params Func<HttpResponseMessage>[] steps)
+        {
+            _steps = [.. steps.Select(step => new Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>((_, _) => Task.FromResult(step())))];
+        }
 
-        internal Transport(Func<HttpRequestMessage, HttpResponseMessage> byRequest) =>
+        internal Transport(Func<HttpRequestMessage, HttpResponseMessage> byRequest)
+        {
             _steps = [(request, _) => Task.FromResult(byRequest(request))];
+        }
 
-        internal Transport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> constant) =>
+        internal Transport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> constant)
+        {
             _steps = [constant];
+        }
 
         internal List<HttpRequestMessage> Requests { get; } = [];
 

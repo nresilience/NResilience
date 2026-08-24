@@ -5,41 +5,16 @@ using NResilience.Extensions;
 namespace NResilience.Tests;
 
 /// <summary>
-/// Registration, resolution and hot reload.
-/// <para>
-/// The design's claim is that hot reload is a reference swap rather than a
-/// machine: a policy is an immutable value, so there is no in-flight execution to drain and no
-/// pipeline to rebuild. The tests that matter here are therefore about what survives the swap - a
-/// breaker's state must, and the configuration must not.
-/// </para>
+///     Registration, resolution and hot reload.
+///     <para>
+///         The design's claim is that hot reload is a reference swap rather than a
+///         machine: a policy is an immutable value, so there is no in-flight execution to drain and no
+///         pipeline to rebuild. The tests that matter here are therefore about what survives the swap - a
+///         breaker's state must, and the configuration must not.
+///     </para>
 /// </summary>
 public sealed class DependencyInjectionTests
 {
-    /// <summary>An in-memory source whose values can be replaced, so reload is testable without a file system.</summary>
-    private sealed class Source
-    {
-        private readonly ConfigurationManager _manager = new();
-        private Dictionary<string, string?> _values;
-
-        public Source(Dictionary<string, string?> values)
-        {
-            _values = values;
-            _manager.AddInMemoryCollection(_values);
-        }
-
-        public IConfiguration Configuration => _manager;
-
-        public void Replace(Dictionary<string, string?> values)
-        {
-            _values = values;
-            _manager.Sources.Clear();
-
-            // Clearing and re-adding raises the change token every IOptionsMonitor is watching,
-            // which is exactly what editing appsettings.json does.
-            _manager.AddInMemoryCollection(_values);
-        }
-    }
-
     private static IResiliencePolicies Build(Action<IServiceCollection> register)
     {
         var services = new ServiceCollection();
@@ -69,10 +44,10 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    /// The registration name beats a name the policy value carried, and this is the case that
-    /// forced the rule: <see cref="Resilience.Http"/> is named "http", so the most likely line
-    /// anybody writes would otherwise tag every client in the process "http" and make four of them
-    /// indistinguishable in the metrics.
+    ///     The registration name beats a name the policy value carried, and this is the case that
+    ///     forced the rule: <see cref="Resilience.Http" /> is named "http", so the most likely line
+    ///     anybody writes would otherwise tag every client in the process "http" and make four of them
+    ///     indistinguishable in the metrics.
     /// </summary>
     [Fact]
     public void The_registration_name_beats_a_preset_name()
@@ -99,16 +74,15 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    /// Validation happens at registration, which is one of the three places the design promises it.
-    /// A deadline of minus one second should not survive until the first request.
+    ///     Validation happens at registration, which is one of the three places the design promises it.
+    ///     A deadline of minus one second should not survive until the first request.
     /// </summary>
     [Fact]
     public void An_invalid_policy_fails_at_registration()
     {
         var services = new ServiceCollection();
 
-        Assert.Throws<ResilienceConfigurationException>(
-            () => services.AddResilience("api", Resilience.Default with { Attempts = 0 }));
+        Assert.Throws<ResilienceConfigurationException>(() => services.AddResilience("api", Resilience.Default with { Attempts = 0 }));
     }
 
     /// <summary>An unknown name is a mistake worth naming, and the message says what is registered.</summary>
@@ -185,8 +159,8 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    /// A classifier is a lambda and JSON cannot hold one, so the configure callback is where it
-    /// goes - and it runs last, so it wins.
+    ///     A classifier is a lambda and JSON cannot hold one, so the configure callback is where it
+    ///     goes - and it runs last, so it wins.
     /// </summary>
     [Fact]
     public void The_configure_callback_runs_after_configuration()
@@ -229,8 +203,8 @@ public sealed class DependencyInjectionTests
     // ---- Hot reload ----
 
     /// <summary>
-    /// The swap. <c>IOptionsMonitor</c> fires, the DTO is projected onto a new
-    /// <see cref="Resilience"/>, and the next resolve hands out the new one - no drain, no rebuild.
+    ///     The swap. <c>IOptionsMonitor</c> fires, the DTO is projected onto a new
+    ///     <see cref="Resilience" />, and the next resolve hands out the new one - no drain, no rebuild.
     /// </summary>
     [Fact]
     public void Editing_configuration_swaps_the_policy()
@@ -250,8 +224,8 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    /// The consequence the design says is documented rather than hidden: a policy captured into a
-    /// field at construction time is a snapshot, and the swap never reaches it. Resolve per call.
+    ///     The consequence the design says is documented rather than hidden: a policy captured into a
+    ///     field at construction time is a snapshot, and the swap never reaches it. Resolve per call.
     /// </summary>
     [Fact]
     public void A_policy_captured_into_a_field_does_not_see_the_swap()
@@ -268,10 +242,10 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    /// The other consequence, and the one that would be a production incident if it went the other
-    /// way: a breaker that is open because a dependency is down stays open across a configuration
-    /// edit. Its state is the point of having it, and handing the traffic straight back to a dead
-    /// dependency because somebody edited a JSON file is the worst available reading of "reload".
+    ///     The other consequence, and the one that would be a production incident if it went the other
+    ///     way: a breaker that is open because a dependency is down stays open across a configuration
+    ///     edit. Its state is the point of having it, and handing the traffic straight back to a dead
+    ///     dependency because somebody edited a JSON file is the worst available reading of "reload".
     /// </summary>
     [Fact]
     public void A_live_breaker_survives_a_reload()
@@ -300,10 +274,10 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    /// The same rule for the budget, including the default one. A budget's whole job is to remember
-    /// how much traffic succeeded recently, and a null <see cref="Resilience.Budget"/> means the
-    /// core creates one keyed by policy <i>instance</i> - so reload would silently reset it. The
-    /// registration pins it to the name instead.
+    ///     The same rule for the budget, including the default one. A budget's whole job is to remember
+    ///     how much traffic succeeded recently, and a null <see cref="Resilience.Budget" /> means the
+    ///     core creates one keyed by policy <i>instance</i> - so reload would silently reset it. The
+    ///     registration pins it to the name instead.
     /// </summary>
     [Fact]
     public void A_live_budget_survives_a_reload_even_when_it_was_never_configured()
@@ -328,8 +302,8 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    /// Sharing a breaker between two policies cannot be said in JSON, so the configure callback is
-    /// how it is said - and the registration must not overwrite what it chose.
+    ///     Sharing a breaker between two policies cannot be said in JSON, so the configure callback is
+    ///     how it is said - and the registration must not overwrite what it chose.
     /// </summary>
     [Fact]
     public void A_breaker_shared_through_the_configure_callback_is_kept()
@@ -353,5 +327,30 @@ public sealed class DependencyInjectionTests
             .AddResilience("reports", o => o.Breaker = new BreakerOptions { ConsecutiveFailures = 2 }));
 
         Assert.NotSame(policies["api"].Breaker, policies["reports"].Breaker);
+    }
+
+    /// <summary>An in-memory source whose values can be replaced, so reload is testable without a file system.</summary>
+    private sealed class Source
+    {
+        private readonly ConfigurationManager _manager = new();
+        private Dictionary<string, string?> _values;
+
+        public Source(Dictionary<string, string?> values)
+        {
+            _values = values;
+            _manager.AddInMemoryCollection(_values);
+        }
+
+        public IConfiguration Configuration => _manager;
+
+        public void Replace(Dictionary<string, string?> values)
+        {
+            _values = values;
+            _manager.Sources.Clear();
+
+            // Clearing and re-adding raises the change token every IOptionsMonitor is watching,
+            // which is exactly what editing appsettings.json does.
+            _manager.AddInMemoryCollection(_values);
+        }
     }
 }

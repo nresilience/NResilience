@@ -9,12 +9,12 @@ using NResilience.Extensions.Internal;
 namespace NResilience.Tests;
 
 /// <summary>
-/// The log vocabulary and the promises made about it.
-/// <para>
-/// Two of these tests are the whole answer to the verbosity objection - a healthy call writes
-/// nothing above <c>Trace</c>, and a retried-then-successful one nothing above <c>Debug</c> - and
-/// one of them, <c>Event_ids_are_stable</c>, is the contract somebody's alert depends on.
-/// </para>
+///     The log vocabulary and the promises made about it.
+///     <para>
+///         Two of these tests are the whole answer to the verbosity objection - a healthy call writes
+///         nothing above <c>Trace</c>, and a retried-then-successful one nothing above <c>Debug</c> - and
+///         one of them, <c>Event_ids_are_stable</c>, is the contract somebody's alert depends on.
+///     </para>
 /// </summary>
 public sealed class LoggingTests
 {
@@ -66,6 +66,7 @@ public sealed class LoggingTests
         var api = Logged(logger, Resilience.Default with { Name = "api", Backoff = Backoff.None });
 
         var calls = 0;
+
         await api.RunAsync(
             _ => ++calls == 1 ? Task.FromException<int>(new IOException()) : Task.FromResult(1),
             TestContext.Current.CancellationToken);
@@ -170,6 +171,7 @@ public sealed class LoggingTests
     public void A_zero_repeat_window_warns_every_time()
     {
         var logger = new FakeLogger();
+
         var listener = new LogListener(
             logger,
             new ResilienceLoggingOptions { RepeatWindow = TimeSpan.Zero },
@@ -258,7 +260,7 @@ public sealed class LoggingTests
 
         listener.Record(Event(CallEventKind.NestedRetry));
         listener.Record(Event(CallEventKind.NestedRetry));
-        listener.Record(Event(CallEventKind.NestedRetry, policy: "other"));
+        listener.Record(Event(CallEventKind.NestedRetry, "other"));
 
         Assert.Equal([1018, 1019, 1018], Ids(logger));
     }
@@ -288,7 +290,7 @@ public sealed class LoggingTests
         // is the one a per-host policy raises events to.
         var scoped = api with { Name = "payments:api.example.com" };
 
-        scoped.OnEvent!(Event(CallEventKind.Rejected, policy: "payments:api.example.com", reason: StopReason.DependencyUnavailable));
+        scoped.OnEvent!(Event(CallEventKind.Rejected, "payments:api.example.com", reason: StopReason.DependencyUnavailable));
 
         Assert.Equal("NResilience.payments", factory.Collector.LatestRecord.Category);
     }
@@ -300,7 +302,7 @@ public sealed class LoggingTests
         var api = (Resilience.Http with { Name = "payments" }).WithLogging(Factory(factory));
 
         (api with { Name = "payments:api.example.com" }).OnEvent!(
-            Event(CallEventKind.Rejected, policy: "payments:api.example.com", reason: StopReason.DependencyUnavailable));
+            Event(CallEventKind.Rejected, "payments:api.example.com", reason: StopReason.DependencyUnavailable));
 
         Assert.Equal("payments:api.example.com", Field(factory.Collector.LatestRecord, "Policy"));
     }
@@ -365,6 +367,7 @@ public sealed class LoggingTests
     public void A_level_delegate_overrides_the_profile()
     {
         var logger = new FakeLogger();
+
         var listener = new LogListener(
             logger,
             new ResilienceLoggingOptions
@@ -381,6 +384,7 @@ public sealed class LoggingTests
     public void A_level_delegate_returning_none_drops_the_record()
     {
         var logger = new FakeLogger();
+
         var listener = new LogListener(
             logger,
             new ResilienceLoggingOptions { Level = (_, _) => LogLevel.None });
@@ -430,8 +434,7 @@ public sealed class LoggingTests
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => api.RunAsync(_ => Task.FromResult(1), cts.Token).AsTask());
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => api.RunAsync(_ => Task.FromResult(1), cts.Token).AsTask());
 
         // Caller cancellation rethrows before any event is raised, so a cancelled call is silent by
         // construction. Worth pinning, because "my cancelled request vanished from the logs" is
@@ -476,7 +479,7 @@ public sealed class LoggingTests
 
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
-        api.OnEvent!(Event(CallEventKind.Rejected, policy: "api", reason: StopReason.DependencyUnavailable));
+        api.OnEvent!(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
 
         Assert.Contains(1010, provider.Collector.GetSnapshot().Select(r => r.Id.Id));
         Assert.Equal("NResilience.api", provider.Collector.GetSnapshot().First(r => r.Id.Id == 1010).Category);
@@ -502,10 +505,10 @@ public sealed class LoggingTests
 
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(theirs).SetMinimumLevel(LogLevel.Trace));
-        services.AddResilience("api", Resilience.Http, configure: p => p.WithLogging(mine));
+        services.AddResilience("api", Resilience.Http, p => p.WithLogging(mine));
 
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
-        api.OnEvent!(Event(CallEventKind.NestedRetry, policy: "api"));
+        api.OnEvent!(Event(CallEventKind.NestedRetry));
 
         Assert.Single(mine.Collector.GetSnapshot(), r => r.Id.Id == 1018);
         Assert.DoesNotContain(1018, theirs.Collector.GetSnapshot().Select(r => r.Id.Id));
@@ -517,6 +520,7 @@ public sealed class LoggingTests
         var provider = new FakeLoggerProvider();
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(provider).SetMinimumLevel(LogLevel.Trace));
+
         services.AddResilience("api", o =>
         {
             o.Logging = "Off";
@@ -535,8 +539,7 @@ public sealed class LoggingTests
         services.AddLogging();
         services.AddResilience("api", o => o.Logging = "Verbse");
 
-        var thrown = Assert.Throws<ResilienceConfigurationException>(
-            () => services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"]);
+        var thrown = Assert.Throws<ResilienceConfigurationException>(() => services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"]);
 
         Assert.Contains("Off, Default or Verbose", thrown.Message, StringComparison.Ordinal);
         Assert.Contains("Verbse", thrown.Message, StringComparison.Ordinal);
@@ -552,7 +555,7 @@ public sealed class LoggingTests
         services.AddResilience("api", Resilience.Http);
 
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
-        api.OnEvent!(Event(CallEventKind.Succeeded, policy: "api", attempt: 1, verdict: Verdict.Ok, reason: StopReason.Succeeded));
+        api.OnEvent!(Event(CallEventKind.Succeeded, "api", 1, Verdict.Ok, reason: StopReason.Succeeded));
 
         Assert.Equal(
             LogLevel.Information,
@@ -567,6 +570,7 @@ public sealed class LoggingTests
         var provider = new FakeLoggerProvider();
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(provider).SetMinimumLevel(LogLevel.Debug));
+
         services.AddResilience("api", o =>
         {
             o.Preset = "Http";
@@ -619,6 +623,7 @@ public sealed class LoggingTests
     {
         var provider = new FakeLoggerProvider();
         var manager = new ConfigurationManager();
+
         manager.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Resilience:api:Attempts"] = "3",
@@ -633,6 +638,7 @@ public sealed class LoggingTests
         var first = policies["api"].Breaker!;
 
         manager.Sources.Clear();
+
         manager.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Resilience:api:Attempts"] = "5",
@@ -642,6 +648,7 @@ public sealed class LoggingTests
         var reloaded = policies["api"];
 
         Assert.Same(first, reloaded.Breaker);
+
         Assert.Equal(
             ["3 attempts", "5 attempts"],
             provider.Collector.GetSnapshot()
@@ -664,8 +671,8 @@ public sealed class LoggingTests
         record.StructuredState?.FirstOrDefault(pair => pair.Key == name).Value;
 
     /// <summary>
-    /// A <see cref="CallEvent"/> of a given kind, shaped enough for the listener to route it. The
-    /// executor's own constructor is internal, so the recorder is how a test gets one.
+    ///     A <see cref="CallEvent" /> of a given kind, shaped enough for the listener to route it. The
+    ///     executor's own constructor is internal, so the recorder is how a test gets one.
     /// </summary>
     private static CallEvent Event(
         CallEventKind kind,
@@ -675,16 +682,16 @@ public sealed class LoggingTests
         Exception? error = null,
         StopReason? reason = null)
     {
-        var effective = verdict ?? (kind switch
+        var effective = verdict ?? kind switch
         {
             CallEventKind.Rejected => Verdict.Transient,
             CallEventKind.NotRetried => Verdict.Permanent,
             CallEventKind.Exhausted => Verdict.Transient,
             CallEventKind.DeadlineExceeded => Verdict.Transient,
             _ => Verdict.Ok,
-        });
+        };
 
-        var effectiveReason = reason ?? (kind switch
+        var effectiveReason = reason ?? kind switch
         {
             CallEventKind.Rejected => StopReason.DependencyUnavailable,
             CallEventKind.NotRetried => StopReason.Permanent,
@@ -692,7 +699,7 @@ public sealed class LoggingTests
             CallEventKind.DeadlineExceeded => StopReason.DeadlineExceeded,
             CallEventKind.Exhausted => StopReason.AttemptsExhausted,
             _ => null,
-        });
+        };
 
         // The constructor is internal, and NResilience grants this assembly access - so a test can
         // hand the listener one event of each kind without driving the executor into every state.

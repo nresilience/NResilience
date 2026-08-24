@@ -64,14 +64,14 @@ A circuit breaker can trip based on consecutive failures or based on rates of fa
 // incident, because the responses are not failing - they are just slow.
 var breaker = new Breaker(new BreakerSettings
 {
-    ConsecutiveFailures = 5,                             // the default trip condition
-    SlowCallThreshold = TimeSpan.FromSeconds(2),         // anything slower counts against
-    SlowCallRatio = 0.5,                                 // half the window being slow trips it
-    MinimumCalls = 20,                                   // below this, a ratio means nothing
+    ConsecutiveFailures = 5, // the default trip condition
+    SlowCallThreshold = TimeSpan.FromSeconds(2), // anything slower counts against
+    SlowCallRatio = 0.5, // half the window being slow trips it
+    MinimumCalls = 20, // below this, a ratio means nothing
     Window = TimeSpan.FromSeconds(30),
-    BreakDuration = TimeSpan.FromSeconds(15),            // doubles per consecutive open
+    BreakDuration = TimeSpan.FromSeconds(15), // doubles per consecutive open
     MaxBreakDuration = TimeSpan.FromMinutes(2),
-    ProbeSuccesses = 2,                                  // two good probes to close, not one
+    ProbeSuccesses = 2, // two good probes to close, not one
 })
 {
     Name = "search",
@@ -92,8 +92,8 @@ When a circuit breaker refuses a call, it serves a short pause before returning.
 // does not have to guess.
 if (result.Exception is CallRejectedException rejection)
 {
-    Console.WriteLine(rejection.Reason);      // DependencyUnavailable, or BudgetExhausted
-    Console.WriteLine(rejection.RetryAfter);  // when to come back, when there is an answer
+    Console.WriteLine(rejection.Reason); // DependencyUnavailable, or BudgetExhausted
+    Console.WriteLine(rejection.RetryAfter); // when to come back, when there is an answer
 }
 ```
 <!-- endsnippet -->
@@ -108,11 +108,11 @@ You can monitor the state of the breaker or manually control its behavior.
 
 <!-- snippet: breaker-admin -->
 ```csharp
-var state = breaker.State;         // Closed, Open, HalfOpen or Isolated
-var since = breaker.OpenedAt;   // null while it is closed
+var state = breaker.State; // Closed, Open, HalfOpen or Isolated
+var since = breaker.OpenedAt; // null while it is closed
 
-breaker.Isolate();                          // force it open and keep it there
-breaker.Reset();                            // close it and forget the history
+breaker.Isolate(); // force it open and keep it there
+breaker.Reset(); // close it and forget the history
 ```
 <!-- endsnippet -->
 

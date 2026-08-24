@@ -1,77 +1,21 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using System.Globalization;
 using NResilience.Extensions;
 
 namespace NResilience.Tests;
 
 /// <summary>
-/// The meter and the activity source.
-/// <para>
-/// The instrument set exists to produce one number: <c>attempts ÷ calls</c>, the retry fraction.
-/// The tests that matter are therefore the ones that establish the denominator is right - one call
-/// counted per logical operation, <i>including</i> the ones that failed, because a denominator that
-/// counts only successes inflates the fraction exactly when it is being read in anger.
-/// </para>
+///     The meter and the activity source.
+///     <para>
+///         The instrument set exists to produce one number: <c>attempts ÷ calls</c>, the retry fraction.
+///         The tests that matter are therefore the ones that establish the denominator is right - one call
+///         counted per logical operation, <i>including</i> the ones that failed, because a denominator that
+///         counts only successes inflates the fraction exactly when it is being read in anger.
+///     </para>
 /// </summary>
 public sealed class MetricsTests
 {
-    /// <summary>Collects what a named set of instruments recorded, with their tags.</summary>
-    private sealed class Recording : IDisposable
-    {
-        private readonly MeterListener _listener = new();
-        private readonly List<(string Instrument, double Value, Dictionary<string, object?> Tags)> _measurements = [];
-        private readonly object _gate = new();
-
-        public Recording()
-        {
-            _listener.InstrumentPublished = (instrument, listener) =>
-            {
-                if (ReferenceEquals(instrument.Meter, ResilienceTelemetry.Meter))
-                {
-                    listener.EnableMeasurementEvents(instrument);
-                }
-            };
-
-            _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => Add(instrument, value, tags));
-            _listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) => Add(instrument, value, tags));
-            _listener.Start();
-        }
-
-        public IReadOnlyList<(string Instrument, double Value, Dictionary<string, object?> Tags)> Measurements
-        {
-            get
-            {
-                lock (_gate)
-                {
-                    return [.. _measurements];
-                }
-            }
-        }
-
-        public double Total(string instrument) =>
-            Measurements.Where(m => m.Instrument == instrument).Sum(m => m.Value);
-
-        public IReadOnlyList<Dictionary<string, object?>> TagsFor(string instrument) =>
-            [.. Measurements.Where(m => m.Instrument == instrument).Select(m => m.Tags)];
-
-        public void Dispose() => _listener.Dispose();
-
-        private void Add<T>(Instrument instrument, T value, ReadOnlySpan<KeyValuePair<string, object?>> tags)
-            where T : struct
-        {
-            var copied = new Dictionary<string, object?>(StringComparer.Ordinal);
-            foreach (var tag in tags)
-            {
-                copied[tag.Key] = tag.Value;
-            }
-
-            lock (_gate)
-            {
-                _measurements.Add((instrument.Name, Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture), copied));
-            }
-        }
-    }
-
     private static Resilience Instant(string name) => (Resilience.Default with
     {
         Name = name,
@@ -94,9 +38,9 @@ public sealed class MetricsTests
     }
 
     /// <summary>
-    /// Three attempts, one call. This is the whole point of splitting the counters: without it,
-    /// "we served 1,000 requests" and "we made 3,000 requests" are the same number and the retry
-    /// fraction cannot be computed at all.
+    ///     Three attempts, one call. This is the whole point of splitting the counters: without it,
+    ///     "we served 1,000 requests" and "we made 3,000 requests" are the same number and the retry
+    ///     fraction cannot be computed at all.
     /// </summary>
     [Fact]
     public async Task Retries_count_attempts_without_counting_extra_calls()
@@ -112,9 +56,9 @@ public sealed class MetricsTests
     }
 
     /// <summary>
-    /// The denominator has to include the failures. A call that ran out of attempts is the most
-    /// interesting call in the process, and counting only the successes would understate the
-    /// denominator precisely when the fraction is being read in an incident.
+    ///     The denominator has to include the failures. A call that ran out of attempts is the most
+    ///     interesting call in the process, and counting only the successes would understate the
+    ///     denominator precisely when the fraction is being read in an incident.
     /// </summary>
     [Fact]
     public async Task A_call_that_exhausts_its_attempts_still_counts_as_one_call()
@@ -144,8 +88,8 @@ public sealed class MetricsTests
     // ---- Rejections ----
 
     /// <summary>
-    /// A rejection is tagged with which guard refused, which is the difference between "the
-    /// dependency is down" and "we are retrying too hard" - two facts with opposite responses.
+    ///     A rejection is tagged with which guard refused, which is the difference between "the
+    ///     dependency is down" and "we are retrying too hard" - two facts with opposite responses.
     /// </summary>
     [Fact]
     public async Task An_open_breaker_records_a_rejection_naming_the_dependency()
@@ -218,8 +162,8 @@ public sealed class MetricsTests
     }
 
     /// <summary>
-    /// A listener the user already attached is kept. Installing metrics by silently dropping
-    /// somebody's logging would be the library preferring its own telemetry to theirs.
+    ///     A listener the user already attached is kept. Installing metrics by silently dropping
+    ///     somebody's logging would be the library preferring its own telemetry to theirs.
     /// </summary>
     [Fact]
     public async Task WithTelemetry_keeps_the_listener_that_was_already_there()
@@ -243,8 +187,8 @@ public sealed class MetricsTests
     // ---- Tracing ----
 
     /// <summary>
-    /// The span carries what happened inside it. A per-attempt HTTP span cannot say "these three
-    /// were one call that eventually succeeded"; this is where that is recorded.
+    ///     The span carries what happened inside it. A per-attempt HTTP span cannot say "these three
+    ///     were one call that eventually succeeded"; this is where that is recorded.
     /// </summary>
     [Fact]
     public async Task A_call_annotates_the_current_activity()
@@ -252,7 +196,7 @@ public sealed class MetricsTests
         using var listener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == ResilienceTelemetry.ActivitySourceName,
-            Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+            Sample = (ref _) => ActivitySamplingResult.AllDataAndRecorded,
         };
 
         ActivitySource.AddActivityListener(listener);
@@ -261,6 +205,7 @@ public sealed class MetricsTests
         Assert.NotNull(activity);
 
         var calls = 0;
+
         await (Instant("t-trace") with { Attempts = 3 }).RunAsync(ct =>
             ++calls < 2 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(1));
 
@@ -284,4 +229,60 @@ public sealed class MetricsTests
         recording.Measurements
             .Single(m => m.Instrument == "nresilience.calls" && Equals(m.Tags["nresilience.policy"], policy))
             .Tags["nresilience.outcome"];
+
+    /// <summary>Collects what a named set of instruments recorded, with their tags.</summary>
+    private sealed class Recording : IDisposable
+    {
+        private readonly object _gate = new();
+        private readonly MeterListener _listener = new();
+        private readonly List<(string Instrument, double Value, Dictionary<string, object?> Tags)> _measurements = [];
+
+        public Recording()
+        {
+            _listener.InstrumentPublished = (instrument, listener) =>
+            {
+                if (ReferenceEquals(instrument.Meter, ResilienceTelemetry.Meter))
+                    listener.EnableMeasurementEvents(instrument);
+            };
+
+            _listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) => Add(instrument, value, tags));
+            _listener.SetMeasurementEventCallback<double>((instrument, value, tags, _) => Add(instrument, value, tags));
+            _listener.Start();
+        }
+
+        public IReadOnlyList<(string Instrument, double Value, Dictionary<string, object?> Tags)> Measurements
+        {
+            get
+            {
+                lock (_gate)
+                {
+                    return [.. _measurements];
+                }
+            }
+        }
+
+        public void Dispose() => _listener.Dispose();
+
+        public double Total(string instrument) =>
+            Measurements.Where(m => m.Instrument == instrument).Sum(m => m.Value);
+
+        public IReadOnlyList<Dictionary<string, object?>> TagsFor(string instrument) =>
+            [.. Measurements.Where(m => m.Instrument == instrument).Select(m => m.Tags)];
+
+        private void Add<T>(Instrument instrument, T value, ReadOnlySpan<KeyValuePair<string, object?>> tags)
+            where T : struct
+        {
+            var copied = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+            foreach (var tag in tags)
+            {
+                copied[tag.Key] = tag.Value;
+            }
+
+            lock (_gate)
+            {
+                _measurements.Add((instrument.Name, Convert.ToDouble(value, CultureInfo.InvariantCulture), copied));
+            }
+        }
+    }
 }

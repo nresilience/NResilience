@@ -67,42 +67,42 @@ public sealed class PolicyConfigurationTests
     public void The_two_bounds_in_the_order_that_works_are_clean()
     {
         Assert.Equal([], Harness.Ids(Harness.InFile("""
-            internal static class Policies
-            {
-                internal static readonly Resilience Api = Resilience.Http with
-                {
-                    Deadline = TimeSpan.FromSeconds(10),
-                    AttemptTimeout = TimeSpan.FromSeconds(3),
-                };
-            }
-            """)));
+                                                    internal static class Policies
+                                                    {
+                                                        internal static readonly Resilience Api = Resilience.Http with
+                                                        {
+                                                            Deadline = TimeSpan.FromSeconds(10),
+                                                            AttemptTimeout = TimeSpan.FromSeconds(3),
+                                                        };
+                                                    }
+                                                    """)));
     }
 
     [Fact]
     public void An_unbounded_attempt_inside_a_deadline_is_the_documented_shape()
     {
         Assert.Equal([], Harness.Ids(Harness.InFile("""
-            internal static class Policies
-            {
-                internal static readonly Resilience Api = Resilience.Http with
-                {
-                    Deadline = TimeSpan.FromSeconds(10),
-                    AttemptTimeout = Timeout.InfiniteTimeSpan,
-                };
-            }
-            """)));
+                                                    internal static class Policies
+                                                    {
+                                                        internal static readonly Resilience Api = Resilience.Http with
+                                                        {
+                                                            Deadline = TimeSpan.FromSeconds(10),
+                                                            AttemptTimeout = Timeout.InfiniteTimeSpan,
+                                                        };
+                                                    }
+                                                    """)));
     }
 
     [Fact]
     public void A_value_the_compiler_cannot_see_is_left_to_Validate()
     {
         Assert.Equal([], Harness.Ids(Harness.InFile("""
-            internal static class Policies
-            {
-                internal static Resilience Of(int attempts, TimeSpan deadline) =>
-                    Resilience.Http with { Attempts = attempts, Deadline = deadline };
-            }
-            """)));
+                                                    internal static class Policies
+                                                    {
+                                                        internal static Resilience Of(int attempts, TimeSpan deadline) =>
+                                                            Resilience.Http with { Attempts = attempts, Deadline = deadline };
+                                                    }
+                                                    """)));
     }
 
     [Fact]

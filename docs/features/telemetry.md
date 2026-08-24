@@ -70,7 +70,7 @@ Console.WriteLine(string.Join(", ", events.Kinds));
 <!-- snippet: telemetry-tostring -->
 ```csharp
 // [PolicyName] Kind #N VerdictKind ExceptionType (duration) +delay
-Console.WriteLine(events[0]);   // [api] Attempt #1 Ok (0.1ms)
+Console.WriteLine(events[0]); // [api] Attempt #1 Ok (0.1ms)
 ```
 <!-- endsnippet -->
 

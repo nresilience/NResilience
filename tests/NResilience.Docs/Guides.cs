@@ -10,8 +10,6 @@ namespace NResilience.Docs;
 /// <summary>The complete examples the guides are built around.</summary>
 public sealed class Guides
 {
-    private sealed record Order(string Id, string Status);
-
     [Fact]
     public async Task Retry_an_http_call_end_to_end()
     {
@@ -40,14 +38,13 @@ public sealed class Guides
             cancellationToken);
 
         if (result.TryGetValue(out var order))
-        {
             return order;
-        }
 
         // The failure, and everything that led to it, without an exception.
         Console.WriteLine($"{result.StopReason}: {result.Attempts}");
         return null;
     }
+
     // </snippet:guide-retry-an-http-call>
 
     [Fact]
@@ -62,6 +59,54 @@ public sealed class Guides
 
         Assert.True(result.IsSuccess);
     }
+
+    [Fact]
+    public void A_health_endpoint_reads_the_breaker()
+    {
+        var dependencies = new Dependencies();
+
+        // <snippet:guide-health-endpoint>
+        // A breaker is an object with a name and a state, so an operator can be told about it.
+        var report = dependencies.Payments.State switch
+        {
+            BreakerState.Closed => "healthy",
+            BreakerState.HalfOpen => "recovering",
+            BreakerState.Isolated => "isolated by an operator",
+            _ => $"open since {dependencies.Payments.OpenedAt:O}",
+        };
+
+        // </snippet:guide-health-endpoint>
+
+        Assert.Equal("healthy", report);
+    }
+
+    [Fact]
+    public void Configure_from_appsettings_end_to_end()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile("appsettings.resilience.json")
+            .Build();
+
+        var services = new ServiceCollection();
+
+        // <snippet:guide-configure-from-configuration>
+        // One policy per child of the section, each named by its key. Values reload; the roster is
+        // read once, because a name that appears in the file after the container is built has
+        // nothing to be injected into.
+        services.AddResilience(configuration.GetSection("Resilience"));
+
+        services.AddHttpClient("orders").AddResilience("api");
+
+        // </snippet:guide-configure-from-configuration>
+
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
+
+        Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
+        Assert.NotNull(provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders"));
+    }
+
+    private sealed record Order(string Id, string Status);
 
     // <snippet:guide-protect-a-dependency>
     public sealed class Dependencies
@@ -88,48 +133,6 @@ public sealed class Guides
             Deadline = TimeSpan.FromSeconds(8),
         };
     }
+
     // </snippet:guide-protect-a-dependency>
-
-    [Fact]
-    public void A_health_endpoint_reads_the_breaker()
-    {
-        var dependencies = new Dependencies();
-
-        // <snippet:guide-health-endpoint>
-        // A breaker is an object with a name and a state, so an operator can be told about it.
-        var report = dependencies.Payments.State switch
-        {
-            BreakerState.Closed => "healthy",
-            BreakerState.HalfOpen => "recovering",
-            BreakerState.Isolated => "isolated by an operator",
-            _ => $"open since {dependencies.Payments.OpenedAt:O}",
-        };
-        // </snippet:guide-health-endpoint>
-
-        Assert.Equal("healthy", report);
-    }
-
-    [Fact]
-    public void Configure_from_appsettings_end_to_end()
-    {
-        var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.resilience.json")
-            .Build();
-        var services = new ServiceCollection();
-
-        // <snippet:guide-configure-from-configuration>
-        // One policy per child of the section, each named by its key. Values reload; the roster is
-        // read once, because a name that appears in the file after the container is built has
-        // nothing to be injected into.
-        services.AddResilience(configuration.GetSection("Resilience"));
-
-        services.AddHttpClient("orders").AddResilience("api");
-        // </snippet:guide-configure-from-configuration>
-
-        using var provider = services.BuildServiceProvider();
-        var policies = provider.GetRequiredService<IResiliencePolicies>();
-
-        Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
-        Assert.NotNull(provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders"));
-    }
 }

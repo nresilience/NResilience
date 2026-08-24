@@ -10,6 +10,7 @@ public sealed class HttpDocs
     public async Task A_client_with_the_handler_in_front_of_it()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Status(HttpStatusCode.OK));
@@ -17,6 +18,7 @@ public sealed class HttpDocs
         using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
+
         using var retried = await client.GetAsync(
             new Uri("https://api.example.com/orders/1"), cancellationToken);
 
@@ -36,6 +38,7 @@ public sealed class HttpDocs
 
         return response.StatusCode;
     }
+
     // </snippet:http-create-client>
 
     [Fact]
@@ -46,12 +49,13 @@ public sealed class HttpDocs
             Resilience.Http with { Attempts = 4 },
             new HttpResilienceOptions
             {
-                RetryUnsafeMethods = false,   // POST and PATCH are not retried. The default.
-                OwnTransportTimeout = true,   // HttpClient.Timeout stops competing with the deadline.
-                BreakerPerHost = true,        // a dead host does not trip calls to the healthy ones
+                RetryUnsafeMethods = false, // POST and PATCH are not retried. The default.
+                OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
+                BreakerPerHost = true, // a dead host does not trip calls to the healthy ones
                 BudgetPerHost = true,
                 DetectNestedRetries = true,
             });
+
         // </snippet:http-options>
 
         Assert.Equal(Timeout.InfiniteTimeSpan, client.Timeout);
@@ -61,12 +65,15 @@ public sealed class HttpDocs
     public async Task A_post_carrying_an_idempotency_key_can_opt_in()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Status(HttpStatusCode.OK));
+
         using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
+
         var key = Guid.NewGuid().ToString();
         HttpContent body = new StringContent("{}");
 
@@ -78,6 +85,7 @@ public sealed class HttpDocs
         request.Options.Set(ResilienceHttp.Repeatable, true);
 
         using var response = await client.SendAsync(request, cancellationToken);
+
         // </snippet:http-repeatable>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -98,6 +106,7 @@ public sealed class HttpDocs
         {
             Console.WriteLine($"{host}: {breaker.State} since {breaker.OpenedAt:O}");
         }
+
         // </snippet:http-per-host>
 
         Assert.Empty(breakers);
@@ -113,8 +122,9 @@ public sealed class HttpDocs
         using var get = new HttpRequestMessage(HttpMethod.Get, "https://api.example.com/orders/1");
         using var post = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders");
 
-        Console.WriteLine(handler.WillRetry(get));    // True
-        Console.WriteLine(handler.WillRetry(post));   // False
+        Console.WriteLine(handler.WillRetry(get)); // True
+        Console.WriteLine(handler.WillRetry(post)); // False
+
         // </snippet:http-will-retry>
 
         Assert.True(handler.WillRetry(get));

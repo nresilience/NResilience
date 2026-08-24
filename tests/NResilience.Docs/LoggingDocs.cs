@@ -58,7 +58,9 @@ public sealed class LoggingDocs
 
         // "Off" attaches no listener at all, so it costs nothing rather than costing a suppressed
         // call. Telemetry is unaffected, which is why OnEvent is still not null.
-        Assert.Contains("logging Verbose", provider.Collector.GetSnapshot().First(r => r.Id.Id == 1020).Message, StringComparison.Ordinal);
+        Assert.Contains("logging Verbose", provider.Collector.GetSnapshot().First(r => r.Id.Id == 1020).Message,
+            StringComparison.Ordinal);
+
         Assert.NotNull(policies["reports"].OnEvent);
     }
 
@@ -72,6 +74,7 @@ public sealed class LoggingDocs
         // A policy registered in a container logs for you. A policy in a static field does not -
         // this says it, and the logger's category is what a filter matches.
         var payments = (Resilience.Http with { Name = "payments" }).WithLogging(logger);
+
         // </snippet:logging-hand-built>
 
         Assert.Equal(1, await payments.RunAsync(_ => Task.FromResult(1), cancellationToken));
@@ -87,6 +90,7 @@ public sealed class LoggingDocs
 
         var payments = (Resilience.Http with { Name = "payments" })
             .WithLogging(factory.CreateLogger(ResilienceLogging.CategoryFor("payments")));
+
         // </snippet:logging-console>
 
         Assert.NotNull(payments.OnEvent);
@@ -106,6 +110,7 @@ public sealed class LoggingDocs
             {
                 Level = (id, _) => id.Id == 1013 ? LogLevel.Critical : null,
             });
+
         // </snippet:logging-level>
 
         Assert.NotNull(payments.OnEvent);
@@ -122,6 +127,7 @@ public sealed class LoggingDocs
         // handler already starts one span per logical operation.
         services.AddLogging(b => b.Configure(o => o.ActivityTrackingOptions =
             ActivityTrackingOptions.TraceId | ActivityTrackingOptions.SpanId));
+
         // </snippet:logging-correlation>
 
         services.AddResilience("payments", Resilience.Http);
@@ -137,6 +143,7 @@ public sealed class LoggingDocs
 
         // <snippet:logging-assert>
         var logger = new FakeLogger();
+
         var payments = (Resilience.Http with { Name = "payments", Backoff = Backoff.None })
             .WithLogging(logger);
 
@@ -144,6 +151,7 @@ public sealed class LoggingDocs
 
         // 1005 is "succeeded on attempt N". Every ID is tabled in docs/reference/events.md.
         Assert.Contains(1005, logger.Collector.GetSnapshot().Select(record => record.Id.Id));
+
         // </snippet:logging-assert>
     }
 }

@@ -18,6 +18,7 @@ public sealed class Features
         var api = Resilience.Default with { Attempts = 3 };
 
         var value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+
         // </snippet:retry-attempts>
 
         Assert.Equal(42, value);
@@ -30,12 +31,18 @@ public sealed class Features
         // <snippet:retry-backoff-tuning>
         var api = Resilience.Http with
         {
+            // snippet-show: Backoff = Backoff.Exponential(
+            // snippet-show:     transientBase: TimeSpan.FromMilliseconds(200),   // the first delay after a transient failure
+            // snippet-show:     throttledBase: TimeSpan.FromSeconds(2),          // the first delay after being throttled
+            // snippet-show:     factor: 2,                                       // doubling
+            // snippet-show:     max: TimeSpan.FromSeconds(10)),                  // the cap on any single delay
             Backoff = Backoff.Exponential(
-                transientBase: TimeSpan.FromMilliseconds(200),   // the first delay after a transient failure
-                throttledBase: TimeSpan.FromSeconds(2),          // the first delay after being throttled
-                factor: 2,                                       // doubling
-                max: TimeSpan.FromSeconds(10)),                  // the cap on any single delay
+                TimeSpan.FromMilliseconds(200), // the first delay after a transient failure
+                TimeSpan.FromSeconds(2), // the first delay after being throttled
+                2, // doubling
+                TimeSpan.FromSeconds(10)), // the cap on any single delay
         };
+
         // </snippet:retry-backoff-tuning>
 
         Assert.Equal(TimeSpan.FromSeconds(10), api.Backoff.Max);
@@ -51,6 +58,7 @@ public sealed class Features
         {
             Backoff = Backoff.Default with { Jitter = Jitter.None },
         };
+
         // </snippet:retry-jitter>
 
         Assert.Equal(Jitter.None, deterministic.Backoff.Jitter);
@@ -69,6 +77,7 @@ public sealed class Features
                 ? TimeSpan.FromSeconds(5)
                 : TimeSpan.FromMilliseconds(50 * next.Number)),
         };
+
         // </snippet:retry-custom-backoff>
 
         Assert.Equal(7, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
@@ -88,6 +97,7 @@ public sealed class Features
             // rebuild a request, because a retry re-invokes the callback from the top.
             BeforeAttempt = next => tokens.RefreshAsync(next.CancellationToken),
         };
+
         // </snippet:retry-before-attempt>
 
         await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
@@ -102,8 +112,8 @@ public sealed class Features
         // <snippet:deadline-effective>
         var api = Resilience.Default with
         {
-            Deadline = TimeSpan.FromSeconds(10),        // the whole call
-            AttemptTimeout = TimeSpan.FromSeconds(3),   // one attempt
+            Deadline = TimeSpan.FromSeconds(10), // the whole call
+            AttemptTimeout = TimeSpan.FromSeconds(3), // one attempt
         };
 
         // Attempt 1 gets 3 s. An attempt starting with 2 s left on the deadline gets 2 s, not 3 -
@@ -149,6 +159,7 @@ public sealed class Features
         {
             Console.WriteLine($"one attempt overran: {attempt.Message}");
         }
+
         // </snippet:deadline-handle-exception>
 
         Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
@@ -169,6 +180,7 @@ public sealed class Features
             Classify = Classifier.Default.On<MyDbException>(Verdict.Transient),
             Backoff = Backoff.None,
         };
+
         // </snippet:classifier-custom-exception>
 
         Assert.Equal(1, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
@@ -178,6 +190,7 @@ public sealed class Features
     public async Task A_result_rule_classifies_what_a_call_returned()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+
         var calls = Sequence.For<Reply>()
             .Returns(new Reply("BUSY"))
             .Returns(new Reply("OK"));
@@ -194,6 +207,7 @@ public sealed class Features
                 _ => Verdict.Permanent,
             }),
         };
+
         // </snippet:classifier-result-rule>
 
         var reply = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
@@ -206,6 +220,7 @@ public sealed class Features
         // <snippet:classifier-print>
         // "What will this actually retry?" without reading the library's source.
         Console.WriteLine(Classifier.Http);
+
         // </snippet:classifier-print>
 
         Assert.Contains("HttpResponseMessage", Classifier.Http.ToString(), StringComparison.Ordinal);
@@ -218,9 +233,10 @@ public sealed class Features
         // <snippet:classifier-http-table>
         var http = Classifier.Http;
 
-        var throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));  // Throttled
-        var transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway));       // Transient
-        var answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound));            // Ok - a 404 is an answer
+        var throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests)); // Throttled
+        var transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway)); // Transient
+        var answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound)); // Ok - a 404 is an answer
+
         // </snippet:classifier-http-table>
 
         Assert.Equal(VerdictKind.Throttled, throttled.Kind);

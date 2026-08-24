@@ -1,17 +1,19 @@
 using System.Globalization;
+using System.Runtime;
+using System.Runtime.InteropServices;
 using System.Text;
+using Microsoft.Extensions.Time.Testing;
 using NResilience.Probes;
 using Xunit;
 
 namespace NResilience.Gates;
 
 /// <summary>
-/// Not a gate. This prints the full measurement table so the checked-in allocation budgets are
-/// produced by a command anyone can re-run, rather than transcribed from a session that no
-/// longer exists.
-///
-/// Run it with:
-///   dotnet test tests/NResilience.Gates -f net10.0 --filter FullyQualifiedName~BaselineReport -l "console;verbosity=detailed"
+///     Not a gate. This prints the full measurement table so the checked-in allocation budgets are
+///     produced by a command anyone can re-run, rather than transcribed from a session that no
+///     longer exists.
+///     Run it with:
+///     dotnet test tests/NResilience.Gates -f net10.0 --filter FullyQualifiedName~BaselineReport -l "console;verbosity=detailed"
 /// </summary>
 [Collection(BaselineCollection.Name)]
 public sealed class BaselineReportTests(ITestOutputHelper output)
@@ -22,13 +24,13 @@ public sealed class BaselineReportTests(ITestOutputHelper output)
         var report = new StringBuilder();
         report.Append(CultureInfo.InvariantCulture, $"runtime            : {Environment.Version}");
         report.AppendLine();
-        report.Append(CultureInfo.InvariantCulture, $"framework          : {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
+        report.Append(CultureInfo.InvariantCulture, $"framework          : {RuntimeInformation.FrameworkDescription}");
         report.AppendLine();
-        report.Append(CultureInfo.InvariantCulture, $"architecture       : {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
+        report.Append(CultureInfo.InvariantCulture, $"architecture       : {RuntimeInformation.ProcessArchitecture}");
         report.AppendLine();
-        report.Append(CultureInfo.InvariantCulture, $"server GC          : {System.Runtime.GCSettings.IsServerGC}");
+        report.Append(CultureInfo.InvariantCulture, $"server GC          : {GCSettings.IsServerGC}");
         report.AppendLine();
-        report.Append(CultureInfo.InvariantCulture, $"latency mode       : {System.Runtime.GCSettings.LatencyMode}");
+        report.Append(CultureInfo.InvariantCulture, $"latency mode       : {GCSettings.LatencyMode}");
         report.AppendLine();
 
         await AppendAsync(report, "SUSPENDING PATH (process-wide counter)", Arms.Suspending());
@@ -39,7 +41,10 @@ public sealed class BaselineReportTests(ITestOutputHelper output)
         report.AppendLine("TIMEPROVIDER / CTS BEHAVIOR");
         report.Append(CultureInfo.InvariantCulture, $"  TryReset, system provider      : {CtsFacts.TryResetWithSystemProvider()}");
         report.AppendLine();
-        report.Append(CultureInfo.InvariantCulture, $"  TryReset, custom provider      : {CtsFacts.TryResetWithCustomProvider(new Microsoft.Extensions.Time.Testing.FakeTimeProvider())}");
+
+        report.Append(CultureInfo.InvariantCulture,
+            $"  TryReset, custom provider      : {CtsFacts.TryResetWithCustomProvider(new FakeTimeProvider())}");
+
         report.AppendLine();
         report.Append(CultureInfo.InvariantCulture, $"  TryReset, after cancellation   : {CtsFacts.TryResetAfterCancellation()}");
         report.AppendLine();
@@ -53,6 +58,7 @@ public sealed class BaselineReportTests(ITestOutputHelper output)
 
         report.AppendLine();
         report.AppendLine(title);
+
         foreach (var arm in arms)
         {
             var m = results[arm.Name];

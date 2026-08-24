@@ -7,14 +7,13 @@ namespace NResilience.Docs;
 /// <summary>Quick start and key concepts: the on-ramp pages.</summary>
 public sealed class GettingStarted
 {
-    private sealed record User(string Name);
-
     // <snippet:quick-start-http-client>
     // One client for the application's lifetime, with the policy already inside it.
     private static readonly HttpClient Client = ResilienceHttp.CreateClient();
 
     private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
         await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
+
     // </snippet:quick-start-http-client>
 
     [Fact]
@@ -23,6 +22,7 @@ public sealed class GettingStarted
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Json(new User("ada")));
+
         using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
@@ -45,6 +45,7 @@ public sealed class GettingStarted
         var api = Resilience.Default;
 
         var name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
+
         // </snippet:quick-start-run-any-call>
 
         Assert.Equal("ada", name);
@@ -63,9 +64,10 @@ public sealed class GettingStarted
         if (!result.TryGetValue(out var user))
         {
             // Why it stopped, and everything that happened on the way.
-            Console.WriteLine(result.StopReason);   // AttemptsExhausted
-            Console.WriteLine(result.Attempts);     // 2 attempts over 1.2ms: Transient IOException (0.6ms), ...
+            Console.WriteLine(result.StopReason); // AttemptsExhausted
+            Console.WriteLine(result.Attempts); // 2 attempts over 1.2ms: Transient IOException (0.6ms), ...
         }
+
         // </snippet:quick-start-outcome>
 
         Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
@@ -76,12 +78,13 @@ public sealed class GettingStarted
     public void A_policy_is_a_value()
     {
         // <snippet:key-concepts-policy-value>
-        var api = Resilience.Http;                              // a preset
-        var patient = api with { Deadline = TimeSpan.FromMinutes(1) };  // a variant
-        var once = patient with { Attempts = 1 };               // a variant of the variant
+        var api = Resilience.Http; // a preset
+        var patient = api with { Deadline = TimeSpan.FromMinutes(1) }; // a variant
+        var once = patient with { Attempts = 1 }; // a variant of the variant
 
-        Console.WriteLine(api == Resilience.Http);              // True - it is a value
-        Console.WriteLine(once.Deadline);                       // 00:01:00 - `with` copies the rest
+        Console.WriteLine(api == Resilience.Http); // True - it is a value
+        Console.WriteLine(once.Deadline); // 00:01:00 - `with` copies the rest
+
         // </snippet:key-concepts-policy-value>
 
         Assert.True(api == Resilience.Http);
@@ -95,9 +98,10 @@ public sealed class GettingStarted
         // <snippet:key-concepts-two-bounds>
         var api = Resilience.Http with
         {
-            Deadline = TimeSpan.FromSeconds(10),        // the whole call, retries and backoff included
-            AttemptTimeout = TimeSpan.FromSeconds(3),   // one attempt, capped by whatever is left of the deadline
+            Deadline = TimeSpan.FromSeconds(10), // the whole call, retries and backoff included
+            AttemptTimeout = TimeSpan.FromSeconds(3), // one attempt, capped by whatever is left of the deadline
         };
+
         // </snippet:key-concepts-two-bounds>
 
         Assert.Equal(TimeSpan.FromSeconds(10), api.Deadline);
@@ -109,11 +113,12 @@ public sealed class GettingStarted
     {
         // <snippet:key-concepts-verdicts>
         var classify = Classifier.Http
-            .On<MyTransportException>(Verdict.Transient)                  // retried, short curve
+            .On<MyTransportException>(Verdict.Transient) // retried, short curve
             .On<MyQuotaException>(ex => Verdict.Throttled(ex.RetryAfter)) // retried, long curve or the server's own delay
-            .On<MyValidationException>(Verdict.Permanent);                // never retried
+            .On<MyValidationException>(Verdict.Permanent); // never retried
 
         var api = Resilience.Http with { Classify = classify };
+
         // </snippet:key-concepts-verdicts>
 
         Assert.Equal(VerdictKind.Transient, api.Classify.ClassifyException(new MyTransportException()).Kind);
@@ -123,6 +128,8 @@ public sealed class GettingStarted
 
     private static Task<User> FetchAsync(CancellationToken cancellationToken) =>
         Task.FromException<User>(new IOException("the socket went away"));
+
+    private sealed record User(string Name);
 
     private sealed class MyTransportException : Exception;
 
@@ -149,4 +156,5 @@ public static class Policies
         AttemptTimeout = TimeSpan.FromMilliseconds(250),
     };
 }
+
 // </snippet:quick-start-house-policy>

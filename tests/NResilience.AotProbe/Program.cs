@@ -1,7 +1,9 @@
 using System.Diagnostics.Metrics;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Net;
+using System.Runtime;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
@@ -14,23 +16,21 @@ using NResilience.Testing;
 namespace NResilience.AotProbe;
 
 /// <summary>
-/// The Native AOT gate: a published binary that actually executes a policy and asserts the
-/// result, then re-runs the allocation budgets under AOT.
-///
-/// Publishing without warnings proves the code is AOT-clean. It does not prove there is no AOT
-/// allocation cliff, and that is the claim worth defending - Polly boxes state per layer per
-/// execution under Native AOT, so its zero-allocation claim is false there. A gate that only
-/// checked for warnings would never have caught that.
-///
-/// Exit code 0 means every budget held. Anything else fails the build.
+///     The Native AOT gate: a published binary that actually executes a policy and asserts the
+///     result, then re-runs the allocation budgets under AOT.
+///     Publishing without warnings proves the code is AOT-clean. It does not prove there is no AOT
+///     allocation cliff, and that is the claim worth defending - Polly boxes state per layer per
+///     execution under Native AOT, so its zero-allocation claim is false there. A gate that only
+///     checked for warnings would never have caught that.
+///     Exit code 0 means every budget held. Anything else fails the build.
 /// </summary>
 internal static class Program
 {
     private static async Task<int> Main()
     {
-        Log($"framework    : {System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription}");
-        Log($"architecture : {System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture}");
-        Log($"server GC    : {System.Runtime.GCSettings.IsServerGC}");
+        Log($"framework    : {RuntimeInformation.FrameworkDescription}");
+        Log($"architecture : {RuntimeInformation.ProcessArchitecture}");
+        Log($"server GC    : {GCSettings.IsServerGC}");
         Console.WriteLine();
 
         var failures = 0;
@@ -55,15 +55,16 @@ internal static class Program
         var value = await executor.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("suspending call returns the callback's value", value == Gate.Value);
 
-        value = await executor.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0).ConfigureAwait(false);
+        value = await executor.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0).ConfigureAwait(false);
         failures += Check("stateful overload returns the callback's value", value == Gate.Value);
 
-        var counter = new Gate.FailCounter(failures: 2);
+        var counter = new Gate.FailCounter(2);
         value = await executor.RunAsync(Gate.SuspendThenFailAsync, counter).ConfigureAwait(false);
         failures += Check("two transient failures are retried to success", value == Gate.Value);
 
         var permanent = new FusedExecutor(FusedPolicy.NoTimeout with { Attempts = 3 });
         var threw = false;
+
         try
         {
             await permanent.RunAsync(static _ => Task.FromException<int>(new InvalidOperationException("permanent"))).ConfigureAwait(false);
@@ -78,6 +79,7 @@ internal static class Program
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync().ConfigureAwait(false);
         var cancelledCorrectly = false;
+
         try
         {
             await executor.RunAsync(Gate.SuspendAsync, cancelled.Token).ConfigureAwait(false);
@@ -93,13 +95,12 @@ internal static class Program
     }
 
     /// <summary>
-    /// The shipping library, published Native AOT.
-    ///
-    /// "No reflection anywhere in core" is a claim, and the only thing that can check it is a
-    /// trimmed, AOT-compiled binary running the real executor. Publishing with the trim and AOT
-    /// analyzers on and warnings as errors proves the code is clean; running it proves the
-    /// per-result-type judge cache and the generic-struct invoker survive whole-program
-    /// compilation, which is where an implementation that reached for reflection would break.
+    ///     The shipping library, published Native AOT.
+    ///     "No reflection anywhere in core" is a claim, and the only thing that can check it is a
+    ///     trimmed, AOT-compiled binary running the real executor. Publishing with the trim and AOT
+    ///     analyzers on and warnings as errors proves the code is clean; running it proves the
+    ///     per-result-type judge cache and the generic-struct invoker survive whole-program
+    ///     compilation, which is where an implementation that reached for reflection would break.
     /// </summary>
     private static async Task<int> ShippingLibraryAsync()
     {
@@ -109,15 +110,16 @@ internal static class Program
         var value = await Resilience.Default.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("library: a suspending call returns the callback's value", value == Gate.Value);
 
-        value = await Resilience.Default.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0).ConfigureAwait(false);
+        value = await Resilience.Default.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0).ConfigureAwait(false);
         failures += Check("library: the stateful overload returns the callback's value", value == Gate.Value);
 
         var instant = Resilience.Default with { Backoff = Backoff.None, Attempts = 3 };
-        var counter = new Gate.FailCounter(failures: 2);
+        var counter = new Gate.FailCounter(2);
         value = await instant.RunAsync(Gate.SuspendThenFailAsync, counter).ConfigureAwait(false);
         failures += Check("library: two transient failures are retried to success", value == Gate.Value);
 
         var threw = false;
+
         try
         {
             await instant.RunAsync(static _ => Task.FromException<int>(new InvalidOperationException("permanent"))).ConfigureAwait(false);
@@ -145,6 +147,7 @@ internal static class Program
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync().ConfigureAwait(false);
         var cancelledCorrectly = false;
+
         try
         {
             await Resilience.Default.RunAsync(Gate.SuspendAsync, cancelled.Token).ConfigureAwait(false);
@@ -165,10 +168,10 @@ internal static class Program
     }
 
     /// <summary>
-    /// The HTTP handler under AOT. It ships, so it is published and run rather than merely
-    /// compiled - and the request clone is the part worth running, because building a fresh
-    /// message and copying its headers is the closest the library gets to the kind of dynamic work
-    /// whole-program compilation is entitled to break.
+    ///     The HTTP handler under AOT. It ships, so it is published and run rather than merely
+    ///     compiled - and the request clone is the part worth running, because building a fresh
+    ///     message and copying its headers is the closest the library gets to the kind of dynamic work
+    ///     whole-program compilation is entitled to break.
     /// </summary>
     private static async Task<int> HttpPackageAsync()
     {
@@ -192,6 +195,7 @@ internal static class Program
         {
             Content = new StringContent("body"),
         };
+
         request.Headers.Add("X-Trace", "abc");
 
         using var response = await client.SendAsync(request).ConfigureAwait(false);
@@ -201,6 +205,7 @@ internal static class Program
         failures += Check("http: the clone carried the headers and the body", transport.LastTrace == "abc" && transport.LastBody == "body");
         failures += Check("http: the breaker was scoped to the host", handler.BreakersByHost().ContainsKey("api.invalid"));
         failures += Check("http: the nested-retry header was stamped", transport.LastStamped);
+
         failures += Check(
             "http: the events came back in order",
             events.Kinds is [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded]);
@@ -209,8 +214,8 @@ internal static class Program
     }
 
     /// <summary>
-    /// The testing package under AOT. It ships, so it is gated like everything else that
-    /// ships: a scripted sequence driving a real policy, and a recorder reading the events back.
+    ///     The testing package under AOT. It ships, so it is gated like everything else that
+    ///     ships: a scripted sequence driving a real policy, and a recorder reading the events back.
     /// </summary>
     private static async Task<int> TestingPackageAsync()
     {
@@ -228,9 +233,11 @@ internal static class Program
 
         failures += Check("testing: a scripted sequence retries to success", result.IsSuccess && result.Value == Gate.Value);
         failures += Check("testing: the sequence served every scripted step", calls.CallCount == 2 && calls.Remaining == 0);
+
         failures += Check(
             "testing: the recorder captured the whole event sequence",
             events.Kinds is [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded]);
+
         failures += Check(
             "testing: the recorder reads the boxed result back",
             Equals(events.Single(CallEventKind.Succeeded).Result, Gate.Value));
@@ -239,11 +246,11 @@ internal static class Program
     }
 
     /// <summary>
-    /// Telemetry under AOT. The one thing here that whole-program compilation could plausibly break
-    /// is the boxed result on <see cref="CallEvent.Result"/>: it is the only place the executor
-    /// converts a generic <c>T</c> to <see cref="object"/>, and the <c>typeof(T)</c> test that
-    /// keeps the void entry points from handing out a box of an internal type is folded by the
-    /// compiler rather than evaluated.
+    ///     Telemetry under AOT. The one thing here that whole-program compilation could plausibly break
+    ///     is the boxed result on <see cref="CallEvent.Result" />: it is the only place the executor
+    ///     converts a generic <c>T</c> to <see cref="object" />, and the <c>typeof(T)</c> test that
+    ///     keeps the void entry points from handing out a box of an internal type is folded by the
+    ///     compiler rather than evaluated.
     /// </summary>
     private static async Task<int> TelemetryAsync()
     {
@@ -270,6 +277,7 @@ internal static class Program
 
         failures += Check("library: a successful call raises Attempt then Succeeded under AOT",
             value == 41 && kinds is [CallEventKind.Attempt, CallEventKind.Succeeded]);
+
         failures += Check("library: the boxed result survives AOT", results is [41, 41]);
 
         kinds.Clear();
@@ -285,10 +293,10 @@ internal static class Program
     }
 
     /// <summary>
-    /// The breaker and budget guards under AOT. Both hold mutable state behind a lock and both feed the
-    /// executor's rejection path, so what this checks is that the state machine and the guarded
-    /// rejection survive whole-program compilation - including <c>Task.Delay</c> on a
-    /// <see cref="TimeProvider"/>, which the guard uses and which nothing else in the probe does.
+    ///     The breaker and budget guards under AOT. Both hold mutable state behind a lock and both feed the
+    ///     executor's rejection path, so what this checks is that the state machine and the guarded
+    ///     rejection survive whole-program compilation - including <c>Task.Delay</c> on a
+    ///     <see cref="TimeProvider" />, which the guard uses and which nothing else in the probe does.
     /// </summary>
     private static async Task<int> GuardsAsync()
     {
@@ -305,8 +313,8 @@ internal static class Program
         var guarded = instant with { Breaker = breaker, Attempts = 2, Budget = RetryBudget.None };
 
         var ran = false;
-        var tripped = await guarded.TryRunAsync(
-            static _ => Task.FromException<int>(new IOException("aot")))
+
+        var tripped = await guarded.TryRunAsync(static _ => Task.FromException<int>(new IOException("aot")))
             .ConfigureAwait(false);
 
         failures += Check("library: two transient attempts open the breaker", breaker.State == BreakerState.Open);
@@ -320,6 +328,7 @@ internal static class Program
         }).ConfigureAwait(false);
 
         failures += Check("library: an open breaker refuses the call without running it", !ran);
+
         failures += Check(
             "library: a refusal reports DependencyUnavailable",
             refused.StopReason == StopReason.DependencyUnavailable && refused.Exception is CallRejectedException);
@@ -329,9 +338,10 @@ internal static class Program
 
         // A quarter of a token per success and no floor, so the bucket funds exactly one retry and
         // the operation after it is refused at the throttle step rather than at admission.
-        var metered = instant with { Attempts = 3, Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0) };
+        var metered = instant with { Attempts = 3, Budget = RetryBudget.Of(0.25, 0) };
 
         await metered.TryRunAsync(static _ => Task.FromException<int>(new IOException("aot"))).ConfigureAwait(false);
+
         var throttled = await metered
             .TryRunAsync(static _ => Task.FromException<int>(new IOException("aot")))
             .ConfigureAwait(false);
@@ -344,23 +354,22 @@ internal static class Program
     }
 
     /// <summary>
-    /// The same budgets the JIT gate enforces, against the same shipping executor. The stand-in
-    /// arms stay in the correctness section above, where what they prove is that the harness
-    /// itself survives AOT.
-    ///
-    /// The numbers are duplicated here rather than shared, because this project must not reference
-    /// the test project, and because an AOT-specific divergence is exactly what this gate exists to
-    /// surface.
+    ///     The same budgets the JIT gate enforces, against the same shipping executor. The stand-in
+    ///     arms stay in the correctness section above, where what they prove is that the harness
+    ///     itself survives AOT.
+    ///     The numbers are duplicated here rather than shared, because this project must not reference
+    ///     the test project, and because an AOT-specific divergence is exactly what this gate exists to
+    ///     surface.
     /// </summary>
     /// <summary>
-    /// The DI, configuration and telemetry surface, in the published binary.
-    /// <para>
-    /// This is the surface most entitled to break under whole-program compilation, because
-    /// configuration binding is reflection by default and a container resolves types by
-    /// <c>Type</c>. The binding source generator is what makes it trim-safe, and a generator that
-    /// silently declined to run would show up here as a policy full of defaults rather than as a
-    /// build warning - which is why the assertion is on the projected values.
-    /// </para>
+    ///     The DI, configuration and telemetry surface, in the published binary.
+    ///     <para>
+    ///         This is the surface most entitled to break under whole-program compilation, because
+    ///         configuration binding is reflection by default and a container resolves types by
+    ///         <c>Type</c>. The binding source generator is what makes it trim-safe, and a generator that
+    ///         silently declined to run would show up here as a policy full of defaults rather than as a
+    ///         build warning - which is why the assertion is on the projected values.
+    ///     </para>
     /// </summary>
     private static async Task<int> ExtensionsAsync()
     {
@@ -405,6 +414,7 @@ internal static class Program
         // profile the section asked for.
         failures += Check("the log listener records under AOT", records.Contains(1004));
         failures += Check("the effective policy is recorded under AOT", records.Contains(1020));
+
         failures += Check(
             "the log category is the policy's own",
             records.Categories.Contains(ResilienceLogging.CategoryFor("api")));
@@ -412,14 +422,13 @@ internal static class Program
         // The instruments have to actually record, not merely exist: a MeterListener is the only
         // way to tell a working instrument from a silently inert one.
         long calls = 0;
+
         using var meterListener = new MeterListener
         {
             InstrumentPublished = (instrument, listener) =>
             {
                 if (instrument.Name == "nresilience.calls")
-                {
                     listener.EnableMeasurementEvents(instrument);
-                }
             },
         };
 
@@ -435,6 +444,7 @@ internal static class Program
         var clientServices = new ServiceCollection();
         clientServices.AddResilience("client", Resilience.Http with { Backoff = Backoff.None });
         clientServices.AddHttpClient("probe").AddResilience("client");
+
         clientServices.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = transport));
 
@@ -455,9 +465,9 @@ internal static class Program
     }
 
     /// <summary>
-    /// The limiter, under AOT: the options bind through the same source generator, the platform's
-    /// limiters run without reflection, and a refusal is classified by the executor rather than by a
-    /// classifier - which is what keeps it off the retry budget.
+    ///     The limiter, under AOT: the options bind through the same source generator, the platform's
+    ///     limiters run without reflection, and a refusal is classified by the executor rather than by a
+    ///     classifier - which is what keeps it off the retry budget.
     /// </summary>
     private static async Task<int> RateLimitAsync()
     {
@@ -481,6 +491,7 @@ internal static class Program
         using (await limiter.AcquireOrThrowAsync("probe").ConfigureAwait(false))
         {
             var refused = false;
+
             try
             {
                 using var _ =
@@ -497,6 +508,7 @@ internal static class Program
         // The one behavior this whole block exists for, re-checked under AOT: the refusal is
         // throttling that the retry budget is not charged for.
         var budget = RetryBudget.Of(minimumPerSecond: 1);
+
         var policy = Resilience.Default with
         {
             Attempts = 3,
@@ -507,7 +519,7 @@ internal static class Program
         };
 
         var limited = await policy
-            .TryRunAsync(static (CancellationToken _) => Task.FromException<int>(new RateLimitedException("probe")))
+            .TryRunAsync(static _ => Task.FromException<int>(new RateLimitedException("probe")))
             .ConfigureAwait(false);
 
         failures += Check("a refusal is retried to exhaustion under AOT", limited.Attempts.Count == 3);
@@ -524,15 +536,19 @@ internal static class Program
 
         // .NET 10 / .NET 8, arm64: bytes above an identical un-wrapped callback.
         const double NoiseFloor = 8;
-        const double TrivialSuspendingBudget = 368;      // measured 328 (320 before the breaker and budget)
-        const double DefaultSuspendingBudget = 448;      // measured 393 (384 before the breaker and budget)
-        const double TryRunSuspendingBudget = 640;       // measured 561 (553 before the breaker and budget)
-        const double ListenerAllowance = 72;             // measured 48: two boxed int results
+        const double TrivialSuspendingBudget = 368; // measured 328 (320 before the breaker and budget)
+        const double DefaultSuspendingBudget = 448; // measured 393 (384 before the breaker and budget)
+        const double TryRunSuspendingBudget = 640; // measured 561 (553 before the breaker and budget)
+        const double ListenerAllowance = 72; // measured 48: two boxed int results
 
         var rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
         var noneSync = await MeasureAsync("None (sync)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
-        var trivialSync = await MeasureAsync("trivial, static+state (sync)", ShippingScenarios.TrivialSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
-        var defaultSync = await MeasureAsync("Default, static+state (sync)", ShippingScenarios.DefaultSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+
+        var trivialSync = await MeasureAsync("trivial, static+state (sync)", ShippingScenarios.TrivialSyncState, AllocationCounter.ThreadLocal)
+            .ConfigureAwait(false);
+
+        var defaultSync = await MeasureAsync("Default, static+state (sync)", ShippingScenarios.DefaultSyncState, AllocationCounter.ThreadLocal)
+            .ConfigureAwait(false);
 
         failures += Check("no AOT cliff: passthrough is free on the synchronous path", noneSync - rawSync <= 0);
         failures += Check("no AOT cliff: static lambda + state is free on the synchronous path", trivialSync - rawSync <= 0);
@@ -542,17 +558,32 @@ internal static class Program
         // own token must never be handed to user code.
         failures += Check("no AOT cliff: an attempt timeout still costs exactly one linked source", defaultSync - rawSync <= 72);
 
-        var rawSuspending = await MeasureAsync("raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        var noneSuspending = await MeasureAsync("None (suspending)", ShippingScenarios.NoneSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        var trivialSuspending = await MeasureAsync("trivial (suspending)", ShippingScenarios.TrivialSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        var defaultSuspending = await MeasureAsync("Default (suspending)", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        var tryRunSuspending = await MeasureAsync("TryRunAsync, Default (suspending)", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        var listenerSuspending = await MeasureAsync("Default + listener (suspending)", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        var rawSuspending = await MeasureAsync("raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide)
+            .ConfigureAwait(false);
+
+        var noneSuspending = await MeasureAsync("None (suspending)", ShippingScenarios.NoneSuspending, AllocationCounter.ProcessWide)
+            .ConfigureAwait(false);
+
+        var trivialSuspending = await MeasureAsync("trivial (suspending)", ShippingScenarios.TrivialSuspending, AllocationCounter.ProcessWide)
+            .ConfigureAwait(false);
+
+        var defaultSuspending = await MeasureAsync("Default (suspending)", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide)
+            .ConfigureAwait(false);
+
+        var tryRunSuspending =
+            await MeasureAsync("TryRunAsync, Default (suspending)", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide)
+                .ConfigureAwait(false);
+
+        var listenerSuspending =
+            await MeasureAsync("Default + listener (suspending)", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide)
+                .ConfigureAwait(false);
 
         failures += Check("no AOT cliff: passthrough is free on the suspending path", noneSuspending - rawSuspending <= NoiseFloor);
+
         failures += Check(
             "no AOT cliff: the trivial policy stays within its suspending budget",
             trivialSuspending - rawSuspending <= TrivialSuspendingBudget + NoiseFloor);
+
         failures += Check(
             "no AOT cliff: the real loop stays within its suspending budget",
             defaultSuspending - rawSuspending <= DefaultSuspendingBudget + NoiseFloor);
@@ -593,13 +624,13 @@ internal static class Program
 
     /// <summary>An inner handler serving one status per attempt, recording what reached it.</summary>
     /// <summary>
-    /// Collects event IDs and categories. A real provider rather than a fake logger, because what is
-    /// being checked is that the generated record travels the whole way to one under AOT.
+    ///     Collects event IDs and categories. A real provider rather than a fake logger, because what is
+    ///     being checked is that the generated record travels the whole way to one under AOT.
     /// </summary>
     private sealed class RecordingLoggerProvider : ILoggerProvider
     {
-        private readonly HashSet<int> _ids = [];
         private readonly HashSet<string> _categories = new(StringComparer.Ordinal);
+        private readonly HashSet<int> _ids = [];
 
         internal IReadOnlyCollection<string> Categories
         {

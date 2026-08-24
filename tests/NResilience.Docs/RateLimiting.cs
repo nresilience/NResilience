@@ -26,6 +26,7 @@ public sealed class RateLimiting
             using var lease = await limiter.AcquireOrThrowAsync(ct);
             return await FetchAsync(ct);
         });
+
         // </snippet:limit-callback>
 
         Assert.Equal(42, value);
@@ -44,6 +45,7 @@ public sealed class RateLimiting
 
         // The bulkhead: at most 20 calls in flight at once, whatever their rate.
         using var inFlight = Limit.Concurrency(20);
+
         // </snippet:limit-shapes>
 
         Assert.NotNull(perSecond);
@@ -75,6 +77,7 @@ public sealed class RateLimiting
         // And it says where it came from. This is the bit the retry budget reads: a refusal that
         // never left the process is not charged, because retrying it costs the dependency nothing.
         Assert.True(refused.Verdict.SelfImposed);
+
         // </snippet:limit-verdict>
 
         Assert.Equal(0, budget.Utilization);
@@ -87,12 +90,13 @@ public sealed class RateLimiting
 
         // <snippet:limit-http>
         services.AddHttpClient("api")
-                .AddResilience()                              // outer: makes the attempts
-                .AddRateLimit(o =>
-                {
-                    o.PermitsPerSecond = 100;                 // one of three shapes; set exactly one
-                    o.PerHost = true;                         // the default, scoped like the breakers
-                });
+            .AddResilience() // outer: makes the attempts
+            .AddRateLimit(o =>
+            {
+                o.PermitsPerSecond = 100; // one of three shapes; set exactly one
+                o.PerHost = true; // the default, scoped like the breakers
+            });
+
         // </snippet:limit-http>
 
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
@@ -114,10 +118,10 @@ public sealed class RateLimiting
         // Handlers run in registration order, outermost first, so this puts the limiter *outside*
         // the retries - one permit for an operation that goes on to make three calls. Refused at
         // registration rather than accepted and silently wrong.
-        var error = Assert.Throws<ResilienceConfigurationException>(
-            () => services.AddHttpClient("api")
-                          .AddRateLimit(o => o.PermitsPerSecond = 100)
-                          .AddResilience());
+        var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient("api")
+            .AddRateLimit(o => o.PermitsPerSecond = 100)
+            .AddResilience());
+
         // </snippet:limit-order>
 
         Assert.Contains("AddRateLimit() before AddResilience()", error.Message, StringComparison.Ordinal);
@@ -129,8 +133,8 @@ public sealed class RateLimiting
         // <snippet:limit-validate>
         // Three different guards, and a section that asks for two of them is a section whose
         // author expected one to win. Every problem is listed at once.
-        var error = Assert.Throws<ResilienceConfigurationException>(
-            () => new RateLimitOptions { PermitsPerSecond = 100, Concurrency = 20 }.Validate());
+        var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitOptions { PermitsPerSecond = 100, Concurrency = 20 }.Validate());
+
         // </snippet:limit-validate>
 
         Assert.Single(error.Problems);

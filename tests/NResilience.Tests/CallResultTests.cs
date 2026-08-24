@@ -122,6 +122,7 @@ public sealed class CallResultTests
     public async Task The_log_records_the_delay_that_preceded_each_attempt()
     {
         var time = new FakeTimeProvider();
+
         var policy = Resilience.Default with
         {
             Time = time,
@@ -138,10 +139,9 @@ public sealed class CallResultTests
         {
             time.Advance(TimeSpan.FromSeconds(1));
             await Task.Yield();
+
             if (call.IsCompleted)
-            {
                 break;
-            }
         }
 
         var result = await call;

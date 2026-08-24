@@ -33,9 +33,7 @@ private async Task<User> ReadUserAsync(UserCache cache, CancellationToken cancel
     var result = await Resilience.Http.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
     if (result.TryGetValue(out var user))
-    {
         return user;
-    }
 
     _logger.LogWarning("Serving the cached user: {Reason} after {Attempts}", result.StopReason, result.Attempts);
     return cache.LastKnownGood;

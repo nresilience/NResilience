@@ -129,6 +129,7 @@ Use `FakeLogger` from `Microsoft.Extensions.Diagnostics.Testing` to assert on wh
 <!-- snippet: logging-assert -->
 ```csharp
 var logger = new FakeLogger();
+
 var payments = (Resilience.Http with { Name = "payments", Backoff = Backoff.None })
     .WithLogging(logger);
 

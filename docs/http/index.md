@@ -58,9 +58,9 @@ using var client = ResilienceHttp.CreateClient(
     Resilience.Http with { Attempts = 4 },
     new HttpResilienceOptions
     {
-        RetryUnsafeMethods = false,   // POST and PATCH are not retried. The default.
-        OwnTransportTimeout = true,   // HttpClient.Timeout stops competing with the deadline.
-        BreakerPerHost = true,        // a dead host does not trip calls to the healthy ones
+        RetryUnsafeMethods = false, // POST and PATCH are not retried. The default.
+        OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
+        BreakerPerHost = true, // a dead host does not trip calls to the healthy ones
         BudgetPerHost = true,
         DetectNestedRetries = true,
     });
@@ -102,8 +102,8 @@ You can use the `WillRetry` method to determine if the handler will retry a spec
 using var get = new HttpRequestMessage(HttpMethod.Get, "https://api.example.com/orders/1");
 using var post = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders");
 
-Console.WriteLine(handler.WillRetry(get));    // True
-Console.WriteLine(handler.WillRetry(post));   // False
+Console.WriteLine(handler.WillRetry(get)); // True
+Console.WriteLine(handler.WillRetry(post)); // False
 ```
 <!-- endsnippet -->
 

@@ -1,12 +1,11 @@
 using Microsoft.Extensions.Time.Testing;
-
 using NResilience.Testing;
 
 namespace NResilience.Tests;
 
 /// <summary>
-/// The recording listener. It exists so a test can assert on the ordered event sequence, which is
-/// the only assertion that catches a telemetry surface raising the right events in the wrong order.
+///     The recording listener. It exists so a test can assert on the ordered event sequence, which is
+///     the only assertion that catches a telemetry surface raising the right events in the wrong order.
 /// </summary>
 public sealed class EventRecorderTests
 {

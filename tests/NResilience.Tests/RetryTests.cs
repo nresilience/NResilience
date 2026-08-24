@@ -3,8 +3,8 @@ using Microsoft.Extensions.Time.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-/// Tests for the attempt loop: including the number of runs, stop conditions, 
-/// and outcome handling.
+///     Tests for the attempt loop: including the number of runs, stop conditions,
+///     and outcome handling.
 /// </summary>
 public sealed class RetryTests
 {
@@ -54,9 +54,7 @@ public sealed class RetryTests
         var value = await Instant.RunAsync(ct =>
         {
             if (++calls < 3)
-            {
                 throw new IOException();
-            }
 
             return Task.FromResult(42);
         });
@@ -91,6 +89,7 @@ public sealed class RetryTests
             var task = tasks.Count < 2
                 ? Task.FromException<int>(new IOException())
                 : Task.FromResult(7);
+
             tasks.Add(task);
             return task;
         });
@@ -128,6 +127,7 @@ public sealed class RetryTests
     public async Task A_result_the_classifier_calls_a_failure_is_retried_and_then_returned()
     {
         var calls = 0;
+
         var policy = Instant with
         {
             Classify = Classifier.Default.OnResult<int>(static code => code == 503 ? Verdict.Transient : Verdict.Ok),
@@ -197,9 +197,7 @@ public sealed class RetryTests
         await Instant.RunAsync(ct =>
         {
             if (++calls < 2)
-            {
                 throw new IOException();
-            }
 
             return Task.CompletedTask;
         });
@@ -221,6 +219,7 @@ public sealed class RetryTests
     public async Task BeforeAttempt_runs_before_every_attempt_including_the_first()
     {
         var seen = new List<int>();
+
         var policy = Instant with
         {
             Attempts = 3,

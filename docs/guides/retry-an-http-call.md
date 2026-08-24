@@ -25,9 +25,7 @@ private static async Task<Order?> ReadOrderAsync(HttpClient client, string id, C
         cancellationToken);
 
     if (result.TryGetValue(out var order))
-    {
         return order;
-    }
 
     // The failure, and everything that led to it, without an exception.
     Console.WriteLine($"{result.StopReason}: {result.Attempts}");

@@ -21,6 +21,7 @@ public sealed class Troubleshooting
             Backoff = Backoff.None,
             Classify = Classifier.Default.On<MyDbException>(Verdict.Transient),
         };
+
         // </snippet:troubleshoot-not-retried>
 
         Assert.Equal(1, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
@@ -38,13 +39,14 @@ public sealed class Troubleshooting
         // invents, and on Exception.Data for an original exception it rethrew unchanged.
         var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 
-        Console.WriteLine(result.StopReason);   // AttemptsExhausted
-        Console.WriteLine(result.Attempts);     // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
+        Console.WriteLine(result.StopReason); // AttemptsExhausted
+        Console.WriteLine(result.Attempts); // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
 
         foreach (var attempt in result.Attempts)
         {
             Console.WriteLine($"#{attempt.Number} {attempt.Verdict.Kind} after {attempt.DelayBefore.TotalMilliseconds}ms");
         }
+
         // </snippet:troubleshoot-attempt-log>
 
         Assert.Equal(3, result.Attempts.Count);
@@ -61,6 +63,7 @@ public sealed class Troubleshooting
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
+
         // </snippet:troubleshoot-transport-timeout>
 
         Assert.Equal(Timeout.InfiniteTimeSpan, client.Timeout);
@@ -70,16 +73,19 @@ public sealed class Troubleshooting
     public async Task A_post_is_not_retried_until_you_say_it_is_safe()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
+
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Status(HttpStatusCode.OK));
+
         using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
         // <snippet:troubleshoot-post-not-retried>
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders");
-        request.Options.Set(ResilienceHttp.Repeatable, true);   // this one carries an idempotency key
+        request.Options.Set(ResilienceHttp.Repeatable, true); // this one carries an idempotency key
+
         // </snippet:troubleshoot-post-not-retried>
 
         using var response = await client.SendAsync(request, cancellationToken);
@@ -92,17 +98,19 @@ public sealed class Troubleshooting
     {
         // This policy is invalid on purpose: the page is about the message it produces. NRES003 says the
         // same thing at build time, which is the analyzer working rather than something to fix here.
-        #pragma warning disable NRES003
+#pragma warning disable NRES003
+
         // <snippet:troubleshoot-validate>
         var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(-1) };
 
         var problem = Assert.Throws<ResilienceConfigurationException>(api.Validate);
 
         Console.WriteLine(string.Join(Environment.NewLine, problem.Problems));
+
         // Attempts must be at least 1; it is 0.
         // Deadline must be positive, or Timeout.InfiniteTimeSpan for no bound; it is -00:00:01.
         // </snippet:troubleshoot-validate>
-        #pragma warning restore NRES003
+#pragma warning restore NRES003
 
         Assert.Equal(2, problem.Problems.Count);
     }

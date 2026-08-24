@@ -4,9 +4,9 @@ using Xunit;
 namespace NResilience.Gates;
 
 /// <summary>
-/// Measures every arm once per test run. Sharing one sweep across the gate classes keeps the
-/// comparisons internally consistent - a ratio between two arms is only meaningful if both
-/// were measured in the same process, under the same GC, in the same tier state.
+///     Measures every arm once per test run. Sharing one sweep across the gate classes keeps the
+///     comparisons internally consistent - a ratio between two arms is only meaningful if both
+///     were measured in the same process, under the same GC, in the same tier state.
 /// </summary>
 public sealed class BaselineFixture : IAsyncLifetime
 {
@@ -52,6 +52,7 @@ public static class Baseline
 
     /// <summary>The same arm with the shipping log listener chained on, at a logger that carries nothing.</summary>
     public const string LibDefaultLogging = "lib: Default + listener + logging";
+
     public const string LibRetry = "lib: retry x2 -> success";
 
     public const string LibLimited = "lib: limited x2 -> success";

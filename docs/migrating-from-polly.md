@@ -61,9 +61,9 @@ var response = await pipeline.ExecuteAsync(ct => Send(ct), cancellationToken);
 // attempts whichever way you read it.
 var api = Resilience.Http with
 {
-    Attempts = 3,                                 // total, including the first
-    AttemptTimeout = TimeSpan.FromSeconds(3),      // per attempt
-    Deadline = TimeSpan.FromSeconds(10),           // the whole call
+    Attempts = 3, // total, including the first
+    AttemptTimeout = TimeSpan.FromSeconds(3), // per attempt
+    Deadline = TimeSpan.FromSeconds(10), // the whole call
     Breaker = new Breaker { Name = "api" },
 };
 ```
@@ -191,7 +191,7 @@ try
 catch (HttpRequestException e)
 {
     var attempts = AttemptLog.Of(e);
-    Console.WriteLine(attempts);   // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
+    Console.WriteLine(attempts); // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
 }
 ```
 <!-- endsnippet -->

@@ -68,8 +68,8 @@ The first attempt always runs; a budget throttles only the retries. When a budge
 // does not have to guess.
 if (result.Exception is CallRejectedException rejection)
 {
-    Console.WriteLine(rejection.Reason);      // DependencyUnavailable, or BudgetExhausted
-    Console.WriteLine(rejection.RetryAfter);  // when to come back, when there is an answer
+    Console.WriteLine(rejection.Reason); // DependencyUnavailable, or BudgetExhausted
+    Console.WriteLine(rejection.RetryAfter); // when to come back, when there is an answer
 }
 ```
 <!-- endsnippet -->
@@ -82,7 +82,7 @@ You can monitor the utilization of a budget to identify when retries are being r
 ```csharp
 // For a dashboard: a budget sitting near 1 is a client whose retries are being refused,
 // which is a symptom to alert on rather than a steady state.
-var spent = budget.Utilization;   // 0 to 1
+var spent = budget.Utilization; // 0 to 1
 ```
 <!-- endsnippet -->
 

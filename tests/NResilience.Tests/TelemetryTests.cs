@@ -4,32 +4,16 @@ using Microsoft.Extensions.Time.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-/// Tests for telemetry: including <see cref="CallEvent"/> and <see cref="Resilience.OnEvent"/>.
-/// <para>
-/// These tests verify that events accurately describe the outcome, rather than just checking 
-/// that they fire. A telemetry surface that emits events in the wrong order or reports a 
-/// <c>Retrying</c> event for a retry that never ran is misleading and therefore worse than 
-/// having no telemetry.
-/// </para>
+///     Tests for telemetry: including <see cref="CallEvent" /> and <see cref="Resilience.OnEvent" />.
+///     <para>
+///         These tests verify that events accurately describe the outcome, rather than just checking
+///         that they fire. A telemetry surface that emits events in the wrong order or reports a
+///         <c>Retrying</c> event for a retry that never ran is misleading and therefore worse than
+///         having no telemetry.
+///     </para>
 /// </summary>
 public sealed class TelemetryTests
 {
-    /// <summary>Collects call events in order. This recorder is thread-safe for listeners.</summary>
-    private sealed class Recorder
-    {
-        private readonly ConcurrentQueue<CallEvent> _events = new();
-
-        public Action<CallEvent> Listener => _events.Enqueue;
-
-        public IReadOnlyList<CallEvent> Events => [.. _events];
-
-        public IReadOnlyList<CallEventKind> Kinds => [.. _events.Select(e => e.Kind)];
-
-        public CallEvent Single(CallEventKind kind) => _events.Single(e => e.Kind == kind);
-
-        public int Count(CallEventKind kind) => _events.Count(e => e.Kind == kind);
-    }
-
     private static Resilience Instant(Recorder recorder) => Resilience.Default with
     {
         Backoff = Backoff.None,
@@ -39,8 +23,8 @@ public sealed class TelemetryTests
     };
 
     /// <summary>
-    /// Runs a call that may serve a guarded rejection, moving the fake clock until it lands. A
-    /// rejection is deliberately not instant, so a test that simply awaited it would hang.
+    ///     Runs a call that may serve a guarded rejection, moving the fake clock until it lands. A
+    ///     rejection is deliberately not instant, so a test that simply awaited it would hang.
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {
@@ -66,10 +50,10 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// A listener is the only feature that takes a policy out of passthrough. Handing back 
-    /// the callback's own task is cheaper and would raise no events, but a listener that 
-    /// never fires is a worse surprise than a policy that stops being free once 
-    /// explicitly instrumented.
+    ///     A listener is the only feature that takes a policy out of passthrough. Handing back
+    ///     the callback's own task is cheaper and would raise no events, but a listener that
+    ///     never fires is a worse surprise than a policy that stops being free once
+    ///     explicitly instrumented.
     /// </summary>
     [Fact]
     public async Task A_listener_on_the_passthrough_preset_still_hears_about_the_call()
@@ -113,13 +97,14 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Implements the design example: "log every retry with the status code that caused it". 
-    /// Because a cross-cutting listener is not generic over <c>T</c>, the value is boxed.
+    ///     Implements the design example: "log every retry with the status code that caused it".
+    ///     Because a cross-cutting listener is not generic over <c>T</c>, the value is boxed.
     /// </summary>
     [Fact]
     public async Task The_result_that_was_classified_a_failure_is_on_the_event()
     {
         var recorder = new Recorder();
+
         var policy = Instant(recorder) with
         {
             Attempts = 2,
@@ -134,8 +119,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// A void call has no result to report. The internal no-result placeholder must not 
-    /// be visible to the listener.
+    ///     A void call has no result to report. The internal no-result placeholder must not
+    ///     be visible to the listener.
     /// </summary>
     [Fact]
     public async Task A_void_call_reports_no_result_rather_than_a_placeholder()
@@ -159,6 +144,7 @@ public sealed class TelemetryTests
             ++calls < 3 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(9));
 
         Assert.Equal(9, value);
+
         Assert.Equal(
             [
                 CallEventKind.Attempt, CallEventKind.Retrying,
@@ -169,9 +155,9 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// <c>Retrying</c> is raised before the backoff is served and identifies the attempt 
-    /// that is about to run. This allows a listener to report, for example, "retrying 
-    /// attempt 2 in 500 ms".
+    ///     <c>Retrying</c> is raised before the backoff is served and identifies the attempt
+    ///     that is about to run. This allows a listener to report, for example, "retrying
+    ///     attempt 2 in 500 ms".
     /// </summary>
     [Fact]
     public async Task Retrying_carries_the_backoff_and_the_number_of_the_attempt_it_precedes()
@@ -200,10 +186,10 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Running out of attempts is a terminal state. This event ensures that every call 
-    /// ends with exactly one terminal event. A listener counting logical operations 
-    /// that skips this event would only count successful calls, which would invalidate 
-    /// the retry fraction metric.
+    ///     Running out of attempts is a terminal state. This event ensures that every call
+    ///     ends with exactly one terminal event. A listener counting logical operations
+    ///     that skips this event would only count successful calls, which would invalidate
+    ///     the retry fraction metric.
     /// </summary>
     [Fact]
     public async Task Exhausting_the_attempts_is_a_terminal_event()
@@ -224,8 +210,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Every call ends with exactly one terminal event, regardless of the path taken. 
-    /// This invariant allows a stateless listener to count logical operations.
+    ///     Every call ends with exactly one terminal event, regardless of the path taken.
+    ///     This invariant allows a stateless listener to count logical operations.
     /// </summary>
     [Theory]
     [InlineData(0, CallEventKind.Succeeded, StopReason.Succeeded)]
@@ -260,9 +246,9 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// A <see cref="CallEventKind.Rejected"/> event can cover two types of refusals: 
-    /// "the dependency is down" or "we are retrying too hard". These require opposite 
-    /// responses, and the reason field distinguishes them.
+    ///     A <see cref="CallEventKind.Rejected" /> event can cover two types of refusals:
+    ///     "the dependency is down" or "we are retrying too hard". These require opposite
+    ///     responses, and the reason field distinguishes them.
     /// </summary>
     [Fact]
     public async Task A_rejection_says_which_guard_refused_the_call()
@@ -294,8 +280,8 @@ public sealed class TelemetryTests
     // ---- Not retried ----
 
     /// <summary>
-    /// An unrecognized exception type raises a <see cref="CallEventKind.NotRetried"/> event 
-    /// that names the type, making the failure visible rather than mysterious.
+    ///     An unrecognized exception type raises a <see cref="CallEventKind.NotRetried" /> event
+    ///     that names the type, making the failure visible rather than mysterious.
     /// </summary>
     [Fact]
     public async Task An_unrecognized_exception_type_raises_NotRetried_naming_the_type()
@@ -351,6 +337,7 @@ public sealed class TelemetryTests
         var time = new FakeTimeProvider();
 
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2, Time = time });
+
         var policy = Resilience.Default with
         {
             Attempts = 2,
@@ -379,8 +366,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// The transition a call causes is reported to the policy that made the call. The breaker
-    /// itself has no listener, because a breaker is shared and a listener is per-policy.
+    ///     The transition a call causes is reported to the policy that made the call. The breaker
+    ///     itself has no listener, because a breaker is shared and a listener is per-policy.
     /// </summary>
     [Fact]
     public async Task The_probe_that_reopens_a_breaker_raises_HalfOpened_then_Opened()
@@ -494,12 +481,13 @@ public sealed class TelemetryTests
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
             Deadline = Timeout.InfiniteTimeSpan,
-            Budget = RetryBudget.Of(fraction: 0.1, minimumPerSecond: 1, time: time),
+            Budget = RetryBudget.Of(0.1, 1, time),
             Time = time,
             OnEvent = recorder.Listener,
         };
 
         var last = StopReason.Succeeded;
+
         for (var i = 0; i < 40 && last != StopReason.BudgetExhausted; i++)
         {
             last = (await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time)).StopReason;
@@ -516,9 +504,9 @@ public sealed class TelemetryTests
     // ---- Orphaned work ----
 
     /// <summary>
-    /// A callback that ignores its token continues running after the attempt timeout expires. 
-    /// Because the executor is blocked on that task, the event is reported when the work 
-    /// finally returns.
+    ///     A callback that ignores its token continues running after the attempt timeout expires.
+    ///     Because the executor is blocked on that task, the event is reported when the work
+    ///     finally returns.
     /// </summary>
     [Fact]
     public async Task Work_that_outlives_its_attempt_timeout_raises_OrphanedWork()
@@ -574,8 +562,8 @@ public sealed class TelemetryTests
     // ---- The listener itself ----
 
     /// <summary>
-    /// Telemetry that can fail the operation it observes is worse than no telemetry. 
-    /// Therefore, a listener that throws is swallowed to avoid affecting the call's outcome.
+    ///     Telemetry that can fail the operation it observes is worse than no telemetry.
+    ///     Therefore, a listener that throws is swallowed to avoid affecting the call's outcome.
     /// </summary>
     [Fact]
     public async Task A_listener_that_throws_does_not_fail_the_call()
@@ -596,8 +584,8 @@ public sealed class TelemetryTests
     }
 
     /// <summary>
-    /// Caller cancellation is neither a failure nor a retry and produces no terminal event. 
-    /// This prevents cancellation from appearing as a policy-driven decision.
+    ///     Caller cancellation is neither a failure nor a retry and produces no terminal event.
+    ///     This prevents cancellation from appearing as a policy-driven decision.
     /// </summary>
     [Fact]
     public async Task Caller_cancellation_raises_no_terminal_event()
@@ -638,5 +626,21 @@ public sealed class TelemetryTests
         Assert.Contains("[api]", text, StringComparison.Ordinal);
         Assert.Contains("Attempt #1", text, StringComparison.Ordinal);
         Assert.Contains("Ok", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>Collects call events in order. This recorder is thread-safe for listeners.</summary>
+    private sealed class Recorder
+    {
+        private readonly ConcurrentQueue<CallEvent> _events = new();
+
+        public Action<CallEvent> Listener => _events.Enqueue;
+
+        public IReadOnlyList<CallEvent> Events => [.. _events];
+
+        public IReadOnlyList<CallEventKind> Kinds => [.. _events.Select(e => e.Kind)];
+
+        public CallEvent Single(CallEventKind kind) => _events.Single(e => e.Kind == kind);
+
+        public int Count(CallEventKind kind) => _events.Count(e => e.Kind == kind);
     }
 }

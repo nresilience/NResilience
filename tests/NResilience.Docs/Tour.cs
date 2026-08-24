@@ -9,8 +9,6 @@ public sealed class Tour
 {
     private readonly ILogger _logger = NullLogger.Instance;
 
-    private sealed record User(string Name);
-
     [Fact]
     public async Task The_whole_api()
     {
@@ -28,13 +26,16 @@ public sealed class Tour
         var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
         // 3. Run any callback through one method. The token handed to your work is the attempt's own.
-        var user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
+        var user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt),
+            cancellationToken);
+
         var response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
         await slow.RunAsync(attempt => queue.FlushAsync(attempt), cancellationToken);
 
         // 4. Want the outcome without an exception? `TryRunAsync` hands it back to branch on.
         var result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
         var best = result.TryGetValue(out var fetched) ? fetched : cache.LastKnownGood;
+
         // </snippet:whole-api>
 
         response.Dispose();
@@ -60,17 +61,18 @@ public sealed class Tour
         var result = await Resilience.Http.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
         if (result.TryGetValue(out var user))
-        {
             return user;
-        }
 
         _logger.LogWarning("Serving the cached user: {Reason} after {Attempts}", result.StopReason, result.Attempts);
         return cache.LastKnownGood;
     }
+
     // </snippet:fallback-is-an-if>
 
     private static Task<User> FetchAsync(CancellationToken cancellationToken) =>
         Task.FromException<User>(new HttpRequestException("the dependency is down"));
+
+    private sealed record User(string Name);
 
     private sealed record UserCache(User LastKnownGood);
 }

@@ -3,8 +3,8 @@ using NResilience.Internal;
 namespace NResilience.Tests;
 
 /// <summary>
-/// Tests for the timeout-source pool: the previous tenant is disposed rather than leaked, and a
-/// fired source is disposed rather than returned.
+///     Tests for the timeout-source pool: the previous tenant is disposed rather than leaked, and a
+///     fired source is disposed rather than returned.
 /// </summary>
 public sealed class CtsPoolTests
 {

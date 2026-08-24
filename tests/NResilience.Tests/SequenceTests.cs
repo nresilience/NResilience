@@ -1,12 +1,11 @@
 using Microsoft.Extensions.Time.Testing;
-
 using NResilience.Testing;
 
 namespace NResilience.Tests;
 
 /// <summary>
-/// The scripted callback. What it serves, in what order, and what it does when the script and the
-/// policy disagree about how many calls there will be.
+///     The scripted callback. What it serves, in what order, and what it does when the script and the
+///     policy disagree about how many calls there will be.
 /// </summary>
 public sealed class SequenceTests
 {
@@ -107,6 +106,7 @@ public sealed class SequenceTests
     public async Task Repeated_Delays_accumulate_onto_the_next_step()
     {
         var time = new FakeTimeProvider();
+
         var calls = Sequence.For<int>(time)
             .Delays(TimeSpan.FromSeconds(2))
             .Delays(TimeSpan.FromSeconds(3))
@@ -189,8 +189,8 @@ public sealed class SequenceTests
     }
 
     /// <summary>
-    /// The snippet in the design document, kept executable: three scripted calls, two transient,
-    /// asserted on the attempt log rather than on elapsed time.
+    ///     The snippet in the design document, kept executable: three scripted calls, two transient,
+    ///     asserted on the attempt log rather than on elapsed time.
     /// </summary>
     [Fact]
     public async Task The_documented_scenario_runs_as_documented()

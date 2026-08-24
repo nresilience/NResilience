@@ -32,9 +32,10 @@ public sealed class BackoffTests
     [Fact]
     public void Full_jitter_spreads_over_the_whole_interval()
     {
-        var backoff = Backoff.Exponential(transientBase: TimeSpan.FromSeconds(1));
+        var backoff = Backoff.Exponential(TimeSpan.FromSeconds(1));
 
         var draws = new List<TimeSpan>();
+
         for (var i = 0; i < 500; i++)
         {
             draws.Add(Delay(backoff, Verdict.Transient, 2));
@@ -48,7 +49,7 @@ public sealed class BackoffTests
     [Fact]
     public void Equal_jitter_keeps_a_floor_under_the_delay()
     {
-        var backoff = Backoff.Exponential(transientBase: TimeSpan.FromSeconds(1)) with { Jitter = Jitter.Equal };
+        var backoff = Backoff.Exponential(TimeSpan.FromSeconds(1)) with { Jitter = Jitter.Equal };
 
         for (var i = 0; i < 200; i++)
         {
@@ -88,6 +89,7 @@ public sealed class BackoffTests
     public void Custom_is_handed_the_attempt_that_is_about_to_happen()
     {
         var seen = 0;
+
         var backoff = Backoff.Custom(next =>
         {
             seen = next.Number;

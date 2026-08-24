@@ -7,14 +7,16 @@ public sealed record Snippet(string Name, string Language, string Text, string S
 public sealed record Drift(string File, string Detail);
 
 /// <summary>
-/// The documentation gate: snippets live in a compiled, executing test project and are 
-/// inlined into the markdown. This ensures that no C# code in the documentation is 
-/// maintained by hand.
+///     The documentation gate: snippets live in a compiled, executing test project and are
+///     inlined into the markdown. This ensures that no C# code in the documentation is
+///     maintained by hand.
 /// </summary>
 public static class SnippetEngine
 {
     private const string OpenPrefix = "<!-- snippet:";
     private const string CloseMarker = "<!-- endsnippet -->";
+    private const string HidePrefix = "// snippet-hide";
+    private const string ShowPrefix = "// snippet-show:";
 
     /// <summary>Reads all snippets from a source tree.</summary>
     public static Dictionary<string, Snippet> Collect(string sourceRoot)
@@ -24,6 +26,7 @@ public static class SnippetEngine
         foreach (var file in SourceFiles(sourceRoot))
         {
             var extension = Path.GetExtension(file);
+
             if (extension is ".json")
             {
                 Add(snippets, new Snippet(Path.GetFileName(file), "json", File.ReadAllText(file).TrimEnd(), file));
@@ -52,10 +55,9 @@ public static class SnippetEngine
             if (!string.Equals(original, updated, StringComparison.Ordinal))
             {
                 drift.Add(new Drift(file, "the inlined snippets are out of date"));
+
                 if (write)
-                {
                     File.WriteAllText(file, updated);
-                }
             }
         }
 
@@ -74,14 +76,13 @@ public static class SnippetEngine
             output.Add(line);
 
             if (!line.TrimStart().StartsWith(OpenPrefix, StringComparison.Ordinal))
-            {
                 continue;
-            }
 
             var name = line.Trim()[OpenPrefix.Length..].TrimEnd('>', '-', ' ').Trim();
 
             // Skip whatever is currently between the markers; it is generated content.
             var end = i + 1;
+
             while (end < lines.Length && !lines[end].TrimStart().StartsWith(CloseMarker, StringComparison.Ordinal))
             {
                 end++;
@@ -129,14 +130,41 @@ public static class SnippetEngine
             if (trimmed.StartsWith("// </snippet:", StringComparison.Ordinal))
             {
                 var (name, start) = open.Pop();
-                yield return new Snippet(name, "csharp", Dedent(lines[start..i]), file);
+                yield return new Snippet(name, "csharp", Dedent(name, file, lines[start..i]), file);
             }
         }
     }
 
-    private static string Dedent(string[] body)
+    private static string Dedent(string name, string source, string[] body)
     {
-        var kept = body.Where(static line => !line.Trim().StartsWith("// snippet-hide", StringComparison.Ordinal)).ToArray();
+        // `snippet-show:` lets the source compile one way (positional args, IDE-friendly) while the
+        // inlined docs read another (named args, reader-friendly). Each directive replaces the next
+        // non-directive source line with its payload; a run of K directives replaces K source lines.
+        var show = new Queue<string>();
+        var kept = new List<string>(body.Length);
+
+        foreach (var line in body)
+        {
+            var trimmed = line.Trim();
+
+            if (trimmed.StartsWith(HidePrefix, StringComparison.Ordinal))
+                continue;
+
+            if (TryTakeShow(trimmed, out var payload))
+            {
+                show.Enqueue(payload);
+                continue;
+            }
+
+            kept.Add(show.Count > 0 ? IndentPayload(line, show.Dequeue()) : line);
+        }
+
+        if (show.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Snippet \"{name}\" in {source} has {show.Count} surplus `snippet-show:` directive(s) "
+                + "with no source line to replace.");
+        }
 
         var indent = kept
             .Where(static line => line.Trim().Length > 0)
@@ -147,6 +175,28 @@ public static class SnippetEngine
         return string.Join(
             '\n',
             kept.Select(line => line.Trim().Length == 0 ? string.Empty : line[indent..])).Trim('\n');
+    }
+
+    private static bool TryTakeShow(string trimmed, out string payload)
+    {
+        if (!trimmed.StartsWith(ShowPrefix, StringComparison.Ordinal))
+        {
+            payload = string.Empty;
+            return false;
+        }
+
+        // Everything after `// snippet-show:` is the display payload, verbatim. A single leading
+        // space is tolerated so `// snippet-show: foo` and `// snippet-show:foo` both yield `foo`.
+        payload = trimmed[ShowPrefix.Length..].TrimStart(' ');
+        return true;
+    }
+
+    private static string IndentPayload(string source, string payload)
+    {
+        // The payload inherits the source line's leading whitespace so Dedent normalises it
+        // alongside its neighbours, regardless of how the author wrote the directive.
+        var leading = source.Length - source.TrimStart().Length;
+        return (leading > 0 ? source[..leading] : string.Empty) + payload;
     }
 
     private static void Add(Dictionary<string, Snippet> snippets, Snippet snippet)

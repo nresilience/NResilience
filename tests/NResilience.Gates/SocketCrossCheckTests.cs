@@ -7,20 +7,17 @@ using Xunit;
 namespace NResilience.Gates;
 
 /// <summary>
-/// Cross-checks the <c>Task.Yield</c> gate against real I/O.
-///
-/// The gate suspends on <c>Task.Yield</c> because it needs determinism. The design's argument is
-/// about the path real I/O takes. This test runs the same arms over a loopback TCP round trip
-/// and asserts only that the two agree about the <i>ordering and rough magnitude</i> of the
-/// fused-versus-composed gap - not about the absolute bytes, which a socket cannot produce
-/// repeatably enough to gate on.
-///
-/// If this ever disagrees with the gate, the gate is measuring an artefact and the design's
-/// central number is not trustworthy. That is worth one slow test.
-///
-/// The yield gate structurally cannot see one thing - that giving the callback a <i>cancellable</i>
-/// token costs 208 B over real I/O against 65 B over <c>Task.Yield</c> - and that finding is the
-/// reason this test exists rather than being a formality.
+///     Cross-checks the <c>Task.Yield</c> gate against real I/O.
+///     The gate suspends on <c>Task.Yield</c> because it needs determinism. The design's argument is
+///     about the path real I/O takes. This test runs the same arms over a loopback TCP round trip
+///     and asserts only that the two agree about the <i>ordering and rough magnitude</i> of the
+///     fused-versus-composed gap - not about the absolute bytes, which a socket cannot produce
+///     repeatably enough to gate on.
+///     If this ever disagrees with the gate, the gate is measuring an artefact and the design's
+///     central number is not trustworthy. That is worth one slow test.
+///     The yield gate structurally cannot see one thing - that giving the callback a <i>cancellable</i>
+///     token costs 208 B over real I/O against 65 B over <c>Task.Yield</c> - and that finding is the
+///     reason this test exists rather than being a formality.
 /// </summary>
 [Collection(BaselineCollection.Name)]
 public sealed class SocketCrossCheckTests(ITestOutputHelper output)
@@ -73,14 +70,21 @@ public sealed class SocketCrossCheckTests(ITestOutputHelper output)
         var report = new StringBuilder();
         report.AppendLine("LOOPBACK SOCKET CROSS-CHECK (process-wide counter)");
         report.Append(CultureInfo.InvariantCulture, $"  {raw}").AppendLine();
-        report.Append(CultureInfo.InvariantCulture, $"  {fusedNoTimeoutResult}  (+{fusedNoTimeoutResult.BytesPerOperation - raw.BytesPerOperation:0.0} B)").AppendLine();
+
+        report.Append(CultureInfo.InvariantCulture,
+            $"  {fusedNoTimeoutResult}  (+{fusedNoTimeoutResult.BytesPerOperation - raw.BytesPerOperation:0.0} B)").AppendLine();
+
         report.Append(CultureInfo.InvariantCulture, $"  {fused}  (+{fusedOverhead:0.0} B)").AppendLine();
-        report.Append(CultureInfo.InvariantCulture, $"  cancellable-token cost at the I/O layer: {fused.BytesPerOperation - fusedNoTimeoutResult.BytesPerOperation:0.0} B/op").AppendLine();
+
+        report.Append(CultureInfo.InvariantCulture,
+            $"  cancellable-token cost at the I/O layer: {fused.BytesPerOperation - fusedNoTimeoutResult.BytesPerOperation:0.0} B/op").AppendLine();
+
         report.Append(CultureInfo.InvariantCulture, $"  {polly}  (+{pollyOverhead:0.0} B)").AppendLine();
         report.Append(CultureInfo.InvariantCulture, $"  ratio: {ratio:0.00}x").AppendLine();
         output.WriteLine(report.ToString());
 
         Assert.True(fusedOverhead > 0, "The fused executor should cost something over a raw socket round trip.");
+
         Assert.True(
             ratio >= Budgets.MinimumSocketRatioVersusPolly,
             string.Create(

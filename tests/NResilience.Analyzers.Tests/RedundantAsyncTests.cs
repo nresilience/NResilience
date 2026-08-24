@@ -26,23 +26,23 @@ public sealed class RedundantAsyncTests
     public void A_void_callback_is_the_same_rewrite()
     {
         Assert.Equal(["NRES007"], Harness.Ids(Harness.InMethod("""
-                    await api.RunAsync(async attempt =>
-                    {
-                        await Helper(attempt);
-                    }, cancellationToken);
-            """)));
+                                                                       await api.RunAsync(async attempt =>
+                                                                       {
+                                                                           await Helper(attempt);
+                                                                       }, cancellationToken);
+                                                               """)));
     }
 
     [Fact]
     public void More_than_one_statement_may_well_need_the_machine()
     {
         Assert.Equal([], Harness.Ids(Harness.InMethod("""
-                    await api.RunAsync(async attempt =>
-                    {
-                        int first = await Helper(attempt);
-                        return first + await Numbered(first, attempt);
-                    }, cancellationToken);
-            """)));
+                                                              await api.RunAsync(async attempt =>
+                                                              {
+                                                                  int first = await Helper(attempt);
+                                                                  return first + await Numbered(first, attempt);
+                                                              }, cancellationToken);
+                                                      """)));
     }
 
     [Fact]

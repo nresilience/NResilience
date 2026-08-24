@@ -4,8 +4,8 @@ using NResilience.Internal;
 namespace NResilience.Tests;
 
 /// <summary>
-/// Tests for the retry budget: the token bucket that bounds retries as a fraction of traffic, 
-/// and the scoping rules that decide the traffic's origin.
+///     Tests for the retry budget: the token bucket that bounds retries as a fraction of traffic,
+///     and the scoping rules that decide the traffic's origin.
 /// </summary>
 public sealed class BudgetTests
 {
@@ -18,8 +18,8 @@ public sealed class BudgetTests
     };
 
     /// <summary>
-    /// Runs a call that may serve a guarded rejection and moves the fake clock until it lands. 
-    /// Because a rejection is not instant, a test that simply awaited it would hang.
+    ///     Runs a call that may serve a guarded rejection and moves the fake clock until it lands.
+    ///     Because a rejection is not instant, a test that simply awaited it would hang.
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {
@@ -99,6 +99,7 @@ public sealed class BudgetTests
         time.Advance(TimeSpan.FromHours(1));
 
         var spent = 0;
+
         while (budget.TrySpend())
         {
             spent++;
@@ -113,7 +114,7 @@ public sealed class BudgetTests
         var time = new FakeTimeProvider();
 
         // No floor, so traffic is the only source of tokens, and a capacity of exactly one retry.
-        var budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0, time: time);
+        var budget = RetryBudget.Of(0.25, 0, time);
 
         Assert.True(budget.TrySpend());
         Assert.False(budget.TrySpend());
@@ -263,13 +264,15 @@ public sealed class BudgetTests
     public async Task An_exhausted_budget_refuses_the_retry_rather_than_the_call()
     {
         var time = new FakeTimeProvider();
+
         var policy = Instant(time) with
         {
             Attempts = 3,
-            Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0, time: time),
+            Budget = RetryBudget.Of(0.25, 0, time),
         };
 
         var calls = 0;
+
         Task<int> Failing(CancellationToken _)
         {
             calls++;
@@ -293,13 +296,15 @@ public sealed class BudgetTests
     public async Task A_budget_refusal_reports_itself_with_the_earlier_failure_as_its_cause()
     {
         var time = new FakeTimeProvider();
+
         var policy = Instant(time) with
         {
             Attempts = 3,
-            Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 2, time: time),
+            Budget = RetryBudget.Of(0.25, 2, time),
         };
 
         var budget = policy.Budget!;
+
         while (budget.TrySpend())
         {
         }
@@ -317,13 +322,15 @@ public sealed class BudgetTests
     public async Task The_budget_bounds_amplification_under_sustained_failure()
     {
         var time = new FakeTimeProvider();
+
         var policy = Instant(time) with
         {
             Attempts = 4,
-            Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0, time: time),
+            Budget = RetryBudget.Of(0.25, 0, time),
         };
 
         var attempts = 0;
+
         Task<int> Failing(CancellationToken _)
         {
             attempts++;
@@ -345,10 +352,11 @@ public sealed class BudgetTests
     public async Task Successful_traffic_keeps_funding_retries()
     {
         var time = new FakeTimeProvider();
+
         var policy = Instant(time) with
         {
             Attempts = 2,
-            Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0, time: time),
+            Budget = RetryBudget.Of(0.25, 0, time),
         };
 
         var attempts = 0;
@@ -390,7 +398,7 @@ public sealed class BudgetTests
     public async Task Two_policies_sharing_one_budget_draw_on_the_same_tokens()
     {
         var time = new FakeTimeProvider();
-        var shared = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0, time: time);
+        var shared = RetryBudget.Of(0.25, 0, time);
 
         var payments = Instant(time) with { Attempts = 2, Budget = shared };
         var search = Instant(time) with { Attempts = 2, Budget = shared };
@@ -420,7 +428,7 @@ public sealed class BudgetTests
     public async Task A_permanent_failure_is_never_charged_to_the_budget()
     {
         var time = new FakeTimeProvider();
-        var budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0, time: time);
+        var budget = RetryBudget.Of(0.25, 0, time);
         var policy = Instant(time) with { Attempts = 3, Budget = budget };
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -434,7 +442,7 @@ public sealed class BudgetTests
     public async Task Caller_cancellation_is_never_charged_to_the_budget()
     {
         var time = new FakeTimeProvider();
-        var budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0, time: time);
+        var budget = RetryBudget.Of(0.25, 0, time);
         var policy = Instant(time) with { Attempts = 3, Budget = budget };
 
         using var caller = new CancellationTokenSource();

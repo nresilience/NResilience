@@ -7,8 +7,8 @@ using NResilience.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-/// The HTTP handler: what it retries, what it clones, what it scopes per host, and what it
-/// refuses to send twice.
+///     The HTTP handler: what it retries, what it clones, what it scopes per host, and what it
+///     refuses to send twice.
 /// </summary>
 public sealed class HttpHandlerTests
 {
@@ -87,6 +87,7 @@ public sealed class HttpHandlerTests
         {
             Content = new StringContent("{\"a\":1}", Encoding.UTF8, "application/json"),
         };
+
         request.Headers.Add("X-Trace", "abc");
 
         using var response = await client.SendAsync(request);
@@ -153,6 +154,7 @@ public sealed class HttpHandlerTests
         {
             Content = new StringContent("order"),
         };
+
         request.Options.Set(ResilienceHttp.Repeatable, true);
 
         using var response = await client.SendAsync(request);
@@ -252,6 +254,7 @@ public sealed class HttpHandlerTests
             transport,
             policy,
             new HttpResilienceOptions { BreakerSettings = new BreakerSettings { ConsecutiveFailures = 2 } });
+
         using var client = new HttpClient(handler);
 
         for (var i = 0; i < 2; i++)
@@ -413,12 +416,14 @@ public sealed class HttpHandlerTests
         // report nesting. A finally that cleared the flag unconditionally would leave the second
         // call unable to detect that it is running inside a retrying context.
         (await outerClient.GetAsync(new Uri("https://api.test/first"))).Dispose();
+
         Assert.True(recorder.Contains(CallEventKind.NestedRetry),
             "the inner client should report nesting on the first call");
 
         recorder.Clear();
 
         (await outerClient.GetAsync(new Uri("https://api.test/second"))).Dispose();
+
         Assert.True(recorder.Contains(CallEventKind.NestedRetry),
             "the inner client should still report nesting on the second call");
     }
@@ -433,6 +438,7 @@ public sealed class HttpHandlerTests
             Instant,
             new HttpResilienceOptions { OwnTransportTimeout = false },
             new ScriptedTransport());
+
         Assert.NotEqual(Timeout.InfiniteTimeSpan, borrowed.Timeout);
     }
 
@@ -511,8 +517,8 @@ public sealed class HttpHandlerTests
         private int _index = -1;
 
         internal ScriptedTransport(params Func<HttpResponseMessage>[] steps)
-            : this(steps.Select(step => new Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>(
-                (_, _) => Task.FromResult(step()))).ToArray())
+            : this(steps.Select(step => new Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>((_, _) => Task.FromResult(step())))
+                .ToArray())
         {
         }
 
@@ -526,8 +532,10 @@ public sealed class HttpHandlerTests
         {
         }
 
-        internal ScriptedTransport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] steps) =>
+        internal ScriptedTransport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] steps)
+        {
             _steps = steps;
+        }
 
         /// <summary>Every request that reached the wire, in order.</summary>
         internal List<HttpRequestMessage> Requests { get; } = [];
@@ -541,9 +549,7 @@ public sealed class HttpHandlerTests
             Bodies.Add(request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
 
             if (_steps.Length == 0)
-            {
                 throw new InvalidOperationException("The transport was given no script.");
-            }
 
             // The last step repeats, so "always 503" is one step rather than as many as the policy
             // happens to allow.
@@ -557,7 +563,7 @@ public sealed class HttpHandlerTests
     {
         internal bool Disposed { get; private set; }
 
-        protected override Task SerializeToStreamAsync(Stream stream, System.Net.TransportContext? context) => Task.CompletedTask;
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => Task.CompletedTask;
 
         protected override bool TryComputeLength(out long length)
         {

@@ -6,16 +6,15 @@ using Xunit;
 namespace NResilience.Gates;
 
 /// <summary>
-/// The hard gate. Ordinary tests over allocation counter deltas on a warmed loop: deterministic,
-/// fast, and they fail with a byte count.
-///
-/// <para>
-/// Every assertion here points at the shipping <see cref="Resilience"/> executor. The stand-in is
-/// still measured in the same sweep, and one gate below compares the two: if the real loop ever
-/// becomes more expensive than the hand-written floor the stand-in established, that is the
-/// design's central mechanism failing, and it should fail a build rather than be inferred from a
-/// document.
-/// </para>
+///     The hard gate. Ordinary tests over allocation counter deltas on a warmed loop: deterministic,
+///     fast, and they fail with a byte count.
+///     <para>
+///         Every assertion here points at the shipping <see cref="Resilience" /> executor. The stand-in is
+///         still measured in the same sweep, and one gate below compares the two: if the real loop ever
+///         becomes more expensive than the hand-written floor the stand-in established, that is the
+///         design's central mechanism failing, and it should fail a build rather than be inferred from a
+///         document.
+///     </para>
 /// </summary>
 [Collection(BaselineCollection.Name)]
 public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHelper output)
@@ -37,8 +36,8 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSyncOverhead(Baseline.LibTrivialSyncCallback, Budgets.FullPolicyNoTimeoutSyncOverhead);
 
     /// <summary>
-    /// Guards the documented exception to the zero-allocation sync claim. It is gated so that the
-    /// cost stays one linked source and does not quietly become two.
+    ///     Guards the documented exception to the zero-allocation sync claim. It is gated so that the
+    ///     cost stays one linked source and does not quietly become two.
     /// </summary>
     [Fact]
     public void Full_policy_with_attempt_timeout_costs_one_linked_source_on_the_synchronous_path()
@@ -53,39 +52,38 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSuspendingOverhead(Baseline.LibDefault, Budgets.DefaultOverhead);
 
     /// <summary>
-    /// A caller token that can be cancelled and never is: the production shape, and the one the
-    /// yield gate systematically under-prices. See <see cref="SocketCrossCheckTests"/> for what the
-    /// same arrangement costs once real I/O registers on the token.
+    ///     A caller token that can be cancelled and never is: the production shape, and the one the
+    ///     yield gate systematically under-prices. See <see cref="SocketCrossCheckTests" /> for what the
+    ///     same arrangement costs once real I/O registers on the token.
     /// </summary>
     [Fact]
     public void A_cancellable_caller_token_stays_within_budget()
         => AssertSuspendingOverhead(Baseline.LibDefaultCancellable, Budgets.DefaultCancellableOverhead);
 
     /// <summary>
-    /// <c>TryRunAsync</c> always materializes the attempt log. That is a deliberate difference from
-    /// the throwing form rather than an oversight, so it is budgeted rather than left unpriced.
+    ///     <c>TryRunAsync</c> always materializes the attempt log. That is a deliberate difference from
+    ///     the throwing form rather than an oversight, so it is budgeted rather than left unpriced.
     /// </summary>
     [Fact]
     public void Reporting_the_outcome_instead_of_throwing_stays_within_budget()
         => AssertSuspendingOverhead(Baseline.LibTryRunDefault, Budgets.TryRunDefaultOverhead);
 
     /// <summary>
-    /// Telemetry with a listener attached, budgeted rather than described. The design's stated
-    /// reason for having its own event type at all is that Polly's costs 6.9x when enabled - the
-    /// configuration production actually runs - so what this costs when it is on is the number
-    /// that matters.
+    ///     Telemetry with a listener attached, budgeted rather than described. The design's stated
+    ///     reason for having its own event type at all is that Polly's costs 6.9x when enabled - the
+    ///     configuration production actually runs - so what this costs when it is on is the number
+    ///     that matters.
     /// </summary>
     [Fact]
     public void A_listener_stays_within_budget()
         => AssertSuspendingOverhead(Baseline.LibDefaultListener, Budgets.DefaultWithListenerOverhead);
 
     /// <summary>
-    /// "Pay-for-play" as a gate rather than a claim: attaching a listener may cost the boxes the
-    /// listener asked for and must not cost anything else.
-    ///
-    /// Both arms are measured in this sweep, so the difference is a measurement rather than a
-    /// subtraction across two harnesses - which is the failure mode this whole harness exists to
-    /// avoid.
+    ///     "Pay-for-play" as a gate rather than a claim: attaching a listener may cost the boxes the
+    ///     listener asked for and must not cost anything else.
+    ///     Both arms are measured in this sweep, so the difference is a measurement rather than a
+    ///     subtraction across two harnesses - which is the failure mode this whole harness exists to
+    ///     avoid.
     /// </summary>
     [Fact]
     public void A_listener_costs_only_the_results_it_asked_to_be_boxed()
@@ -110,13 +108,12 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
-    /// The log listener's own promise, as a gate: a call whose logging levels are all disabled
-    /// allocates exactly what the same call allocates with a listener alone.
-    ///
-    /// Differenced against the telemetry-only arm measured in the same sweep, which is the shape
-    /// every other budget here uses. The record templates are generated by <c>[LoggerMessage]</c>,
-    /// so the <c>IsEnabled</c> guard is emitted rather than written - if this fails, something in
-    /// the listener is formatting, boxing or capturing before it asks whether anybody is listening.
+    ///     The log listener's own promise, as a gate: a call whose logging levels are all disabled
+    ///     allocates exactly what the same call allocates with a listener alone.
+    ///     Differenced against the telemetry-only arm measured in the same sweep, which is the shape
+    ///     every other budget here uses. The record templates are generated by <c>[LoggerMessage]</c>,
+    ///     so the <c>IsEnabled</c> guard is emitted rather than written - if this fails, something in
+    ///     the listener is formatting, boxing or capturing before it asks whether anybody is listening.
     /// </summary>
     [Fact]
     public void A_logging_listener_allocates_nothing_when_its_levels_are_disabled()
@@ -141,14 +138,13 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
-    /// The other half of pay-for-play, and the half that everyone pays: a policy with no listener
-    /// must cost exactly what it cost before telemetry existed.
-    ///
-    /// <see cref="The_default_policy_stays_within_budget_on_the_suspending_path"/> already gates the
-    /// absolute figure, and the telemetry work moved it by zero bytes - the delegate is a field on a record the
-    /// state-machine box already holds a reference to, so reading it is free, and every event site
-    /// is behind a null test. This asserts the comparison the budget cannot: that the silent path
-    /// has not drifted toward the listening one.
+    ///     The other half of pay-for-play, and the half that everyone pays: a policy with no listener
+    ///     must cost exactly what it cost before telemetry existed.
+    ///     <see cref="The_default_policy_stays_within_budget_on_the_suspending_path" /> already gates the
+    ///     absolute figure, and the telemetry work moved it by zero bytes - the delegate is a field on a record the
+    ///     state-machine box already holds a reference to, so reading it is free, and every event site
+    ///     is behind a null test. This asserts the comparison the budget cannot: that the silent path
+    ///     has not drifted toward the listening one.
     /// </summary>
     [Fact]
     public void A_policy_with_no_listener_pays_nothing_for_telemetry()
@@ -168,10 +164,10 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
-    /// The falsification test for the shipping executor. The stand-in measured a hand-written fused loop to establish
-    /// what was achievable before any library existed; the shipping executor has to match it while
-    /// doing strictly more - capturing a per-attempt exception, classifying results, and awaiting a
-    /// pre-attempt hook. Both arms are measured in this sweep, so the comparison is not inferred.
+    ///     The falsification test for the shipping executor. The stand-in measured a hand-written fused loop to establish
+    ///     what was achievable before any library existed; the shipping executor has to match it while
+    ///     doing strictly more - capturing a per-attempt exception, classifying results, and awaiting a
+    ///     pre-attempt hook. Both arms are measured in this sweep, so the comparison is not inferred.
     /// </summary>
     [Fact]
     public void The_shipping_executor_is_no_more_expensive_than_the_stand_in()
@@ -196,15 +192,14 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
-    /// The inline attempt log is the largest single discretionary contributor to the state-machine
-    /// box, and it is paid on the happy path by every suspending call whether or not anything ever
-    /// fails.
-    ///
-    /// The stand-in priced it by differencing two stand-in loops, one with the log removed. The shipping
-    /// executor has no log-less variant - the log is not optional - so this asserts the layout that
-    /// determines the cost: capacity times record size, both of which a change would have to move.
-    /// The record shrank from 24 bytes to 16 and the capacity stayed at 4, taking the log from
-    /// 96 B of box to 64 B.
+    ///     The inline attempt log is the largest single discretionary contributor to the state-machine
+    ///     box, and it is paid on the happy path by every suspending call whether or not anything ever
+    ///     fails.
+    ///     The stand-in priced it by differencing two stand-in loops, one with the log removed. The shipping
+    ///     executor has no log-less variant - the log is not optional - so this asserts the layout that
+    ///     determines the cost: capacity times record size, both of which a change would have to move.
+    ///     The record shrank from 24 bytes to 16 and the capacity stayed at 4, taking the log from
+    ///     96 B of box to 64 B.
     /// </summary>
     [Fact]
     public void The_inline_attempt_log_costs_what_its_layout_says_it_costs()
@@ -218,6 +213,7 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
             $"inline attempt log: {capacity} x {recordSize} B = {cost} B of state-machine box; budget {Budgets.InlineAttemptLogCost:0} B"));
 
         Assert.Equal(16, recordSize);
+
         Assert.True(
             cost <= Budgets.InlineAttemptLogCost,
             string.Create(
@@ -226,14 +222,13 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
-    /// A verdict is live across the attempt <c>await</c>, so every byte of it is paid for in the
-    /// state-machine box of every suspending call.
-    ///
-    /// <c>SelfImposed</c> - the bit that keeps the retry budget from being charged for
-    /// a refusal local admission control imposed on this process - was added on the premise that a <c>bool</c>
-    /// packs into the padding the single-byte <c>Kind</c> already leaves beside a nullable
-    /// <see cref="TimeSpan"/>. That premise is the whole reason the flag is not a fifth
-    /// <c>VerdictKind</c>, and it is asserted here rather than assumed.
+    ///     A verdict is live across the attempt <c>await</c>, so every byte of it is paid for in the
+    ///     state-machine box of every suspending call.
+    ///     <c>SelfImposed</c> - the bit that keeps the retry budget from being charged for
+    ///     a refusal local admission control imposed on this process - was added on the premise that a <c>bool</c>
+    ///     packs into the padding the single-byte <c>Kind</c> already leaves beside a nullable
+    ///     <see cref="TimeSpan" />. That premise is the whole reason the flag is not a fifth
+    ///     <c>VerdictKind</c>, and it is asserted here rather than assumed.
     /// </summary>
     [Fact]
     public void The_verdict_carries_its_origin_for_free()
@@ -248,9 +243,9 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
-    /// The refusal path, priced. Not a hot path, and not asserted tightly for that reason - what it
-    /// asserts is that a refusal costs what a retried exception costs, because the two paths differ
-    /// only in which catch clause runs.
+    ///     The refusal path, priced. Not a hot path, and not asserted tightly for that reason - what it
+    ///     asserts is that a refusal costs what a retried exception costs, because the two paths differ
+    ///     only in which catch clause runs.
     /// </summary>
     [Fact]
     public void Being_refused_twice_costs_what_failing_twice_costs()
@@ -264,7 +259,8 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
 
         Assert.True(
             limited <= Budgets.LimitedTwiceCeiling,
-            string.Create(CultureInfo.InvariantCulture, $"Being refused twice now allocates {limited:0.0} B/op against a ceiling of {Budgets.LimitedTwiceCeiling:0} B/op."));
+            string.Create(CultureInfo.InvariantCulture,
+                $"Being refused twice now allocates {limited:0.0} B/op against a ceiling of {Budgets.LimitedTwiceCeiling:0} B/op."));
     }
 
     [Fact]
@@ -272,11 +268,13 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     {
         var actual = baseline.SuspendingBytes(Baseline.LibRetry);
 
-        output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{Baseline.LibRetry}: {actual:0.0} B/op; ceiling {Budgets.RetryTwiceCeiling:0} B"));
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture,
+            $"{Baseline.LibRetry}: {actual:0.0} B/op; ceiling {Budgets.RetryTwiceCeiling:0} B"));
 
         Assert.True(
             actual <= Budgets.RetryTwiceCeiling,
-            string.Create(CultureInfo.InvariantCulture, $"Retry x2 now allocates {actual:0.0} B/op against a ceiling of {Budgets.RetryTwiceCeiling:0} B/op."));
+            string.Create(CultureInfo.InvariantCulture,
+                $"Retry x2 now allocates {actual:0.0} B/op against a ceiling of {Budgets.RetryTwiceCeiling:0} B/op."));
     }
 
     private void AssertSyncOverhead(string arm, double budget)
@@ -289,7 +287,8 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
 
         Assert.True(
             actual <= budget,
-            string.Create(CultureInfo.InvariantCulture, $"'{arm}' now allocates {actual:0.0} B/op above the raw callback, against a budget of {budget:0} B/op."));
+            string.Create(CultureInfo.InvariantCulture,
+                $"'{arm}' now allocates {actual:0.0} B/op above the raw callback, against a budget of {budget:0} B/op."));
     }
 
     private void AssertSuspendingOverhead(string arm, double budget)
@@ -303,6 +302,7 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
 
         Assert.True(
             actual <= ceiling,
-            string.Create(CultureInfo.InvariantCulture, $"'{arm}' now allocates {actual:0.0} B/op above the raw callback, against a budget of {budget:0} B/op."));
+            string.Create(CultureInfo.InvariantCulture,
+                $"'{arm}' now allocates {actual:0.0} B/op above the raw callback, against a budget of {budget:0} B/op."));
     }
 }

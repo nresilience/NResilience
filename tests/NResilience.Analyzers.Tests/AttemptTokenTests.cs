@@ -62,12 +62,12 @@ public sealed class AttemptTokenTests
         Assert.Equal(
             ["NRES001", "NRES001"],
             Harness.Ids(Harness.InMethod("""
-                        await api.RunAsync(async attempt =>
-                        {
-                            await Helper();
-                            await Numbered(2);
-                        }, cancellationToken);
-                """)));
+                                                 await api.RunAsync(async attempt =>
+                                                 {
+                                                     await Helper();
+                                                     await Numbered(2);
+                                                 }, cancellationToken);
+                                         """)));
     }
 
     [Fact]
@@ -77,12 +77,12 @@ public sealed class AttemptTokenTests
         // forgets a second is CA2016's business, and guessing which of the two was deliberate is
         // how an analyzer earns a NoWarn.
         Assert.Equal([], Harness.Ids(Harness.InMethod("""
-                        await api.RunAsync(async attempt =>
-                        {
-                            await Helper(attempt);
-                            await Numbered(2);
-                        }, cancellationToken);
-                """)));
+                                                              await api.RunAsync(async attempt =>
+                                                              {
+                                                                  await Helper(attempt);
+                                                                  await Numbered(2);
+                                                              }, cancellationToken);
+                                                      """)));
     }
 
     [Fact]
@@ -119,9 +119,9 @@ public sealed class AttemptTokenTests
     public void A_nested_call_that_threads_the_token_is_clean()
     {
         Assert.Equal([], Harness.Ids(Harness.InMethod("""
-                        await api.RunAsync(
-                            attempt => api.RunAsync(inner => Helper(inner), attempt).AsTask(),
-                            cancellationToken);
-                """)));
+                                                              await api.RunAsync(
+                                                                  attempt => api.RunAsync(inner => Helper(inner), attempt).AsTask(),
+                                                                  cancellationToken);
+                                                      """)));
     }
 }

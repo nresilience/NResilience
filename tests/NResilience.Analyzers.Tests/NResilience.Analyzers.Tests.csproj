@@ -17,15 +17,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="xunit.v3" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="xunit.v3"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
-    <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj" />
-    <ProjectReference Include="../../src/NResilience.CodeFixes/NResilience.CodeFixes.csproj" />
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj"/>
+    <ProjectReference Include="../../src/NResilience.CodeFixes/NResilience.CodeFixes.csproj"/>
   </ItemGroup>
 
 </Project>

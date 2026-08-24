@@ -25,6 +25,7 @@ public sealed class TelemetryDocs
                 "{Policy} {Kind} attempt {Attempt}: {Verdict} in {Ms}ms",
                 e.PolicyName, e.Kind, e.AttemptNumber, e.Verdict.Kind, e.Duration.TotalMilliseconds),
         };
+
         // </snippet:telemetry-listener>
 
         Assert.Equal(1, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
@@ -44,6 +45,7 @@ public sealed class TelemetryDocs
 
         // Attempt, Retrying, Attempt, Succeeded
         Console.WriteLine(string.Join(", ", events.Kinds));
+
         // </snippet:telemetry-recorder>
 
         Assert.Equal(
@@ -58,6 +60,7 @@ public sealed class TelemetryDocs
         // A policy registered in a container is instrumented for you. A policy in a static field
         // is not - this says it.
         var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
+
         // </snippet:telemetry-with-telemetry>
 
         Assert.NotNull(api.OnEvent);
@@ -73,7 +76,8 @@ public sealed class TelemetryDocs
 
         // <snippet:telemetry-tostring>
         // [PolicyName] Kind #N VerdictKind ExceptionType (duration) +delay
-        Console.WriteLine(events[0]);   // [api] Attempt #1 Ok (0.1ms)
+        Console.WriteLine(events[0]); // [api] Attempt #1 Ok (0.1ms)
+
         // </snippet:telemetry-tostring>
 
         Assert.StartsWith("[api] Attempt #1 Ok", events[0].ToString(), StringComparison.Ordinal);

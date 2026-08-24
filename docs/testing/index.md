@@ -23,7 +23,7 @@ Use the `Sequence<T>` class to create a script of outcomes (returns, throws, or 
 <!-- snippet: testing-sequence -->
 ```csharp
 var calls = Sequence.For<HttpResponseMessage>()
-    .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), count: 2)
+    .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), 2)
     .Returns(new HttpResponseMessage(HttpStatusCode.OK));
 
 var policy = Resilience.Http with { Backoff = Backoff.None };
@@ -55,7 +55,7 @@ To test timeouts or deadlines without actually waiting for the clock, provide a 
 var time = new FakeTimeProvider();
 
 var calls = Sequence.For<int>(time)
-    .Delays(TimeSpan.FromSeconds(30))   // longer than the attempt timeout
+    .Delays(TimeSpan.FromSeconds(30)) // longer than the attempt timeout
     .Returns(1);
 
 var policy = Resilience.Default with

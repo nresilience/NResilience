@@ -3,8 +3,8 @@ using Microsoft.Extensions.Time.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-/// The cancellation contract: the caller's token always wins, an attempt timeout never reaches
-/// the classifier, and the two are never confused for one another.
+///     The cancellation contract: the caller's token always wins, an attempt timeout never reaches
+///     the classifier, and the two are never confused for one another.
 /// </summary>
 public sealed class CancellationTests
 {

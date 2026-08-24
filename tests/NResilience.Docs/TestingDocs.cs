@@ -13,7 +13,7 @@ public sealed class TestingDocs
     {
         // <snippet:testing-sequence>
         var calls = Sequence.For<HttpResponseMessage>()
-            .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), count: 2)
+            .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), 2)
             .Returns(new HttpResponseMessage(HttpStatusCode.OK));
 
         var policy = Resilience.Http with { Backoff = Backoff.None };
@@ -23,6 +23,7 @@ public sealed class TestingDocs
         Assert.True(result.IsSuccess);
         Assert.Equal(3, calls.CallCount);
         Assert.Equal(3, result.Attempts.Count);
+
         // </snippet:testing-sequence>
     }
 
@@ -35,7 +36,7 @@ public sealed class TestingDocs
         var time = new FakeTimeProvider();
 
         var calls = Sequence.For<int>(time)
-            .Delays(TimeSpan.FromSeconds(30))   // longer than the attempt timeout
+            .Delays(TimeSpan.FromSeconds(30)) // longer than the attempt timeout
             .Returns(1);
 
         var policy = Resilience.Default with
@@ -51,6 +52,7 @@ public sealed class TestingDocs
         var result = await pending;
 
         Assert.IsType<AttemptTimeoutException>(result.Exception);
+
         // </snippet:testing-fake-time>
     }
 
@@ -74,6 +76,7 @@ public sealed class TestingDocs
 
         Assert.Equal(VerdictKind.Transient, events.OfKind(CallEventKind.Attempt)[0].Verdict.Kind);
         Assert.Equal(42, events.Single(CallEventKind.Succeeded).Result);
+
         // </snippet:testing-event-recorder>
     }
 
@@ -93,6 +96,7 @@ public sealed class TestingDocs
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(2, transport.Requests.Count);
+
         // </snippet:testing-http-handler>
     }
 

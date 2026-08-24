@@ -52,7 +52,9 @@ var api = Resilience.Http;
 var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
 // 3. Run any callback through one method. The token handed to your work is the attempt's own.
-var user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
+var user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt),
+    cancellationToken);
+
 var response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 await slow.RunAsync(attempt => queue.FlushAsync(attempt), cancellationToken);
 

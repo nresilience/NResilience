@@ -9,32 +9,32 @@ using Microsoft.CodeAnalysis.Text;
 namespace NResilience.Analyzers.Tests;
 
 /// <summary>
-/// Compiles a snippet the way a consumer's project would and runs the analyzers over it.
-/// <para>
-/// Every compilation is asserted to be error-free first. A snippet with a typo produces no
-/// analyzer diagnostics either, and a test that cannot tell those two outcomes apart passes for
-/// the wrong reason.
-/// </para>
+///     Compiles a snippet the way a consumer's project would and runs the analyzers over it.
+///     <para>
+///         Every compilation is asserted to be error-free first. A snippet with a typo produces no
+///         analyzer diagnostics either, and a test that cannot tell those two outcomes apart passes for
+///         the wrong reason.
+///     </para>
 /// </summary>
 internal static class Harness
 {
-    private static readonly ImmutableArray<MetadataReference> References = ImmutableArray.CreateRange(
-        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
-            .Split(Path.PathSeparator)
-            .Where(static path => path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
-            .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path)));
-
     /// <summary>The usings a consumer would have; the snippets are about the calls, not the header.</summary>
     private const string Header = """
-        using System;
-        using System.Net.Http;
-        using System.Net.Http.Json;
-        using System.Threading;
-        using System.Threading.Tasks;
-        using NResilience;
-        using NResilience.Http;
+                                  using System;
+                                  using System.Net.Http;
+                                  using System.Net.Http.Json;
+                                  using System.Threading;
+                                  using System.Threading.Tasks;
+                                  using NResilience;
+                                  using NResilience.Http;
 
-        """;
+                                  """;
+
+    private static readonly ImmutableArray<MetadataReference> References = ImmutableArray.CreateRange(
+        ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!)
+        .Split(Path.PathSeparator)
+        .Where(static path => path.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
+        .Select(static path => (MetadataReference)MetadataReference.CreateFromFile(path)));
 
     internal static ImmutableArray<Diagnostic> Run(string source, OutputKind kind = OutputKind.DynamicallyLinkedLibrary)
     {
@@ -59,23 +59,23 @@ internal static class Harness
 
     /// <summary>A snippet wrapped in the method a consumer would have written it in.</summary>
     internal static string InMethod(string body) => Header + $$"""
-        internal sealed class Target
-        {
-            private static readonly HttpClient Client = new();
+                                                               internal sealed class Target
+                                                               {
+                                                                   private static readonly HttpClient Client = new();
 
-            internal async Task Run(Uri url, CancellationToken cancellationToken)
-            {
-                var api = Resilience.Http;
-        {{body}}
-            }
+                                                                   internal async Task Run(Uri url, CancellationToken cancellationToken)
+                                                                   {
+                                                                       var api = Resilience.Http;
+                                                               {{body}}
+                                                                   }
 
-            internal static Task<int> Helper(CancellationToken cancellationToken = default) => Task.FromResult(1);
+                                                                   internal static Task<int> Helper(CancellationToken cancellationToken = default) => Task.FromResult(1);
 
-            internal static Task<int> Numbered(int value, CancellationToken cancellationToken = default) => Task.FromResult(value);
+                                                                   internal static Task<int> Numbered(int value, CancellationToken cancellationToken = default) => Task.FromResult(value);
 
-            internal static Task<int> Optional(int first = 1, int second = 2, CancellationToken cancellationToken = default) => Task.FromResult(first);
-        }
-        """;
+                                                                   internal static Task<int> Optional(int first = 1, int second = 2, CancellationToken cancellationToken = default) => Task.FromResult(first);
+                                                               }
+                                                               """;
 
     /// <summary>A whole file, for the rules that are about where a declaration lives.</summary>
     internal static string InFile(string source) => Header + source;
@@ -96,6 +96,7 @@ internal static class Harness
             .AddDocument(documentId, "Snippet.cs", SourceText.From(source));
 
         var document = solution.GetDocument(documentId)!;
+
         var diagnostic = Run(source)
             .OrderBy(static reported => reported.Location.SourceSpan.Start)
             .First();

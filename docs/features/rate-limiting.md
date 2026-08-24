@@ -15,12 +15,12 @@ It is a different guard from the two the library turns on for you. The [circuit 
 <!-- snippet: limit-http -->
 ```csharp
 services.AddHttpClient("api")
-        .AddResilience()                              // outer: makes the attempts
-        .AddRateLimit(o =>
-        {
-            o.PermitsPerSecond = 100;                 // one of three shapes; set exactly one
-            o.PerHost = true;                         // the default, scoped like the breakers
-        });
+    .AddResilience() // outer: makes the attempts
+    .AddRateLimit(o =>
+    {
+        o.PermitsPerSecond = 100; // one of three shapes; set exactly one
+        o.PerHost = true; // the default, scoped like the breakers
+    });
 ```
 <!-- endsnippet -->
 
@@ -34,10 +34,9 @@ The other order would take one permit for an operation that then makes three cal
 // Handlers run in registration order, outermost first, so this puts the limiter *outside*
 // the retries - one permit for an operation that goes on to make three calls. Refused at
 // registration rather than accepted and silently wrong.
-var error = Assert.Throws<ResilienceConfigurationException>(
-    () => services.AddHttpClient("api")
-                  .AddRateLimit(o => o.PermitsPerSecond = 100)
-                  .AddResilience());
+var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient("api")
+    .AddRateLimit(o => o.PermitsPerSecond = 100)
+    .AddResilience());
 ```
 <!-- endsnippet -->
 
@@ -88,8 +87,7 @@ Set exactly one of them in `RateLimitOptions`. Asking for two is a configuration
 ```csharp
 // Three different guards, and a section that asks for two of them is a section whose
 // author expected one to win. Every problem is listed at once.
-var error = Assert.Throws<ResilienceConfigurationException>(
-    () => new RateLimitOptions { PermitsPerSecond = 100, Concurrency = 20 }.Validate());
+var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitOptions { PermitsPerSecond = 100, Concurrency = 20 }.Validate());
 ```
 <!-- endsnippet -->
 

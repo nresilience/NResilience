@@ -3,14 +3,14 @@ using Microsoft.Extensions.Time.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-/// The circuit breaker: what trips it, what does not, how long it stays tripped, and what it takes
-/// to close it again.
-/// <para>
-/// The state machine is exercised directly through the admission and recording entry points the
-/// executor uses, because that is where the transitions live and driving them through a policy would
-/// only add a callback between the assertion and the thing being asserted. The executor's own
-/// integration - admission, feeding, and the guarded rejection - is tested end to end at the bottom.
-/// </para>
+///     The circuit breaker: what trips it, what does not, how long it stays tripped, and what it takes
+///     to close it again.
+///     <para>
+///         The state machine is exercised directly through the admission and recording entry points the
+///         executor uses, because that is where the transitions live and driving them through a policy would
+///         only add a callback between the assertion and the thing being asserted. The executor's own
+///         integration - admission, feeding, and the guarded rejection - is tested end to end at the bottom.
+///     </para>
 /// </summary>
 public sealed class BreakerTests
 {
@@ -96,6 +96,7 @@ public sealed class BreakerTests
     public void The_failure_ratio_trips_it_alongside_the_consecutive_counter()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 100,
@@ -104,10 +105,10 @@ public sealed class BreakerTests
         });
 
         Sample(breaker, VerdictKind.Ok, 2);
-        Sample(breaker, VerdictKind.Transient, 1);
+        Sample(breaker, VerdictKind.Transient);
         Assert.Equal(BreakerState.Closed, breaker.State);
 
-        Sample(breaker, VerdictKind.Transient, 1);
+        Sample(breaker, VerdictKind.Transient);
 
         Assert.Equal(BreakerState.Open, breaker.State);
     }
@@ -116,6 +117,7 @@ public sealed class BreakerTests
     public void The_failure_ratio_waits_for_the_minimum_call_count()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 100,
@@ -136,6 +138,7 @@ public sealed class BreakerTests
     public void Slow_calls_trip_it_even_though_they_succeeded()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             SlowCallThreshold = TimeSpan.FromSeconds(1),
@@ -158,6 +161,7 @@ public sealed class BreakerTests
     public void The_window_forgets_failures_that_fall_out_of_it()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 100,
@@ -234,6 +238,7 @@ public sealed class BreakerTests
     public void A_slow_probe_is_not_a_recovery()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(1),
@@ -254,6 +259,7 @@ public sealed class BreakerTests
     public void The_break_doubles_on_each_consecutive_open()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(10),
@@ -279,6 +285,7 @@ public sealed class BreakerTests
     public void The_growth_is_capped_by_the_maximum()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(10),
@@ -400,6 +407,7 @@ public sealed class BreakerTests
         breaker.Isolate();
 
         var ran = false;
+
         var call = (Instant(time) with { Breaker = breaker })
             .TryRunAsync(_ =>
             {
@@ -484,6 +492,7 @@ public sealed class BreakerTests
         var breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 1 });
 
         var policy = Instant(time) with { Breaker = breaker, Attempts = 3 };
+
         var call = policy
             .TryRunAsync(_ => Task.FromException<int>(new IOException("down")))
             .AsTask();
@@ -555,8 +564,8 @@ public sealed class BreakerTests
     // ---- Probe-slot release ----
 
     /// <summary>
-    /// Runs a call that may serve a guarded rejection and moves the fake clock until it lands.
-    /// A rejection is deliberately not instant, so a test that simply awaited it would hang.
+    ///     Runs a call that may serve a guarded rejection and moves the fake clock until it lands.
+    ///     A rejection is deliberately not instant, so a test that simply awaited it would hang.
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {
@@ -575,6 +584,7 @@ public sealed class BreakerTests
     public async Task Caller_cancellation_during_a_half_open_probe_releases_the_slot()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 1,
@@ -617,6 +627,7 @@ public sealed class BreakerTests
     public async Task A_deadline_exceeded_after_admission_releases_the_probe_slot()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 1,
@@ -665,6 +676,7 @@ public sealed class BreakerTests
     public async Task A_before_attempt_hook_that_throws_releases_the_probe_slot()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 1,

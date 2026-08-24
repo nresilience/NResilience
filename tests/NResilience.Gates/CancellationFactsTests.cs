@@ -6,12 +6,11 @@ using Xunit;
 namespace NResilience.Gates;
 
 /// <summary>
-/// The cancellation facts the timeout design is built on, re-run on the exact target TFMs.
-///
-/// These are gated rather than merely reported because the arrangement they justify - pool the
-/// timer source, link per attempt, never hand the pooled token to user code, and fall back to
-/// per-call construction under a custom <see cref="TimeProvider"/> - is not obvious from reading
-/// the BCL, and would silently degrade to no benefit at all if any of them changed.
+///     The cancellation facts the timeout design is built on, re-run on the exact target TFMs.
+///     These are gated rather than merely reported because the arrangement they justify - pool the
+///     timer source, link per attempt, never hand the pooled token to user code, and fall back to
+///     per-call construction under a custom <see cref="TimeProvider" /> - is not obvious from reading
+///     the BCL, and would silently degrade to no benefit at all if any of them changed.
 /// </summary>
 [Collection(BaselineCollection.Name)]
 public sealed class CancellationFactsTests(BaselineFixture baseline, ITestOutputHelper output)
@@ -29,9 +28,9 @@ public sealed class CancellationFactsTests(BaselineFixture baseline, ITestOutput
         => AssertAtMost(Baseline.LinkedNone, Budgets.LinkedFromNone);
 
     /// <summary>
-    /// The 0 B figure the pooling story rests on. It applies to the timer source only - the
-    /// per-attempt linked child is a separate, non-zero cost, which is why the executor's
-    /// suspending budget is not zero.
+    ///     The 0 B figure the pooling story rests on. It applies to the timer source only - the
+    ///     per-attempt linked child is a separate, non-zero cost, which is why the executor's
+    ///     suspending budget is not zero.
     /// </summary>
     [Fact]
     public void A_pooled_timer_source_is_free_to_reuse()
@@ -49,9 +48,9 @@ public sealed class CancellationFactsTests(BaselineFixture baseline, ITestOutput
     }
 
     /// <summary>
-    /// The interaction that makes CTS pooling and injectable-<see cref="TimeProvider"/>
-    /// testability mutually exclusive: the runtime type-tests <c>_timer is TimerQueueTimer</c>,
-    /// and a custom provider's <c>ITimer</c> is not one.
+    ///     The interaction that makes CTS pooling and injectable-<see cref="TimeProvider" />
+    ///     testability mutually exclusive: the runtime type-tests <c>_timer is TimerQueueTimer</c>,
+    ///     and a custom provider's <c>ITimer</c> is not one.
     /// </summary>
     [Fact]
     public void TryReset_fails_on_a_source_built_with_a_custom_TimeProvider()
@@ -66,9 +65,9 @@ public sealed class CancellationFactsTests(BaselineFixture baseline, ITestOutput
         => Assert.False(CtsFacts.TryResetAfterCancellation());
 
     /// <summary>
-    /// The other half of the resolution: <c>CancelAfter()</c> does drive an injected provider's
-    /// timer, so virtual time still cancels an attempt in tests even though the source is
-    /// constructed per call rather than pooled.
+    ///     The other half of the resolution: <c>CancelAfter()</c> does drive an injected provider's
+    ///     timer, so virtual time still cancels an attempt in tests even though the source is
+    ///     constructed per call rather than pooled.
     /// </summary>
     [Fact]
     public void CancelAfter_honors_an_injected_TimeProvider()
@@ -86,9 +85,9 @@ public sealed class CancellationFactsTests(BaselineFixture baseline, ITestOutput
     }
 
     /// <summary>
-    /// The executor honors the pooling/testability split: the system provider takes the pooled
-    /// path, anything else does not. Getting this backwards would mean either a broken test clock
-    /// or a pool that silently never hits.
+    ///     The executor honors the pooling/testability split: the system provider takes the pooled
+    ///     path, anything else does not. Getting this backwards would mean either a broken test clock
+    ///     or a pool that silently never hits.
     /// </summary>
     [Fact]
     public void The_pool_is_used_for_the_system_provider_and_not_for_any_other()

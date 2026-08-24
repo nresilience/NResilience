@@ -1,11 +1,9 @@
-using NResilience.DocSnippets;
-
 namespace NResilience.Docs;
 
 /// <summary>
-/// The docs gate itself: every snippet block in the markdown is the current text of the snippet it
-/// names. The same check runs in CI as a build step; having it here as well means a page and its
-/// source cannot drift apart without a red test.
+///     The docs gate itself: every snippet block in the markdown is the current text of the snippet it
+///     names. The same check runs in CI as a build step; having it here as well means a page and its
+///     source cannot drift apart without a red test.
 /// </summary>
 public sealed class SnippetSyncTests
 {
@@ -17,7 +15,7 @@ public sealed class SnippetSyncTests
 
         Assert.NotEmpty(snippets);
 
-        var drift = SnippetEngine.Sync(root, snippets, write: false);
+        var drift = SnippetEngine.Sync(root, snippets, false);
 
         Assert.Empty(drift.Select(d => $"{Path.GetRelativePath(root, d.File)}: {d.Detail}"));
     }

@@ -16,6 +16,7 @@ public sealed class Guards
 
         var payments = Resilience.Http with { Breaker = breaker };
         var paymentsWrites = payments with { Attempts = 1 };
+
         // </snippet:breaker-construct>
 
         Assert.Same(breaker, paymentsWrites.Breaker);
@@ -31,18 +32,19 @@ public sealed class Guards
         // incident, because the responses are not failing - they are just slow.
         var breaker = new Breaker(new BreakerSettings
         {
-            ConsecutiveFailures = 5,                             // the default trip condition
-            SlowCallThreshold = TimeSpan.FromSeconds(2),         // anything slower counts against
-            SlowCallRatio = 0.5,                                 // half the window being slow trips it
-            MinimumCalls = 20,                                   // below this, a ratio means nothing
+            ConsecutiveFailures = 5, // the default trip condition
+            SlowCallThreshold = TimeSpan.FromSeconds(2), // anything slower counts against
+            SlowCallRatio = 0.5, // half the window being slow trips it
+            MinimumCalls = 20, // below this, a ratio means nothing
             Window = TimeSpan.FromSeconds(30),
-            BreakDuration = TimeSpan.FromSeconds(15),            // doubles per consecutive open
+            BreakDuration = TimeSpan.FromSeconds(15), // doubles per consecutive open
             MaxBreakDuration = TimeSpan.FromMinutes(2),
-            ProbeSuccesses = 2,                                  // two good probes to close, not one
+            ProbeSuccesses = 2, // two good probes to close, not one
         })
         {
             Name = "search",
         };
+
         // </snippet:breaker-slow-calls>
 
         Assert.Equal(TimeSpan.FromSeconds(2), breaker.Settings.SlowCallThreshold);
@@ -54,11 +56,12 @@ public sealed class Guards
         var breaker = new Breaker { Name = "payments" };
 
         // <snippet:breaker-admin>
-        var state = breaker.State;         // Closed, Open, HalfOpen or Isolated
-        var since = breaker.OpenedAt;   // null while it is closed
+        var state = breaker.State; // Closed, Open, HalfOpen or Isolated
+        var since = breaker.OpenedAt; // null while it is closed
 
-        breaker.Isolate();                          // force it open and keep it there
-        breaker.Reset();                            // close it and forget the history
+        breaker.Isolate(); // force it open and keep it there
+        breaker.Reset(); // close it and forget the history
+
         // </snippet:breaker-admin>
 
         Assert.Equal(BreakerState.Closed, breaker.State);
@@ -85,9 +88,10 @@ public sealed class Guards
         // does not have to guess.
         if (result.Exception is CallRejectedException rejection)
         {
-            Console.WriteLine(rejection.Reason);      // DependencyUnavailable, or BudgetExhausted
-            Console.WriteLine(rejection.RetryAfter);  // when to come back, when there is an answer
+            Console.WriteLine(rejection.Reason); // DependencyUnavailable, or BudgetExhausted
+            Console.WriteLine(rejection.RetryAfter); // when to come back, when there is an answer
         }
+
         // </snippet:breaker-rejection>
 
         Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
@@ -101,10 +105,12 @@ public sealed class Guards
         // Retries compose multiplicatively: three layers each retrying three times is 27 attempts
         // at the bottom. A budget bounds retries as a fraction of traffic - 10% here - so the
         // aggregate is bounded whether or not anybody coordinates.
-        var budget = RetryBudget.Shared("payments", fraction: 0.1, minimumPerSecond: 3);
+        // snippet-show: var budget = RetryBudget.Shared("payments", fraction: 0.1, minimumPerSecond: 3);
+        var budget = RetryBudget.Shared("payments");
 
         var charge = Resilience.Http with { Budget = budget };
         var refund = Resilience.Http with { Budget = budget };
+
         // </snippet:budget-shared>
 
         Assert.Same(budget, charge.Budget);
@@ -117,7 +123,8 @@ public sealed class Guards
     {
         // A snippet is not a call path. The reader holds this policy in a static readonly field, which
         // is what NRES005 asks for; here it lives in a test method so that the docs gate can run it.
-        #pragma warning disable NRES005
+#pragma warning disable NRES005
+
         // <snippet:budget-off>
         // Null - the default - is an automatic budget private to this policy instance, so storm
         // protection needs no configuration. None is the opt-out, and the only correct
@@ -125,9 +132,11 @@ public sealed class Guards
         var unbudgeted = Resilience.Default with { Budget = RetryBudget.None };
 
         // Or tune it, privately to whoever holds the instance.
-        var generous = Resilience.Default with { Budget = RetryBudget.Of(fraction: 0.2, minimumPerSecond: 10) };
+        // snippet-show: var generous = Resilience.Default with { Budget = RetryBudget.Of(fraction: 0.2, minimumPerSecond: 10) };
+        var generous = Resilience.Default with { Budget = RetryBudget.Of(0.2, 10) };
+
         // </snippet:budget-off>
-        #pragma warning restore NRES005
+#pragma warning restore NRES005
 
         Assert.NotNull(unbudgeted.Budget);
         Assert.Equal(0, generous.Budget!.Utilization);
@@ -141,7 +150,8 @@ public sealed class Guards
         // <snippet:budget-utilization>
         // For a dashboard: a budget sitting near 1 is a client whose retries are being refused,
         // which is a symptom to alert on rather than a steady state.
-        var spent = budget.Utilization;   // 0 to 1
+        var spent = budget.Utilization; // 0 to 1
+
         // </snippet:budget-utilization>
 
         Assert.Equal(0, spent);

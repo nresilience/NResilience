@@ -26,9 +26,9 @@ By using a single classifier, NResilience ensures that retry logic, backoff curv
 ```csharp
 var http = Classifier.Http;
 
-var throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));  // Throttled
-var transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway));       // Transient
-var answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound));            // Ok - a 404 is an answer
+var throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests)); // Throttled
+var transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway)); // Transient
+var answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound)); // Ok - a 404 is an answer
 ```
 <!-- endsnippet -->
 
@@ -65,9 +65,9 @@ You can also use a predicate to inspect the exception for more granular control:
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
 var classify = Classifier.Http
-    .On<MyTransportException>(Verdict.Transient)                  // retried, short curve
+    .On<MyTransportException>(Verdict.Transient) // retried, short curve
     .On<MyQuotaException>(ex => Verdict.Throttled(ex.RetryAfter)) // retried, long curve or the server's own delay
-    .On<MyValidationException>(Verdict.Permanent);                // never retried
+    .On<MyValidationException>(Verdict.Permanent); // never retried
 
 var api = Resilience.Http with { Classify = classify };
 ```

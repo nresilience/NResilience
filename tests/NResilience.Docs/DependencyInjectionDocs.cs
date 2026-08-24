@@ -20,6 +20,7 @@ public sealed class DependencyInjectionDocs
         // Or with a policy of your own, or a registered one by name.
         services.AddHttpClient("reports").AddResilience(Resilience.Http with { Attempts = 5 });
         services.AddHttpClient("payments").AddResilience("api", o => o.RetryUnsafeMethods = false);
+
         // </snippet:di-http-client>
 
         services.AddResilience("api", Resilience.Http);
@@ -44,6 +45,7 @@ public sealed class DependencyInjectionDocs
             o.Attempts = 5;
             o.Deadline = TimeSpan.FromMinutes(5);
         });
+
         // </snippet:di-register-named>
 
         using var provider = services.BuildServiceProvider();
@@ -59,10 +61,12 @@ public sealed class DependencyInjectionDocs
         var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.resilience.json")
             .Build();
+
         var services = new ServiceCollection();
 
         // <snippet:di-register-section>
         services.AddResilience(configuration.GetSection("Resilience"));
+
         // </snippet:di-register-section>
 
         using var provider = services.BuildServiceProvider();
@@ -80,6 +84,7 @@ public sealed class DependencyInjectionDocs
         var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.resilience.json")
             .Build();
+
         var services = new ServiceCollection();
         var shared = new Breaker { Name = "payments" };
 
@@ -95,6 +100,7 @@ public sealed class DependencyInjectionDocs
                 Classify = Classifier.Http.On<MyTransportException>(Verdict.Transient),
                 Breaker = shared,
             });
+
         // </snippet:di-configure-callback>
 
         using var provider = services.BuildServiceProvider();
@@ -127,6 +133,7 @@ public sealed class DependencyInjectionDocs
 
         private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult("ok");
     }
+
     // </snippet:di-inject>
 
     internal sealed class MyTransportException : Exception;
