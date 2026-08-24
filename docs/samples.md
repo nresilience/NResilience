@@ -6,7 +6,7 @@ order: 10
 
 # Samples
 
-The repository includes three standalone console applications in the [`samples/`](../samples) directory.
+The repository includes three standalone console applications in the [`samples/`](https://github.com/nresilience/NResilience/tree/main/samples) directory.
 
 To run the samples, use the following commands:
 
@@ -24,4 +24,4 @@ dotnet run --project samples/Samples.Worker
 
 Each sample runs against an in-process fake dependency and does not require network access or external subscriptions.
 
-Additionally, the code snippets used throughout this documentation are maintained as executable tests in [`tests/NResilience.Docs`](../tests/NResilience.Docs). Every code block on these pages is inlined from those tests to ensure that all examples compile and run.
+Additionally, the code snippets used throughout this documentation are maintained as executable tests in [`tests/NResilience.Docs`](https://github.com/nresilience/NResilience/tree/main/tests/NResilience.Docs). Every code block on these pages is inlined from those tests to ensure that all examples compile and run.

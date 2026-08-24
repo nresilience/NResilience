@@ -23,7 +23,7 @@ Using total attempts removes ambiguity. `Attempts = 1` means no retry occurs, el
 No. A retry loop that blocks holds a thread through every backoff delay. Offering both synchronous and asynchronous APIs would either duplicate the engine or risk deadlocks. For this reason, `ResilienceHandler.Send` throws a `NotSupportedException`.
 
 ### Where is hedging?
-Hedging is not implemented. Issuing a second request before the first fails is a dangerous default because it multiplies load on a dependency exactly when it is slow. Implementing hedging safely requires a budget, an adaptive latency threshold, and a per-request idempotency strategy. The [retry budget](../features/retry-budget.md) and the [circuit breaker](../features/circuit-breaker.md) provide the necessary groundwork for this feature.
+Hedging is not implemented. Issuing a second request before the first fails is a dangerous default because it multiplies load on a dependency exactly when it is slow. Implementing hedging safely requires a budget, an adaptive latency threshold, and a per-request idempotency strategy. The [retry budget](./features/retry-budget.md) and the [circuit breaker](./features/circuit-breaker.md) provide the necessary groundwork for this feature.
 
 ### Where is a rate limiter?
 `NResilience.Extensions` provides one, and it does not reimplement `System.Threading.RateLimiting` - it gives the platform's limiters a correct place to stand. See [Rate limiting](features/rate-limiting.md).
@@ -64,7 +64,7 @@ services.AddHttpClient("api")
 The callback-based approach respects NResilience's design philosophy: explicit insertion point, zero cost when unused, and integration with the verdict system. A hand-rolled `SemaphoreSlim` requires manual handling of the deadline, exception flow on timeout, and outcome classification. The limiter handles these for you.
 
 ### Can I add my own policy layer?
-You cannot add layers through composition because the engine is [one flat method](../deep-dives/one-executor.md). Extension points include the [classifier](../features/classification.md), `Backoff.Custom`, `BeforeAttempt`, and `OnEvent`. This restricted surface ensures long-term API stability.
+You cannot add layers through composition because the engine is [one flat method](./deep-dives/one-executor.md). Extension points include the [classifier](./features/classification.md), `Backoff.Custom`, `BeforeAttempt`, and `OnEvent`. This restricted surface ensures long-term API stability.
 
 ### Is a `Breaker` thread-safe? Can I share one across policies?
 Yes. Sharing a breaker allows you to treat multiple different calls as the same dependency. The breaker is guarded by an uncontended lock. Using `with` copies the reference to the breaker, not its internal state.
@@ -73,7 +73,7 @@ Yes. Sharing a breaker allows you to treat multiple different calls as the same 
 The breaker always samples individual attempts. This provides a consistent behavior regardless of how the policy is configured.
 
 ### Why does refusing a call take 100 milliseconds?
-A free rejection inside a polling loop creates a CPU spin, turning a load-shedding guard into a load generator. For more details, see [Guarded rejection](../deep-dives/guarded-rejection.md).
+A free rejection inside a polling loop creates a CPU spin, turning a load-shedding guard into a load generator. For more details, see [Guarded rejection](./deep-dives/guarded-rejection.md).
 
 ### Why is telemetry off for hand-built policies but on for registered ones?
 Setting `OnEvent = null` ensures that telemetry is "free when unused." Since policies registered via dependency injection are typically used in production environments, the registration automatically attaches a listener. You can disable this using `telemetry: false` or `ResilienceOptions.Telemetry = false`. Logging works the same way and for the same reason: a registered policy logs, a hand-built one opts in with `WithLogging`, and `ResilienceOptions.Logging = "Off"` turns it off. See [Logging](features/logging.md).
@@ -87,4 +87,4 @@ Yes. Both ahead-of-time (AOT) compilation and trimming are enforced in CI. The b
 NResilience supports `net8.0` and `net10.0`. Both frameworks are tested and gated; specifically, the library ensures there is no "allocation cliff" on `net8.0`.
 
 ### Does it work with `IHttpClientFactory`?
-Yes. You can use `.AddResilience()` on the client builder. For more information about the two-minute handler rotation for configuration reloads, see [Dependency injection](../di/index.md).
+Yes. You can use `.AddResilience()` on the client builder. For more information about the two-minute handler rotation for configuration reloads, see [Dependency injection](./di/index.md).

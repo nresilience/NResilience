@@ -39,7 +39,7 @@ var answer = http.ClassifyResult(value: new HttpResponseMessage(statusCode: Http
 | Other 5xx or 408 | `Transient` |
 | 404 and other 4xx | `Ok` (treated as a valid answer, not a failure) |
 
-A 404 is considered an answer and is not retried. If a specific status is transient for your API, you can add a custom rule for it. For more information, see [migrating a predicate](../migrating-from-polly.md#predicates).
+A 404 is considered an answer and is not retried. If a specific status is transient for your API, you can add a custom rule for it. For more information, see [migrating a predicate](../migrating-from-polly.md#configure-predicates).
 
 ## Add custom exception rules
 

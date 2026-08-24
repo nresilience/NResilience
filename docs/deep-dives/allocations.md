@@ -8,7 +8,7 @@ order: 2
 
 Performance in NResilience is managed through strict allocation budgets. Every figure below represents a ceiling enforced by the build process. These measurements are taken using `GC.GetAllocatedBytesForCurrentThread()` in a Release build on target frameworks, using workstation non-concurrent GC.
 
-For detailed measurements and gate constants, see [`Budgets.cs`](../../tests/NResilience.Gates/Budgets.cs).
+For detailed measurements and gate constants, see [`Budgets.cs`](https://github.com/nresilience/NResilience/blob/main/tests/NResilience.Gates/Budgets.cs).
 
 | Scenario | Allocation ceiling (above unwrapped callback) |
 | :--- | :---: |
