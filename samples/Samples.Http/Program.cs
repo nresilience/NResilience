@@ -9,13 +9,14 @@ using var client = ResilienceHttp.CreateClient(
     Resilience.Http with
     {
         Name = "orders",
-        Backoff = Backoff.Exponential(transientBase: TimeSpan.FromMilliseconds(20)),
+        Backoff = Backoff.Exponential(TimeSpan.FromMilliseconds(20)),
         OnEvent = e => Console.WriteLine($"  {e}"),
     },
     new HttpResilienceOptions { BreakerPerHost = true, BudgetPerHost = true },
     transport);
 
 Console.WriteLine("A GET that gets a 503 and then a 200:");
+
 using (var response = await client.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None))
 {
     Console.WriteLine($"  -> {(int)response.StatusCode} after {transport.Sends} send(s)");
@@ -24,6 +25,7 @@ using (var response = await client.GetAsync(new Uri("https://orders.example/1"),
 Console.WriteLine();
 Console.WriteLine("A POST is not retried, because a retried POST is a duplicate order:");
 transport.Reset();
+
 using (var post = new HttpRequestMessage(HttpMethod.Post, "https://orders.example") { Content = new StringContent("{}") })
 using (var response = await client.SendAsync(post, CancellationToken.None))
 {
@@ -33,6 +35,7 @@ using (var response = await client.SendAsync(post, CancellationToken.None))
 Console.WriteLine();
 Console.WriteLine("Unless the request says it is safe to repeat:");
 transport.Reset();
+
 using (var post = new HttpRequestMessage(HttpMethod.Post, "https://orders.example") { Content = new StringContent("{}") })
 {
     post.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
@@ -45,6 +48,7 @@ using (var post = new HttpRequestMessage(HttpMethod.Post, "https://orders.exampl
 Console.WriteLine();
 Console.WriteLine("The handler's own view, per host - what a health endpoint would report:");
 var handler = new ResilienceHandler(new FakeTransport(), Resilience.Http);
+
 using (HttpClient probe = new(handler))
 {
     using var _ = await probe.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);

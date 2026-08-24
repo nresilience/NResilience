@@ -20,8 +20,10 @@ services.AddLogging(b => b
     .SetMinimumLevel(LogLevel.Debug));
 
 services.AddResilience(configuration.GetSection("Resilience"));
+
 services.AddHttpClient("orders")
     .AddResilience("api")
+
     // After AddResilience, so the limiter is inner to the retries and takes one permit per
     // attempt. The other order is refused at registration.
     .AddRateLimit(configuration.GetSection("RateLimit"))
@@ -32,15 +34,16 @@ using var provider = services.BuildServiceProvider();
 // Everything the meter records, printed as it happens. In a real application this is
 // AddOpenTelemetry().WithMetrics(m => m.AddMeter(ResilienceTelemetry.MeterName)).
 using var listener = new MeterListener();
+
 listener.InstrumentPublished = (instrument, l) =>
 {
     if (instrument.Meter.Name == ResilienceTelemetry.MeterName)
-    {
         l.EnableMeasurementEvents(instrument);
-    }
 };
+
 listener.SetMeasurementEventCallback<long>((instrument, value, tags, _) =>
     Console.WriteLine($"  {instrument.Name} += {value}"));
+
 listener.Start();
 
 var policies = provider.GetRequiredService<IResiliencePolicies>();
@@ -49,9 +52,11 @@ Console.WriteLine($"  api: {policies["api"].Attempts} attempts, {policies["api"]
 Console.WriteLine();
 
 Console.WriteLine("A call through the registered policy:");
+
 var direct = await policies["api"].TryRunAsync(
     static attempt => Task.FromResult("answered"),
     CancellationToken.None);
+
 Console.WriteLine($"  -> {direct.StopReason}");
 
 Console.WriteLine();

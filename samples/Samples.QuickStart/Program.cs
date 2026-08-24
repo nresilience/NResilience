@@ -7,19 +7,19 @@ var api = Resilience.Default with
     Name = "sample",
     Attempts = 4,
     Deadline = TimeSpan.FromSeconds(5),
-    Backoff = Backoff.Exponential(transientBase: TimeSpan.FromMilliseconds(50)),
+    Backoff = Backoff.Exponential(TimeSpan.FromMilliseconds(50)),
     Classify = Classifier.Default.On<FlakyDependencyException>(Verdict.Transient),
     OnEvent = e => Console.WriteLine($"  {e}"),
 };
 
 Console.WriteLine("A call that fails twice and then succeeds:");
-var flaky = new FakeDependency(failuresBeforeSuccess: 2);
+var flaky = new FakeDependency(2);
 var value = await api.RunAsync(attempt => flaky.ReadAsync(attempt), CancellationToken.None);
 Console.WriteLine($"  -> {value}");
 
 Console.WriteLine();
 Console.WriteLine("A call that never succeeds, reported rather than thrown:");
-var broken = new FakeDependency(failuresBeforeSuccess: int.MaxValue);
+var broken = new FakeDependency(int.MaxValue);
 var result = await api.TryRunAsync(attempt => broken.ReadAsync(attempt), CancellationToken.None);
 
 Console.WriteLine($"  -> {result.StopReason}");
