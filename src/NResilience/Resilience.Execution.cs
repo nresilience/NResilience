@@ -4,24 +4,47 @@ using NResilience.Internal;
 namespace NResilience;
 
 /// <content>
-/// The execution engine: admission, deadline, attempt loop, per-attempt timeout, classification,
-/// backoff and the inline attempt log, all in <b>one</b> <c>async</c> frame.
-/// <para>
-/// This is the architectural decision the whole design turns on. Every <c>async</c> frame that
-/// suspends heap-allocates its own state-machine box, and depth is a linear multiplier - so a
-/// chain of composed strategies pays a box per layer on the path every real I/O call takes.
-/// Collapsing the layers into one method removes all but one of them.
-/// </para>
+///     The execution engine: admission, deadline, attempt loop, per-attempt timeout, classification,
+///     backoff and the inline attempt log, all in <b>one</b> <c>async</c> frame.
+///     <para>
+///         This is the architectural decision the whole design turns on. Every <c>async</c> frame that
+///         suspends heap-allocates its own state-machine box, and depth is a linear multiplier - so a
+///         chain of composed strategies pays a box per layer on the path every real I/O call takes.
+///         Collapsing the layers into one method removes all but one of them.
+///     </para>
 /// </content>
 public sealed partial record Resilience
 {
+    /// <summary>
+    ///     How long a refused call pauses before it is reported. See <see cref="GuardDelay" /> for why it
+    ///     pauses at all.
+    ///     <para>
+    ///         Not configurable, and short enough that no caller needs it to be: it exists to put a floor
+    ///         under the rate of a rejection loop, not to be tuned. A static field on a record does not
+    ///         participate in the synthesized equality.
+    ///     </para>
+    /// </summary>
+    private static readonly TimeSpan RejectionDelay = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>
+    ///     How far past its own attempt timeout a callback has to run before the overrun is reported
+    ///     as <see cref="CallEventKind.OrphanedWork" /> rather than as ordinary scheduling noise.
+    ///     <para>
+    ///         Not configurable. It is a threshold for a diagnostic, not a bound on behavior, and a
+    ///         second is far beyond any delay the thread pool or a cancellation registration can account
+    ///         for while being short enough that a callback which genuinely ignored its token always
+    ///         crosses it.
+    ///     </para>
+    /// </summary>
+    private static readonly TimeSpan OrphanGrace = TimeSpan.FromSeconds(1);
+
     /// <summary>Runs a callback, retrying and bounding it according to this policy.</summary>
     /// <typeparam name="T">What the callback returns. Inferred; there is nothing to declare.</typeparam>
     /// <param name="work">
-    /// The work, taking the attempt's cancellation token: cancelled when that attempt hits its
-    /// <see cref="AttemptTimeout"/>, and when <paramref name="cancellationToken"/> is. Pass it into
-    /// whatever you call, because that is what lets a timed-out attempt actually stop. Every overload
-    /// takes it, so there is none that lets you forget.
+    ///     The work, taking the attempt's cancellation token: cancelled when that attempt hits its
+    ///     <see cref="AttemptTimeout" />, and when <paramref name="cancellationToken" /> is. Pass it into
+    ///     whatever you call, because that is what lets a timed-out attempt actually stop. Every overload
+    ///     takes it, so there is none that lets you forget.
     /// </param>
     /// <param name="cancellationToken">The caller's token. Cancelling it aborts the operation immediately and is never treated as a failure.</param>
     /// <returns>What the last attempt returned.</returns>
@@ -31,9 +54,7 @@ public sealed partial record Resilience
         ExecutionState.EnsureValidated(this);
 
         if (IsPassthrough)
-        {
             return new ValueTask<T>(work(cancellationToken));
-        }
 
         return ExecuteAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
             new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
@@ -49,18 +70,16 @@ public sealed partial record Resilience
         ExecutionState.EnsureValidated(this);
 
         if (IsPassthrough)
-        {
             return new ValueTask(work(cancellationToken));
-        }
 
         return Discard(ExecuteAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
             new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken));
     }
 
     /// <summary>
-    /// Runs a callback with caller state, so the lambda can be <c>static</c> and allocate no
-    /// closure. Same length as the simple form, and zero-allocation on a synchronously-completing
-    /// call.
+    ///     Runs a callback with caller state, so the lambda can be <c>static</c> and allocate no
+    ///     closure. Same length as the simple form, and zero-allocation on a synchronously-completing
+    ///     call.
     /// </summary>
     /// <typeparam name="TState">The state's type.</typeparam>
     /// <typeparam name="T">What the callback returns.</typeparam>
@@ -74,9 +93,7 @@ public sealed partial record Resilience
         ExecutionState.EnsureValidated(this);
 
         if (IsPassthrough)
-        {
             return new ValueTask<T>(work(state, cancellationToken));
-        }
 
         return ExecuteAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
             new StatefulInvoker<TState, T>(work), state, cancellationToken);
@@ -94,22 +111,20 @@ public sealed partial record Resilience
         ExecutionState.EnsureValidated(this);
 
         if (IsPassthrough)
-        {
             return new ValueTask(work(state, cancellationToken));
-        }
 
         return Discard(ExecuteAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
             new VoidStatefulInvoker<TState>(work), state, cancellationToken));
     }
 
     /// <summary>
-    /// Runs a callback and reports the outcome instead of throwing. This is what replaces a
-    /// fallback strategy - a fallback is an <c>if</c>.
-    /// <para>
-    /// Unlike the throwing forms, this always materializes the attempt log: its caller has
-    /// explicitly asked for a result object, and a history that vanished on success would make
-    /// "assert this succeeded on the third attempt" impossible to write.
-    /// </para>
+    ///     Runs a callback and reports the outcome instead of throwing. This is what replaces a
+    ///     fallback strategy - a fallback is an <c>if</c>.
+    ///     <para>
+    ///         Unlike the throwing forms, this always materializes the attempt log: its caller has
+    ///         explicitly asked for a result object, and a history that vanished on success would make
+    ///         "assert this succeeded on the third attempt" impossible to write.
+    ///     </para>
     /// </summary>
     /// <typeparam name="T">What the callback returns.</typeparam>
     /// <param name="work">The work, taking the attempt's cancellation token. Pass it into whatever you call.</param>
@@ -144,7 +159,8 @@ public sealed partial record Resilience
     /// <param name="state">Handed to the callback on every attempt.</param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <returns>The outcome.</returns>
-    public ValueTask<CallResult<T>> TryRunAsync<TState, T>(Func<TState, CancellationToken, Task<T>> work, TState state, CancellationToken cancellationToken = default)
+    public ValueTask<CallResult<T>> TryRunAsync<TState, T>(Func<TState, CancellationToken, Task<T>> work, TState state,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
@@ -169,40 +185,17 @@ public sealed partial record Resilience
     }
 
     /// <summary>
-    /// Drops a <see cref="VoidResult"/> without adding a frame.
-    /// <para>
-    /// When the core suspended, its <c>ValueTask&lt;VoidResult&gt;</c> is backed by a
-    /// <c>Task&lt;VoidResult&gt;</c>, which <i>is</i> a <see cref="Task"/> - so <c>AsTask()</c>
-    /// hands back the object that already exists rather than creating one. Awaiting the core here
-    /// instead would cost a second state-machine box on the suspending path, which is the whole
-    /// thing this design exists to avoid.
-    /// </para>
+    ///     Drops a <see cref="VoidResult" /> without adding a frame.
+    ///     <para>
+    ///         When the core suspended, its <c>ValueTask&lt;VoidResult&gt;</c> is backed by a
+    ///         <c>Task&lt;VoidResult&gt;</c>, which <i>is</i> a <see cref="Task" /> - so <c>AsTask()</c>
+    ///         hands back the object that already exists rather than creating one. Awaiting the core here
+    ///         instead would cost a second state-machine box on the suspending path, which is the whole
+    ///         thing this design exists to avoid.
+    ///     </para>
     /// </summary>
     private static ValueTask Discard(ValueTask<VoidResult> pending) =>
         pending.IsCompletedSuccessfully ? default : new ValueTask(pending.AsTask());
-
-    /// <summary>
-    /// How long a refused call pauses before it is reported. See <see cref="GuardDelay"/> for why it
-    /// pauses at all.
-    /// <para>
-    /// Not configurable, and short enough that no caller needs it to be: it exists to put a floor
-    /// under the rate of a rejection loop, not to be tuned. A static field on a record does not
-    /// participate in the synthesized equality.
-    /// </para>
-    /// </summary>
-    private static readonly TimeSpan RejectionDelay = TimeSpan.FromMilliseconds(100);
-
-    /// <summary>
-    /// How far past its own attempt timeout a callback has to run before the overrun is reported
-    /// as <see cref="CallEventKind.OrphanedWork"/> rather than as ordinary scheduling noise.
-    /// <para>
-    /// Not configurable. It is a threshold for a diagnostic, not a bound on behavior, and a
-    /// second is far beyond any delay the thread pool or a cancellation registration can account
-    /// for while being short enough that a callback which genuinely ignored its token always
-    /// crosses it.
-    /// </para>
-    /// </summary>
-    private static readonly TimeSpan OrphanGrace = TimeSpan.FromSeconds(1);
 
     private async ValueTask<TOut> ExecuteAsync<TState, T, TInvoker, TOut, TShaper>(
         TInvoker invoker,
@@ -254,9 +247,7 @@ public sealed partial record Resilience
                 // and one slow listener holding that lock would serialize every call through the
                 // breaker.
                 if (admission != BreakerTransition.None && OnEvent is not null)
-                {
                     NotifyBreaker(admission, log.Count + 1, Time.GetElapsedTime(start));
-                }
 
                 if (!admitted)
                 {
@@ -264,9 +255,8 @@ public sealed partial record Resilience
                     var pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
 
                     if (OnEvent is not null)
-                    {
-                        Notify(CallEventKind.Rejected, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null, StopReason.DependencyUnavailable);
-                    }
+                        Notify(CallEventKind.Rejected, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
+                            StopReason.DependencyUnavailable);
 
                     await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
                     break;
@@ -280,270 +270,265 @@ public sealed partial record Resilience
             // was not. A bool live across the await costs one byte in the state-machine box; the
             // alternative is a liveness bug.
             var recorded = false;
+
             try
             {
-            var remaining = Remaining(Time, start, Deadline, bounded);
-            if (remaining == TimeSpan.Zero)
-            {
-                reason = StopReason.DeadlineExceeded;
-                NotifyDeadline(log.Count + 1, verdict, Time.GetElapsedTime(start), error);
-                break;
-            }
+                var remaining = Remaining(Time, start, Deadline, bounded);
 
-            if (BeforeAttempt is { } beforeAttempt)
-            {
-                // Awaited as a Task rather than a ValueTask on purpose: Roslyn shares one hoisted
-                // awaiter field between await sites of the same awaiter type, so this await reuses
-                // the one the attempt and the backoff delay already need. A ValueTask-returning
-                // hook measured 16 B/call more on every suspending call, configured or not.
-                await beforeAttempt(new NextAttempt(log.Count + 1, verdict, error, remaining, cancellationToken)).ConfigureAwait(false);
-                cancellationToken.ThrowIfCancellationRequested();
-
-                remaining = Remaining(Time, start, Deadline, bounded);
                 if (remaining == TimeSpan.Zero)
                 {
                     reason = StopReason.DeadlineExceeded;
                     NotifyDeadline(log.Count + 1, verdict, Time.GetElapsedTime(start), error);
                     break;
                 }
-            }
 
-            var effective = Effective(AttemptTimeout, remaining);
+                if (BeforeAttempt is { } beforeAttempt)
+                {
+                    // Awaited as a Task rather than a ValueTask on purpose: Roslyn shares one hoisted
+                    // awaiter field between await sites of the same awaiter type, so this await reuses
+                    // the one the attempt and the backoff delay already need. A ValueTask-returning
+                    // hook measured 16 B/call more on every suspending call, configured or not.
+                    await beforeAttempt(new NextAttempt(log.Count + 1, verdict, error, remaining, cancellationToken)).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
 
-            CancellationTokenSource? timer = null;
-            CancellationTokenSource? attemptSource = null;
-            var attemptToken = cancellationToken;
+                    remaining = Remaining(Time, start, Deadline, bounded);
 
-            if (effective != Timeout.InfiniteTimeSpan)
-            {
-                // A pooled source drives the timer, and the attempt links it with the caller's
-                // token to make the token the callback receives. The pooled source's own token is
-                // never handed out: TryReset preserves token identity, so a callback that outlived
-                // its attempt would observe the next operation's cancellation.
-                //
-                // The tempting shortcut - one fresh CreateLinkedTokenSource(caller) with
-                // CancelAfter on it, dodging the second source - measures 96 B/call *worse*.
-                // A pooled source keeps its TimerQueueTimer across TryReset, so its CancelAfter
-                // allocates nothing, and a fresh source's cannot. Measured, not reasoned.
-                timer = CtsPool.Rent(Time);
-                timer.CancelAfter(effective);
-                attemptSource = cancellationToken.CanBeCanceled
-                    ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
-                    : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
+                    if (remaining == TimeSpan.Zero)
+                    {
+                        reason = StopReason.DeadlineExceeded;
+                        NotifyDeadline(log.Count + 1, verdict, Time.GetElapsedTime(start), error);
+                        break;
+                    }
+                }
 
-                attemptToken = attemptSource.Token;
-            }
+                var effective = Effective(AttemptTimeout, remaining);
 
-            var attemptStart = Time.GetTimestamp();
-            error = null;
-            hasValue = false;
+                CancellationTokenSource? timer = null;
+                CancellationTokenSource? attemptSource = null;
+                var attemptToken = cancellationToken;
 
-            try
-            {
-                var attempt = invoker.Invoke(state, attemptToken);
-                await attempt.ConfigureAwait(false);
-                value = invoker.Result(attempt);
-                hasValue = true;
-                verdict = Classify.ClassifyResult(value);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                // Never retried, never counted, never converted into a timeout, and no classifier
-                // can override it.
-                throw;
-            }
-            catch (OperationCanceledException canceled) when (attemptSource is not null && attemptSource.IsCancellationRequested)
-            {
-                // Our own attempt timeout. It never reaches the classifier: the executor knows
-                // which source fired, and disambiguating that from caller cancellation is the
-                // classic bug in timeout implementations.
-                verdict = Verdict.Transient;
-                error = new AttemptTimeoutException(effective, canceled);
-            }
-            catch (RateLimitedException limited)
-            {
-                // Local admission control. It never reaches the classifier either: a refusal this
-                // process imposed on itself is not evidence about the dependency, and a user
-                // predicate that called it Transient would open a circuit against a service that
-                // was never contacted. The verdict is Throttled - so the long backoff curve and the
-                // limiter's own hint apply - and carries the flag that keeps the retry budget from
-                // being charged for a call that never left.
-                verdict = Verdict.Limited(limited.RetryAfter);
-                error = limited;
-            }
-            catch (Exception exception)
-            {
-                verdict = Classify.ClassifyException(exception);
+                if (effective != Timeout.InfiniteTimeSpan)
+                {
+                    // A pooled source drives the timer, and the attempt links it with the caller's
+                    // token to make the token the callback receives. The pooled source's own token is
+                    // never handed out: TryReset preserves token identity, so a callback that outlived
+                    // its attempt would observe the next operation's cancellation.
+                    //
+                    // The tempting shortcut - one fresh CreateLinkedTokenSource(caller) with
+                    // CancelAfter on it, dodging the second source - measures 96 B/call *worse*.
+                    // A pooled source keeps its TimerQueueTimer across TryReset, so its CancelAfter
+                    // allocates nothing, and a fresh source's cannot. Measured, not reasoned.
+                    timer = CtsPool.Rent(Time);
+                    timer.CancelAfter(effective);
 
-                // An exception cannot be turned into a value, so a classifier that calls one Ok
-                // is read as "stop, do not retry".
+                    attemptSource = cancellationToken.CanBeCanceled
+                        ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
+                        : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
+
+                    attemptToken = attemptSource.Token;
+                }
+
+                var attemptStart = Time.GetTimestamp();
+                error = null;
+                hasValue = false;
+
+                try
+                {
+                    var attempt = invoker.Invoke(state, attemptToken);
+                    await attempt.ConfigureAwait(false);
+                    value = invoker.Result(attempt);
+                    hasValue = true;
+                    verdict = Classify.ClassifyResult(value);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // Never retried, never counted, never converted into a timeout, and no classifier
+                    // can override it.
+                    throw;
+                }
+                catch (OperationCanceledException canceled) when (attemptSource is not null && attemptSource.IsCancellationRequested)
+                {
+                    // Our own attempt timeout. It never reaches the classifier: the executor knows
+                    // which source fired, and disambiguating that from caller cancellation is the
+                    // classic bug in timeout implementations.
+                    verdict = Verdict.Transient;
+                    error = new AttemptTimeoutException(effective, canceled);
+                }
+                catch (RateLimitedException limited)
+                {
+                    // Local admission control. It never reaches the classifier either: a refusal this
+                    // process imposed on itself is not evidence about the dependency, and a user
+                    // predicate that called it Transient would open a circuit against a service that
+                    // was never contacted. The verdict is Throttled - so the long backoff curve and the
+                    // limiter's own hint apply - and carries the flag that keeps the retry budget from
+                    // being charged for a call that never left.
+                    verdict = Verdict.Limited(limited.RetryAfter);
+                    error = limited;
+                }
+                catch (Exception exception)
+                {
+                    verdict = Classify.ClassifyException(exception);
+
+                    // An exception cannot be turned into a value, so a classifier that calls one Ok
+                    // is read as "stop, do not retry".
+                    if (verdict.Kind == VerdictKind.Ok)
+                        verdict = Verdict.Permanent;
+
+                    error = exception;
+                }
+                finally
+                {
+                    attemptSource?.Dispose();
+
+                    if (timer is not null)
+                        CtsPool.Return(timer, Time);
+                }
+
+                var duration = Time.GetElapsedTime(attemptStart);
+
+                log.Record(
+                    Time.GetElapsedTime(start, attemptStart).Ticks,
+                    duration.Ticks,
+                    verdict.Kind,
+                    verdict.SelfImposed,
+                    error);
+
+                if (OnEvent is not null)
+                {
+                    var observed = ResultOf(value, hasValue);
+                    Notify(CallEventKind.Attempt, log.Count, verdict, duration, null, error, observed);
+
+                    // A callback that kept running well past the timeout that was supposed to stop it
+                    // is the ecosystem's most-hit footgun, and it is invisible from inside: the
+                    // executor is blocked on the very task that ignored its token. So it is reported
+                    // retrospectively, the moment the work finally does return, by comparing what the
+                    // attempt was allowed against what it actually took.
+                    if (attemptSource is not null && duration >= effective + OrphanGrace)
+                        Notify(CallEventKind.OrphanedWork, log.Count, verdict, duration, null, error, observed);
+                }
+
+                // The duration goes with it because the breaker trips on brownouts as well as errors:
+                // a dependency returning 200s at 30x normal latency is the most common real degradation,
+                // and an error-rate breaker sits closed through the entire incident.
+                if (Breaker is { } sampled)
+                {
+                    var outcome = sampled.Record(verdict.Kind, duration);
+                    recorded = true;
+
+                    if (outcome != BreakerTransition.None && OnEvent is not null)
+                        NotifyBreaker(outcome, log.Count, Time.GetElapsedTime(start));
+                }
+
                 if (verdict.Kind == VerdictKind.Ok)
                 {
-                    verdict = Verdict.Permanent;
+                    // A success is what funds future retries. Deposits and withdrawals are both on the
+                    // budget rather than split across it and the breaker, so the fraction the budget
+                    // enforces is a fraction of the traffic that actually reached the dependency.
+                    budget?.Deposit();
+
+                    // Deliberately checked *after* the success return rather than before it. The
+                    // post-attempt cancellation check exists to stop the loop starting another attempt;
+                    // a caller who cancelled while an attempt was already succeeding has waited for
+                    // that attempt either way, and throwing away work that is done and paid for helps
+                    // nobody.
+                    if (OnEvent is not null)
+                        Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue),
+                            StopReason.Succeeded);
+
+                    var succeeded = shaper.WantsLogOnSuccess
+                        ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
+                        : AttemptLog.Empty;
+
+                    return shaper.Success(value, succeeded);
                 }
 
-                error = exception;
-            }
-            finally
-            {
-                attemptSource?.Dispose();
-                if (timer is not null)
-                {
-                    CtsPool.Return(timer, Time);
-                }
-            }
-
-            var duration = Time.GetElapsedTime(attemptStart);
-
-            log.Record(
-                Time.GetElapsedTime(start, attemptStart).Ticks,
-                duration.Ticks,
-                verdict.Kind,
-                verdict.SelfImposed,
-                error);
-
-            if (OnEvent is not null)
-            {
-                var observed = ResultOf(value, hasValue);
-                Notify(CallEventKind.Attempt, log.Count, verdict, duration, null, error, observed);
-
-                // A callback that kept running well past the timeout that was supposed to stop it
-                // is the ecosystem's most-hit footgun, and it is invisible from inside: the
-                // executor is blocked on the very task that ignored its token. So it is reported
-                // retrospectively, the moment the work finally does return, by comparing what the
-                // attempt was allowed against what it actually took.
-                if (attemptSource is not null && duration >= effective + OrphanGrace)
-                {
-                    Notify(CallEventKind.OrphanedWork, log.Count, verdict, duration, null, error, observed);
-                }
-            }
-
-            // The duration goes with it because the breaker trips on brownouts as well as errors:
-            // a dependency returning 200s at 30x normal latency is the most common real degradation,
-            // and an error-rate breaker sits closed through the entire incident.
-            if (Breaker is { } sampled)
-            {
-                var outcome = sampled.Record(verdict.Kind, duration);
-                recorded = true;
-                if (outcome != BreakerTransition.None && OnEvent is not null)
-                {
-                    NotifyBreaker(outcome, log.Count, Time.GetElapsedTime(start));
-                }
-            }
-
-            if (verdict.Kind == VerdictKind.Ok)
-            {
-                // A success is what funds future retries. Deposits and withdrawals are both on the
-                // budget rather than split across it and the breaker, so the fraction the budget
-                // enforces is a fraction of the traffic that actually reached the dependency.
-                budget?.Deposit();
-
-                // Deliberately checked *after* the success return rather than before it. The
-                // post-attempt cancellation check exists to stop the loop starting another attempt;
-                // a caller who cancelled while an attempt was already succeeding has waited for
-                // that attempt either way, and throwing away work that is done and paid for helps
-                // nobody.
-                if (OnEvent is not null)
-                {
-                    Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue), StopReason.Succeeded);
-                }
-
-                var succeeded = shaper.WantsLogOnSuccess
-                    ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
-                    : AttemptLog.Empty;
-
-                return shaper.Success(value, succeeded);
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-
-            if (verdict.Kind == VerdictKind.Permanent)
-            {
-                reason = StopReason.Permanent;
-
-                if (OnEvent is not null)
-                {
-                    // The event that makes "Classifier.Default did not recognize your exception
-                    // type" visible rather than mysterious: the type is right there on it.
-                    Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue), StopReason.Permanent);
-                }
-
-                break;
-            }
-
-            if (log.Count >= Attempts)
-            {
-                reason = StopReason.AttemptsExhausted;
-
-                if (OnEvent is not null)
-                {
-                    Notify(CallEventKind.Exhausted, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue), StopReason.AttemptsExhausted);
-                }
-
-                break;
-            }
-
-            var left = Remaining(Time, start, Deadline, bounded);
-            if (left == TimeSpan.Zero)
-            {
-                reason = StopReason.DeadlineExceeded;
-                NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
-                break;
-            }
-
-            // 3i. Throttle, after the deadline check so a retry there is no time for is never
-            //     charged for. The per-attempt limit above cannot prevent a retry storm on its own,
-            //     because every caller independently believes it is being reasonable; only a budget
-            //     expressed as a fraction of traffic bounds the aggregate.
-            //
-            //     A self-imposed refusal is exempt. The budget is a fraction of the traffic that
-            //     actually reached the dependency, and a retry of a call local admission control
-            //     stopped costs the dependency nothing - charging for it would let a burst of
-            //     self-throttling quietly drain the capacity real transient failures need.
-            if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
-            {
-                reason = StopReason.BudgetExhausted;
-                var refused = GuardDelay(left);
-
-                if (OnEvent is not null)
-                {
-                    Notify(CallEventKind.Rejected, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue), StopReason.BudgetExhausted);
-                }
-
-                await Delay(Time, refused, cancellationToken).ConfigureAwait(false);
-                break;
-            }
-
-            var delay = Backoff.Compute(new NextAttempt(log.Count + 1, verdict, error, left, cancellationToken));
-
-            // A delay that would consume the rest of the budget leaves nothing for the attempt
-            // after it, so the deadline stops the operation here rather than sleeping through it.
-            if (bounded && delay >= left)
-            {
-                reason = StopReason.DeadlineExceeded;
-                NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
-                break;
-            }
-
-            if (OnEvent is not null)
-            {
-                // Raised before the backoff is served rather than after it, so a listener sees the
-                // retry coming and can report how long the call is about to sit idle.
-                Notify(CallEventKind.Retrying, log.Count + 1, verdict, Time.GetElapsedTime(start), delay, error, ResultOf(value, hasValue));
-            }
-
-            if (delay > TimeSpan.Zero)
-            {
-                await Task.Delay(delay, Time, cancellationToken).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
-            }
+
+                if (verdict.Kind == VerdictKind.Permanent)
+                {
+                    reason = StopReason.Permanent;
+
+                    if (OnEvent is not null)
+                    {
+                        // The event that makes "Classifier.Default did not recognize your exception
+                        // type" visible rather than mysterious: the type is right there on it.
+                        Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                            StopReason.Permanent);
+                    }
+
+                    break;
+                }
+
+                if (log.Count >= Attempts)
+                {
+                    reason = StopReason.AttemptsExhausted;
+
+                    if (OnEvent is not null)
+                        Notify(CallEventKind.Exhausted, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                            StopReason.AttemptsExhausted);
+
+                    break;
+                }
+
+                var left = Remaining(Time, start, Deadline, bounded);
+
+                if (left == TimeSpan.Zero)
+                {
+                    reason = StopReason.DeadlineExceeded;
+                    NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
+                    break;
+                }
+
+                // 3i. Throttle, after the deadline check so a retry there is no time for is never
+                //     charged for. The per-attempt limit above cannot prevent a retry storm on its own,
+                //     because every caller independently believes it is being reasonable; only a budget
+                //     expressed as a fraction of traffic bounds the aggregate.
+                //
+                //     A self-imposed refusal is exempt. The budget is a fraction of the traffic that
+                //     actually reached the dependency, and a retry of a call local admission control
+                //     stopped costs the dependency nothing - charging for it would let a burst of
+                //     self-throttling quietly drain the capacity real transient failures need.
+                if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
+                {
+                    reason = StopReason.BudgetExhausted;
+                    var refused = GuardDelay(left);
+
+                    if (OnEvent is not null)
+                        Notify(CallEventKind.Rejected, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue),
+                            StopReason.BudgetExhausted);
+
+                    await Delay(Time, refused, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+                var delay = Backoff.Compute(new NextAttempt(log.Count + 1, verdict, error, left, cancellationToken));
+
+                // A delay that would consume the rest of the budget leaves nothing for the attempt
+                // after it, so the deadline stops the operation here rather than sleeping through it.
+                if (bounded && delay >= left)
+                {
+                    reason = StopReason.DeadlineExceeded;
+                    NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
+                    break;
+                }
+
+                if (OnEvent is not null)
+                {
+                    // Raised before the backoff is served rather than after it, so a listener sees the
+                    // retry coming and can report how long the call is about to sit idle.
+                    Notify(CallEventKind.Retrying, log.Count + 1, verdict, Time.GetElapsedTime(start), delay, error, ResultOf(value, hasValue));
+                }
+
+                if (delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay, Time, cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
             }
             finally
             {
                 if (Breaker is { } b && !recorded)
-                {
                     b.ReleaseProbe();
-                }
             }
         }
 
@@ -563,59 +548,59 @@ public sealed partial record Resilience
     }
 
     /// <summary>
-    /// The pause a refused call serves before it is reported.
-    /// <para>
-    /// <b>Guarded rejection is not fail-fast.</b> A cheap rejection inside a caller's
-    /// <c>while (true)</c> polling loop is a CPU spin: without a forced pause, a tripped breaker or a
-    /// depleted budget turns into errors returned with no delay, spiking client CPU and generating
-    /// more traffic than the call it refused would have. AWS carves out an explicit exception for
-    /// exactly this on its long-polling operations.
-    /// </para>
-    /// <para>
-    /// Bounded by the time left on the deadline, so a refusal can never make a call overrun the
-    /// budget its caller set. Returns <see cref="Task"/> so the await shares the hoisted awaiter
-    /// field the attempt and the backoff delay already need.
-    /// </para>
+    ///     The pause a refused call serves before it is reported.
+    ///     <para>
+    ///         <b>Guarded rejection is not fail-fast.</b> A cheap rejection inside a caller's
+    ///         <c>while (true)</c> polling loop is a CPU spin: without a forced pause, a tripped breaker or a
+    ///         depleted budget turns into errors returned with no delay, spiking client CPU and generating
+    ///         more traffic than the call it refused would have. AWS carves out an explicit exception for
+    ///         exactly this on its long-polling operations.
+    ///     </para>
+    ///     <para>
+    ///         Bounded by the time left on the deadline, so a refusal can never make a call overrun the
+    ///         budget its caller set. Returns <see cref="Task" /> so the await shares the hoisted awaiter
+    ///         field the attempt and the backoff delay already need.
+    ///     </para>
     /// </summary>
     private static TimeSpan GuardDelay(TimeSpan remaining) =>
         remaining == Timeout.InfiniteTimeSpan || remaining > RejectionDelay ? RejectionDelay : remaining;
 
     /// <summary>
-    /// The pause itself, split from <see cref="GuardDelay"/> so a listener can be told how long a
-    /// refusal is about to sit before it sits there. Returns <see cref="Task"/> so the await shares
-    /// the hoisted awaiter field the attempt and the backoff delay already need.
+    ///     The pause itself, split from <see cref="GuardDelay" /> so a listener can be told how long a
+    ///     refusal is about to sit before it sits there. Returns <see cref="Task" /> so the await shares
+    ///     the hoisted awaiter field the attempt and the backoff delay already need.
     /// </summary>
     private static Task Delay(TimeProvider time, TimeSpan delay, CancellationToken cancellationToken) =>
         delay > TimeSpan.Zero ? Task.Delay(delay, time, cancellationToken) : Task.CompletedTask;
 
     /// <summary>
-    /// Boxes an attempt's result for a listener, and only for a listener.
-    /// <para>
-    /// <c>typeof(T)</c> is a JIT constant in each closed instantiation, so the void entry points
-    /// fold this to a constant null rather than handing out a meaningless box of the internal
-    /// no-result type.
-    /// </para>
+    ///     Boxes an attempt's result for a listener, and only for a listener.
+    ///     <para>
+    ///         <c>typeof(T)</c> is a JIT constant in each closed instantiation, so the void entry points
+    ///         fold this to a constant null rather than handing out a meaningless box of the internal
+    ///         no-result type.
+    ///     </para>
     /// </summary>
     private static object? ResultOf<T>(T value, bool hasValue) =>
         hasValue && typeof(T) != typeof(VoidResult) ? value : null;
 
     /// <summary>
-    /// Raises one event.
-    /// <para>
-    /// Every call site is already guarded by a <c>OnEvent is not null</c> test, because the
-    /// arguments - a boxed result, an elapsed-time read - are themselves work not worth doing for
-    /// a policy nobody is listening to. The delegate is read once here rather than twice, so a
-    /// listener detached by another thread between the guard and the raise cannot produce a null
-    /// dereference.
-    /// </para>
+    ///     Raises one event.
+    ///     <para>
+    ///         Every call site is already guarded by a <c>OnEvent is not null</c> test, because the
+    ///         arguments - a boxed result, an elapsed-time read - are themselves work not worth doing for
+    ///         a policy nobody is listening to. The delegate is read once here rather than twice, so a
+    ///         listener detached by another thread between the guard and the raise cannot produce a null
+    ///         dereference.
+    ///     </para>
     /// </summary>
-    private void Notify(CallEventKind kind, int attemptNumber, Verdict verdict, TimeSpan duration, TimeSpan? delay, Exception? error, object? result, StopReason? reason = null)
+    private void Notify(CallEventKind kind, int attemptNumber, Verdict verdict, TimeSpan duration, TimeSpan? delay, Exception? error, object? result,
+        StopReason? reason = null)
     {
         var listener = OnEvent;
+
         if (listener is null)
-        {
             return;
-        }
 
         try
         {
@@ -643,25 +628,21 @@ public sealed partial record Resilience
     }
 
     /// <summary>
-    /// Raises <see cref="CallEventKind.DeadlineExceeded"/>. Unlike the other helpers this checks
-    /// the listener itself, because it is called from four places whose only other work is to set
-    /// the stop reason and leave.
+    ///     Raises <see cref="CallEventKind.DeadlineExceeded" />. Unlike the other helpers this checks
+    ///     the listener itself, because it is called from four places whose only other work is to set
+    ///     the stop reason and leave.
     /// </summary>
     private void NotifyDeadline(int attemptNumber, Verdict verdict, TimeSpan elapsed, Exception? error)
     {
         if (OnEvent is not null)
-        {
             Notify(CallEventKind.DeadlineExceeded, attemptNumber, verdict, elapsed, null, error, null, StopReason.DeadlineExceeded);
-        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static TimeSpan Remaining(TimeProvider time, long start, TimeSpan deadline, bool bounded)
     {
         if (!bounded)
-        {
             return Timeout.InfiniteTimeSpan;
-        }
 
         var left = deadline - time.GetElapsedTime(start);
         return left > TimeSpan.Zero ? left : TimeSpan.Zero;
@@ -671,14 +652,10 @@ public sealed partial record Resilience
     private static TimeSpan Effective(TimeSpan attemptTimeout, TimeSpan remaining)
     {
         if (attemptTimeout == Timeout.InfiniteTimeSpan)
-        {
             return remaining;
-        }
 
         if (remaining == Timeout.InfiniteTimeSpan)
-        {
             return attemptTimeout;
-        }
 
         return attemptTimeout < remaining ? attemptTimeout : remaining;
     }

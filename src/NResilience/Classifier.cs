@@ -4,18 +4,18 @@ using System.Text;
 namespace NResilience;
 
 /// <summary>
-/// Says once what counts as a failure. Retry, backoff selection, the attempt log and the breaker
-/// and the budget all read the same answer, so there is no way for them
-/// to disagree.
-/// <para>
-/// Predicates are synchronous, because a classification is a type test or a status-code
-/// comparison. Work that genuinely needs I/O to classify a result belongs in the callback.
-/// </para>
-/// <para>
-/// Instances are immutable. <see cref="On{TException}(Verdict)"/> and
-/// <see cref="OnResult{T}(Func{T, Verdict})"/> return a new classifier, so the shipped statics
-/// can never be mutated by a caller deriving from them.
-/// </para>
+///     Says once what counts as a failure. Retry, backoff selection, the attempt log and the breaker
+///     and the budget all read the same answer, so there is no way for them
+///     to disagree.
+///     <para>
+///         Predicates are synchronous, because a classification is a type test or a status-code
+///         comparison. Work that genuinely needs I/O to classify a result belongs in the callback.
+///     </para>
+///     <para>
+///         Instances are immutable. <see cref="On{TException}(Verdict)" /> and
+///         <see cref="OnResult{T}(Func{T, Verdict})" /> return a new classifier, so the shipped statics
+///         can never be mutated by a caller deriving from them.
+///     </para>
 /// </summary>
 public sealed class Classifier
 {
@@ -27,9 +27,9 @@ public sealed class Classifier
     ];
 
     private readonly ExceptionRule[] _exceptionRules;
+    private readonly string _name;
     private readonly ResultRule[] _resultRules;
     private readonly Verdict _unrecognized;
-    private readonly string _name;
 
     private Classifier(ExceptionRule[] exceptionRules, ResultRule[] resultRules, Verdict unrecognized, string name)
     {
@@ -40,30 +40,34 @@ public sealed class Classifier
     }
 
     /// <summary>
-    /// Curated exception rules - <see cref="TimeoutException"/>, <see cref="IOException"/> and
-    /// <see cref="SocketException"/> are transient - and <b>anything unrecognized is
-    /// <see cref="VerdictKind.Permanent"/></b>.
-    /// <para>
-    /// Retrying a programming error is worse than not retrying it: it converts a fast, clear
-    /// failure into a slow, confusing one and hides the bug. The cost is that a genuinely
-    /// transient exception of your own needs one line -
-    /// <c>Classifier.Default.On&lt;MyDbException&gt;(Verdict.Transient)</c>.
-    /// </para>
+    ///     Curated exception rules - <see cref="TimeoutException" />, <see cref="IOException" /> and
+    ///     <see cref="SocketException" /> are transient - and
+    ///     <b>
+    ///         anything unrecognized is
+    ///         <see cref="VerdictKind.Permanent" />
+    ///     </b>
+    ///     .
+    ///     <para>
+    ///         Retrying a programming error is worse than not retrying it: it converts a fast, clear
+    ///         failure into a slow, confusing one and hides the bug. The cost is that a genuinely
+    ///         transient exception of your own needs one line -
+    ///         <c>Classifier.Default.On&lt;MyDbException&gt;(Verdict.Transient)</c>.
+    ///     </para>
     /// </summary>
     public static Classifier Default { get; } = new(DefaultRules, [], Verdict.Permanent, "Default");
 
     /// <summary>
-    /// <see cref="Default"/> plus HTTP transport knowledge. Used by <see cref="Resilience.Http"/>.
-    /// <para>
-    /// Held behind a nested holder so that an application which never touches HTTP does not root
-    /// <see cref="HttpResponseMessage"/> and its dependencies.
-    /// </para>
+    ///     <see cref="Default" /> plus HTTP transport knowledge. Used by <see cref="Resilience.Http" />.
+    ///     <para>
+    ///         Held behind a nested holder so that an application which never touches HTTP does not root
+    ///         <see cref="HttpResponseMessage" /> and its dependencies.
+    ///     </para>
     /// </summary>
     public static Classifier Http => HttpHolder.Instance;
 
     /// <summary>
-    /// No rules at all: every exception is <see cref="VerdictKind.Transient"/>. Opt-in, and named
-    /// so that choosing it is a visible decision rather than an accident.
+    ///     No rules at all: every exception is <see cref="VerdictKind.Transient" />. Opt-in, and named
+    ///     so that choosing it is a visible decision rather than an accident.
     /// </summary>
     public static Classifier RetryEverything { get; } = new([], [], Verdict.Transient, "RetryEverything");
 
@@ -92,11 +96,11 @@ public sealed class Classifier
     }
 
     /// <summary>
-    /// Classifies a returned value. Resolved once per <typeparamref name="T"/> and then cached, so
-    /// the policy itself never needs to be generic.
-    /// <para>
-    /// If no judge is registered for <typeparamref name="T"/>, any returned value is a success.
-    /// </para>
+    ///     Classifies a returned value. Resolved once per <typeparamref name="T" /> and then cached, so
+    ///     the policy itself never needs to be generic.
+    ///     <para>
+    ///         If no judge is registered for <typeparamref name="T" />, any returned value is a success.
+    ///     </para>
     /// </summary>
     /// <typeparam name="T">The result type this rule applies to. Matched exactly, not by assignability.</typeparam>
     /// <param name="judge">Given the value, returns its verdict.</param>
@@ -110,8 +114,8 @@ public sealed class Classifier
     }
 
     /// <summary>
-    /// The verdict for an exception. Rules are evaluated most-recently-added first, so a rule you
-    /// add always beats one it was derived from.
+    ///     The verdict for an exception. Rules are evaluated most-recently-added first, so a rule you
+    ///     add always beats one it was derived from.
     /// </summary>
     /// <param name="exception">The exception an attempt threw.</param>
     /// <returns>Its verdict, or the unrecognized-exception verdict when no rule matches.</returns>
@@ -120,30 +124,27 @@ public sealed class Classifier
         ArgumentNullException.ThrowIfNull(exception);
 
         var rules = _exceptionRules;
+
         for (var i = 0; i < rules.Length; i++)
         {
             if (rules[i].ExceptionType.IsInstanceOfType(exception))
-            {
                 return rules[i].Judge(exception);
-            }
         }
 
         return _unrecognized;
     }
 
     /// <summary>
-    /// The verdict for a returned value. Free when no result rules are configured, which is the
-    /// case for every classifier except <see cref="Http"/> and ones derived from it.
+    ///     The verdict for a returned value. Free when no result rules are configured, which is the
+    ///     case for every classifier except <see cref="Http" /> and ones derived from it.
     /// </summary>
     /// <typeparam name="T">The static result type of the call.</typeparam>
     /// <param name="value">The value the callback returned.</param>
-    /// <returns>Its verdict, or <see cref="Verdict.Ok"/> when nothing is registered for <typeparamref name="T"/>.</returns>
+    /// <returns>Its verdict, or <see cref="Verdict.Ok" /> when nothing is registered for <typeparamref name="T" />.</returns>
     public Verdict ClassifyResult<T>(T value)
     {
         if (_resultRules.Length == 0)
-        {
             return Verdict.Ok;
-        }
 
         // A single-entry cache per result type, guarded by an owner check. The static slot is
         // shared across all classifiers for a given T, so the Owner field on the entry is what
@@ -153,17 +154,16 @@ public sealed class Classifier
         // comparison. Alternating two classifiers for the same T thrashes the slot and falls to
         // the slow path on every call, which is correct but not free.
         var cached = ResultJudge<T>.Cache;
+
         if (cached is not null && ReferenceEquals(cached.Owner, this))
-        {
             return cached.Judge is null ? Verdict.Ok : cached.Judge(value);
-        }
 
         return ClassifyResultSlow(value);
     }
 
     /// <summary>
-    /// Every rule, in the order they are evaluated. Answers "what will this actually retry?"
-    /// without reading the library's source.
+    ///     Every rule, in the order they are evaluated. Answers "what will this actually retry?"
+    ///     without reading the library's source.
     /// </summary>
     /// <returns>A multi-line dump of the ruleset.</returns>
     public override string ToString()
@@ -190,6 +190,7 @@ public sealed class Classifier
     {
         Func<T, Verdict>? judge = null;
         var rules = _resultRules;
+
         for (var i = 0; i < rules.Length; i++)
         {
             if (rules[i].ResultType == typeof(T))
@@ -221,12 +222,12 @@ public sealed class Classifier
 
         public string Description { get; } = description;
 
-        /// <summary>Set only by <see cref="Fixed"/>, purely so <c>ToString</c> can print it.</summary>
+        /// <summary>Set only by <see cref="Fixed" />, purely so <c>ToString</c> can print it.</summary>
         public Verdict? Constant { get; private init; }
 
         /// <summary>
-        /// A rule that always gives the same verdict. The judge and the printed constant are
-        /// derived from one value here, so they cannot disagree.
+        ///     A rule that always gives the same verdict. The judge and the printed constant are
+        ///     derived from one value here, so they cannot disagree.
         /// </summary>
         public static ExceptionRule Fixed(Type exceptionType, Verdict verdict, string description) =>
             new(exceptionType, _ => verdict, description) { Constant = verdict };
@@ -242,8 +243,8 @@ public sealed class Classifier
     }
 
     /// <summary>
-    /// The per-result-type judge cache. A static of a generic type, so <c>typeof(T)</c> never has
-    /// to be compared at run time and a monomorphic call site reduces to one static read.
+    ///     The per-result-type judge cache. A static of a generic type, so <c>typeof(T)</c> never has
+    ///     to be compared at run time and a monomorphic call site reduces to one static read.
     /// </summary>
     private static class ResultJudge<T>
     {
@@ -279,15 +280,12 @@ public sealed class Classifier
         private static TimeSpan? RetryAfterOf(HttpResponseMessage response)
         {
             var header = response.Headers.RetryAfter;
+
             if (header is null)
-            {
                 return null;
-            }
 
             if (header.Delta is { } delta)
-            {
                 return delta > TimeSpan.Zero ? delta : TimeSpan.Zero;
-            }
 
             if (header.Date is { } date)
             {

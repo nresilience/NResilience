@@ -1,6 +1,6 @@
 namespace NResilience;
 
-/// <summary>What a <see cref="Breaker"/> is currently doing.</summary>
+/// <summary>What a <see cref="Breaker" /> is currently doing.</summary>
 public enum BreakerState
 {
     /// <summary>Calls pass through. Outcomes are being sampled.</summary>
@@ -10,25 +10,25 @@ public enum BreakerState
     Open,
 
     /// <summary>
-    /// The break has expired and a trickle of trial calls is allowed through. Successes close the
-    /// breaker; a failure re-opens it with a longer break.
+    ///     The break has expired and a trickle of trial calls is allowed through. Successes close the
+    ///     breaker; a failure re-opens it with a longer break.
     /// </summary>
     HalfOpen,
 
-    /// <summary>Forced open by <see cref="Breaker.Isolate"/>. Never self-heals.</summary>
+    /// <summary>Forced open by <see cref="Breaker.Isolate" />. Never self-heals.</summary>
     Isolated,
 }
 
 /// <summary>
-/// A state change a call caused, handed back to the executor so it can raise the matching
-/// <see cref="CallEvent"/> after the breaker's lock has been released.
-/// <para>
-/// Internal, and deliberately not a public "the breaker changed state" callback on
-/// <see cref="Breaker"/> itself. A breaker is shared and a listener is per-policy: the transition
-/// belongs to the call that caused it, which is the only context in which "which policy saw this?"
-/// has an answer. <see cref="Breaker.Isolate"/> and <see cref="Breaker.Reset"/> are administrative
-/// and raise nothing, because there is no call to attribute them to.
-/// </para>
+///     A state change a call caused, handed back to the executor so it can raise the matching
+///     <see cref="CallEvent" /> after the breaker's lock has been released.
+///     <para>
+///         Internal, and deliberately not a public "the breaker changed state" callback on
+///         <see cref="Breaker" /> itself. A breaker is shared and a listener is per-policy: the transition
+///         belongs to the call that caused it, which is the only context in which "which policy saw this?"
+///         has an answer. <see cref="Breaker.Isolate" /> and <see cref="Breaker.Reset" /> are administrative
+///         and raise nothing, because there is no call to attribute them to.
+///     </para>
 /// </summary>
 internal enum BreakerTransition : byte
 {
@@ -46,16 +46,16 @@ internal enum BreakerTransition : byte
 }
 
 /// <summary>
-/// How a <see cref="Breaker"/> decides to trip, how long it stays tripped, and what it takes to
-/// close it again.
+///     How a <see cref="Breaker" /> decides to trip, how long it stays tripped, and what it takes to
+///     close it again.
 /// </summary>
 /// <remarks>
-/// Every default here is a departure from Polly v8, and each one is deliberate. Polly removed
-/// classic consecutive-failure breaking, leaving only a rate-based trip at <c>FailureRatio</c> 0.1
-/// over a minimum throughput of 100 calls per 30 s - which means a service doing fewer than 100
-/// calls per 30 s can never open its breaker, and that is the median .NET service. Consecutive
-/// failures is therefore the default trip condition here, and the rate-based trip is opt-in
-/// alongside it.
+///     Every default here is a departure from Polly v8, and each one is deliberate. Polly removed
+///     classic consecutive-failure breaking, leaving only a rate-based trip at <c>FailureRatio</c> 0.1
+///     over a minimum throughput of 100 calls per 30 s - which means a service doing fewer than 100
+///     calls per 30 s can never open its breaker, and that is the median .NET service. Consecutive
+///     failures is therefore the default trip condition here, and the rate-based trip is opt-in
+///     alongside it.
 /// </remarks>
 public sealed record BreakerSettings
 {
@@ -63,9 +63,9 @@ public sealed record BreakerSettings
     public int ConsecutiveFailures { get; init; } = 5;
 
     /// <summary>
-    /// Optional rate-based trip, evaluated alongside the consecutive counter. Null disables it, and
-    /// nothing rate-based - including <see cref="SlowCallThreshold"/> - is evaluated until
-    /// <see cref="MinimumCalls"/> outcomes have landed in <see cref="Window"/>.
+    ///     Optional rate-based trip, evaluated alongside the consecutive counter. Null disables it, and
+    ///     nothing rate-based - including <see cref="SlowCallThreshold" /> - is evaluated until
+    ///     <see cref="MinimumCalls" /> outcomes have landed in <see cref="Window" />.
     /// </summary>
     public double? FailureRatio { get; init; }
 
@@ -76,13 +76,13 @@ public sealed record BreakerSettings
     public TimeSpan Window { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    /// Trip on brownouts, not just errors. An attempt slower than this counts against
-    /// <see cref="SlowCallRatio"/>, even when it succeeded.
-    /// <para>
-    /// The most common real degradation is not a dependency returning errors, it is a dependency
-    /// returning 200s at 30× normal latency while your thread pool and connection pool fill. An
-    /// error-rate breaker sits closed through the entire incident.
-    /// </para>
+    ///     Trip on brownouts, not just errors. An attempt slower than this counts against
+    ///     <see cref="SlowCallRatio" />, even when it succeeded.
+    ///     <para>
+    ///         The most common real degradation is not a dependency returning errors, it is a dependency
+    ///         returning 200s at 30× normal latency while your thread pool and connection pool fill. An
+    ///         error-rate breaker sits closed through the entire incident.
+    ///     </para>
     /// </summary>
     public TimeSpan? SlowCallThreshold { get; init; }
 
@@ -93,12 +93,12 @@ public sealed record BreakerSettings
     public TimeSpan BreakDuration { get; init; } = TimeSpan.FromSeconds(15);
 
     /// <summary>
-    /// <see cref="BreakDuration"/> doubles on each consecutive open, up to this. Set equal to
-    /// <see cref="BreakDuration"/> to disable growth.
-    /// <para>
-    /// This is exponential backoff applied to the breaker itself, and its absence is why breakers
-    /// flap on a fixed cadence forever. The counter resets on a clean close.
-    /// </para>
+    ///     <see cref="BreakDuration" /> doubles on each consecutive open, up to this. Set equal to
+    ///     <see cref="BreakDuration" /> to disable growth.
+    ///     <para>
+    ///         This is exponential backoff applied to the breaker itself, and its absence is why breakers
+    ///         flap on a fixed cadence forever. The counter resets on a clean close.
+    ///     </para>
     /// </summary>
     public TimeSpan MaxBreakDuration { get; init; } = TimeSpan.FromMinutes(2);
 
@@ -106,22 +106,22 @@ public sealed record BreakerSettings
     public int HalfOpenProbes { get; init; } = 1;
 
     /// <summary>
-    /// Successful probes required to close. More than one on purpose: closing a breaker on a single
-    /// lucky probe, in front of a dependency that is still broken and a client fleet whose
-    /// accumulated retries are waiting, is how breakers oscillate and how a metastable failure
-    /// sustains itself.
+    ///     Successful probes required to close. More than one on purpose: closing a breaker on a single
+    ///     lucky probe, in front of a dependency that is still broken and a client fleet whose
+    ///     accumulated retries are waiting, is how breakers oscillate and how a metastable failure
+    ///     sustains itself.
     /// </summary>
     public int ProbeSuccesses { get; init; } = 2;
 
     /// <summary>
-    /// The clock. Leave it alone in production.
-    /// <para>
-    /// A breaker owns its clock rather than borrowing the executing policy's, because
-    /// <see cref="Breaker.State"/> and <see cref="Breaker.OpenedAt"/> are read from health
-    /// endpoints and admin handlers that have no policy in hand - and because one breaker shared by
-    /// two policies with different clocks would otherwise have no single answer to "how long have
-    /// you been open?".
-    /// </para>
+    ///     The clock. Leave it alone in production.
+    ///     <para>
+    ///         A breaker owns its clock rather than borrowing the executing policy's, because
+    ///         <see cref="Breaker.State" /> and <see cref="Breaker.OpenedAt" /> are read from health
+    ///         endpoints and admin handlers that have no policy in hand - and because one breaker shared by
+    ///         two policies with different clocks would otherwise have no single answer to "how long have
+    ///         you been open?".
+    ///     </para>
     /// </summary>
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
@@ -132,161 +132,137 @@ public sealed record BreakerSettings
         var problems = new List<string>();
 
         if (ConsecutiveFailures < 1)
-        {
             problems.Add($"{nameof(ConsecutiveFailures)} must be at least 1; it is {ConsecutiveFailures}.");
-        }
 
         if (FailureRatio is { } ratio && (ratio <= 0 || ratio > 1 || double.IsNaN(ratio)))
-        {
             problems.Add($"{nameof(FailureRatio)} must be in (0, 1]; it is {ratio}.");
-        }
 
         if (MinimumCalls < 1)
-        {
             problems.Add($"{nameof(MinimumCalls)} must be at least 1; it is {MinimumCalls}.");
-        }
 
         if (Window <= TimeSpan.Zero)
-        {
             problems.Add($"{nameof(Window)} must be positive; it is {Window}.");
-        }
 
         if (SlowCallThreshold is { } slow && slow <= TimeSpan.Zero)
-        {
             problems.Add($"{nameof(SlowCallThreshold)} must be positive, or null for no slow-call trip; it is {slow}.");
-        }
 
         if (SlowCallRatio <= 0 || SlowCallRatio > 1 || double.IsNaN(SlowCallRatio))
-        {
             problems.Add($"{nameof(SlowCallRatio)} must be in (0, 1]; it is {SlowCallRatio}.");
-        }
 
         if (BreakDuration <= TimeSpan.Zero)
-        {
             problems.Add($"{nameof(BreakDuration)} must be positive; it is {BreakDuration}.");
-        }
 
         if (MaxBreakDuration < BreakDuration)
-        {
             problems.Add($"{nameof(MaxBreakDuration)} must be at least {nameof(BreakDuration)}; they are {MaxBreakDuration} and {BreakDuration}.");
-        }
 
         if (HalfOpenProbes < 1)
-        {
             problems.Add($"{nameof(HalfOpenProbes)} must be at least 1; it is {HalfOpenProbes}.");
-        }
 
         if (ProbeSuccesses < 1)
-        {
             problems.Add($"{nameof(ProbeSuccesses)} must be at least 1; it is {ProbeSuccesses}.");
-        }
 
         if (Time is null)
-        {
             problems.Add($"{nameof(Time)} must not be null.");
-        }
 
         if (problems.Count > 0)
-        {
             throw new ResilienceConfigurationException(problems);
-        }
     }
 }
 
 /// <summary>
-/// A circuit breaker: an object you construct, hold, and share exactly as widely as you intend.
-/// <para>
-/// Breaker scope is the single most confusing thing in the .NET resilience ecosystem, because in
-/// every existing library it is an emergent property of where a pipeline happened to be registered.
-/// Here it is a variable with a name and a lifetime, visible at the point you write
-/// <c>new Breaker()</c>. <c>with</c> on a <see cref="Resilience"/> copies the <i>reference</i>,
-/// never the state, so two policies derived from a common ancestor share whatever breaker that
-/// ancestor held - and that is exactly the intent.
-/// </para>
-/// <para>
-/// It samples individual <b>attempts</b>, always, because that is the only reading that produces a
-/// useful failure signal - so "does the breaker see attempts or whole operations?" has one answer
-/// rather than depending on composition order. Only <see cref="VerdictKind.Transient"/> counts as
-/// evidence: a <see cref="VerdictKind.Throttled"/> response means the dependency is working
-/// correctly and defending itself, and a <see cref="VerdictKind.Permanent"/> one is overwhelmingly
-/// a client-side fact.
-/// </para>
+///     A circuit breaker: an object you construct, hold, and share exactly as widely as you intend.
+///     <para>
+///         Breaker scope is the single most confusing thing in the .NET resilience ecosystem, because in
+///         every existing library it is an emergent property of where a pipeline happened to be registered.
+///         Here it is a variable with a name and a lifetime, visible at the point you write
+///         <c>new Breaker()</c>. <c>with</c> on a <see cref="Resilience" /> copies the <i>reference</i>,
+///         never the state, so two policies derived from a common ancestor share whatever breaker that
+///         ancestor held - and that is exactly the intent.
+///     </para>
+///     <para>
+///         It samples individual <b>attempts</b>, always, because that is the only reading that produces a
+///         useful failure signal - so "does the breaker see attempts or whole operations?" has one answer
+///         rather than depending on composition order. Only <see cref="VerdictKind.Transient" /> counts as
+///         evidence: a <see cref="VerdictKind.Throttled" /> response means the dependency is working
+///         correctly and defending itself, and a <see cref="VerdictKind.Permanent" /> one is overwhelmingly
+///         a client-side fact.
+///     </para>
 /// </summary>
 /// <example>
-/// <code>
+///     <code>
 /// public sealed class Dependencies
 /// {
 ///     public Breaker Payments { get; } = new() { Name = "payments" };
 ///     public Breaker Search   { get; } = new() { Name = "search" };
 /// }
-///
+/// 
 /// var payments = Resilience.Http with { Breaker = deps.Payments };
-///
+/// 
 /// app.MapGet("/health/payments", () =>
 ///     deps.Payments.State is BreakerState.Closed ? Results.Ok() : Results.StatusCode(503));
 /// </code>
 /// </example>
 /// <remarks>
-/// Guarded by an uncontended <c>lock</c> rather than being lock-free. Sliding-window rotation is a
-/// multi-word operation whose failure mode under <c>Interlocked</c> alone is a silently incorrect
-/// failure ratio - far worse than being slow. An uncontended lock is roughly 20 ns and the callback
-/// it guards dominates by orders of magnitude.
+///     Guarded by an uncontended <c>lock</c> rather than being lock-free. Sliding-window rotation is a
+///     multi-word operation whose failure mode under <c>Interlocked</c> alone is a silently incorrect
+///     failure ratio - far worse than being slow. An uncontended lock is roughly 20 ns and the callback
+///     it guards dominates by orders of magnitude.
 /// </remarks>
 public sealed class Breaker
 {
     /// <summary>
-    /// Buckets in the sliding window. Ten gives a rotation granularity of 3 s on the default 30 s
-    /// window, which is finer than any trip decision needs and costs 120 bytes of <c>int</c> per
-    /// breaker - and only when a rate-based trip is actually configured.
+    ///     Buckets in the sliding window. Ten gives a rotation granularity of 3 s on the default 30 s
+    ///     window, which is finer than any trip decision needs and costs 120 bytes of <c>int</c> per
+    ///     breaker - and only when a rate-based trip is actually configured.
     /// </summary>
     private const int BucketCount = 10;
 
     /// <summary>
-    /// Cap on the doubling exponent. <c>MaxBreakDuration</c> is the real bound; this only keeps the
-    /// shift from overflowing after a very long outage.
+    ///     Cap on the doubling exponent. <c>MaxBreakDuration</c> is the real bound; this only keeps the
+    ///     shift from overflowing after a very long outage.
     /// </summary>
     private const int MaxGrowthShift = 40;
 
-    private readonly object _gate = new();
-    private readonly BreakerSettings _settings;
-    private readonly TimeProvider _time;
-    private readonly long _startedAt;
-    private readonly long _ticksPerBucket;
     private readonly int[]? _calls;
     private readonly int[]? _failures;
+
+    private readonly object _gate = new();
     private readonly int[]? _slow;
+    private readonly long _startedAt;
+    private readonly long _ticksPerBucket;
+    private readonly TimeProvider _time;
+    private long _breakUntil;
+    private int _consecutiveFailures;
+    private int _consecutiveOpens;
 
     private long _epoch = -1;
-    private int _consecutiveFailures;
-    private BreakerState _state;
     private DateTimeOffset _openedAt;
-    private long _breakUntil;
-    private int _consecutiveOpens;
-    private int _probesInFlight;
     private int _probeSuccesses;
+    private int _probesInFlight;
+    private BreakerState _state;
 
     /// <summary>
-    /// Set by <see cref="OpenCore"/> and <see cref="CloseCore"/> under the lock, and drained by
-    /// <see cref="Record"/> on the way out. The transitions happen at four separate points inside
-    /// the state machine, and threading a return value out of each of them would mean touching
-    /// every one of those paths to carry a value only telemetry reads.
+    ///     Set by <see cref="OpenCore" /> and <see cref="CloseCore" /> under the lock, and drained by
+    ///     <see cref="Record" /> on the way out. The transitions happen at four separate points inside
+    ///     the state machine, and threading a return value out of each of them would mean touching
+    ///     every one of those paths to carry a value only telemetry reads.
     /// </summary>
     private BreakerTransition _transition;
 
     /// <summary>Creates a breaker.</summary>
-    /// <param name="settings">How it trips. Null means <see cref="BreakerSettings"/>'s defaults.</param>
+    /// <param name="settings">How it trips. Null means <see cref="BreakerSettings" />'s defaults.</param>
     /// <exception cref="ResilienceConfigurationException">The settings cannot be used.</exception>
     public Breaker(BreakerSettings? settings = null)
     {
-        _settings = settings ?? new BreakerSettings();
-        _settings.Validate();
-        _time = _settings.Time;
+        Settings = settings ?? new BreakerSettings();
+        Settings.Validate();
+        _time = Settings.Time;
         _startedAt = _time.GetTimestamp();
-        _ticksPerBucket = Math.Max(_settings.Window.Ticks / BucketCount, 1);
+        _ticksPerBucket = Math.Max(Settings.Window.Ticks / BucketCount, 1);
 
         // The window arrays exist only when something reads them. A consecutive-failures breaker -
         // the default - is three fields and no allocation beyond the object itself.
-        if (IsWindowed(_settings))
+        if (IsWindowed(Settings))
         {
             _calls = new int[BucketCount];
             _failures = new int[BucketCount];
@@ -298,16 +274,16 @@ public sealed class Breaker
     public string? Name { get; init; }
 
     /// <summary>The settings this breaker was built with.</summary>
-    public BreakerSettings Settings => _settings;
+    public BreakerSettings Settings { get; }
 
     /// <summary>
-    /// What the breaker is currently doing.
-    /// <para>
-    /// An <see cref="BreakerState.Open"/> breaker whose break duration has already elapsed reports
-    /// <see cref="BreakerState.HalfOpen"/>, because that is what the next call will find. Reading
-    /// this never changes it: the transition happens on admission, so a health endpoint cannot
-    /// consume the probe slot a real call needs.
-    /// </para>
+    ///     What the breaker is currently doing.
+    ///     <para>
+    ///         An <see cref="BreakerState.Open" /> breaker whose break duration has already elapsed reports
+    ///         <see cref="BreakerState.HalfOpen" />, because that is what the next call will find. Reading
+    ///         this never changes it: the transition happens on admission, so a health endpoint cannot
+    ///         consume the probe slot a real call needs.
+    ///     </para>
     /// </summary>
     public BreakerState State
     {
@@ -335,8 +311,8 @@ public sealed class Breaker
     }
 
     /// <summary>
-    /// Forces the breaker open. It never self-heals from this state; only <see cref="Reset"/>
-    /// brings it back.
+    ///     Forces the breaker open. It never self-heals from this state; only <see cref="Reset" />
+    ///     brings it back.
     /// </summary>
     public void Isolate()
     {
@@ -352,8 +328,8 @@ public sealed class Breaker
     }
 
     /// <summary>
-    /// Forces the breaker closed and discards everything it had learned, including the accumulated
-    /// break-duration growth.
+    ///     Forces the breaker closed and discards everything it had learned, including the accumulated
+    ///     break-duration growth.
     /// </summary>
     public void Reset()
     {
@@ -364,14 +340,14 @@ public sealed class Breaker
     }
 
     /// <summary>
-    /// Admission. True means the call may proceed, and in the half-open state consumes one of the
-    /// probe slots - so every true must be followed by exactly one <see cref="Record"/>.
+    ///     Admission. True means the call may proceed, and in the half-open state consumes one of the
+    ///     probe slots - so every true must be followed by exactly one <see cref="Record" />.
     /// </summary>
     /// <param name="transition">
-    /// The state change this admission caused, for the caller to report. Reported by the caller
-    /// rather than raised here because the transition happens under the breaker's lock and a
-    /// listener is arbitrary user code: raising inside the lock would let one slow listener
-    /// serialize every call through the breaker.
+    ///     The state change this admission caused, for the caller to report. Reported by the caller
+    ///     rather than raised here because the transition happens under the breaker's lock and a
+    ///     listener is arbitrary user code: raising inside the lock would let one slow listener
+    ///     serialize every call through the breaker.
     /// </param>
     internal bool TryEnter(out BreakerTransition transition)
     {
@@ -389,9 +365,7 @@ public sealed class Breaker
 
                 case BreakerState.Open:
                     if (Elapsed() < _breakUntil)
-                    {
                         return false;
-                    }
 
                     // Half-open is a trickle, not a surge: this call becomes the first probe and
                     // the remaining slots - if any - are handed out one admission at a time.
@@ -402,10 +376,8 @@ public sealed class Breaker
                     return true;
 
                 case BreakerState.HalfOpen:
-                    if (_probesInFlight >= _settings.HalfOpenProbes)
-                    {
+                    if (_probesInFlight >= Settings.HalfOpenProbes)
                         return false;
-                    }
 
                     _probesInFlight++;
                     return true;
@@ -420,8 +392,8 @@ public sealed class Breaker
     /// <param name="kind">How the executor classified it.</param>
     /// <param name="duration">How long the attempt took, for the slow-call trip.</param>
     /// <returns>
-    /// The state change this outcome caused, for the caller to report. See
-    /// <see cref="TryEnter"/> for why the breaker does not raise it itself.
+    ///     The state change this outcome caused, for the caller to report. See
+    ///     <see cref="TryEnter" /> for why the breaker does not raise it itself.
     /// </returns>
     internal BreakerTransition Record(VerdictKind kind, TimeSpan duration)
     {
@@ -434,15 +406,15 @@ public sealed class Breaker
     }
 
     /// <summary>
-    /// Returns a probe slot that <see cref="TryEnter"/> consumed but <see cref="Record"/> will not
-    /// be called on - because the attempt never ran, or was aborted by caller cancellation or a
-    /// deadline before it reached the recording point.
+    ///     Returns a probe slot that <see cref="TryEnter" /> consumed but <see cref="Record" /> will not
+    ///     be called on - because the attempt never ran, or was aborted by caller cancellation or a
+    ///     deadline before it reached the recording point.
     /// </summary>
     /// <remarks>
-    /// Without this, a probe admitted while half-open but never recorded leaves
-    /// <see cref="_probesInFlight"/> at its cap and the breaker wedged in <see cref="BreakerState.HalfOpen"/>
-    /// forever: every subsequent <see cref="TryEnter"/> sees the slots full and refuses, and the
-    /// breaker has no clock-driven path back to <see cref="BreakerState.Open"/> that would reset them.
+    ///     Without this, a probe admitted while half-open but never recorded leaves
+    ///     <see cref="_probesInFlight" /> at its cap and the breaker wedged in <see cref="BreakerState.HalfOpen" />
+    ///     forever: every subsequent <see cref="TryEnter" /> sees the slots full and refuses, and the
+    ///     breaker has no clock-driven path back to <see cref="BreakerState.Open" /> that would reset them.
     /// </remarks>
     internal void ReleaseProbe()
     {
@@ -452,9 +424,7 @@ public sealed class Breaker
             // the breaker moved the state away from HalfOpen. This guard makes the release a no-op
             // for any path that did record, so the executor can call it unconditionally in its finally.
             if (_state == BreakerState.HalfOpen && _probesInFlight > 0)
-            {
                 _probesInFlight--;
-            }
         }
     }
 
@@ -466,44 +436,35 @@ public sealed class Breaker
         // double-punish a dependency already broken or credit a probe slot that was reset out
         // from under it.
         if (_state is BreakerState.Isolated or BreakerState.Open)
-        {
             return;
-        }
 
         var probe = _state == BreakerState.HalfOpen;
+
         if (probe && _probesInFlight > 0)
-        {
             _probesInFlight--;
-        }
 
         var now = Elapsed();
 
         if (kind == VerdictKind.Ok)
         {
-            var slow = _settings.SlowCallThreshold is { } threshold && duration >= threshold;
+            var slow = Settings.SlowCallThreshold is { } threshold && duration >= threshold;
             _consecutiveFailures = 0;
-            Bucket(now, failure: false, slow: slow);
+            Bucket(now, false, slow);
 
             if (probe)
             {
                 // A slow probe is not a recovery. Closing on a 200 that took 30 s hands the
                 // waiting client fleet straight back to a dependency that is still in trouble.
                 if (slow)
-                {
                     OpenCore(now);
-                }
-                else if (++_probeSuccesses >= _settings.ProbeSuccesses)
-                {
+                else if (++_probeSuccesses >= Settings.ProbeSuccesses)
                     CloseCore();
-                }
 
                 return;
             }
 
             if (slow)
-            {
                 Evaluate(now);
-            }
 
             return;
         }
@@ -513,11 +474,9 @@ public sealed class Breaker
         // fact, and five NullReferenceExceptions in your own mapping code must not open a
         // circuit against a dependency that never misbehaved.
         if (kind != VerdictKind.Transient)
-        {
             return;
-        }
 
-        Bucket(now, failure: true, slow: false);
+        Bucket(now, true, false);
         _consecutiveFailures++;
 
         if (probe)
@@ -530,18 +489,16 @@ public sealed class Breaker
     }
 
     /// <summary>
-    /// How long until admission might succeed, for the <see cref="CallRejectedException"/> a
-    /// refusal carries. Null when there is nothing useful to say - an isolated breaker will not
-    /// self-heal, and a half-open one is waiting on a probe rather than on a clock.
+    ///     How long until admission might succeed, for the <see cref="CallRejectedException" /> a
+    ///     refusal carries. Null when there is nothing useful to say - an isolated breaker will not
+    ///     self-heal, and a half-open one is waiting on a probe rather than on a clock.
     /// </summary>
     internal TimeSpan? RetryAfterHint()
     {
         lock (_gate)
         {
             if (_state != BreakerState.Open)
-            {
                 return null;
-            }
 
             var left = _breakUntil - Elapsed();
             return left > 0 ? TimeSpan.FromTicks(left) : TimeSpan.Zero;
@@ -555,33 +512,28 @@ public sealed class Breaker
 
     private void Evaluate(long now)
     {
-        if (_consecutiveFailures >= _settings.ConsecutiveFailures)
+        if (_consecutiveFailures >= Settings.ConsecutiveFailures)
         {
             OpenCore(now);
             return;
         }
 
         if (_calls is null)
-        {
             return;
-        }
 
         var calls = Sum(_calls);
-        if (calls < _settings.MinimumCalls)
-        {
-            return;
-        }
 
-        if (_settings.FailureRatio is { } ratio && Sum(_failures!) >= ratio * calls)
+        if (calls < Settings.MinimumCalls)
+            return;
+
+        if (Settings.FailureRatio is { } ratio && Sum(_failures!) >= ratio * calls)
         {
             OpenCore(now);
             return;
         }
 
-        if (_settings.SlowCallThreshold is not null && Sum(_slow!) >= _settings.SlowCallRatio * calls)
-        {
+        if (Settings.SlowCallThreshold is not null && Sum(_slow!) >= Settings.SlowCallRatio * calls)
             OpenCore(now);
-        }
     }
 
     private void OpenCore(long now)
@@ -592,8 +544,8 @@ public sealed class Breaker
 
         // Exponential backoff applied to the breaker itself. The first open serves BreakDuration;
         // each consecutive one doubles, capped by MaxBreakDuration, and a clean close resets it.
-        var grown = _settings.BreakDuration.Ticks << Math.Min(_consecutiveOpens, MaxGrowthShift);
-        var capped = Math.Min(grown <= 0 ? long.MaxValue : grown, _settings.MaxBreakDuration.Ticks);
+        var grown = Settings.BreakDuration.Ticks << Math.Min(_consecutiveOpens, MaxGrowthShift);
+        var capped = Math.Min(grown <= 0 ? long.MaxValue : grown, Settings.MaxBreakDuration.Ticks);
 
         _breakUntil = now + capped;
         _consecutiveOpens = Math.Min(_consecutiveOpens + 1, MaxGrowthShift);
@@ -619,17 +571,17 @@ public sealed class Breaker
     private void Bucket(long now, bool failure, bool slow)
     {
         if (_calls is null)
-        {
             return;
-        }
 
         var epoch = now / _ticksPerBucket;
+
         if (epoch != _epoch)
         {
             // Every bucket the window has moved onto since the last write holds counts from a
             // previous revolution. Clearing them on write rather than on a timer means an idle
             // breaker costs nothing and a resumed one does not trip on stale evidence.
             var stale = _epoch < 0 ? BucketCount : Math.Min(epoch - _epoch, BucketCount);
+
             for (long i = 0; i < stale; i++)
             {
                 var stalled = Index(epoch - i);
@@ -643,23 +595,18 @@ public sealed class Breaker
 
         var index = Index(epoch);
         _calls[index]++;
+
         if (failure)
-        {
             _failures![index]++;
-        }
 
         if (slow)
-        {
             _slow![index]++;
-        }
     }
 
     private void ClearWindow()
     {
         if (_calls is null)
-        {
             return;
-        }
 
         Array.Clear(_calls);
         Array.Clear(_failures!);
@@ -667,11 +614,12 @@ public sealed class Breaker
         _epoch = -1;
     }
 
-    private static int Index(long epoch) => (int)(((epoch % BucketCount) + BucketCount) % BucketCount);
+    private static int Index(long epoch) => (int)((epoch % BucketCount + BucketCount) % BucketCount);
 
     private static int Sum(int[] buckets)
     {
         var total = 0;
+
         for (var i = 0; i < buckets.Length; i++)
         {
             total += buckets[i];

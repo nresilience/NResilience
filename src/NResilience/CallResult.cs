@@ -4,8 +4,8 @@ using System.Runtime.ExceptionServices;
 namespace NResilience;
 
 /// <summary>
-/// The outcome of a call that was asked not to throw. This is what replaces a fallback strategy:
-/// a fallback is an <c>if</c>.
+///     The outcome of a call that was asked not to throw. This is what replaces a fallback strategy:
+///     a fallback is an <c>if</c>.
 /// </summary>
 /// <typeparam name="T">What the callback returns.</typeparam>
 public readonly struct CallResult<T>
@@ -20,21 +20,21 @@ public readonly struct CallResult<T>
         Attempts = attempts;
     }
 
-    /// <summary>True when an attempt returned a value the classifier called <see cref="VerdictKind.Ok"/>.</summary>
+    /// <summary>True when an attempt returned a value the classifier called <see cref="VerdictKind.Ok" />.</summary>
     public bool IsSuccess { get; }
 
     /// <summary>
-    /// The last value an attempt returned, or <c>default</c> when every attempt threw.
-    /// <para>
-    /// This is populated even when <see cref="IsSuccess"/> is false, because an answer the policy
-    /// judged a failure is still an answer - a final <c>503 HttpResponseMessage</c> is a value the
-    /// caller needs, not least so it can be disposed. <see cref="HasValue"/> says whether it is
-    /// real.
-    /// </para>
+    ///     The last value an attempt returned, or <c>default</c> when every attempt threw.
+    ///     <para>
+    ///         This is populated even when <see cref="IsSuccess" /> is false, because an answer the policy
+    ///         judged a failure is still an answer - a final <c>503 HttpResponseMessage</c> is a value the
+    ///         caller needs, not least so it can be disposed. <see cref="HasValue" /> says whether it is
+    ///         real.
+    ///     </para>
     /// </summary>
     public T? Value { get; }
 
-    /// <summary>True when <see cref="Value"/> holds a value an attempt actually returned.</summary>
+    /// <summary>True when <see cref="Value" /> holds a value an attempt actually returned.</summary>
     public bool HasValue { get; }
 
     /// <summary>What the last attempt threw, or the deadline exception the library invented.</summary>
@@ -60,9 +60,7 @@ public readonly struct CallResult<T>
     public T ValueOrThrow()
     {
         if (IsSuccess)
-        {
             return Value!;
-        }
 
         ThrowFailure(Exception, StopReason, Attempts);
 
@@ -75,15 +73,13 @@ public readonly struct CallResult<T>
     internal static void ThrowFailure(Exception? exception, StopReason stopReason, AttemptLog attempts)
     {
         if (exception is not null)
-        {
             ExceptionDispatchInfo.Capture(exception).Throw();
-        }
 
         throw new CallRejectedException(stopReason, attempts);
     }
 }
 
-/// <summary>The void form of <see cref="CallResult{T}"/>. Same members, no value.</summary>
+/// <summary>The void form of <see cref="CallResult{T}" />. Same members, no value.</summary>
 public readonly struct CallResult
 {
     internal CallResult(bool isSuccess, Exception? exception, StopReason stopReason, AttemptLog attempts)
@@ -110,8 +106,6 @@ public readonly struct CallResult
     public void ThrowIfFailed()
     {
         if (!IsSuccess)
-        {
             CallResult<bool>.ThrowFailure(Exception, StopReason, Attempts);
-        }
     }
 }

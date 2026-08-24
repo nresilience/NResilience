@@ -4,17 +4,15 @@ using System.Runtime.CompilerServices;
 namespace NResilience.Internal;
 
 /// <summary>
-/// A thread-static xoshiro128** for jitter. No locking, no shared <see cref="Random"/>, and no
-/// contention on <c>Random.Shared</c> - jitter is drawn on a path whose whole purpose is to be
-/// taken by many threads at once during an incident.
+///     A thread-static xoshiro128** for jitter. No locking, no shared <see cref="Random" />, and no
+///     contention on <c>Random.Shared</c> - jitter is drawn on a path whose whole purpose is to be
+///     taken by many threads at once during an incident.
 /// </summary>
 internal static class Rng
 {
-    [ThreadStatic]
-    private static uint t_s0, t_s1, t_s2, t_s3;
+    [ThreadStatic] private static uint t_s0, t_s1, t_s2, t_s3;
 
-    [ThreadStatic]
-    private static bool t_seeded;
+    [ThreadStatic] private static bool t_seeded;
 
     /// <summary>A uniform double in [0, 1).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -23,9 +21,7 @@ internal static class Rng
     private static uint NextUInt32()
     {
         if (!t_seeded)
-        {
             Seed();
-        }
 
         var result = BitOperations.RotateLeft(t_s1 * 5, 7) * 9;
         var t = t_s1 << 9;
@@ -50,10 +46,9 @@ internal static class Rng
         t_s1 = SplitMix(ref x);
         t_s2 = SplitMix(ref x);
         t_s3 = SplitMix(ref x);
+
         if ((t_s0 | t_s1 | t_s2 | t_s3) == 0)
-        {
             t_s0 = 1;
-        }
 
         t_seeded = true;
 

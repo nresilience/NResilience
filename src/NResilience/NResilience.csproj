@@ -39,7 +39,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="../../README.md" Pack="true" PackagePath="\" />
+    <None Include="../../README.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
 
   <ItemGroup>
@@ -50,26 +50,26 @@
       because the library does not use them; the ProjectReference is here for build order, and the
       DLLs travel in analyzers/dotnet/cs, which is where the compiler looks.
     -->
-    <ProjectReference Include="../NResilience.Analyzers/NResilience.Analyzers.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" />
-    <ProjectReference Include="../NResilience.CodeFixes/NResilience.CodeFixes.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="../NResilience.Analyzers/NResilience.Analyzers.csproj" PrivateAssets="all" ReferenceOutputAssembly="false"/>
+    <ProjectReference Include="../NResilience.CodeFixes/NResilience.CodeFixes.csproj" PrivateAssets="all" ReferenceOutputAssembly="false"/>
 
-    <None Include="../NResilience.Analyzers/bin/$(Configuration)/netstandard2.0/NResilience.Analyzers.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
-    <None Include="../NResilience.CodeFixes/bin/$(Configuration)/netstandard2.0/NResilience.CodeFixes.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+    <None Include="../NResilience.Analyzers/bin/$(Configuration)/netstandard2.0/NResilience.Analyzers.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
+    <None Include="../NResilience.CodeFixes/bin/$(Configuration)/netstandard2.0/NResilience.CodeFixes.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
   </ItemGroup>
 
   <ItemGroup>
     <!-- The behavioural suite constructs NextAttempt and reads the inline log directly. -->
-    <InternalsVisibleTo Include="NResilience.Tests" />
+    <InternalsVisibleTo Include="NResilience.Tests"/>
 
     <!--
       The allocation gate asserts the inline attempt log's layout - capacity times record size -
       because the shipping executor has no log-less variant to difference against. Both are
       internal, and both are load-bearing for the suspending-path budget.
     -->
-    <InternalsVisibleTo Include="NResilience.Gates" />
+    <InternalsVisibleTo Include="NResilience.Gates"/>
   </ItemGroup>
 
   <!-- Shared package metadata: authors, repository URL, source link, symbols, readme. -->
-  <Import Project="../../Release.props" />
+  <Import Project="../../Release.props"/>
 
 </Project>

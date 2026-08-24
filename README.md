@@ -2,7 +2,8 @@
 
 Prevent cascading failures in your .NET applications.
 
-A struggling dependency can hang your requests, tie up your threads, and crash your application. Blind retries often make the problem worse by overwhelming the failing service. NResilience wraps your calls in retries, timeouts, and circuit breakers so your app degrades gracefully instead of crashing.
+A struggling dependency can hang your requests, tie up your threads, and crash your application. Blind retries often make the problem worse by overwhelming the
+failing service. NResilience wraps your calls in retries, timeouts, and circuit breakers so your app degrades gracefully instead of crashing.
 
 ## Why NResilience?
 
@@ -32,7 +33,8 @@ private static async Task<User?> GetUserAsync(int id, CancellationToken cancella
     await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
 ```
 
-Every call this client makes now uses three attempts with exponential backoff, a 30-second deadline, and HTTP-aware retry logic (for example, it retries a `503` but not a `404`).
+Every call this client makes now uses three attempts with exponential backoff, a 30-second deadline, and HTTP-aware retry logic (for example, it retries a `503`
+but not a `404`).
 
 ## Simple configuration
 
@@ -83,8 +85,8 @@ For more information, see these resources:
 
 ## Packages
 
-| Package | Use case |
-|---|---|
-| `NResilience` | The core library, HTTP handler, and analyzers. |
+| Package                  | Use case                                                                  |
+|--------------------------|---------------------------------------------------------------------------|
+| `NResilience`            | The core library, HTTP handler, and analyzers.                            |
 | `NResilience.Extensions` | Dependency injection, configuration binding, and metrics for hosted apps. |
-| `NResilience.Testing` | Helpers for testing your policies. |
+| `NResilience.Testing`    | Helpers for testing your policies.                                        |
