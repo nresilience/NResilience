@@ -128,7 +128,7 @@ public static class SnippetEngine
 
             if (trimmed.StartsWith("// </snippet:", StringComparison.Ordinal))
             {
-                (var name, var start) = open.Pop();
+                var (name, start) = open.Pop();
                 yield return new Snippet(name, "csharp", Dedent(lines[start..i]), file);
             }
         }

@@ -18,11 +18,9 @@ namespace NResilience.Extensions.Internal;
 /// </remarks>
 internal sealed class ResilienceTelemetryHandler(string clientName) : DelegatingHandler
 {
-    private readonly string _clientName = clientName;
-
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        using var activity = ResilienceTelemetry.StartCall(_clientName);
+        using var activity = ResilienceTelemetry.StartCall(clientName);
 
         if (activity is null)
         {

@@ -16,10 +16,6 @@ internal sealed class HttpCall(
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
     bool clone)
 {
-    private readonly HttpRequestMessage _original = request;
-    private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> _send = send;
-    private readonly bool _clone = clone;
-
     private byte[]? _body;
     private HttpResponseMessage? _previous;
 
@@ -36,7 +32,7 @@ internal sealed class HttpCall(
     /// </remarks>
     internal async Task BufferAsync(CancellationToken cancellationToken)
     {
-        if (_original.Content is { } content)
+        if (request.Content is { } content)
         {
 #if NET8_0_OR_GREATER
             _body = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
@@ -67,16 +63,16 @@ internal sealed class HttpCall(
         _previous?.Dispose();
         _previous = null;
 
-        var attempt = _clone ? Clone() : _original;
+        var attempt = clone ? Clone() : request;
         try
         {
-            var response = await _send(attempt, cancellationToken).ConfigureAwait(false);
+            var response = await send(attempt, cancellationToken).ConfigureAwait(false);
             _previous = response;
             return response;
         }
         finally
         {
-            if (_clone)
+            if (clone)
             {
                 attempt.Dispose();
             }
@@ -86,23 +82,23 @@ internal sealed class HttpCall(
     /// <summary>A fresh request carrying everything the original did.</summary>
     internal HttpRequestMessage Clone()
     {
-        var clone = new HttpRequestMessage(_original.Method, _original.RequestUri)
+        var clone = new HttpRequestMessage(request.Method, request.RequestUri)
         {
-            Version = _original.Version,
-            VersionPolicy = _original.VersionPolicy,
+            Version = request.Version,
+            VersionPolicy = request.VersionPolicy,
         };
 
-        foreach (var header in _original.Headers)
+        foreach (var header in request.Headers)
         {
             clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
-        foreach (var option in (IDictionary<string, object?>)_original.Options)
+        foreach (var option in (IDictionary<string, object?>)request.Options)
         {
             ((IDictionary<string, object?>)clone.Options)[option.Key] = option.Value;
         }
 
-        if (_body is { } body && _original.Content is { } original)
+        if (_body is { } body && request.Content is { } original)
         {
             var content = new ByteArrayContent(body);
 

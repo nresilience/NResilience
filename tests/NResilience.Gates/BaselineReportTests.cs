@@ -14,12 +14,8 @@ namespace NResilience.Gates;
 ///   dotnet test tests/NResilience.Gates -f net10.0 --filter FullyQualifiedName~BaselineReport -l "console;verbosity=detailed"
 /// </summary>
 [Collection(BaselineCollection.Name)]
-public sealed class BaselineReportTests
+public sealed class BaselineReportTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public BaselineReportTests(ITestOutputHelper output) => _output = output;
-
     [Fact]
     public async Task Report()
     {
@@ -48,7 +44,7 @@ public sealed class BaselineReportTests
         report.Append(CultureInfo.InvariantCulture, $"  TryReset, after cancellation   : {CtsFacts.TryResetAfterCancellation()}");
         report.AppendLine();
 
-        _output.WriteLine(report.ToString());
+        output.WriteLine(report.ToString());
     }
 
     private static async Task AppendAsync(StringBuilder report, string title, IReadOnlyList<Arm> arms)

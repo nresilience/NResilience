@@ -18,17 +18,8 @@ namespace NResilience.Gates;
 /// </para>
 /// </summary>
 [Collection(BaselineCollection.Name)]
-public sealed class AllocationGateTests
+public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHelper output)
 {
-    private readonly BaselineFixture _baseline;
-    private readonly ITestOutputHelper _output;
-
-    public AllocationGateTests(BaselineFixture baseline, ITestOutputHelper output)
-    {
-        _baseline = baseline;
-        _output = output;
-    }
-
     [Fact]
     public void Passthrough_allocates_nothing_on_the_synchronous_path()
         => AssertSyncOverhead(Baseline.LibNoneSync, Budgets.NoneSyncOverhead);
@@ -99,10 +90,10 @@ public sealed class AllocationGateTests
     [Fact]
     public void A_listener_costs_only_the_results_it_asked_to_be_boxed()
     {
-        var listening = _baseline.SuspendingOverhead(Baseline.LibDefaultListener);
-        var silent = _baseline.SuspendingOverhead(Baseline.LibDefault);
+        var listening = baseline.SuspendingOverhead(Baseline.LibDefaultListener);
+        var silent = baseline.SuspendingOverhead(Baseline.LibDefault);
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"listener {listening:0.0} B/op vs no listener {silent:0.0} B/op, delta {listening - silent:0.0} B (allowance {Budgets.ListenerAllowance:0} B)"));
 
@@ -130,10 +121,10 @@ public sealed class AllocationGateTests
     [Fact]
     public void A_logging_listener_allocates_nothing_when_its_levels_are_disabled()
     {
-        var logging = _baseline.SuspendingOverhead(Baseline.LibDefaultLogging);
-        var listening = _baseline.SuspendingOverhead(Baseline.LibDefaultListener);
+        var logging = baseline.SuspendingOverhead(Baseline.LibDefaultLogging);
+        var listening = baseline.SuspendingOverhead(Baseline.LibDefaultListener);
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"logging {logging:0.0} B/op vs listener only {listening:0.0} B/op, delta {logging - listening:0.0} B (allowance {Budgets.DisabledLoggingAllowance:0} B)"));
 
@@ -162,8 +153,8 @@ public sealed class AllocationGateTests
     [Fact]
     public void A_policy_with_no_listener_pays_nothing_for_telemetry()
     {
-        var silent = _baseline.SuspendingOverhead(Baseline.LibDefault);
-        var listening = _baseline.SuspendingOverhead(Baseline.LibDefaultListener);
+        var silent = baseline.SuspendingOverhead(Baseline.LibDefault);
+        var listening = baseline.SuspendingOverhead(Baseline.LibDefaultListener);
 
         Assert.True(
             silent < listening - Budgets.SuspendingNoiseFloor,
@@ -185,10 +176,10 @@ public sealed class AllocationGateTests
     [Fact]
     public void The_shipping_executor_is_no_more_expensive_than_the_stand_in()
     {
-        var shipping = _baseline.SuspendingOverhead(Baseline.LibDefault);
-        var standIn = _baseline.SuspendingOverhead(Baseline.RealDefault);
+        var shipping = baseline.SuspendingOverhead(Baseline.LibDefault);
+        var standIn = baseline.SuspendingOverhead(Baseline.RealDefault);
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"shipping executor {shipping:0.0} B/op vs stand-in {standIn:0.0} B/op (allowance {Budgets.ShippingVersusStandInAllowance:0} B)"));
 
@@ -222,7 +213,7 @@ public sealed class AllocationGateTests
         var capacity = AttemptBuffer.Capacity;
         var cost = recordSize * capacity;
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"inline attempt log: {capacity} x {recordSize} B = {cost} B of state-machine box; budget {Budgets.InlineAttemptLogCost:0} B"));
 
@@ -249,7 +240,7 @@ public sealed class AllocationGateTests
     {
         var size = Unsafe.SizeOf<Verdict>();
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"Verdict: {size} B; budget {Budgets.VerdictSize} B"));
 
@@ -264,10 +255,10 @@ public sealed class AllocationGateTests
     [Fact]
     public void Being_refused_twice_costs_what_failing_twice_costs()
     {
-        var limited = _baseline.SuspendingBytes(Baseline.LibLimited);
-        var retried = _baseline.SuspendingBytes(Baseline.LibRetry);
+        var limited = baseline.SuspendingBytes(Baseline.LibLimited);
+        var retried = baseline.SuspendingBytes(Baseline.LibRetry);
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"{Baseline.LibLimited}: {limited:0.0} B/op against retry's {retried:0.0} B/op; ceiling {Budgets.LimitedTwiceCeiling:0} B"));
 
@@ -279,9 +270,9 @@ public sealed class AllocationGateTests
     [Fact]
     public void Retrying_twice_stays_within_the_ceiling()
     {
-        var actual = _baseline.SuspendingBytes(Baseline.LibRetry);
+        var actual = baseline.SuspendingBytes(Baseline.LibRetry);
 
-        _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{Baseline.LibRetry}: {actual:0.0} B/op; ceiling {Budgets.RetryTwiceCeiling:0} B"));
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{Baseline.LibRetry}: {actual:0.0} B/op; ceiling {Budgets.RetryTwiceCeiling:0} B"));
 
         Assert.True(
             actual <= Budgets.RetryTwiceCeiling,
@@ -290,11 +281,11 @@ public sealed class AllocationGateTests
 
     private void AssertSyncOverhead(string arm, double budget)
     {
-        var actual = _baseline.SyncOverhead(arm);
+        var actual = baseline.SyncOverhead(arm);
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
-            $"{arm}: {_baseline.SyncBytes(arm):0.0} B/op total, {actual:0.0} B/op above the raw callback; budget {budget:0} B"));
+            $"{arm}: {baseline.SyncBytes(arm):0.0} B/op total, {actual:0.0} B/op above the raw callback; budget {budget:0} B"));
 
         Assert.True(
             actual <= budget,
@@ -303,12 +294,12 @@ public sealed class AllocationGateTests
 
     private void AssertSuspendingOverhead(string arm, double budget)
     {
-        var actual = _baseline.SuspendingOverhead(arm);
+        var actual = baseline.SuspendingOverhead(arm);
         var ceiling = budget + Budgets.SuspendingNoiseFloor;
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
-            $"{arm}: {_baseline.SuspendingBytes(arm):0.0} B/op total, {actual:0.0} B/op above the raw callback; budget {budget:0} B (+{Budgets.SuspendingNoiseFloor:0} B instrument floor)"));
+            $"{arm}: {baseline.SuspendingBytes(arm):0.0} B/op total, {actual:0.0} B/op above the raw callback; budget {budget:0} B (+{Budgets.SuspendingNoiseFloor:0} B instrument floor)"));
 
         Assert.True(
             actual <= ceiling,

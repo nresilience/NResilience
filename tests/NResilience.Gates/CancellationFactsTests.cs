@@ -14,17 +14,8 @@ namespace NResilience.Gates;
 /// the BCL, and would silently degrade to no benefit at all if any of them changed.
 /// </summary>
 [Collection(BaselineCollection.Name)]
-public sealed class CancellationFactsTests
+public sealed class CancellationFactsTests(BaselineFixture baseline, ITestOutputHelper output)
 {
-    private readonly BaselineFixture _baseline;
-    private readonly ITestOutputHelper _output;
-
-    public CancellationFactsTests(BaselineFixture baseline, ITestOutputHelper output)
-    {
-        _baseline = baseline;
-        _output = output;
-    }
-
     [Fact]
     public void A_bare_source_costs_one_small_object()
         => AssertAtMost(Baseline.NewSource, Budgets.NewSource);
@@ -49,10 +40,10 @@ public sealed class CancellationFactsTests
     [Fact]
     public void Linking_a_cancellable_token_costs_materially_more_than_linking_none()
     {
-        var cancellable = _baseline.CancellationBytes(Baseline.LinkedCancellable);
-        var none = _baseline.CancellationBytes(Baseline.LinkedNone);
+        var cancellable = baseline.CancellationBytes(Baseline.LinkedCancellable);
+        var none = baseline.CancellationBytes(Baseline.LinkedNone);
 
-        _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"CreateLinked: cancellable {cancellable:0.0} B, None {none:0.0} B"));
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"CreateLinked: cancellable {cancellable:0.0} B, None {none:0.0} B"));
 
         Assert.True(cancellable > none * 2, "The short-circuit for a non-cancellable caller token no longer pays for itself.");
     }
@@ -108,9 +99,9 @@ public sealed class CancellationFactsTests
 
     private void AssertAtMost(string arm, double budget)
     {
-        var actual = _baseline.CancellationBytes(arm);
+        var actual = baseline.CancellationBytes(arm);
 
-        _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{arm}: {actual:0.0} B/op; budget {budget:0} B"));
+        output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{arm}: {actual:0.0} B/op; budget {budget:0} B"));
 
         Assert.True(
             actual <= budget,

@@ -24,12 +24,8 @@ namespace NResilience.Gates;
 /// reason this test exists rather than being a formality.
 /// </summary>
 [Collection(BaselineCollection.Name)]
-public sealed class SocketCrossCheckTests
+public sealed class SocketCrossCheckTests(ITestOutputHelper output)
 {
-    private readonly ITestOutputHelper _output;
-
-    public SocketCrossCheckTests(ITestOutputHelper output) => _output = output;
-
     [Fact]
     public async Task Real_socket_io_agrees_with_the_yield_gate()
     {
@@ -83,7 +79,7 @@ public sealed class SocketCrossCheckTests
         report.Append(CultureInfo.InvariantCulture, $"  cancellable-token cost at the I/O layer: {fused.BytesPerOperation - fusedNoTimeoutResult.BytesPerOperation:0.0} B/op").AppendLine();
         report.Append(CultureInfo.InvariantCulture, $"  {polly}  (+{pollyOverhead:0.0} B)").AppendLine();
         report.Append(CultureInfo.InvariantCulture, $"  ratio: {ratio:0.00}x").AppendLine();
-        _output.WriteLine(report.ToString());
+        output.WriteLine(report.ToString());
 
         Assert.True(fusedOverhead > 0, "The fused executor should cost something over a raw socket round trip.");
         Assert.True(

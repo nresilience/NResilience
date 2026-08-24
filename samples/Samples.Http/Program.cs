@@ -50,7 +50,7 @@ using (HttpClient probe = new(handler))
     using var _ = await probe.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);
 }
 
-foreach ((var host, var breaker) in handler.BreakersByHost())
+foreach (var (host, breaker) in handler.BreakersByHost())
 {
     Console.WriteLine($"  {host}: {breaker.State}");
 }

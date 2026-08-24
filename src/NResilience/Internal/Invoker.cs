@@ -38,47 +38,31 @@ internal interface IInvoker<in TState, out T>
     T Result(Task completed);
 }
 
-internal readonly struct StatelessInvoker<TState, T> : IInvoker<TState, T>
+internal readonly struct StatelessInvoker<TState, T>(Func<CancellationToken, Task<T>> work) : IInvoker<TState, T>
 {
-    private readonly Func<CancellationToken, Task<T>> _work;
-
-    public StatelessInvoker(Func<CancellationToken, Task<T>> work) => _work = work;
-
-    public Task Invoke(TState state, CancellationToken cancellationToken) => _work(cancellationToken);
+    public Task Invoke(TState state, CancellationToken cancellationToken) => work(cancellationToken);
 
     // The invariant is local and total: this is the task Invoke just returned.
     public T Result(Task completed) => Unsafe.As<Task<T>>(completed).Result;
 }
 
-internal readonly struct StatefulInvoker<TState, T> : IInvoker<TState, T>
+internal readonly struct StatefulInvoker<TState, T>(Func<TState, CancellationToken, Task<T>> work) : IInvoker<TState, T>
 {
-    private readonly Func<TState, CancellationToken, Task<T>> _work;
-
-    public StatefulInvoker(Func<TState, CancellationToken, Task<T>> work) => _work = work;
-
-    public Task Invoke(TState state, CancellationToken cancellationToken) => _work(state, cancellationToken);
+    public Task Invoke(TState state, CancellationToken cancellationToken) => work(state, cancellationToken);
 
     public T Result(Task completed) => Unsafe.As<Task<T>>(completed).Result;
 }
 
-internal readonly struct VoidStatelessInvoker<TState> : IInvoker<TState, VoidResult>
+internal readonly struct VoidStatelessInvoker<TState>(Func<CancellationToken, Task> work) : IInvoker<TState, VoidResult>
 {
-    private readonly Func<CancellationToken, Task> _work;
-
-    public VoidStatelessInvoker(Func<CancellationToken, Task> work) => _work = work;
-
-    public Task Invoke(TState state, CancellationToken cancellationToken) => _work(cancellationToken);
+    public Task Invoke(TState state, CancellationToken cancellationToken) => work(cancellationToken);
 
     public VoidResult Result(Task completed) => default;
 }
 
-internal readonly struct VoidStatefulInvoker<TState> : IInvoker<TState, VoidResult>
+internal readonly struct VoidStatefulInvoker<TState>(Func<TState, CancellationToken, Task> work) : IInvoker<TState, VoidResult>
 {
-    private readonly Func<TState, CancellationToken, Task> _work;
-
-    public VoidStatefulInvoker(Func<TState, CancellationToken, Task> work) => _work = work;
-
-    public Task Invoke(TState state, CancellationToken cancellationToken) => _work(state, cancellationToken);
+    public Task Invoke(TState state, CancellationToken cancellationToken) => work(state, cancellationToken);
 
     public VoidResult Result(Task completed) => default;
 }

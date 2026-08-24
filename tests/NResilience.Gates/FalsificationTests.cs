@@ -18,17 +18,8 @@ namespace NResilience.Gates;
 /// which is the version that has to hold from here on.
 /// </summary>
 [Collection(BaselineCollection.Name)]
-public sealed class FalsificationTests
+public sealed class FalsificationTests(BaselineFixture baseline, ITestOutputHelper output)
 {
-    private readonly BaselineFixture _baseline;
-    private readonly ITestOutputHelper _output;
-
-    public FalsificationTests(BaselineFixture baseline, ITestOutputHelper output)
-    {
-        _baseline = baseline;
-        _output = output;
-    }
-
     /// <summary>
     /// The load-bearing comparison: a policy a real caller would actually configure - retry,
     /// attempt timeout, deadline, classification, budget - against Polly's equivalent.
@@ -36,11 +27,11 @@ public sealed class FalsificationTests
     [Fact]
     public void Fusing_the_loop_substantially_beats_a_composed_pipeline_for_a_realistic_policy()
     {
-        var fused = _baseline.SuspendingOverhead(Baseline.LibDefault);
-        var polly = _baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
+        var fused = baseline.SuspendingOverhead(Baseline.LibDefault);
+        var polly = baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
         var ratio = polly / fused;
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"realistic policy: fused {fused:0.0} B/op vs polly {polly:0.0} B/op = {ratio:0.00}x (gate: >= {Budgets.MinimumOverheadRatioVersusPolly:0.0}x)"));
 
@@ -74,11 +65,11 @@ public sealed class FalsificationTests
     [Fact]
     public void A_trivial_policy_stays_at_parity_with_a_pipeline_that_does_nothing()
     {
-        var fused = _baseline.SuspendingOverhead(Baseline.LibTrivial);
-        var polly = _baseline.SuspendingOverhead(Baseline.PollyEmpty);
+        var fused = baseline.SuspendingOverhead(Baseline.LibTrivial);
+        var polly = baseline.SuspendingOverhead(Baseline.PollyEmpty);
         var ratio = fused / polly;
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"trivial policy: fused {fused:0.0} B/op vs polly empty {polly:0.0} B/op = {ratio:0.00}x the wrong way (gate: <= {Budgets.MaximumTrivialRatioVersusPollyEmpty:0.00}x)"));
 
@@ -99,10 +90,10 @@ public sealed class FalsificationTests
     [Fact]
     public void Fusing_the_loop_beats_a_composed_pipeline_when_retries_actually_happen()
     {
-        var fused = _baseline.SuspendingBytes(Baseline.LibRetry);
-        var polly = _baseline.SuspendingBytes(Baseline.PollyRetry);
+        var fused = baseline.SuspendingBytes(Baseline.LibRetry);
+        var polly = baseline.SuspendingBytes(Baseline.PollyRetry);
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"retry x2: fused {fused:0.0} B/op vs polly {polly:0.0} B/op = {polly / fused:0.00}x"));
 
@@ -121,10 +112,10 @@ public sealed class FalsificationTests
     [Fact]
     public void The_harness_reproduces_the_published_polly_baseline()
     {
-        var empty = _baseline.SuspendingOverhead(Baseline.PollyEmpty);
-        var retryTimeout = _baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
+        var empty = baseline.SuspendingOverhead(Baseline.PollyEmpty);
+        var retryTimeout = baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
 
-        _output.WriteLine(string.Create(
+        output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
             $"polly empty: {empty:0.0} B/op (Appendix B: 312 B); polly retry+timeout: {retryTimeout:0.0} B/op (Appendix B: 1328 B)"));
 
