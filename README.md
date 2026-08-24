@@ -1,5 +1,11 @@
 # NResilience
 
+[![Build](https://github.com/nresilience/NResilience/actions/workflows/ci.yml/badge.svg)](https://github.com/nresilience/NResilience/actions/workflows/ci.yml)
+[![NuGet Version](https://img.shields.io/nuget/v/NResilience.svg)](https://www.nuget.org/packages/NResilience)
+[![NuGet Downloads](https://img.shields.io/nuget/dt/NResilience.svg)](https://www.nuget.org/packages/NResilience)
+[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-blue.svg)](https://dotnet.microsoft.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Prevent cascading failures in your .NET applications.
 
 A struggling dependency can hang your requests, tie up your threads, and crash your application. Blind retries often make the problem worse by overwhelming the
