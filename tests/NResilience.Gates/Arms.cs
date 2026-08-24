@@ -39,10 +39,9 @@ public sealed class Arm
 }
 
 /// <summary>
-///     Every arm, in one list, measured in one process. Appendix B's headline comparison was
-///     inferred by subtracting a floor measured on one harness from a total measured on another,
-///     which the design document itself calls out as the failure mode to avoid. This list is the
-///     replacement.
+///     Every arm, in one list, measured in one process. The headline comparison this design is
+///     argued on was inferred by subtracting a floor measured on one harness from a total measured
+///     on another, which is the failure mode to avoid. This list is the replacement.
 ///     <para>
 ///         Every gate points at the <b>shipping</b> executor. The stand-in arms are
 ///         kept and still measured, in the same sweep, because the only trustworthy stand-in-versus-shipping

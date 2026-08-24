@@ -11,7 +11,7 @@
 
     <!--
       The AOT gate is only a gate if a warning fails the build. TreatWarningsAsErrors covers the
-      C# compiler; these three cover the trimmer, the single-file analyser and ILCompiler, which
+      C# compiler; these three cover the trimmer, the single-file analyzer and ILCompiler, which
       report through a different channel and are silent by default.
     -->
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>

@@ -12,9 +12,9 @@ namespace NResilience.Internal;
 ///         identity, which the record's equality cannot see.
 ///     </para>
 ///     <para>
-///         The automatic per-policy retry budget lives here for the same reason, and the table's lifetime
-///         gives it exactly the scope the design asks for: it is created on the policy's first execution and
-///         collected with the policy, so it is private to that instance without a field ever holding it.
+///     The automatic per-policy retry budget lives here for the same reason, and the table's lifetime
+///     gives it exactly the scope the design needs: it is created on the policy's first execution and
+///     collected with the policy, so it is private to that instance without a field ever holding it.
 ///     </para>
 /// </summary>
 internal sealed class ExecutionState

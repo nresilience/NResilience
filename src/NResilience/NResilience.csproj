@@ -15,7 +15,7 @@
     <IsAotCompatible>true</IsAotCompatible>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
-    <!-- The AOT claim is CI-enforced; the analysers have to be on at the source. -->
+    <!-- The AOT claim is CI-enforced; the analyzers have to be on at the source. -->
     <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
     <EnableAotAnalyzer>true</EnableAotAnalyzer>
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
@@ -58,7 +58,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The behavioural suite constructs NextAttempt and reads the inline log directly. -->
+    <!-- The behavioral suite constructs NextAttempt and reads the inline log directly. -->
     <InternalsVisibleTo Include="NResilience.Tests"/>
 
     <!--

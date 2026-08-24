@@ -9,8 +9,8 @@ namespace NResilience.Gates;
 ///     The claim under test: fusing the pipeline into one async frame substantially cuts allocation
 ///     on the suspending path - the path every real I/O call takes. Both sides are measured in this
 ///     process, on this harness, against the same un-wrapped callback, so no number here is obtained
-///     by subtracting across two harnesses. That subtraction is the failure mode the design document
-///     criticises, and it produced the 4-8x figure these tests exist to check.
+///     by subtracting across two harnesses. That subtraction is the failure mode the original
+///     argument fell into, and it produced the 4-8x figure these tests exist to check.
 ///     These tests first ran against a hand-written stand-in, because the point of running them first was
 ///     that no library code existed to bias them. They now point at the shipping executor,
 ///     which is the version that has to hold from here on.

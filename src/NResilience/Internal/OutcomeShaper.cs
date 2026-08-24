@@ -5,11 +5,11 @@ namespace NResilience.Internal;
 /// <summary>
 ///     Turns the loop's final state into whatever the entry point promised to return.
 ///     <para>
-///         The design document says the throwing and non-throwing entry points must be two fused methods
-///         rather than one plus a wrapper, because a wrapper would add a second state-machine box on the
-///         suspending path - doubling exactly the overhead this design exists to remove. That is right,
-///         and it does not follow that the loop itself must be written twice: with the <i>output</i> type
-///         as a second type parameter, one <c>async</c> method serves both, and the shaping happens in a
+///         The throwing and non-throwing entry points are two fused methods rather than one plus a
+///         wrapper, because a wrapper would add a second state-machine box on the suspending path -
+///         doubling exactly the overhead this design exists to remove. That is right, and it does not
+///         follow that the loop itself must be written twice: with the <i>output</i> type as a second
+///         type parameter, one <c>async</c> method serves both, and the shaping happens in a
 ///         non-<c>async</c> struct that devirtualizes away. Two closed instantiations either way, one
 ///         loop to keep correct.
 ///     </para>

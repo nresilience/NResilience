@@ -164,7 +164,7 @@ public static class Budgets
     ///     The design's central claim, reduced to a number that can fail a build: the fused executor
     ///     under a realistic policy must allocate substantially less than Polly's equivalent pipeline
     ///     on the suspending path.
-    ///     Measured: 3.2x. The design document predicted 4-8x for a realistic policy, so this gate is
+    ///     Measured: 3.2x. The original argument predicted 4-8x for a realistic policy, so this gate is
     ///     set at the level below which the architectural argument stops paying for itself rather than
     ///     at the measured value. If this fails, collapsing composition is no longer worth what it
     ///     costs in flexibility, and that is an answer the falsification test exists to give.

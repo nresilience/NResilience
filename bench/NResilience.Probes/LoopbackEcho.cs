@@ -10,8 +10,8 @@ namespace NResilience.Probes;
 ///     with a second thread, or variance. However, it is not I/O, and the design's performance
 ///     argument concerns the path real I/O takes. If a fused loop and a composed pipeline
 ///     disagree on the ratio over a real socket, the gate is measuring an artifact.
-///     Appendix B of the design document reports 112 B per frame over a loopback socket,
-///     providing a published figure for verification.
+///     The original measurement reported 112 B per frame over a loopback socket, which is the
+///     published figure this probe exists to verify.
 ///     The callback passes its cancellation token to the socket calls, mimicking real code.
 ///     A wrapper that provides a cancellable token incurs the cost of the socket's
 ///     registration, which is a genuine cost rather than a harness artifact.

@@ -189,7 +189,7 @@ public sealed class SequenceTests
     }
 
     /// <summary>
-    ///     The snippet in the design document, kept executable: three scripted calls, two transient,
+    ///     The documented scenario, kept executable: three scripted calls, two transient,
     ///     asserted on the attempt log rather than on elapsed time.
     /// </summary>
     [Fact]

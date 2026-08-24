@@ -92,7 +92,7 @@ public sealed class ResilienceOptions
     /// <summary>
     ///     Names a <see cref="RetryBudget.Shared(string, double, int)" /> budget, so several policies
     ///     throttle against one pool. Null - the default - gives this policy its own, which is the
-    ///     blast-radius decision the design argues for.
+    ///     blast-radius decision the library argues for.
     /// </summary>
     public string? SharedBudget { get; set; }
 

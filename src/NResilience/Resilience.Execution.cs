@@ -235,10 +235,10 @@ public sealed partial record Resilience
 
         while (true)
         {
-            // 1. Admission. Checked per attempt rather than once per operation, because the breaker
-            //    samples attempts - so a first attempt that trips it must stop the second, which is
-            //    the whole point of having tripped. It is also why "does the breaker see attempts or
-            //    whole operations?" has one answer here instead of depending on composition order.
+            // Admission. Checked per attempt rather than once per operation, because the breaker
+            // samples attempts - so a first attempt that trips it must stop the second, which is
+            // the whole point of having tripped. It is also why "does the breaker see attempts or
+            // whole operations?" has one answer here instead of depending on composition order.
             if (Breaker is { } breaker)
             {
                 var admitted = breaker.TryEnter(out var admission);
@@ -479,15 +479,15 @@ public sealed partial record Resilience
                     break;
                 }
 
-                // 3i. Throttle, after the deadline check so a retry there is no time for is never
-                //     charged for. The per-attempt limit above cannot prevent a retry storm on its own,
-                //     because every caller independently believes it is being reasonable; only a budget
-                //     expressed as a fraction of traffic bounds the aggregate.
+                // Throttle, after the deadline check so a retry there is no time for is never
+                // charged for. The per-attempt limit above cannot prevent a retry storm on its own,
+                // because every caller independently believes it is being reasonable; only a budget
+                // expressed as a fraction of traffic bounds the aggregate.
                 //
-                //     A self-imposed refusal is exempt. The budget is a fraction of the traffic that
-                //     actually reached the dependency, and a retry of a call local admission control
-                //     stopped costs the dependency nothing - charging for it would let a burst of
-                //     self-throttling quietly drain the capacity real transient failures need.
+                // A self-imposed refusal is exempt. The budget is a fraction of the traffic that
+                // actually reached the dependency, and a retry of a call local admission control
+                // stopped costs the dependency nothing - charging for it would let a burst of
+                // self-throttling quietly drain the capacity real transient failures need.
                 if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
                 {
                     reason = StopReason.BudgetExhausted;

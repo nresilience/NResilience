@@ -74,8 +74,9 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    ///     Validation happens at registration, which is one of the three places the design promises it.
-    ///     A deadline of minus one second should not survive until the first request.
+    ///     Validation happens at registration, which is one of the three places validation happens:
+    ///     here, on first execution, and when Validate() is called directly. A deadline of minus one
+    ///     second should not survive until the first request.
     /// </summary>
     [Fact]
     public void An_invalid_policy_fails_at_registration()
@@ -224,7 +225,7 @@ public sealed class DependencyInjectionTests
     }
 
     /// <summary>
-    ///     The consequence the design says is documented rather than hidden: a policy captured into a
+    ///     The consequence that is documented rather than hidden: a policy captured into a
     ///     field at construction time is a snapshot, and the swap never reaches it. Resolve per call.
     /// </summary>
     [Fact]
@@ -318,7 +319,7 @@ public sealed class DependencyInjectionTests
         Assert.Same(shared, policies["reports"].Breaker);
     }
 
-    /// <summary>Two policies that did not ask to share do not share, which is the blast-radius decision the design argues for.</summary>
+    /// <summary>Two policies that did not ask to share do not share, which is the blast-radius decision the library argues for.</summary>
     [Fact]
     public void Two_policies_do_not_share_a_breaker_by_accident()
     {

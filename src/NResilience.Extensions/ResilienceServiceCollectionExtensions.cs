@@ -44,8 +44,9 @@ public static class ResilienceServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(policy);
 
-        // Eagerly, at registration, which is one of the three places the design promises validation
-        // happens. A deadline of minus one second should not survive until the first request.
+        // Eagerly, at registration, which is one of the three places validation happens: here, on
+        // first execution, and when Validate() is called directly. A deadline of minus one second
+        // should not survive until the first request.
         policy.Validate();
 
         Register(services, name);
