@@ -4,27 +4,27 @@ using System.Diagnostics.Metrics;
 namespace NResilience.Extensions;
 
 /// <summary>
-/// The metrics and traces. One <see cref="System.Diagnostics.Metrics.Meter"/>, one
-/// <see cref="System.Diagnostics.ActivitySource"/>, and a listener that turns
-/// <see cref="CallEvent"/>s into both.
-/// <para>
-/// The instrument set is chosen around one number. <c>nresilience.attempts ÷ nresilience.calls</c>
-/// is the <b>retry fraction</b> - the characteristic metric of a retry feedback loop, and the one
-/// that tells you whether you are approaching a storm rather than merely serving errors. You cannot
-/// compute it unless the library distinguishes logical operations from wire-level attempts, which
-/// is Finagle's distinction and is why the counters are split.
-/// </para>
+///     The metrics and traces. One <see cref="System.Diagnostics.Metrics.Meter" />, one
+///     <see cref="System.Diagnostics.ActivitySource" />, and a listener that turns
+///     <see cref="CallEvent" />s into both.
+///     <para>
+///         The instrument set is chosen around one number. <c>nresilience.attempts ÷ nresilience.calls</c>
+///         is the <b>retry fraction</b> - the characteristic metric of a retry feedback loop, and the one
+///         that tells you whether you are approaching a storm rather than merely serving errors. You cannot
+///         compute it unless the library distinguishes logical operations from wire-level attempts, which
+///         is Finagle's distinction and is why the counters are split.
+///     </para>
 /// </summary>
 /// <example>
-/// <code>
+///     <code>
 /// builder.Services.AddOpenTelemetry()
 ///     .WithMetrics(m => m.AddMeter(ResilienceTelemetry.MeterName))
 ///     .WithTracing(t => t.AddSource(ResilienceTelemetry.ActivitySourceName));
 /// </code>
 /// </example>
 /// <remarks>
-/// Metric names, tag names and event names deliberately share nothing with Polly's
-/// <c>resilience.polly.*</c> vocabulary, so a process running both is legible.
+///     Metric names, tag names and event names deliberately share nothing with Polly's
+///     <c>resilience.polly.*</c> vocabulary, so a process running both is legible.
 /// </remarks>
 public static class ResilienceTelemetry
 {
@@ -47,33 +47,33 @@ public static class ResilienceTelemetry
 
     private static readonly Counter<long> CallCounter = Meter.CreateCounter<long>(
         "nresilience.calls",
-        unit: "{call}",
-        description: "Logical operations - one per call, whatever happened inside it.");
+        "{call}",
+        "Logical operations - one per call, whatever happened inside it.");
 
     private static readonly Counter<long> AttemptCounter = Meter.CreateCounter<long>(
         "nresilience.attempts",
-        unit: "{attempt}",
-        description: "Wire-level attempts. Divided by nresilience.calls, this is the retry fraction.");
+        "{attempt}",
+        "Wire-level attempts. Divided by nresilience.calls, this is the retry fraction.");
 
     private static readonly Counter<long> RejectionCounter = Meter.CreateCounter<long>(
         "nresilience.rejections",
-        unit: "{rejection}",
-        description: "Calls a guard refused to make: an open breaker, or an exhausted retry budget.");
+        "{rejection}",
+        "Calls a guard refused to make: an open breaker, or an exhausted retry budget.");
 
     private static readonly Histogram<double> CallDuration = Meter.CreateHistogram<double>(
         "nresilience.call.duration",
-        unit: "s",
-        description: "End-to-end duration of a logical operation, retries and backoff included.");
+        "s",
+        "End-to-end duration of a logical operation, retries and backoff included.");
 
     private static readonly Histogram<double> AttemptDuration = Meter.CreateHistogram<double>(
         "nresilience.attempt.duration",
-        unit: "s",
-        description: "Duration of one attempt.");
+        "s",
+        "Duration of one attempt.");
 
     private static readonly Counter<long> LeaseCounter = Meter.CreateCounter<long>(
         "nresilience.limiter.leases",
-        unit: "{lease}",
-        description: "Permits a limiter was asked for, tagged by whether it granted one.");
+        "{lease}",
+        "Permits a limiter was asked for, tagged by whether it granted one.");
 
     private static readonly Histogram<double> LeaseWait = Meter.CreateHistogram<double>(
         "nresilience.limiter.wait.duration",
@@ -92,52 +92,49 @@ public static class ResilienceTelemetry
     public static Action<CallEvent> Listener { get; } = Record;
 
     /// <summary>
-    /// Returns the policy with <see cref="Listener"/> attached, chained after whatever
-    /// <see cref="Resilience.OnEvent"/> already held.
+    ///     Returns the policy with <see cref="Listener" /> attached, chained after whatever
+    ///     <see cref="Resilience.OnEvent" /> already held.
     /// </summary>
     /// <param name="policy">The policy.</param>
     /// <returns>The instrumented policy, or the same policy if it is already instrumented.</returns>
     /// <remarks>
-    /// Chained rather than assigned, because a policy that reached here through a <c>configure</c>
-    /// callback may already carry the caller's own listener, and silently dropping it to install
-    /// metrics would be the library choosing its own telemetry over the user's.
+    ///     Chained rather than assigned, because a policy that reached here through a <c>configure</c>
+    ///     callback may already carry the caller's own listener, and silently dropping it to install
+    ///     metrics would be the library choosing its own telemetry over the user's.
     /// </remarks>
     public static Resilience WithTelemetry(this Resilience policy)
     {
         ArgumentNullException.ThrowIfNull(policy);
 
         var existing = policy.OnEvent;
+
         if (existing is null)
-        {
             return policy with { OnEvent = Listener };
-        }
 
         // Reference equality is enough: Listener is a singleton, and a chained combination
         // containing it reports it in GetInvocationList.
-        if (existing == Listener || Array.IndexOf(existing.GetInvocationList(), (Delegate)Listener) >= 0)
-        {
+        if (existing == Listener || Array.IndexOf(existing.GetInvocationList(), Listener) >= 0)
             return policy;
-        }
 
         return policy with { OnEvent = existing + Listener };
     }
 
     /// <summary>
-    /// Starts a span covering one logical operation. Returns null when nobody is listening, which
-    /// is what makes an always-registered telemetry handler free.
+    ///     Starts a span covering one logical operation. Returns null when nobody is listening, which
+    ///     is what makes an always-registered telemetry handler free.
     /// </summary>
     internal static Activity? StartCall(string policyName) =>
-        ActivitySource.StartActivity($"resilience {policyName}", ActivityKind.Internal);
+        ActivitySource.StartActivity($"resilience {policyName}");
 
     /// <summary>
-    /// Records one acquisition against a limiter.
-    /// <para>
-    /// Recorded here, by the adapter, rather than by <see cref="Listener"/> from a
-    /// <see cref="CallEvent"/>: the limiter is the only thing that knows how long the caller waited,
-    /// and a refusal that the policy goes on to retry successfully raises no distinguishable event
-    /// at all. Nothing in the existing instruments or their tags changes, so a dashboard built on
-    /// them keeps working.
-    /// </para>
+    ///     Records one acquisition against a limiter.
+    ///     <para>
+    ///         Recorded here, by the adapter, rather than by <see cref="Listener" /> from a
+    ///         <see cref="CallEvent" />: the limiter is the only thing that knows how long the caller waited,
+    ///         and a refusal that the policy goes on to retry successfully raises no distinguishable event
+    ///         at all. Nothing in the existing instruments or their tags changes, so a dashboard built on
+    ///         them keeps working.
+    ///     </para>
     /// </summary>
     internal static void RecordLease(string limiter, bool acquired, TimeSpan waited)
     {
@@ -187,16 +184,13 @@ public static class ResilienceTelemetry
                 // of transitions is the shape that answers neither question well.
                 Annotate(e, EventName(e.Kind));
                 break;
-
-            default:
-                break;
         }
     }
 
     /// <summary>
-    /// The five terminal kinds close the logical operation, and the call counter and the call
-    /// duration histogram are recorded exactly once here - which is what makes
-    /// <c>attempts ÷ calls</c> a fraction rather than a coincidence.
+    ///     The five terminal kinds close the logical operation, and the call counter and the call
+    ///     duration histogram are recorded exactly once here - which is what makes
+    ///     <c>attempts ÷ calls</c> a fraction rather than a coincidence.
     /// </summary>
     private static void Terminal(CallEvent e, string policy)
     {
@@ -213,15 +207,13 @@ public static class ResilienceTelemetry
             activity.SetTag("nresilience.attempts", e.AttemptNumber);
 
             if (e.Kind != CallEventKind.Succeeded)
-            {
                 activity.SetStatus(ActivityStatusCode.Error, e.Exception?.Message);
-            }
         }
     }
 
     /// <summary>
-    /// Span-event names as constants rather than <c>ToString()</c>, for the reason
-    /// <see cref="Name(VerdictKind)"/> gives.
+    ///     Span-event names as constants rather than <c>ToString()</c>, for the reason
+    ///     <see cref="Name(VerdictKind)" /> gives.
     /// </summary>
     private static string EventName(CallEventKind kind) => kind switch
     {
@@ -243,14 +235,10 @@ public static class ResilienceTelemetry
             };
 
             if (e.Delay is { } delay)
-            {
                 tags["nresilience.delay"] = delay.TotalSeconds;
-            }
 
             if (e.Exception is { } error)
-            {
                 tags["exception.type"] = error.GetType().FullName;
-            }
 
             activity.AddEvent(new ActivityEvent(name, tags: tags));
         }
@@ -260,9 +248,9 @@ public static class ResilienceTelemetry
         new("nresilience.verdict", Name(e.Verdict.Kind));
 
     /// <summary>
-    /// The rejection's cause, which is the difference between "the dependency is down" and "we are
-    /// retrying too hard" - two facts that call for opposite responses and that only
-    /// <see cref="CallEvent.Reason"/> can tell apart.
+    ///     The rejection's cause, which is the difference between "the dependency is down" and "we are
+    ///     retrying too hard" - two facts that call for opposite responses and that only
+    ///     <see cref="CallEvent.Reason" /> can tell apart.
     /// </summary>
     private static KeyValuePair<string, object?> Reason(CallEvent e) =>
         new("nresilience.reason", e.Reason switch
@@ -284,8 +272,8 @@ public static class ResilienceTelemetry
         });
 
     /// <summary>
-    /// Verdict names as constants rather than <c>ToString()</c>, because a tag value is recorded
-    /// on every attempt and <c>Enum.ToString</c> allocates a string each time.
+    ///     Verdict names as constants rather than <c>ToString()</c>, because a tag value is recorded
+    ///     on every attempt and <c>Enum.ToString</c> allocates a string each time.
     /// </summary>
     private static string Name(VerdictKind kind) => kind switch
     {

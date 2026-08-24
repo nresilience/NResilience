@@ -5,31 +5,31 @@ using Microsoft.Extensions.Options;
 namespace NResilience.Extensions.Internal;
 
 /// <summary>
-/// A base policy and a post-configure step, registered under a name. Named options rather than a
-/// dictionary of our own, so a second registration for the same name composes the way every other
-/// options-based registration in the platform does.
+///     A base policy and a post-configure step, registered under a name. Named options rather than a
+///     dictionary of our own, so a second registration for the same name composes the way every other
+///     options-based registration in the platform does.
 /// </summary>
 internal sealed class ResiliencePolicyRegistration
 {
-    /// <summary>What the configuration section is projected onto. Null means <see cref="Resilience.Default"/>.</summary>
+    /// <summary>What the configuration section is projected onto. Null means <see cref="Resilience.Default" />.</summary>
     public Resilience? Baseline { get; set; }
 
     /// <summary>
-    /// Runs last, after configuration and after the live objects are re-attached. This is where a
-    /// classifier or a hook goes, because JSON cannot hold a lambda.
+    ///     Runs last, after configuration and after the live objects are re-attached. This is where a
+    ///     classifier or a hook goes, because JSON cannot hold a lambda.
     /// </summary>
     public Func<Resilience, Resilience>? Configure { get; set; }
 }
 
-/// <summary>The registered names, collected at registration time so <see cref="IResiliencePolicies.Names"/> can be answered.</summary>
+/// <summary>The registered names, collected at registration time so <see cref="IResiliencePolicies.Names" /> can be answered.</summary>
 internal sealed class ResilienceNames
 {
     public ConcurrentDictionary<string, byte> Set { get; } = new(StringComparer.Ordinal);
 }
 
 /// <summary>
-/// The live objects for one name: created on first projection and deliberately outliving every
-/// reload, because a breaker's state is the reason to have one.
+///     The live objects for one name: created on first projection and deliberately outliving every
+///     reload, because a breaker's state is the reason to have one.
 /// </summary>
 internal sealed class LiveState
 {
@@ -38,16 +38,16 @@ internal sealed class LiveState
     public RetryBudget? Budget { get; set; }
 }
 
-/// <inheritdoc cref="IResiliencePolicies"/>
+/// <inheritdoc cref="IResiliencePolicies" />
 internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
 {
-    private readonly IOptionsMonitor<ResilienceOptions> _options;
-    private readonly IOptionsMonitor<ResiliencePolicyRegistration> _registrations;
-    private readonly ResilienceNames _names;
+    private readonly ConcurrentDictionary<string, LiveState> _live = new(StringComparer.Ordinal);
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ResilienceLoggingOptions _logging;
+    private readonly ResilienceNames _names;
+    private readonly IOptionsMonitor<ResilienceOptions> _options;
     private readonly ConcurrentDictionary<string, Resilience> _projected = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, LiveState> _live = new(StringComparer.Ordinal);
+    private readonly IOptionsMonitor<ResiliencePolicyRegistration> _registrations;
     private readonly IDisposable? _subscription;
 
     public ResiliencePolicies(
@@ -72,11 +72,11 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
         _subscription = options.OnChange((_, name) =>
         {
             if (name is not null)
-            {
                 _projected.TryRemove(name, out var _);
-            }
         });
     }
+
+    public void Dispose() => _subscription?.Dispose();
 
     public Resilience this[string name]
     {
@@ -110,8 +110,6 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
         return true;
     }
 
-    public void Dispose() => _subscription?.Dispose();
-
     private string Registered()
     {
         var names = _names.Set.Keys.ToArray();
@@ -120,13 +118,13 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
     }
 
     /// <summary>
-    /// Builds the policy for a name, or returns the one already built.
-    /// <para>
-    /// <c>GetOrAdd</c> without a lock: a reload racing a resolve can build the policy twice, and
-    /// building it twice is harmless because the live breaker and budget are taken from
-    /// <see cref="_live"/> rather than created here. Two identical values, one of which is
-    /// discarded, is the cheap outcome; a lock on every resolve is not.
-    /// </para>
+    ///     Builds the policy for a name, or returns the one already built.
+    ///     <para>
+    ///         <c>GetOrAdd</c> without a lock: a reload racing a resolve can build the policy twice, and
+    ///         building it twice is harmless because the live breaker and budget are taken from
+    ///         <see cref="_live" /> rather than created here. Two identical values, one of which is
+    ///         discarded, is the cheap outcome; a lock on every resolve is not.
+    ///     </para>
     /// </summary>
     private Resilience Project(string name) => _projected.GetOrAdd(name, Build, this);
 
@@ -144,9 +142,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
         // clients could not tell them apart. A preset's name is a label on the preset, not a
         // decision about this registration.
         if (options.Name is null)
-        {
             policy = policy with { Name = name };
-        }
 
         policy = self.Reuse(name, policy);
 
@@ -159,14 +155,14 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
         }
 
         var telemetry = options.Telemetry ?? true;
+
         if (telemetry)
-        {
             policy = policy.WithTelemetry();
-        }
 
         // After the configure callback, so a callback that assigns OnEvent does not lose logging and
         // one that calls WithLogging itself wins under the first-attach-wins rule.
         var profile = ResilienceLogging.ProfileFor(options.Logging, self._logging.Profile);
+
         if (profile != ResilienceLogProfile.Off && self._loggerFactory is { } factory)
         {
             var logging = self.LoggingFor(profile);
@@ -179,16 +175,12 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             var reported = policy.Name ?? name;
 
             if (logger.IsEnabled(LogLevel.Debug))
-            {
                 Log.PolicyResolved(logger, LogLevel.Debug, reported, ResilienceLogging.Describe(policy, telemetry, profile));
-            }
 
             // Classifier.ToString builds a multi-line dump, so the guard is the point rather than a
             // micro-optimization: this is the only record that costs a string before it is written.
             if (logger.IsEnabled(LogLevel.Trace))
-            {
                 Log.PolicyClassifier(logger, LogLevel.Trace, reported, policy.Classify.ToString());
-            }
         }
 
         policy.Validate();
@@ -196,9 +188,9 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
     }
 
     /// <summary>
-    /// The process-wide logging options, or a copy with the profile a section overrode. Copied once
-    /// per policy per reload rather than per call, which is what keeps
-    /// <see cref="ResilienceLoggingOptions"/> a plain mutable options class.
+    ///     The process-wide logging options, or a copy with the profile a section overrode. Copied once
+    ///     per policy per reload rather than per call, which is what keeps
+    ///     <see cref="ResilienceLoggingOptions" /> a plain mutable options class.
     /// </summary>
     private ResilienceLoggingOptions LoggingFor(ResilienceLogProfile profile) =>
         profile == _logging.Profile
@@ -212,14 +204,14 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             };
 
     /// <summary>
-    /// Re-attaches the breaker and the budget this name is already using, or adopts the ones this
-    /// projection created.
-    /// <para>
-    /// This is what makes reload a swap of configuration rather than a reset of state. A breaker
-    /// that is open because a dependency is down stays open when somebody edits an unrelated field
-    /// in appsettings.json; handing the traffic straight back to a dead dependency because a file
-    /// changed would be the worst possible reading of "hot reload".
-    /// </para>
+    ///     Re-attaches the breaker and the budget this name is already using, or adopts the ones this
+    ///     projection created.
+    ///     <para>
+    ///         This is what makes reload a swap of configuration rather than a reset of state. A breaker
+    ///         that is open because a dependency is down stays open when somebody edits an unrelated field
+    ///         in appsettings.json; handing the traffic straight back to a dead dependency because a file
+    ///         changed would be the worst possible reading of "hot reload".
+    ///     </para>
     /// </summary>
     private Resilience Reuse(string name, Resilience policy)
     {

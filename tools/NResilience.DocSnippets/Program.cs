@@ -5,11 +5,13 @@ using NResilience.DocSnippets;
 //   dotnet run --project tools/NResilience.DocSnippets -- --write
 //   dotnet run --project tools/NResilience.DocSnippets -- --check
 var write = args.Contains("--write", StringComparer.Ordinal);
+
 var repositoryRoot = Path.GetFullPath(
     args.FirstOrDefault(static a => !a.StartsWith("--", StringComparison.Ordinal))
     ?? Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 
 var sources = Path.Combine(repositoryRoot, "tests", "NResilience.Docs");
+
 if (!Directory.Exists(sources))
 {
     Console.Error.WriteLine($"No snippet project at {sources}.");

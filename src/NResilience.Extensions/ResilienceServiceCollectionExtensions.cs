@@ -9,13 +9,13 @@ using NResilience.Extensions.Internal;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Registers named policies, allowing an application to define its dependency resilience
-/// requirements once and inject <see cref="IResiliencePolicies"/> throughout the application.
+///     Registers named policies, allowing an application to define its dependency resilience
+///     requirements once and inject <see cref="IResiliencePolicies" /> throughout the application.
 /// </summary>
 /// <remarks>
-/// Provided in <c>Microsoft.Extensions.DependencyInjection</c> rather than <c>NResilience.Extensions</c>
-/// to align with common registration patterns in the .NET ecosystem. The types these methods
-/// take and return are in their own namespaces.
+///     Provided in <c>Microsoft.Extensions.DependencyInjection</c> rather than <c>NResilience.Extensions</c>
+///     to align with common registration patterns in the .NET ecosystem. The types these methods
+///     take and return are in their own namespaces.
 /// </remarks>
 public static class ResilienceServiceCollectionExtensions
 {
@@ -25,9 +25,12 @@ public static class ResilienceServiceCollectionExtensions
     /// <param name="policy">The policy.</param>
     /// <param name="configure">Runs after configuration binding, for the things JSON cannot hold - a classifier, a hook, a shared breaker.</param>
     /// <returns>The service collection.</returns>
-    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed. Registration validates eagerly, so a bad policy fails at startup rather than on the first request.</exception>
+    /// <exception cref="ResilienceConfigurationException">
+    ///     The policy cannot be executed. Registration validates eagerly, so a bad policy fails at startup rather than
+    ///     on the first request.
+    /// </exception>
     /// <example>
-    /// <code>
+    ///     <code>
     /// services.AddResilience("api", Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) });
     /// </code>
     /// </example>
@@ -46,6 +49,7 @@ public static class ResilienceServiceCollectionExtensions
         policy.Validate();
 
         Register(services, name);
+
         services.Configure<ResiliencePolicyRegistration>(name, r =>
         {
             r.Baseline = policy;
@@ -59,7 +63,7 @@ public static class ResilienceServiceCollectionExtensions
     /// <param name="services">The service collection.</param>
     /// <param name="name">The name it is resolved by.</param>
     /// <param name="configureOptions">Sets the bindable properties.</param>
-    /// <param name="configure">Runs last, for the things <see cref="ResilienceOptions"/> cannot express.</param>
+    /// <param name="configure">Runs last, for the things <see cref="ResilienceOptions" /> cannot express.</param>
     /// <returns>The service collection.</returns>
     public static IServiceCollection AddResilience(
         this IServiceCollection services,
@@ -75,9 +79,7 @@ public static class ResilienceServiceCollectionExtensions
         services.Configure(name, configureOptions);
 
         if (configure is not null)
-        {
             services.Configure<ResiliencePolicyRegistration>(name, r => r.Configure = configure);
-        }
 
         return services;
     }
@@ -103,27 +105,25 @@ public static class ResilienceServiceCollectionExtensions
         services.Configure<ResilienceOptions>(name, section);
 
         if (configure is not null)
-        {
             services.Configure<ResiliencePolicyRegistration>(name, r => r.Configure = configure);
-        }
 
         return services;
     }
 
     /// <summary>
-    /// Registers every child of a section as a policy, each named by its key.
+    ///     Registers every child of a section as a policy, each named by its key.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="section">The parent section - one child per policy.</param>
     /// <returns>The service collection.</returns>
     /// <example>
-    /// <code>
+    ///     <code>
     /// services.AddResilience(configuration.GetSection("Resilience"));
     /// </code>
     /// </example>
     /// <remarks>
-    /// The set of names is read at registration time, because a name that appears in the file after
-    /// the container is built has nothing to be injected into. Values reload; the roster does not.
+    ///     The set of names is read at registration time, because a name that appears in the file after
+    ///     the container is built has nothing to be injected into. Values reload; the roster does not.
     /// </remarks>
     public static IServiceCollection AddResilience(this IServiceCollection services, IConfiguration section)
     {
@@ -137,40 +137,40 @@ public static class ResilienceServiceCollectionExtensions
 
         // So an empty or missing section still yields a working IResiliencePolicies that reports an
         // empty roster, rather than a container that cannot resolve it at all.
-        Register(services, name: null);
+        Register(services, null);
         return services;
     }
 
     /// <summary>
-    /// Registers <see cref="IResiliencePolicies"/> without registering any policy. Every other
-    /// overload calls it, so it is only needed to resolve the service in a container that
-    /// configures its policies some other way.
+    ///     Registers <see cref="IResiliencePolicies" /> without registering any policy. Every other
+    ///     overload calls it, so it is only needed to resolve the service in a container that
+    ///     configures its policies some other way.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <returns>The service collection.</returns>
     public static IServiceCollection AddResilience(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
-        Register(services, name: null);
+        Register(services, null);
         return services;
     }
 
     /// <summary>
-    /// Sets the process-wide log listener settings: the profile, the rejection repeat window, and the
-    /// level delegate.
+    ///     Sets the process-wide log listener settings: the profile, the rejection repeat window, and the
+    ///     level delegate.
     /// </summary>
     /// <param name="services">The service collection.</param>
     /// <param name="configure">Sets the settings.</param>
     /// <returns>The service collection.</returns>
     /// <example>
-    /// <code>
+    ///     <code>
     /// services.AddResilienceLogging(o => o.Profile = ResilienceLogProfile.Verbose);
     /// </code>
     /// </example>
     /// <remarks>
-    /// This does not enable logging: a policy registered in a container logs by default. This method
-    /// allows the process-wide settings to be discoverable via IntelliSense when calling <c>services.AddResilience</c>.
-    /// A single policy can override the profile using <see cref="ResilienceOptions.Logging"/>.
+    ///     This does not enable logging: a policy registered in a container logs by default. This method
+    ///     allows the process-wide settings to be discoverable via IntelliSense when calling <c>services.AddResilience</c>.
+    ///     A single policy can override the profile using <see cref="ResilienceOptions.Logging" />.
     /// </remarks>
     public static IServiceCollection AddResilienceLogging(
         this IServiceCollection services,
@@ -178,12 +178,10 @@ public static class ResilienceServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        Register(services, name: null);
+        Register(services, null);
 
         if (configure is not null)
-        {
             services.Configure(configure);
-        }
 
         return services;
     }
@@ -203,28 +201,25 @@ public static class ResilienceServiceCollectionExtensions
             provider.GetService<IOptions<ResilienceLoggingOptions>>()?.Value));
 
         var names = NamesFor(services);
+
         if (name is not null)
-        {
             names.Set.TryAdd(name, 0);
-        }
     }
 
     /// <summary>
-    /// Finds the roster already in the collection, or puts one there.
-    /// <para>
-    /// Registration happens before there is a provider to resolve anything from, and the roster has
-    /// to be written to at registration time - so it is a singleton *instance*, found by looking
-    /// through the descriptors, which is the shape the platform's own builders use for exactly this.
-    /// </para>
+    ///     Finds the roster already in the collection, or puts one there.
+    ///     <para>
+    ///         Registration happens before there is a provider to resolve anything from, and the roster has
+    ///         to be written to at registration time - so it is a singleton *instance*, found by looking
+    ///         through the descriptors, which is the shape the platform's own builders use for exactly this.
+    ///     </para>
     /// </summary>
     private static ResilienceNames NamesFor(IServiceCollection services)
     {
         foreach (var descriptor in services)
         {
             if (descriptor.ServiceType == typeof(ResilienceNames) && descriptor.ImplementationInstance is ResilienceNames existing)
-            {
                 return existing;
-            }
         }
 
         var created = new ResilienceNames();

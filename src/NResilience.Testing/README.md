@@ -1,6 +1,7 @@
 # NResilience.Testing
 
-Test helpers for [NResilience](https://github.com/nresilience/NResilience): scripted callbacks, a recording telemetry listener, and fake-time support for deterministic, fast tests.
+Test helpers for [NResilience](https://github.com/nresilience/NResilience): scripted callbacks, a recording telemetry listener, and fake-time support for
+deterministic, fast tests.
 
 ## Install
 
@@ -12,7 +13,9 @@ dotnet add package NResilience.Testing
 
 ## Why a separate package
 
-Testing retries and timeouts against the real clock is slow and flaky - a 30-second timeout takes 30 seconds to test, and timing varies across machines. `NResilience.Testing` lets you script dependency behavior, capture policy events for assertion, and advance time manually, so a timeout test runs in microseconds.
+Testing retries and timeouts against the real clock is slow and flaky - a 30-second timeout takes 30 seconds to test, and timing varies across machines.
+`NResilience.Testing` lets you script dependency behavior, capture policy events for assertion, and advance time manually, so a timeout test runs in
+microseconds.
 
 It is a test-time dependency only and does not affect the core library in production.
 
@@ -61,7 +64,8 @@ Assert.IsType<AttemptTimeoutException>(result.Exception);
 ```
 
 > [!IMPORTANT]
-> Pass the same `TimeProvider` to both the policy and the sequence. If the sequence uses the system clock while the policy uses a fake clock, the scripted delay becomes a real sleep.
+> Pass the same `TimeProvider` to both the policy and the sequence. If the sequence uses the system clock while the policy uses a fake clock, the scripted delay
+becomes a real sleep.
 
 ## Verify policy behavior
 
@@ -103,7 +107,8 @@ Assert.Equal(2, transport.Requests.Count);
 
 For more information, see the following resources:
 
-- [Testing guide](https://github.com/nresilience/NResilience/blob/main/docs/testing/index.md) - the full walkthrough, including best practices for keeping tests fast and deterministic.
+- [Testing guide](https://github.com/nresilience/NResilience/blob/main/docs/testing/index.md) - the full walkthrough, including best practices for keeping tests
+  fast and deterministic.
 
 ## Feedback
 

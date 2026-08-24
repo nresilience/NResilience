@@ -4,27 +4,27 @@ using System.Threading.RateLimiting;
 namespace NResilience.Extensions.Internal;
 
 /// <summary>
-/// Acquires one permit per attempt, inside <see cref="Http.ResilienceHandler"/>.
-/// <para>
-/// Its position in the chain is the whole design. <c>HttpCall</c> sends through the handler inner to
-/// the resilience handler once per attempt, so a limiter installed there is asked for a permit on
-/// every attempt and receives that attempt's cancellation token - which is already
-/// <c>min(AttemptTimeout, remaining deadline)</c> linked with the caller's. Installed outside it
-/// instead, the limiter would be asked once per operation and every retry would bypass the quota it
-/// exists to respect.
-/// </para>
-/// <para>
-/// The refusal is a <see cref="RateLimitedException"/>, which the executor classifies as
-/// <see cref="Verdict.Limited"/> itself: retried on the throttled curve honoring the limiter's own
-/// hint, never counted as evidence against the host, and never charged to the retry budget.
-/// </para>
+///     Acquires one permit per attempt, inside <see cref="Http.ResilienceHandler" />.
+///     <para>
+///         Its position in the chain is the whole design. <c>HttpCall</c> sends through the handler inner to
+///         the resilience handler once per attempt, so a limiter installed there is asked for a permit on
+///         every attempt and receives that attempt's cancellation token - which is already
+///         <c>min(AttemptTimeout, remaining deadline)</c> linked with the caller's. Installed outside it
+///         instead, the limiter would be asked once per operation and every retry would bypass the quota it
+///         exists to respect.
+///     </para>
+///     <para>
+///         The refusal is a <see cref="RateLimitedException" />, which the executor classifies as
+///         <see cref="Verdict.Limited" /> itself: retried on the throttled curve honoring the limiter's own
+///         hint, never counted as evidence against the host, and never charged to the retry budget.
+///     </para>
 /// </summary>
 internal sealed class RateLimitHandler : DelegatingHandler
 {
     private readonly RateLimiter? _limiter;
-    private readonly PartitionedRateLimiter<HttpRequestMessage>? _partitioned;
     private readonly string _name;
     private readonly bool _owned;
+    private readonly PartitionedRateLimiter<HttpRequestMessage>? _partitioned;
 
     /// <summary>One limiter for the whole client.</summary>
     internal RateLimitHandler(RateLimiter limiter, string name, bool owned)
@@ -57,9 +57,7 @@ internal sealed class RateLimitHandler : DelegatingHandler
         ResilienceTelemetry.RecordLease(_name, lease.IsAcquired, Stopwatch.GetElapsedTime(start));
 
         if (!lease.IsAcquired)
-        {
             throw new RateLimitedException(_name, RateLimiterExtensions.RetryAfterOf(lease));
-        }
 
         return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }

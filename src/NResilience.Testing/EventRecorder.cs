@@ -1,49 +1,31 @@
 namespace NResilience.Testing;
 
 /// <summary>
-/// A recording <see cref="Resilience.OnEvent"/> listener: it keeps every <see cref="CallEvent"/> a
-/// policy raised, in order, so a test can assert on what the policy did rather than on how long it
-/// took.
+///     A recording <see cref="Resilience.OnEvent" /> listener: it keeps every <see cref="CallEvent" /> a
+///     policy raised, in order, so a test can assert on what the policy did rather than on how long it
+///     took.
 /// </summary>
 /// <example>
-/// <code>
+///     <code>
 /// var events = new EventRecorder();
 /// var policy = Resilience.Default with { Time = time, OnEvent = events.Record };
-///
+/// 
 /// await policy.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
-///
+/// 
 /// Assert.Equal(
 ///     [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
 ///     events.Kinds);
 /// </code>
 /// </example>
 /// <remarks>
-/// Assert on the whole sequence where you can. A telemetry surface that raises the right events in
-/// the wrong order still produces a log people believe, and only an ordered assertion catches that;
-/// <see cref="Kinds"/> exists to make the ordered assertion the short one to write.
+///     Assert on the whole sequence where you can. A telemetry surface that raises the right events in
+///     the wrong order still produces a log people believe, and only an ordered assertion catches that;
+///     <see cref="Kinds" /> exists to make the ordered assertion the short one to write.
 /// </remarks>
 public sealed class EventRecorder
 {
     private readonly List<CallEvent> _events = [];
     private readonly object _gate = new();
-
-    /// <summary>
-    /// The listener. Assign it to <see cref="Resilience.OnEvent"/>:
-    /// <c>policy with { OnEvent = recorder.Record }</c>.
-    /// </summary>
-    /// <param name="callEvent">The event to record.</param>
-    /// <remarks>
-    /// A method group rather than an implicit conversion, so the subscription is visible at the
-    /// call site. Multicast composition is the platform's answer to wanting two listeners:
-    /// <c>OnEvent = recorder.Record + logIt</c>.
-    /// </remarks>
-    public void Record(CallEvent callEvent)
-    {
-        lock (_gate)
-        {
-            _events.Add(callEvent);
-        }
-    }
 
     /// <summary>Every event raised so far, in the order it was raised.</summary>
     public IReadOnlyList<CallEvent> Events
@@ -81,7 +63,7 @@ public sealed class EventRecorder
         }
     }
 
-    /// <summary>The event at <paramref name="index"/>, in the order raised.</summary>
+    /// <summary>The event at <paramref name="index" />, in the order raised.</summary>
     public CallEvent this[int index]
     {
         get
@@ -93,7 +75,25 @@ public sealed class EventRecorder
         }
     }
 
-    /// <summary>Every recorded event of one <paramref name="kind"/>, in order.</summary>
+    /// <summary>
+    ///     The listener. Assign it to <see cref="Resilience.OnEvent" />:
+    ///     <c>policy with { OnEvent = recorder.Record }</c>.
+    /// </summary>
+    /// <param name="callEvent">The event to record.</param>
+    /// <remarks>
+    ///     A method group rather than an implicit conversion, so the subscription is visible at the
+    ///     call site. Multicast composition is the platform's answer to wanting two listeners:
+    ///     <c>OnEvent = recorder.Record + logIt</c>.
+    /// </remarks>
+    public void Record(CallEvent callEvent)
+    {
+        lock (_gate)
+        {
+            _events.Add(callEvent);
+        }
+    }
+
+    /// <summary>Every recorded event of one <paramref name="kind" />, in order.</summary>
     public IReadOnlyList<CallEvent> OfKind(CallEventKind kind)
     {
         lock (_gate)
@@ -102,10 +102,10 @@ public sealed class EventRecorder
         }
     }
 
-    /// <summary>The single recorded event of one <paramref name="kind"/>.</summary>
+    /// <summary>The single recorded event of one <paramref name="kind" />.</summary>
     /// <exception cref="InvalidOperationException">
-    /// The kind was raised no times, or more than once. The message says which, and lists what was
-    /// actually raised - the assertion that fails here is usually about the shape of the whole call.
+    ///     The kind was raised no times, or more than once. The message says which, and lists what was
+    ///     actually raised - the assertion that fails here is usually about the shape of the whole call.
     /// </exception>
     public CallEvent Single(CallEventKind kind)
     {
@@ -117,7 +117,7 @@ public sealed class EventRecorder
                 $"Expected exactly one {kind} event, found {matches.Count}. Recorded: {this}.");
     }
 
-    /// <summary>Whether an event of <paramref name="kind"/> was raised at least once.</summary>
+    /// <summary>Whether an event of <paramref name="kind" /> was raised at least once.</summary>
     public bool Contains(CallEventKind kind)
     {
         lock (_gate)
@@ -126,7 +126,7 @@ public sealed class EventRecorder
         }
     }
 
-    /// <summary>How many events of <paramref name="kind"/> were raised.</summary>
+    /// <summary>How many events of <paramref name="kind" /> were raised.</summary>
     public int CountOf(CallEventKind kind)
     {
         lock (_gate)
@@ -145,8 +145,8 @@ public sealed class EventRecorder
     }
 
     /// <summary>
-    /// The recorded kinds in order, comma-separated - a readable assertion-failure message rather
-    /// than a type name.
+    ///     The recorded kinds in order, comma-separated - a readable assertion-failure message rather
+    ///     than a type name.
     /// </summary>
     public override string ToString()
     {
