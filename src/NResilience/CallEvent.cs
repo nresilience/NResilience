@@ -195,9 +195,9 @@ public readonly struct CallEvent
     /// <inheritdoc/>
     public override string ToString()
     {
-        string name = PolicyName is null ? string.Empty : $"[{PolicyName}] ";
-        string delay = Delay is { } pause ? $" +{pause.TotalMilliseconds:0.#}ms" : string.Empty;
-        string error = Exception is null ? string.Empty : $" {Exception.GetType().Name}";
+        var name = PolicyName is null ? string.Empty : $"[{PolicyName}] ";
+        var delay = Delay is { } pause ? $" +{pause.TotalMilliseconds:0.#}ms" : string.Empty;
+        var error = Exception is null ? string.Empty : $" {Exception.GetType().Name}";
 
         return $"{name}{Kind} #{AttemptNumber} {Verdict.Kind}{error} ({Duration.TotalMilliseconds:0.#}ms){delay}";
     }

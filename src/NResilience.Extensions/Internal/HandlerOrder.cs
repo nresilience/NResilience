@@ -31,7 +31,7 @@ internal sealed class HandlerOrder
     /// <summary>Finds the record already in the collection, or puts one there.</summary>
     public static HandlerOrder For(IServiceCollection services)
     {
-        foreach (ServiceDescriptor descriptor in services)
+        foreach (var descriptor in services)
         {
             if (descriptor.ServiceType == typeof(HandlerOrder) && descriptor.ImplementationInstance is HandlerOrder existing)
             {

@@ -49,8 +49,8 @@ public sealed class CancellationFactsTests
     [Fact]
     public void Linking_a_cancellable_token_costs_materially_more_than_linking_none()
     {
-        double cancellable = _baseline.CancellationBytes(Baseline.LinkedCancellable);
-        double none = _baseline.CancellationBytes(Baseline.LinkedNone);
+        var cancellable = _baseline.CancellationBytes(Baseline.LinkedCancellable);
+        var none = _baseline.CancellationBytes(Baseline.LinkedNone);
 
         _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"CreateLinked: cancellable {cancellable:0.0} B, None {none:0.0} B"));
 
@@ -83,7 +83,7 @@ public sealed class CancellationFactsTests
     public void CancelAfter_honors_an_injected_TimeProvider()
     {
         var time = new FakeTimeProvider();
-        using CancellationTokenSource cts = CtsFacts.CancelAfterOnProvider(time, TimeSpan.FromSeconds(5));
+        using var cts = CtsFacts.CancelAfterOnProvider(time, TimeSpan.FromSeconds(5));
 
         Assert.False(cts.IsCancellationRequested);
 
@@ -108,7 +108,7 @@ public sealed class CancellationFactsTests
 
     private void AssertAtMost(string arm, double budget)
     {
-        double actual = _baseline.CancellationBytes(arm);
+        var actual = _baseline.CancellationBytes(arm);
 
         _output.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{arm}: {actual:0.0} B/op; budget {budget:0} B"));
 

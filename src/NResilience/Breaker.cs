@@ -470,17 +470,17 @@ public sealed class Breaker
             return;
         }
 
-        bool probe = _state == BreakerState.HalfOpen;
+        var probe = _state == BreakerState.HalfOpen;
         if (probe && _probesInFlight > 0)
         {
             _probesInFlight--;
         }
 
-        long now = Elapsed();
+        var now = Elapsed();
 
         if (kind == VerdictKind.Ok)
         {
-            bool slow = _settings.SlowCallThreshold is { } threshold && duration >= threshold;
+            var slow = _settings.SlowCallThreshold is { } threshold && duration >= threshold;
             _consecutiveFailures = 0;
             Bucket(now, failure: false, slow: slow);
 
@@ -543,7 +543,7 @@ public sealed class Breaker
                 return null;
             }
 
-            long left = _breakUntil - Elapsed();
+            var left = _breakUntil - Elapsed();
             return left > 0 ? TimeSpan.FromTicks(left) : TimeSpan.Zero;
         }
     }
@@ -566,7 +566,7 @@ public sealed class Breaker
             return;
         }
 
-        int calls = Sum(_calls);
+        var calls = Sum(_calls);
         if (calls < _settings.MinimumCalls)
         {
             return;
@@ -592,8 +592,8 @@ public sealed class Breaker
 
         // Exponential backoff applied to the breaker itself. The first open serves BreakDuration;
         // each consecutive one doubles, capped by MaxBreakDuration, and a clean close resets it.
-        long grown = _settings.BreakDuration.Ticks << Math.Min(_consecutiveOpens, MaxGrowthShift);
-        long capped = Math.Min(grown <= 0 ? long.MaxValue : grown, _settings.MaxBreakDuration.Ticks);
+        var grown = _settings.BreakDuration.Ticks << Math.Min(_consecutiveOpens, MaxGrowthShift);
+        var capped = Math.Min(grown <= 0 ? long.MaxValue : grown, _settings.MaxBreakDuration.Ticks);
 
         _breakUntil = now + capped;
         _consecutiveOpens = Math.Min(_consecutiveOpens + 1, MaxGrowthShift);
@@ -623,16 +623,16 @@ public sealed class Breaker
             return;
         }
 
-        long epoch = now / _ticksPerBucket;
+        var epoch = now / _ticksPerBucket;
         if (epoch != _epoch)
         {
             // Every bucket the window has moved onto since the last write holds counts from a
             // previous revolution. Clearing them on write rather than on a timer means an idle
             // breaker costs nothing and a resumed one does not trip on stale evidence.
-            long stale = _epoch < 0 ? BucketCount : Math.Min(epoch - _epoch, BucketCount);
+            var stale = _epoch < 0 ? BucketCount : Math.Min(epoch - _epoch, BucketCount);
             for (long i = 0; i < stale; i++)
             {
-                int stalled = Index(epoch - i);
+                var stalled = Index(epoch - i);
                 _calls[stalled] = 0;
                 _failures![stalled] = 0;
                 _slow![stalled] = 0;
@@ -641,7 +641,7 @@ public sealed class Breaker
             _epoch = epoch;
         }
 
-        int index = Index(epoch);
+        var index = Index(epoch);
         _calls[index]++;
         if (failure)
         {
@@ -671,8 +671,8 @@ public sealed class Breaker
 
     private static int Sum(int[] buckets)
     {
-        int total = 0;
-        for (int i = 0; i < buckets.Length; i++)
+        var total = 0;
+        for (var i = 0; i < buckets.Length; i++)
         {
             total += buckets[i];
         }

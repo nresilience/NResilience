@@ -16,13 +16,13 @@ The `Sequence<T>` class acts as a test double that serves pre-defined outcomes i
 
 <!-- snippet: testing-sequence -->
 ```csharp
-Sequence<HttpResponseMessage> calls = Sequence.For<HttpResponseMessage>()
+var calls = Sequence.For<HttpResponseMessage>()
     .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), count: 2)
     .Returns(new HttpResponseMessage(HttpStatusCode.OK));
 
 var policy = Resilience.Http with { Backoff = Backoff.None };
 
-CallResult<HttpResponseMessage> result = await policy.TryRunAsync(attempt => calls.NextAsync(attempt));
+var result = await policy.TryRunAsync(attempt => calls.NextAsync(attempt));
 
 Assert.True(result.IsSuccess);
 Assert.Equal(3, calls.CallCount);
@@ -46,7 +46,7 @@ To test timeouts or deadlines without actually waiting for the clock, provide a 
 // sleep - and a real sleep is what makes timing tests slow and flaky.
 var time = new FakeTimeProvider();
 
-Sequence<int> calls = Sequence.For<int>(time)
+var calls = Sequence.For<int>(time)
     .Delays(TimeSpan.FromSeconds(30))   // longer than the attempt timeout
     .Returns(1);
 
@@ -57,10 +57,10 @@ var policy = Resilience.Default with
     AttemptTimeout = TimeSpan.FromSeconds(3),
 };
 
-Task<CallResult<int>> pending = policy.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
+var pending = policy.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
 time.Advance(TimeSpan.FromSeconds(4));
 
-CallResult<int> result = await pending;
+var result = await pending;
 
 Assert.IsType<AttemptTimeoutException>(result.Exception);
 ```
@@ -75,7 +75,7 @@ You can verify that a policy is emitting the correct events in the correct order
 <!-- snippet: testing-event-recorder -->
 ```csharp
 var events = new EventRecorder();
-Sequence<int> calls = Sequence.For<int>().Throws(new IOException()).Returns(42);
+var calls = Sequence.For<int>().Throws(new IOException()).Returns(42);
 
 var policy = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 

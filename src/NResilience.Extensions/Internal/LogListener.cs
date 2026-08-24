@@ -43,7 +43,7 @@ internal sealed class LogListener
 
     private void Write(CallEvent e)
     {
-        string policy = e.PolicyName ?? "(unnamed)";
+        var policy = e.PolicyName ?? "(unnamed)";
 
         switch (e.Kind)
         {
@@ -200,13 +200,13 @@ internal sealed class LogListener
     /// </summary>
     private void Rejected(CallEvent e, string policy)
     {
-        EventId id = e.Reason == StopReason.BudgetExhausted
+        var id = e.Reason == StopReason.BudgetExhausted
             ? Log.Ids.RejectedBudgetExhausted
             : Log.Ids.RejectedDependencyUnavailable;
 
         // The level is decided before the window is consumed, so a warning nobody is carrying does
         // not silently reset the suppressed count.
-        if (Level(id, e) is { } level && ShouldWarn($"{policy}|{id.Id}", out int suppressed))
+        if (Level(id, e) is { } level && ShouldWarn($"{policy}|{id.Id}", out var suppressed))
         {
             if (id.Id == Log.Codes.RejectedBudgetExhausted)
             {
@@ -266,7 +266,7 @@ internal sealed class LogListener
     /// </summary>
     private LogLevel? Level(EventId id, CallEvent e)
     {
-        LogLevel level = _options.Profile switch
+        var level = _options.Profile switch
         {
             ResilienceLogProfile.Verbose => Verbose(id.Id),
             ResilienceLogProfile.Default => Ordinary(id.Id),
@@ -335,7 +335,7 @@ internal sealed class LogListener
             return true;
         }
 
-        if (!_windows.TryGetValue(key, out Window? window))
+        if (!_windows.TryGetValue(key, out var window))
         {
             if (_windows.Count >= MaxKeys)
             {
@@ -347,7 +347,7 @@ internal sealed class LogListener
 
         lock (window)
         {
-            long now = _time.GetTimestamp();
+            var now = _time.GetTimestamp();
             if (window.Opened && now < window.NextAt)
             {
                 window.Suppressed++;

@@ -19,7 +19,7 @@ public sealed class RetryTests
     [Fact]
     public async Task Attempts_is_the_total_including_the_first()
     {
-        int calls = 0;
+        var calls = 0;
 
         await Assert.ThrowsAsync<TimeoutException>(async () =>
             await (Instant with { Attempts = 3 }).RunAsync(ct =>
@@ -34,7 +34,7 @@ public sealed class RetryTests
     [Fact]
     public async Task One_attempt_means_no_retry()
     {
-        int calls = 0;
+        var calls = 0;
 
         await Assert.ThrowsAsync<TimeoutException>(async () =>
             await (Instant with { Attempts = 1 }).RunAsync(ct =>
@@ -49,9 +49,9 @@ public sealed class RetryTests
     [Fact]
     public async Task A_transient_failure_that_then_succeeds_returns_the_value()
     {
-        int calls = 0;
+        var calls = 0;
 
-        int value = await Instant.RunAsync(ct =>
+        var value = await Instant.RunAsync(ct =>
         {
             if (++calls < 3)
             {
@@ -68,7 +68,7 @@ public sealed class RetryTests
     [Fact]
     public async Task A_permanent_failure_is_not_retried()
     {
-        int calls = 0;
+        var calls = 0;
 
         // Classifier.Default does not recognize InvalidOperationException, so it is Permanent.
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
@@ -86,9 +86,9 @@ public sealed class RetryTests
     {
         var tasks = new List<Task<int>>();
 
-        int value = await Instant.RunAsync(ct =>
+        var value = await Instant.RunAsync(ct =>
         {
-            Task<int> task = tasks.Count < 2
+            var task = tasks.Count < 2
                 ? Task.FromException<int>(new IOException())
                 : Task.FromResult(7);
             tasks.Add(task);
@@ -105,7 +105,7 @@ public sealed class RetryTests
     {
         var thrown = new IOException("the far end hung up");
 
-        IOException caught = await Assert.ThrowsAsync<IOException>(async () =>
+        var caught = await Assert.ThrowsAsync<IOException>(async () =>
             await Instant.RunAsync(ct => throw thrown));
 
         Assert.Same(thrown, caught);
@@ -115,10 +115,10 @@ public sealed class RetryTests
     [Fact]
     public async Task The_attempt_history_is_attached_to_the_rethrown_exception()
     {
-        IOException caught = await Assert.ThrowsAsync<IOException>(async () =>
+        var caught = await Assert.ThrowsAsync<IOException>(async () =>
             await (Instant with { Attempts = 2 }).RunAsync(ct => throw new IOException()));
 
-        AttemptLog? log = AttemptLog.Of(caught);
+        var log = AttemptLog.Of(caught);
         Assert.NotNull(log);
         Assert.Equal(2, log.Count);
         Assert.All(log, a => Assert.Equal(VerdictKind.Transient, a.Verdict.Kind));
@@ -127,15 +127,15 @@ public sealed class RetryTests
     [Fact]
     public async Task A_result_the_classifier_calls_a_failure_is_retried_and_then_returned()
     {
-        int calls = 0;
-        Resilience policy = Instant with
+        var calls = 0;
+        var policy = Instant with
         {
             Classify = Classifier.Default.OnResult<int>(static code => code == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         // An answer the policy judged a failure is still an answer: the caller gets the 503 back
         // rather than an exception, which is what makes the HTTP story work.
-        int value = await policy.RunAsync(ct =>
+        var value = await policy.RunAsync(ct =>
         {
             calls++;
             return Task.FromResult(503);
@@ -148,8 +148,8 @@ public sealed class RetryTests
     [Fact]
     public async Task A_classifier_cannot_turn_an_exception_into_a_success()
     {
-        int calls = 0;
-        Resilience policy = Instant with { Classify = Classifier.Default.On<IOException>(Verdict.Ok) };
+        var calls = 0;
+        var policy = Instant with { Classify = Classifier.Default.On<IOException>(Verdict.Ok) };
 
         await Assert.ThrowsAsync<IOException>(async () =>
             await policy.RunAsync(ct =>
@@ -165,9 +165,9 @@ public sealed class RetryTests
     public async Task Retries_stop_when_the_deadline_has_no_room_left()
     {
         var time = new FakeTimeProvider();
-        int calls = 0;
+        var calls = 0;
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Time = time,
             Backoff = Backoff.None,
@@ -176,7 +176,7 @@ public sealed class RetryTests
             Attempts = 5,
         };
 
-        DeadlineExceededException caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
+        var caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
             await policy.RunAsync(ct =>
             {
                 calls++;
@@ -192,7 +192,7 @@ public sealed class RetryTests
     [Fact]
     public async Task The_void_overload_runs_the_loop_and_returns_nothing()
     {
-        int calls = 0;
+        var calls = 0;
 
         await Instant.RunAsync(ct =>
         {
@@ -210,7 +210,7 @@ public sealed class RetryTests
     [Fact]
     public async Task The_state_overload_threads_state_without_a_closure()
     {
-        int value = await Instant.RunAsync(
+        var value = await Instant.RunAsync(
             static (state, ct) => Task.FromResult(state * 2),
             21);
 
@@ -221,7 +221,7 @@ public sealed class RetryTests
     public async Task BeforeAttempt_runs_before_every_attempt_including_the_first()
     {
         var seen = new List<int>();
-        Resilience policy = Instant with
+        var policy = Instant with
         {
             Attempts = 3,
             BeforeAttempt = next =>
@@ -241,7 +241,7 @@ public sealed class RetryTests
     {
         var thrown = new InvalidOperationException();
 
-        InvalidOperationException caught = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        var caught = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await Resilience.None.RunAsync(ct => Task.FromException<int>(thrown)));
 
         Assert.Same(thrown, caught);

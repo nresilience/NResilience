@@ -16,7 +16,7 @@ internal sealed class HostScope
     {
         Host = host;
 
-        Resilience scoped = policy with { Name = policy.Name is null ? host : $"{policy.Name}:{host}" };
+        var scoped = policy with { Name = policy.Name is null ? host : $"{policy.Name}:{host}" };
 
         // An explicit breaker or budget on the policy is a deliberate scope decision - one breaker
         // shared across several hosts is a legitimate thing to want - and per-host scoping is a
@@ -78,7 +78,7 @@ internal sealed class HostRegistry(Resilience policy, HttpResilienceOptions opti
     private readonly ConcurrentDictionary<string, HostScope> _scopes = new(StringComparer.OrdinalIgnoreCase);
 
     internal HostScope For(string host) =>
-        _scopes.TryGetValue(host, out HostScope? scope)
+        _scopes.TryGetValue(host, out var scope)
             ? scope
             : _scopes.GetOrAdd(host, static (key, state) => new HostScope(state.Policy, key, state.Options), (Policy: policy, Options: options));
 

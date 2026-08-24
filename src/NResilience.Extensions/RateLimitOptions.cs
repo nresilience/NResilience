@@ -69,7 +69,7 @@ public sealed class RateLimitOptions
     {
         var problems = new List<string>();
 
-        int kindsConfigured = 0;
+        var kindsConfigured = 0;
         if (PermitsPerSecond is not null)
         {
             kindsConfigured++;

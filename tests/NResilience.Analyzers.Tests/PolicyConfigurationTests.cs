@@ -8,7 +8,7 @@ public sealed class PolicyConfigurationTests
     [Fact]
     public void Fewer_than_one_attempt_is_not_a_policy()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InFile(
+        var reported = Assert.Single(Harness.Run(Harness.InFile(
             "internal static class Policies { internal static readonly Resilience Api = Resilience.Http with { Attempts = 0 }; }")));
 
         Assert.Equal("NRES003", reported.Id);
@@ -18,7 +18,7 @@ public sealed class PolicyConfigurationTests
     [Fact]
     public void A_zero_deadline_is_the_mistake_that_Timeout_InfiniteTimeSpan_exists_to_avoid()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InFile(
+        var reported = Assert.Single(Harness.Run(Harness.InFile(
             "internal static class Policies { internal static readonly Resilience Api = Resilience.Http with { Deadline = TimeSpan.Zero }; }")));
 
         Assert.Equal("NRES003", reported.Id);
@@ -49,16 +49,16 @@ public sealed class PolicyConfigurationTests
     [Fact]
     public void An_attempt_timeout_above_the_deadline_can_never_be_reached()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InFile("""
-            internal static class Policies
-            {
-                internal static readonly Resilience Api = Resilience.Http with
-                {
-                    Deadline = TimeSpan.FromSeconds(5),
-                    AttemptTimeout = TimeSpan.FromSeconds(10),
-                };
-            }
-            """)));
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Policies
+                                                                {
+                                                                    internal static readonly Resilience Api = Resilience.Http with
+                                                                    {
+                                                                        Deadline = TimeSpan.FromSeconds(5),
+                                                                        AttemptTimeout = TimeSpan.FromSeconds(10),
+                                                                    };
+                                                                }
+                                                                """)));
 
         Assert.Equal("NRES004", reported.Id);
         Assert.Contains("0:00:10", reported.GetMessage(), StringComparison.Ordinal);

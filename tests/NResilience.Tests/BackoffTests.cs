@@ -6,7 +6,7 @@ public sealed class BackoffTests
     [Fact]
     public void Throttling_and_transient_failure_get_curves_an_order_of_magnitude_apart()
     {
-        Backoff backoff = Backoff.Exponential() with { Jitter = Jitter.None };
+        var backoff = Backoff.Exponential() with { Jitter = Jitter.None };
 
         Assert.Equal(TimeSpan.FromMilliseconds(100), Delay(backoff, Verdict.Transient, 2));
         Assert.Equal(TimeSpan.FromSeconds(1), Delay(backoff, Verdict.Throttled(), 2));
@@ -15,7 +15,7 @@ public sealed class BackoffTests
     [Fact]
     public void The_curve_grows_by_the_factor_per_attempt()
     {
-        Backoff backoff = Backoff.Exponential() with { Jitter = Jitter.None };
+        var backoff = Backoff.Exponential() with { Jitter = Jitter.None };
 
         Assert.Equal(TimeSpan.FromMilliseconds(100), Delay(backoff, Verdict.Transient, 2));
         Assert.Equal(TimeSpan.FromMilliseconds(200), Delay(backoff, Verdict.Transient, 3));
@@ -25,17 +25,17 @@ public sealed class BackoffTests
     [Fact]
     public void The_cap_is_hard_and_defaults_to_thirty_seconds()
     {
-        Backoff backoff = Backoff.Exponential() with { Jitter = Jitter.None };
+        var backoff = Backoff.Exponential() with { Jitter = Jitter.None };
         Assert.Equal(TimeSpan.FromSeconds(30), Delay(backoff, Verdict.Transient, 30));
     }
 
     [Fact]
     public void Full_jitter_spreads_over_the_whole_interval()
     {
-        Backoff backoff = Backoff.Exponential(transientBase: TimeSpan.FromSeconds(1));
+        var backoff = Backoff.Exponential(transientBase: TimeSpan.FromSeconds(1));
 
         var draws = new List<TimeSpan>();
-        for (int i = 0; i < 500; i++)
+        for (var i = 0; i < 500; i++)
         {
             draws.Add(Delay(backoff, Verdict.Transient, 2));
         }
@@ -48,9 +48,9 @@ public sealed class BackoffTests
     [Fact]
     public void Equal_jitter_keeps_a_floor_under_the_delay()
     {
-        Backoff backoff = Backoff.Exponential(transientBase: TimeSpan.FromSeconds(1)) with { Jitter = Jitter.Equal };
+        var backoff = Backoff.Exponential(transientBase: TimeSpan.FromSeconds(1)) with { Jitter = Jitter.Equal };
 
-        for (int i = 0; i < 200; i++)
+        for (var i = 0; i < 200; i++)
         {
             Assert.InRange(Delay(backoff, Verdict.Transient, 2), TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(1));
         }
@@ -65,7 +65,7 @@ public sealed class BackoffTests
     [Fact]
     public void Server_pushback_is_still_capped()
     {
-        Backoff backoff = Backoff.Exponential(max: TimeSpan.FromSeconds(10));
+        var backoff = Backoff.Exponential(max: TimeSpan.FromSeconds(10));
         Assert.Equal(TimeSpan.FromSeconds(10), Delay(backoff, Verdict.Throttled(TimeSpan.FromHours(1)), 2));
     }
 
@@ -78,7 +78,7 @@ public sealed class BackoffTests
     [Fact]
     public void Constant_is_constant()
     {
-        Backoff backoff = Backoff.Constant(TimeSpan.FromMilliseconds(250)) with { Jitter = Jitter.None };
+        var backoff = Backoff.Constant(TimeSpan.FromMilliseconds(250)) with { Jitter = Jitter.None };
 
         Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(backoff, Verdict.Transient, 2));
         Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(backoff, Verdict.Transient, 9));
@@ -87,8 +87,8 @@ public sealed class BackoffTests
     [Fact]
     public void Custom_is_handed_the_attempt_that_is_about_to_happen()
     {
-        int seen = 0;
-        Backoff backoff = Backoff.Custom(next =>
+        var seen = 0;
+        var backoff = Backoff.Custom(next =>
         {
             seen = next.Number;
             return TimeSpan.FromMilliseconds(next.Number);
@@ -115,9 +115,9 @@ public sealed class BackoffTests
         // Math.Pow(factor, n) into the infinite range. The runtime clamps (long)infinity to
         // long.MaxValue, so this does not wrap to negative - but the guard makes the intent
         // explicit and returns TimeSpan.Zero rather than a 29000-year delay.
-        Backoff uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
+        var uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
 
-        TimeSpan delay = Delay(uncapped, Verdict.Transient, 1100);
+        var delay = Delay(uncapped, Verdict.Transient, 1100);
 
         Assert.True(delay >= TimeSpan.Zero, $"expected non-negative delay, got {delay}");
     }
@@ -127,9 +127,9 @@ public sealed class BackoffTests
     {
         // A finite-but-huge ticks value clamps to long.MaxValue ticks, which is a positive TimeSpan,
         // rather than wrapping or collapsing to zero.
-        Backoff uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
+        var uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
 
-        TimeSpan delay = Delay(uncapped, Verdict.Transient, 1000);
+        var delay = Delay(uncapped, Verdict.Transient, 1000);
 
         Assert.True(delay > TimeSpan.Zero, $"expected a positive delay, got {delay}");
     }
@@ -137,7 +137,7 @@ public sealed class BackoffTests
     [Fact]
     public void A_nan_factor_is_rejected_by_validation()
     {
-        Backoff nan = Backoff.Exponential(factor: double.NaN);
+        var nan = Backoff.Exponential(factor: double.NaN);
 
         var problems = new List<string>();
         nan.Validate(problems);

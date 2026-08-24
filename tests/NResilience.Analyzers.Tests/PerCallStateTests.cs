@@ -8,12 +8,12 @@ public sealed class PerCallStateTests
     [Fact]
     public void A_breaker_built_inside_a_method_has_never_seen_a_failure()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InFile("""
-            internal static class Dependencies
-            {
-                internal static Resilience Payments() => Resilience.Http with { Breaker = new Breaker() };
-            }
-            """)));
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Dependencies
+                                                                {
+                                                                    internal static Resilience Payments() => Resilience.Http with { Breaker = new Breaker() };
+                                                                }
+                                                                """)));
 
         Assert.Equal("NRES005", reported.Id);
         Assert.Contains("breaker", reported.GetMessage(), StringComparison.Ordinal);
@@ -57,12 +57,12 @@ public sealed class PerCallStateTests
     [Fact]
     public void A_fresh_budget_per_call_has_never_seen_a_deposit()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InFile("""
-            internal static class Dependencies
-            {
-                internal static Resilience Api() => Resilience.Http with { Budget = RetryBudget.Of() };
-            }
-            """)));
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Dependencies
+                                                                {
+                                                                    internal static Resilience Api() => Resilience.Http with { Budget = RetryBudget.Of() };
+                                                                }
+                                                                """)));
 
         Assert.Equal("NRES005", reported.Id);
         Assert.Contains("retry budget", reported.GetMessage(), StringComparison.Ordinal);
@@ -94,16 +94,16 @@ public sealed class PerCallStateTests
     [Fact]
     public void A_client_created_and_disposed_inside_a_method_keeps_no_per_host_state()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InFile("""
-            internal static class Reader
-            {
-                internal static async Task<string> ReadAsync(Uri url, CancellationToken cancellationToken)
-                {
-                    using HttpClient client = ResilienceHttp.CreateClient();
-                    return await client.GetStringAsync(url, cancellationToken);
-                }
-            }
-            """)));
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Reader
+                                                                {
+                                                                    internal static async Task<string> ReadAsync(Uri url, CancellationToken cancellationToken)
+                                                                    {
+                                                                        using HttpClient client = ResilienceHttp.CreateClient();
+                                                                        return await client.GetStringAsync(url, cancellationToken);
+                                                                    }
+                                                                }
+                                                                """)));
 
         Assert.Equal("NRES006", reported.Id);
         Assert.Equal(DiagnosticSeverity.Info, reported.Severity);

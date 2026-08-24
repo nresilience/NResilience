@@ -133,7 +133,7 @@ public sealed class ResilienceOptions
     /// <exception cref="ResilienceConfigurationException"><see cref="Preset"/> names something that is not a preset.</exception>
     public Resilience ToPolicy(Resilience? baseline = null)
     {
-        Resilience policy = ResolvePreset() ?? baseline ?? Resilience.Default;
+        var policy = ResolvePreset() ?? baseline ?? Resilience.Default;
 
         if (Attempts is { } attempts)
         {

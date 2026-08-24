@@ -20,11 +20,11 @@ private static async Task<Order?> ReadOrderAsync(HttpClient client, string id, C
     // answer. Three attempts, a 30 s deadline and a 10 s attempt ceiling are the defaults.
     var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) };
 
-    CallResult<Order?> result = await api.TryRunAsync(
+    var result = await api.TryRunAsync(
         attempt => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), attempt),
         cancellationToken);
 
-    if (result.TryGetValue(out Order? order))
+    if (result.TryGetValue(out var order))
     {
         return order;
     }
@@ -56,9 +56,9 @@ The [resilience handler](../http/index.md) clones each request to allow retries,
 // nothing to a client that is rebuilt per call.
 private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cancellationToken)
 {
-    using HttpClient client = ResilienceHttp.CreateClient();
+    using var client = ResilienceHttp.CreateClient();
 
-    using HttpResponseMessage response = await client.GetAsync(
+    using var response = await client.GetAsync(
         new Uri("https://api.example.com/orders/1"), cancellationToken);
 
     return response.StatusCode;

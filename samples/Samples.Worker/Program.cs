@@ -9,7 +9,7 @@ using NResilience.Extensions;
 
 // Registration from configuration, a resilient HttpClient, and the meter - in a plain container, so
 // the sample is readable without a hosting model in the way.
-IConfigurationRoot configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
+var configuration = new ConfigurationBuilder().AddJsonFile("appsettings.json").Build();
 
 var services = new ServiceCollection();
 
@@ -28,7 +28,7 @@ services.AddHttpClient("orders")
     .AddRateLimit(configuration.GetSection("RateLimit"))
     .ConfigurePrimaryHttpMessageHandler(() => new FakeTransport());
 
-using ServiceProvider provider = services.BuildServiceProvider();
+using var provider = services.BuildServiceProvider();
 
 // Everything the meter records, printed as it happens. In a real application this is
 // AddOpenTelemetry().WithMetrics(m => m.AddMeter(ResilienceTelemetry.MeterName)).
@@ -50,30 +50,30 @@ Console.WriteLine($"  api: {policies["api"].Attempts} attempts, {policies["api"]
 Console.WriteLine();
 
 Console.WriteLine("A call through the registered policy:");
-CallResult<string> direct = await policies["api"].TryRunAsync(
+var direct = await policies["api"].TryRunAsync(
     static attempt => Task.FromResult("answered"),
     CancellationToken.None);
 Console.WriteLine($"  -> {direct.StopReason}");
 
 Console.WriteLine();
 Console.WriteLine("A call through the registered HttpClient, which sees a 503 first:");
-HttpClient client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders");
-using HttpResponseMessage response = await client.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);
+var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders");
+using var response = await client.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);
 Console.WriteLine($"  -> {(int)response.StatusCode}");
 
 Console.WriteLine();
 Console.WriteLine("The limiter allows one call in flight per host. A second, while the first is held:");
 
 var budget = RetryBudget.Of(minimumPerSecond: 1);
-Resilience limited = policies["api"] with { Backoff = Backoff.None, Budget = budget };
+var limited = policies["api"] with { Backoff = Backoff.None, Budget = budget };
 
-using RateLimiter limiter = new RateLimitOptions { Concurrency = 1 }.ToLimiter();
-using RateLimitLease held = await limiter.AcquireOrThrowAsync("orders");
+using var limiter = new RateLimitOptions { Concurrency = 1 }.ToLimiter();
+using var held = await limiter.AcquireOrThrowAsync("orders");
 
-CallResult<int> refused = await limited.TryRunAsync(
+var refused = await limited.TryRunAsync(
     async ct =>
     {
-        using RateLimitLease lease = await limiter.AcquireOrThrowAsync("orders", ct);
+        using var lease = await limiter.AcquireOrThrowAsync("orders", ct);
         return 1;
     },
     CancellationToken.None);

@@ -76,21 +76,21 @@ public static class AllocationProbe
 
         await WarmAsync(body, warmup, betweenOperations).ConfigureAwait(false);
 
-        double best = double.MaxValue;
-        for (int r = 0; r < repeats; r++)
+        var best = double.MaxValue;
+        for (var r = 0; r < repeats; r++)
         {
             Quiesce();
 
-            long before = Read(counter);
-            for (int i = 0; i < iterations; i++)
+            var before = Read(counter);
+            for (var i = 0; i < iterations; i++)
             {
                 betweenOperations?.Invoke();
                 await body().ConfigureAwait(false);
             }
 
-            long after = Read(counter);
+            var after = Read(counter);
 
-            double perOp = (after - before) / (double)iterations;
+            var perOp = (after - before) / (double)iterations;
             if (perOp < best)
             {
                 best = perOp;
@@ -106,7 +106,7 @@ public static class AllocationProbe
     /// </summary>
     public static async Task WarmAsync<TResult>(Func<ValueTask<TResult>> body, int warmup, Action? betweenOperations = null)
     {
-        for (int i = 0; i < warmup; i++)
+        for (var i = 0; i < warmup; i++)
         {
             betweenOperations?.Invoke();
             await body().ConfigureAwait(false);
@@ -114,7 +114,7 @@ public static class AllocationProbe
 
         await Task.Delay(TierUpSettleMs).ConfigureAwait(false);
 
-        for (int i = 0; i < warmup; i++)
+        for (var i = 0; i < warmup; i++)
         {
             betweenOperations?.Invoke();
             await body().ConfigureAwait(false);

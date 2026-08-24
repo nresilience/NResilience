@@ -17,7 +17,7 @@ The `Attempts` property specifies the total number of attempts, including the fi
 // Three attempts: try, retry, retry. Not "one call plus three retries".
 var api = Resilience.Default with { Attempts = 3 };
 
-int value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+var value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 ```
 <!-- endsnippet -->
 

@@ -130,7 +130,7 @@ public static class ResilienceServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(section);
 
-        foreach (IConfigurationSection child in section.GetChildren())
+        foreach (var child in section.GetChildren())
         {
             services.AddResilience(child.Key, child);
         }
@@ -202,7 +202,7 @@ public static class ResilienceServiceCollectionExtensions
             provider.GetService<ILoggerFactory>(),
             provider.GetService<IOptions<ResilienceLoggingOptions>>()?.Value));
 
-        ResilienceNames names = NamesFor(services);
+        var names = NamesFor(services);
         if (name is not null)
         {
             names.Set.TryAdd(name, 0);
@@ -219,7 +219,7 @@ public static class ResilienceServiceCollectionExtensions
     /// </summary>
     private static ResilienceNames NamesFor(IServiceCollection services)
     {
-        foreach (ServiceDescriptor descriptor in services)
+        foreach (var descriptor in services)
         {
             if (descriptor.ServiceType == typeof(ResilienceNames) && descriptor.ImplementationInstance is ResilienceNames existing)
             {

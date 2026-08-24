@@ -24,7 +24,7 @@ public sealed class DependencyInjectionDocs
         // </snippet:di-http-client>
 
         services.AddResilience("api", Resilience.Http);
-        using ServiceProvider provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
         Assert.NotNull(provider.GetRequiredService<IHttpClientFactory>().CreateClient("reports"));
     }
@@ -47,8 +47,8 @@ public sealed class DependencyInjectionDocs
         });
         // </snippet:di-register-named>
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        IResiliencePolicies policies = provider.GetRequiredService<IResiliencePolicies>();
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
 
         Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
         Assert.Equal(5, policies["reports"].Attempts);
@@ -57,7 +57,7 @@ public sealed class DependencyInjectionDocs
     [Fact]
     public void A_section_registers_one_policy_per_child()
     {
-        IConfigurationRoot configuration = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.resilience.json")
             .Build();
         var services = new ServiceCollection();
@@ -66,8 +66,8 @@ public sealed class DependencyInjectionDocs
         services.AddResilience(configuration.GetSection("Resilience"));
         // </snippet:di-register-section>
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        IResiliencePolicies policies = provider.GetRequiredService<IResiliencePolicies>();
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
 
         Assert.Equal(["api", "reports"], policies.Names.OrderBy(n => n, StringComparer.Ordinal));
         Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
@@ -78,7 +78,7 @@ public sealed class DependencyInjectionDocs
     [Fact]
     public void The_configure_callback_holds_what_json_cannot()
     {
-        IConfigurationRoot configuration = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.resilience.json")
             .Build();
         var services = new ServiceCollection();
@@ -98,8 +98,8 @@ public sealed class DependencyInjectionDocs
             });
         // </snippet:di-configure-callback>
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        Resilience api = provider.GetRequiredService<IResiliencePolicies>()["api"];
+        using var provider = services.BuildServiceProvider();
+        var api = provider.GetRequiredService<IResiliencePolicies>()["api"];
 
         Assert.Same(shared, api.Breaker);
         Assert.Equal(VerdictKind.Transient, api.Classify.ClassifyException(new MyTransportException()).Kind);
@@ -110,7 +110,7 @@ public sealed class DependencyInjectionDocs
     {
         var services = new ServiceCollection();
         services.AddResilience("api", Resilience.Default with { Attempts = 1 });
-        using ServiceProvider provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
 
         var client = new Orders(provider.GetRequiredService<IResiliencePolicies>());
 

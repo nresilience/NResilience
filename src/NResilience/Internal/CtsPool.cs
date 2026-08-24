@@ -37,7 +37,7 @@ internal static class CtsPool
             return new CancellationTokenSource(Timeout.InfiniteTimeSpan, time);
         }
 
-        CancellationTokenSource? cached = t_pooled;
+        var cached = t_pooled;
         if (cached is null)
         {
             return new CancellationTokenSource();

@@ -36,13 +36,13 @@ public sealed class Migration
     [Fact]
     public async Task A_fallback_becomes_an_if()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<string> calls = Sequence.For<string>().Throws(new IOException(), 3);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<string>().Throws(new IOException(), 3);
         var api = Resilience.Default with { Backoff = Backoff.None };
 
         // <snippet:migration-fallback>
-        CallResult<string> result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
-        string value = result.TryGetValue(out string? fetched) ? fetched : "cached";
+        var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        var value = result.TryGetValue(out var fetched) ? fetched : "cached";
         // </snippet:migration-fallback>
 
         Assert.Equal("cached", value);
@@ -57,15 +57,15 @@ public sealed class Migration
         services.AddHttpClient<Client>().AddResilience();
         // </snippet:migration-registration>
 
-        using ServiceProvider provider = services.BuildServiceProvider();
+        using var provider = services.BuildServiceProvider();
         Assert.NotNull(provider.GetRequiredService<Client>());
     }
 
     [Fact]
     public async Task The_original_exception_still_comes_out()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new HttpRequestException("down"), 3);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new HttpRequestException("down"), 3);
         var api = Resilience.Http with { Backoff = Backoff.None };
 
         // <snippet:migration-exceptions>
@@ -77,7 +77,7 @@ public sealed class Migration
         }
         catch (HttpRequestException e)
         {
-            AttemptLog? attempts = AttemptLog.Of(e);
+            var attempts = AttemptLog.Of(e);
             Console.WriteLine(attempts);   // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
         }
         // </snippet:migration-exceptions>
@@ -88,8 +88,8 @@ public sealed class Migration
     [Fact]
     public async Task A_status_code_predicate_becomes_a_result_rule()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<HttpResponseMessage> calls = Sequence.For<HttpResponseMessage>()
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<HttpResponseMessage>()
             .Returns(new HttpResponseMessage(HttpStatusCode.Conflict))
             .Returns(new HttpResponseMessage(HttpStatusCode.OK));
 
@@ -105,7 +105,7 @@ public sealed class Migration
         };
         // </snippet:migration-predicate>
 
-        using HttpResponseMessage response = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        using var response = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
@@ -113,8 +113,8 @@ public sealed class Migration
     public async Task A_bulkhead_is_a_concurrency_limit()
     {
         var services = new ServiceCollection();
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Resilience policy = Resilience.Http with { Backoff = Backoff.None };
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var policy = Resilience.Http with { Backoff = Backoff.None };
         var dependency = new Dependency();
 
         // <snippet:migration-bulkhead>

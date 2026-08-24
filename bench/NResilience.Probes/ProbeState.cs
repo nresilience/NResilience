@@ -26,7 +26,7 @@ public sealed class ProbeBreaker
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryEnter(TimeProvider time)
     {
-        long openedAt = Volatile.Read(ref _openedAtTicks);
+        var openedAt = Volatile.Read(ref _openedAtTicks);
         if (openedAt == 0)
         {
             return true;
@@ -84,10 +84,10 @@ public sealed class ProbeBudget
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TrySpend()
     {
-        int current = Volatile.Read(ref _tokens);
+        var current = Volatile.Read(ref _tokens);
         while (current > 0)
         {
-            int observed = Interlocked.CompareExchange(ref _tokens, current - 1, current);
+            var observed = Interlocked.CompareExchange(ref _tokens, current - 1, current);
             if (observed == current)
             {
                 return true;
@@ -102,7 +102,7 @@ public sealed class ProbeBudget
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Refund()
     {
-        int current = Volatile.Read(ref _tokens);
+        var current = Volatile.Read(ref _tokens);
         if (current >= _capacity)
         {
             return;

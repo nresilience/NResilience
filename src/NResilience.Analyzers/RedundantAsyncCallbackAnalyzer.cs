@@ -32,7 +32,7 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(static start =>
         {
-            if (!KnownSymbols.TryCreate(start.Compilation, out KnownSymbols known))
+            if (!KnownSymbols.TryCreate(start.Compilation, out var known))
             {
                 return;
             }
@@ -45,7 +45,7 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
     {
         var invocation = (IInvocationOperation)context.Operation;
 
-        if (!Callback.TryGet(invocation, known, out Callback callback)
+        if (!Callback.TryGet(invocation, known, out var callback)
             || !callback.Function.Symbol.IsAsync
             || callback.Function.Syntax is not AnonymousFunctionExpressionSyntax { AsyncKeyword.RawKind: not 0 } syntax)
         {
@@ -82,7 +82,7 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        CommonConversion conversion = compilation.ClassifyCommonConversion(awaited, returned);
+        var conversion = compilation.ClassifyCommonConversion(awaited, returned);
         return conversion.IsImplicit && (conversion.IsIdentity || conversion.IsReference);
     }
 
@@ -100,7 +100,7 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
 
         // A block body ends in a synthesized `return` that was never written down. Counting it
         // would mean the statement form of the same lambda looks like two statements.
-        ImmutableArray<IOperation> written = body.Operations
+        var written = body.Operations
             .Where(static operation => operation is not IReturnOperation { ReturnedValue: null, IsImplicit: true })
             .ToImmutableArray();
 

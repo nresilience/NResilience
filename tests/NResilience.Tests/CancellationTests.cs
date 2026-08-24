@@ -14,7 +14,7 @@ public sealed class CancellationTests
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        int calls = 0;
+        var calls = 0;
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await Resilience.Default.RunAsync(
@@ -32,7 +32,7 @@ public sealed class CancellationTests
     public async Task Caller_cancellation_is_never_retried()
     {
         using var cts = new CancellationTokenSource();
-        int calls = 0;
+        var calls = 0;
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await Resilience.Default.RunAsync(
@@ -63,16 +63,16 @@ public sealed class CancellationTests
     public async Task Cancellation_during_a_backoff_delay_aborts_the_operation()
     {
         using var cts = new CancellationTokenSource();
-        int calls = 0;
+        var calls = 0;
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Backoff = Backoff.Constant(TimeSpan.FromSeconds(30)),
             Deadline = Timeout.InfiniteTimeSpan,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
         };
 
-        ValueTask call = policy.RunAsync(
+        var call = policy.RunAsync(
             ct =>
             {
                 calls++;
@@ -91,9 +91,9 @@ public sealed class CancellationTests
     public async Task An_attempt_timeout_is_transient_and_is_retried()
     {
         var time = new FakeTimeProvider();
-        int calls = 0;
+        var calls = 0;
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Time = time,
             Attempts = 2,
@@ -104,7 +104,7 @@ public sealed class CancellationTests
 
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        ValueTask<int> call = policy.RunAsync(async ct =>
+        var call = policy.RunAsync(async ct =>
         {
             if (++calls == 1)
             {
@@ -129,7 +129,7 @@ public sealed class CancellationTests
     {
         var time = new FakeTimeProvider();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Time = time,
             Attempts = 1,
@@ -140,7 +140,7 @@ public sealed class CancellationTests
 
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        ValueTask<int> call = policy.RunAsync(async ct =>
+        var call = policy.RunAsync(async ct =>
         {
             started.SetResult();
             await Task.Delay(Timeout.Infinite, ct);
@@ -150,7 +150,7 @@ public sealed class CancellationTests
         await started.Task;
         time.Advance(TimeSpan.FromSeconds(6));
 
-        AttemptTimeoutException caught = await Assert.ThrowsAsync<AttemptTimeoutException>(async () => await call);
+        var caught = await Assert.ThrowsAsync<AttemptTimeoutException>(async () => await call);
         Assert.Equal(TimeSpan.FromSeconds(5), caught.Timeout);
         Assert.Single(caught.Attempts);
         Assert.Equal(VerdictKind.Transient, caught.Attempts[0].Verdict.Kind);
@@ -161,7 +161,7 @@ public sealed class CancellationTests
     {
         var time = new FakeTimeProvider();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Time = time,
             Attempts = 1,
@@ -172,7 +172,7 @@ public sealed class CancellationTests
 
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        ValueTask<int> call = policy.RunAsync(async ct =>
+        var call = policy.RunAsync(async ct =>
         {
             started.SetResult();
             await Task.Delay(Timeout.Infinite, ct);
@@ -184,7 +184,7 @@ public sealed class CancellationTests
         // The configured ceiling is ten minutes; the effective one is the five seconds left.
         time.Advance(TimeSpan.FromSeconds(6));
 
-        AttemptTimeoutException caught = await Assert.ThrowsAsync<AttemptTimeoutException>(async () => await call);
+        var caught = await Assert.ThrowsAsync<AttemptTimeoutException>(async () => await call);
         Assert.Equal(TimeSpan.FromSeconds(5), caught.Timeout);
     }
 
@@ -194,7 +194,7 @@ public sealed class CancellationTests
         var time = new FakeTimeProvider();
         using var cts = new CancellationTokenSource();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Time = time,
             Attempts = 1,
@@ -205,7 +205,7 @@ public sealed class CancellationTests
 
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        ValueTask<int> call = policy.RunAsync(
+        var call = policy.RunAsync(
             async ct =>
             {
                 started.SetResult();
@@ -227,7 +227,7 @@ public sealed class CancellationTests
 
         // The post-attempt cancellation check stops the loop starting another attempt. An attempt
         // that already succeeded has been waited for either way, so its result is returned.
-        int value = await Resilience.Default.RunAsync(
+        var value = await Resilience.Default.RunAsync(
             ct =>
             {
                 cts.Cancel();
@@ -242,9 +242,9 @@ public sealed class CancellationTests
     public async Task Cancelling_while_an_attempt_is_failing_aborts_instead_of_retrying()
     {
         using var cts = new CancellationTokenSource();
-        int calls = 0;
+        var calls = 0;
 
-        Resilience policy = Resilience.Default with { Backoff = Backoff.None, Attempts = 3 };
+        var policy = Resilience.Default with { Backoff = Backoff.None, Attempts = 3 };
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await policy.RunAsync(
@@ -263,9 +263,9 @@ public sealed class CancellationTests
     public async Task The_callback_receives_a_token_even_when_the_caller_passed_none()
     {
         var time = new FakeTimeProvider();
-        Resilience policy = Resilience.Default with { Time = time, Attempts = 1 };
+        var policy = Resilience.Default with { Time = time, Attempts = 1 };
 
-        bool cancellable = await policy.RunAsync(ct => Task.FromResult(ct.CanBeCanceled));
+        var cancellable = await policy.RunAsync(ct => Task.FromResult(ct.CanBeCanceled));
 
         Assert.True(cancellable);
     }

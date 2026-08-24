@@ -51,7 +51,7 @@ public sealed class LoggingTests
     public async Task A_healthy_call_writes_nothing_above_trace()
     {
         var logger = new FakeLogger();
-        Resilience api = Logged(logger, Resilience.Default with { Name = "api" });
+        var api = Logged(logger, Resilience.Default with { Name = "api" });
 
         await api.RunAsync(_ => Task.FromResult(1), TestContext.Current.CancellationToken);
 
@@ -63,9 +63,9 @@ public sealed class LoggingTests
     public async Task A_retried_then_successful_call_writes_nothing_above_debug()
     {
         var logger = new FakeLogger();
-        Resilience api = Logged(logger, Resilience.Default with { Name = "api", Backoff = Backoff.None });
+        var api = Logged(logger, Resilience.Default with { Name = "api", Backoff = Backoff.None });
 
-        int calls = 0;
+        var calls = 0;
         await api.RunAsync(
             _ => ++calls == 1 ? Task.FromException<int>(new IOException()) : Task.FromResult(1),
             TestContext.Current.CancellationToken);
@@ -114,7 +114,7 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
 
-        foreach (CallEventKind kind in Enum.GetValues<CallEventKind>())
+        foreach (var kind in Enum.GetValues<CallEventKind>())
         {
             logger.Collector.Clear();
             listener.Record(Event(kind));
@@ -134,7 +134,7 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions(), new FakeTimeProvider());
 
-        for (int i = 0; i < 100; i++)
+        for (var i = 0; i < 100; i++)
         {
             listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
         }
@@ -151,7 +151,7 @@ public sealed class LoggingTests
         var time = new FakeTimeProvider();
         var listener = new LogListener(logger, new ResilienceLoggingOptions(), time);
 
-        for (int i = 0; i < 100; i++)
+        for (var i = 0; i < 100; i++)
         {
             listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
         }
@@ -175,7 +175,7 @@ public sealed class LoggingTests
             new ResilienceLoggingOptions { RepeatWindow = TimeSpan.Zero },
             new FakeTimeProvider());
 
-        for (int i = 0; i < 5; i++)
+        for (var i = 0; i < 5; i++)
         {
             listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
         }
@@ -241,7 +241,7 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
 
-        for (int i = 0; i < 200; i++)
+        for (var i = 0; i < 200; i++)
         {
             listener.Record(Event(CallEventKind.NotRetried, error: new InvalidOperationException($"#{i}"), policy: $"p{i}"));
         }
@@ -282,11 +282,11 @@ public sealed class LoggingTests
     public void The_category_is_the_policy_name_without_the_host_suffix()
     {
         var factory = new FakeLoggerProvider();
-        Resilience api = (Resilience.Http with { Name = "payments" }).WithLogging(Factory(factory));
+        var api = (Resilience.Http with { Name = "payments" }).WithLogging(Factory(factory));
 
         // What HostRegistry does: `with` preserves OnEvent, so the listener created for "payments"
         // is the one a per-host policy raises events to.
-        Resilience scoped = api with { Name = "payments:api.example.com" };
+        var scoped = api with { Name = "payments:api.example.com" };
 
         scoped.OnEvent!(Event(CallEventKind.Rejected, policy: "payments:api.example.com", reason: StopReason.DependencyUnavailable));
 
@@ -297,7 +297,7 @@ public sealed class LoggingTests
     public void The_record_carries_the_host_scoped_name()
     {
         var factory = new FakeLoggerProvider();
-        Resilience api = (Resilience.Http with { Name = "payments" }).WithLogging(Factory(factory));
+        var api = (Resilience.Http with { Name = "payments" }).WithLogging(Factory(factory));
 
         (api with { Name = "payments:api.example.com" }).OnEvent!(
             Event(CallEventKind.Rejected, policy: "payments:api.example.com", reason: StopReason.DependencyUnavailable));
@@ -319,7 +319,7 @@ public sealed class LoggingTests
         var seen = new List<CallEventKind>();
         var logger = new FakeLogger();
 
-        Resilience api = (Resilience.Default with { Name = "api", OnEvent = e => seen.Add(e.Kind) }).WithLogging(logger);
+        var api = (Resilience.Default with { Name = "api", OnEvent = e => seen.Add(e.Kind) }).WithLogging(logger);
 
         api.OnEvent!(Event(CallEventKind.NestedRetry));
 
@@ -331,7 +331,7 @@ public sealed class LoggingTests
     public void WithLogging_twice_attaches_one_listener()
     {
         var logger = new FakeLogger();
-        Resilience api = (Resilience.Default with { Name = "api" }).WithLogging(logger).WithLogging(logger);
+        var api = (Resilience.Default with { Name = "api" }).WithLogging(logger).WithLogging(logger);
 
         api.OnEvent!(Event(CallEventKind.NestedRetry));
 
@@ -341,7 +341,7 @@ public sealed class LoggingTests
     [Fact]
     public void WithLogging_off_attaches_nothing()
     {
-        Resilience api = (Resilience.Default with { Name = "api" })
+        var api = (Resilience.Default with { Name = "api" })
             .WithLogging(new FakeLogger(), new ResilienceLoggingOptions { Profile = ResilienceLogProfile.Off });
 
         Assert.Null(api.OnEvent);
@@ -385,7 +385,7 @@ public sealed class LoggingTests
             logger,
             new ResilienceLoggingOptions { Level = (_, _) => LogLevel.None });
 
-        foreach (CallEventKind kind in Enum.GetValues<CallEventKind>())
+        foreach (var kind in Enum.GetValues<CallEventKind>())
         {
             listener.Record(Event(kind));
         }
@@ -425,7 +425,7 @@ public sealed class LoggingTests
     public async Task A_cancelled_call_logs_nothing()
     {
         var logger = new FakeLogger();
-        Resilience api = Logged(logger, Resilience.Default with { Name = "api" });
+        var api = Logged(logger, Resilience.Default with { Name = "api" });
 
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
@@ -442,7 +442,7 @@ public sealed class LoggingTests
     [Fact]
     public async Task A_listener_that_throws_does_not_fail_the_call()
     {
-        Resilience api = Resilience.Default with
+        var api = Resilience.Default with
         {
             Name = "api",
             OnEvent = _ => throw new InvalidOperationException("the provider fell over"),
@@ -455,7 +455,7 @@ public sealed class LoggingTests
     public async Task A_limited_attempt_reports_its_own_event_id()
     {
         var logger = new FakeLogger();
-        Resilience api = Logged(logger, Resilience.Default with { Name = "api", Attempts = 1 });
+        var api = Logged(logger, Resilience.Default with { Name = "api", Attempts = 1 });
 
         await Assert.ThrowsAnyAsync<Exception>(() => api.RunAsync(
             _ => throw new RateLimitedException("quota", TimeSpan.FromSeconds(1)),
@@ -474,7 +474,7 @@ public sealed class LoggingTests
         services.AddLogging(b => b.AddProvider(provider).SetMinimumLevel(LogLevel.Trace));
         services.AddResilience("api", Resilience.Http);
 
-        Resilience api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
+        var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
         api.OnEvent!(Event(CallEventKind.Rejected, policy: "api", reason: StopReason.DependencyUnavailable));
 
@@ -488,7 +488,7 @@ public sealed class LoggingTests
         var services = new ServiceCollection();
         services.AddResilience("api", Resilience.Http);
 
-        Resilience api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
+        var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
         // Telemetry is attached, logging is not, and nothing threw.
         Assert.NotNull(api.OnEvent);
@@ -504,7 +504,7 @@ public sealed class LoggingTests
         services.AddLogging(b => b.AddProvider(theirs).SetMinimumLevel(LogLevel.Trace));
         services.AddResilience("api", Resilience.Http, configure: p => p.WithLogging(mine));
 
-        Resilience api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
+        var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
         api.OnEvent!(Event(CallEventKind.NestedRetry, policy: "api"));
 
         Assert.Single(mine.Collector.GetSnapshot(), r => r.Id.Id == 1018);
@@ -523,7 +523,7 @@ public sealed class LoggingTests
             o.Telemetry = false;
         });
 
-        Resilience api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
+        var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
         Assert.Null(api.OnEvent);
     }
@@ -551,7 +551,7 @@ public sealed class LoggingTests
         services.AddResilienceLogging(o => o.Profile = ResilienceLogProfile.Verbose);
         services.AddResilience("api", Resilience.Http);
 
-        Resilience api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
+        var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
         api.OnEvent!(Event(CallEventKind.Succeeded, policy: "api", attempt: 1, verdict: Verdict.Ok, reason: StopReason.Succeeded));
 
         Assert.Equal(
@@ -576,7 +576,7 @@ public sealed class LoggingTests
 
         _ = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
-        FakeLogRecord resolved = provider.Collector.GetSnapshot().First(r => r.Id.Id == 1020);
+        var resolved = provider.Collector.GetSnapshot().First(r => r.Id.Id == 1020);
 
         Assert.Equal(LogLevel.Debug, resolved.Level);
         Assert.Contains("4 attempts", resolved.Message, StringComparison.Ordinal);
@@ -608,7 +608,7 @@ public sealed class LoggingTests
 
         _ = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
-        FakeLogRecord dump = provider.Collector.GetSnapshot().First(r => r.Id.Id == 1021);
+        var dump = provider.Collector.GetSnapshot().First(r => r.Id.Id == 1021);
 
         Assert.Equal(LogLevel.Trace, dump.Level);
         Assert.Contains("exception", dump.Message, StringComparison.Ordinal);
@@ -629,8 +629,8 @@ public sealed class LoggingTests
         services.AddLogging(b => b.AddProvider(provider).SetMinimumLevel(LogLevel.Debug));
         services.AddResilience(manager.GetSection("Resilience"));
 
-        IResiliencePolicies policies = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>();
-        Breaker first = policies["api"].Breaker!;
+        var policies = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>();
+        var first = policies["api"].Breaker!;
 
         manager.Sources.Clear();
         manager.AddInMemoryCollection(new Dictionary<string, string?>
@@ -639,7 +639,7 @@ public sealed class LoggingTests
             ["Resilience:api:Breaker:ConsecutiveFailures"] = "2",
         });
 
-        Resilience reloaded = policies["api"];
+        var reloaded = policies["api"];
 
         Assert.Same(first, reloaded.Breaker);
         Assert.Equal(
@@ -675,7 +675,7 @@ public sealed class LoggingTests
         Exception? error = null,
         StopReason? reason = null)
     {
-        Verdict effective = verdict ?? (kind switch
+        var effective = verdict ?? (kind switch
         {
             CallEventKind.Rejected => Verdict.Transient,
             CallEventKind.NotRetried => Verdict.Permanent,
@@ -684,7 +684,7 @@ public sealed class LoggingTests
             _ => Verdict.Ok,
         });
 
-        StopReason? effectiveReason = reason ?? (kind switch
+        var effectiveReason = reason ?? (kind switch
         {
             CallEventKind.Rejected => StopReason.DependencyUnavailable,
             CallEventKind.NotRetried => StopReason.Permanent,

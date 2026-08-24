@@ -76,7 +76,7 @@ public sealed class Classifier
     public Classifier On<TException>(Verdict verdict)
         where TException : Exception
     {
-        ExceptionRule rule = ExceptionRule.Fixed(typeof(TException), verdict, typeof(TException).Name);
+        var rule = ExceptionRule.Fixed(typeof(TException), verdict, typeof(TException).Name);
         return new Classifier(Prepend(_exceptionRules, rule), _resultRules, _unrecognized, DerivedName());
     }
 
@@ -121,8 +121,8 @@ public sealed class Classifier
     {
         ArgumentNullException.ThrowIfNull(exception);
 
-        ExceptionRule[] rules = _exceptionRules;
-        for (int i = 0; i < rules.Length; i++)
+        var rules = _exceptionRules;
+        for (var i = 0; i < rules.Length; i++)
         {
             if (rules[i].ExceptionType.IsInstanceOfType(exception))
             {
@@ -154,7 +154,7 @@ public sealed class Classifier
         // the steady-state cost for a monomorphic call site is one static read and one reference
         // comparison. Alternating two classifiers for the same T thrashes the slot and falls to
         // the slow path on every call, which is correct but not free.
-        ResultJudge<T>.Entry? cached = ResultJudge<T>.Cache;
+        var cached = ResultJudge<T>.Cache;
         if (cached is not null && ReferenceEquals(cached.Owner, this))
         {
             return cached.Judge is null ? Verdict.Ok : cached.Judge(value);
@@ -173,12 +173,12 @@ public sealed class Classifier
         var text = new StringBuilder();
         text.Append("Classifier ").Append(_name).Append(':').Append('\n');
 
-        foreach (ExceptionRule rule in _exceptionRules)
+        foreach (var rule in _exceptionRules)
         {
             text.Append("  exception ").Append(rule.Description).Append(" -> ").Append(rule.Constant?.ToString() ?? "(predicate)").Append('\n');
         }
 
-        foreach (ResultRule rule in _resultRules)
+        foreach (var rule in _resultRules)
         {
             text.Append("  result ").Append(rule.Description).Append(" -> (predicate)").Append('\n');
         }
@@ -191,8 +191,8 @@ public sealed class Classifier
     private Verdict ClassifyResultSlow<T>(T value)
     {
         Func<T, Verdict>? judge = null;
-        ResultRule[] rules = _resultRules;
-        for (int i = 0; i < rules.Length; i++)
+        var rules = _resultRules;
+        for (var i = 0; i < rules.Length; i++)
         {
             if (rules[i].ResultType == typeof(T))
             {
@@ -280,7 +280,7 @@ public sealed class Classifier
 
         private static TimeSpan? RetryAfterOf(HttpResponseMessage response)
         {
-            RetryConditionHeaderValue? header = response.Headers.RetryAfter;
+            var header = response.Headers.RetryAfter;
             if (header is null)
             {
                 return null;
@@ -293,7 +293,7 @@ public sealed class Classifier
 
             if (header.Date is { } date)
             {
-                TimeSpan until = date - DateTimeOffset.UtcNow;
+                var until = date - DateTimeOffset.UtcNow;
                 return until > TimeSpan.Zero ? until : TimeSpan.Zero;
             }
 

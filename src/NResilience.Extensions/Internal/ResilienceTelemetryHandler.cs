@@ -22,7 +22,7 @@ internal sealed class ResilienceTelemetryHandler(string clientName) : Delegating
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        using Activity? activity = ResilienceTelemetry.StartCall(_clientName);
+        using var activity = ResilienceTelemetry.StartCall(_clientName);
 
         if (activity is null)
         {
@@ -34,7 +34,7 @@ internal sealed class ResilienceTelemetryHandler(string clientName) : Delegating
         // covering the operation they belong to.
         try
         {
-            HttpResponseMessage response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
             activity.SetTag("http.response.status_code", (int)response.StatusCode);
             return response;
         }

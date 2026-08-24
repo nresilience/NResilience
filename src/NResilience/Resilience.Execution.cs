@@ -216,23 +216,23 @@ public sealed partial record Resilience
         // whole design exists to minimize: caching the policy's Backoff in a local costs 56 bytes
         // on every suspending call to save a field load that the JIT keeps in a register anyway.
         // `this` is already a field of the box, so reading a property off it is free.
-        bool bounded = Deadline != Timeout.InfiniteTimeSpan;
+        var bounded = Deadline != Timeout.InfiniteTimeSpan;
         TShaper shaper = default;
 
         // The one local the breaker and budget add to the box, at 8 bytes: either the policy's own
         // budget or the automatic one private to this policy instance. Resolved once here rather
         // than at each of the two points that need it, because re-resolving after the attempt await
         // would miss the per-thread cache - a continuation resumes on whichever pool thread is free.
-        RetryBudget? budget = ExecutionState.BudgetFor(this);
+        var budget = ExecutionState.BudgetFor(this);
 
-        long start = Time.GetTimestamp();
+        var start = Time.GetTimestamp();
         AttemptSink log = default;
 
         // One slot each, reused every iteration, rather than a current and a previous pair.
-        Verdict verdict = Verdict.Ok;
+        var verdict = Verdict.Ok;
         Exception? error = null;
         T value = default!;
-        bool hasValue = false;
+        var hasValue = false;
         StopReason reason;
 
         // Caller cancellation is never a failure. Checked here, after every attempt returns, and
@@ -248,7 +248,7 @@ public sealed partial record Resilience
             //    whole operations?" has one answer here instead of depending on composition order.
             if (Breaker is { } breaker)
             {
-                bool admitted = breaker.TryEnter(out BreakerTransition admission);
+                var admitted = breaker.TryEnter(out var admission);
 
                 // Raised outside the breaker's lock, on purpose: a listener is arbitrary user code
                 // and one slow listener holding that lock would serialize every call through the
@@ -261,7 +261,7 @@ public sealed partial record Resilience
                 if (!admitted)
                 {
                     reason = StopReason.DependencyUnavailable;
-                    TimeSpan pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
+                    var pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
 
                     if (OnEvent is not null)
                     {
@@ -279,10 +279,10 @@ public sealed partial record Resilience
             // The flag is set when Record is called, and the finally below releases only when it
             // was not. A bool live across the await costs one byte in the state-machine box; the
             // alternative is a liveness bug.
-            bool recorded = false;
+            var recorded = false;
             try
             {
-            TimeSpan remaining = Remaining(Time, start, Deadline, bounded);
+            var remaining = Remaining(Time, start, Deadline, bounded);
             if (remaining == TimeSpan.Zero)
             {
                 reason = StopReason.DeadlineExceeded;
@@ -308,11 +308,11 @@ public sealed partial record Resilience
                 }
             }
 
-            TimeSpan effective = Effective(AttemptTimeout, remaining);
+            var effective = Effective(AttemptTimeout, remaining);
 
             CancellationTokenSource? timer = null;
             CancellationTokenSource? attemptSource = null;
-            CancellationToken attemptToken = cancellationToken;
+            var attemptToken = cancellationToken;
 
             if (effective != Timeout.InfiniteTimeSpan)
             {
@@ -334,13 +334,13 @@ public sealed partial record Resilience
                 attemptToken = attemptSource.Token;
             }
 
-            long attemptStart = Time.GetTimestamp();
+            var attemptStart = Time.GetTimestamp();
             error = null;
             hasValue = false;
 
             try
             {
-                Task attempt = invoker.Invoke(state, attemptToken);
+                var attempt = invoker.Invoke(state, attemptToken);
                 await attempt.ConfigureAwait(false);
                 value = invoker.Result(attempt);
                 hasValue = true;
@@ -393,7 +393,7 @@ public sealed partial record Resilience
                 }
             }
 
-            TimeSpan duration = Time.GetElapsedTime(attemptStart);
+            var duration = Time.GetElapsedTime(attemptStart);
 
             log.Record(
                 Time.GetElapsedTime(start, attemptStart).Ticks,
@@ -404,7 +404,7 @@ public sealed partial record Resilience
 
             if (OnEvent is not null)
             {
-                object? observed = ResultOf(value, hasValue);
+                var observed = ResultOf(value, hasValue);
                 Notify(CallEventKind.Attempt, log.Count, verdict, duration, null, error, observed);
 
                 // A callback that kept running well past the timeout that was supposed to stop it
@@ -423,7 +423,7 @@ public sealed partial record Resilience
             // and an error-rate breaker sits closed through the entire incident.
             if (Breaker is { } sampled)
             {
-                BreakerTransition outcome = sampled.Record(verdict.Kind, duration);
+                var outcome = sampled.Record(verdict.Kind, duration);
                 recorded = true;
                 if (outcome != BreakerTransition.None && OnEvent is not null)
                 {
@@ -448,7 +448,7 @@ public sealed partial record Resilience
                     Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue), StopReason.Succeeded);
                 }
 
-                AttemptLog succeeded = shaper.WantsLogOnSuccess
+                var succeeded = shaper.WantsLogOnSuccess
                     ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
                     : AttemptLog.Empty;
 
@@ -483,7 +483,7 @@ public sealed partial record Resilience
                 break;
             }
 
-            TimeSpan left = Remaining(Time, start, Deadline, bounded);
+            var left = Remaining(Time, start, Deadline, bounded);
             if (left == TimeSpan.Zero)
             {
                 reason = StopReason.DeadlineExceeded;
@@ -503,7 +503,7 @@ public sealed partial record Resilience
             if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
             {
                 reason = StopReason.BudgetExhausted;
-                TimeSpan refused = GuardDelay(left);
+                var refused = GuardDelay(left);
 
                 if (OnEvent is not null)
                 {
@@ -514,7 +514,7 @@ public sealed partial record Resilience
                 break;
             }
 
-            TimeSpan delay = Backoff.Compute(new NextAttempt(log.Count + 1, verdict, error, left, cancellationToken));
+            var delay = Backoff.Compute(new NextAttempt(log.Count + 1, verdict, error, left, cancellationToken));
 
             // A delay that would consume the rest of the budget leaves nothing for the attempt
             // after it, so the deadline stops the operation here rather than sleeping through it.
@@ -547,12 +547,12 @@ public sealed partial record Resilience
             }
         }
 
-        AttemptLog attempts = log.Materialize(Time.GetElapsedTime(start), Deadline, bounded);
+        var attempts = log.Materialize(Time.GetElapsedTime(start), Deadline, bounded);
 
         // Read after the guarded delay rather than before it, which is both more accurate - the
         // hint is that much shorter by the time the caller sees it - and keeps a TimeSpan? out of
         // the state-machine box.
-        TimeSpan? retryAfter = reason switch
+        var retryAfter = reason switch
         {
             StopReason.DependencyUnavailable => Breaker?.RetryAfterHint(),
             StopReason.BudgetExhausted => budget?.RetryAfterHint(),
@@ -611,7 +611,7 @@ public sealed partial record Resilience
     /// </summary>
     private void Notify(CallEventKind kind, int attemptNumber, Verdict verdict, TimeSpan duration, TimeSpan? delay, Exception? error, object? result, StopReason? reason = null)
     {
-        Action<CallEvent>? listener = OnEvent;
+        var listener = OnEvent;
         if (listener is null)
         {
             return;
@@ -632,7 +632,7 @@ public sealed partial record Resilience
     /// <summary>Raises a breaker transition, which carries no verdict and no result of its own.</summary>
     private void NotifyBreaker(BreakerTransition transition, int attemptNumber, TimeSpan elapsed)
     {
-        CallEventKind kind = transition switch
+        var kind = transition switch
         {
             BreakerTransition.Opened => CallEventKind.BreakerOpened,
             BreakerTransition.Closed => CallEventKind.BreakerClosed,
@@ -663,7 +663,7 @@ public sealed partial record Resilience
             return Timeout.InfiniteTimeSpan;
         }
 
-        TimeSpan left = deadline - time.GetElapsedTime(start);
+        var left = deadline - time.GetElapsedTime(start);
         return left > TimeSpan.Zero ? left : TimeSpan.Zero;
     }
 

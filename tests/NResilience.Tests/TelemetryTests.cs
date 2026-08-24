@@ -44,7 +44,7 @@ public sealed class TelemetryTests
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {
-        Task<CallResult<int>> call = policy.TryRunAsync(work).AsTask();
+        var call = policy.TryRunAsync(work).AsTask();
 
         while (!call.IsCompleted)
         {
@@ -75,7 +75,7 @@ public sealed class TelemetryTests
     public async Task A_listener_on_the_passthrough_preset_still_hears_about_the_call()
     {
         var recorder = new Recorder();
-        Resilience policy = Resilience.None with { OnEvent = recorder.Listener };
+        var policy = Resilience.None with { OnEvent = recorder.Listener };
 
         Assert.Equal(1, await policy.RunAsync(static ct => Task.FromResult(1)));
         Assert.Equal([CallEventKind.Attempt, CallEventKind.Succeeded], recorder.Kinds);
@@ -103,7 +103,7 @@ public sealed class TelemetryTests
 
         Assert.Equal([CallEventKind.Attempt, CallEventKind.Succeeded], recorder.Kinds);
 
-        CallEvent attempt = recorder.Single(CallEventKind.Attempt);
+        var attempt = recorder.Single(CallEventKind.Attempt);
         Assert.Equal("api", attempt.PolicyName);
         Assert.Equal(1, attempt.AttemptNumber);
         Assert.Equal(VerdictKind.Ok, attempt.Verdict.Kind);
@@ -120,7 +120,7 @@ public sealed class TelemetryTests
     public async Task The_result_that_was_classified_a_failure_is_on_the_event()
     {
         var recorder = new Recorder();
-        Resilience policy = Instant(recorder) with
+        var policy = Instant(recorder) with
         {
             Attempts = 2,
             Classify = Classifier.Default.OnResult<int>(static status => status == 503 ? Verdict.Transient : Verdict.Ok),
@@ -153,9 +153,9 @@ public sealed class TelemetryTests
     public async Task A_retried_call_raises_one_attempt_and_one_retrying_per_retry()
     {
         var recorder = new Recorder();
-        int calls = 0;
+        var calls = 0;
 
-        int value = await (Instant(recorder) with { Attempts = 3 }).RunAsync(ct =>
+        var value = await (Instant(recorder) with { Attempts = 3 }).RunAsync(ct =>
             ++calls < 3 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(9));
 
         Assert.Equal(9, value);
@@ -179,7 +179,7 @@ public sealed class TelemetryTests
         var recorder = new Recorder();
         var time = new FakeTimeProvider();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 2,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
@@ -189,11 +189,11 @@ public sealed class TelemetryTests
             OnEvent = recorder.Listener,
         };
 
-        CallResult<int> result = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time);
+        var result = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time);
 
         Assert.False(result.IsSuccess);
 
-        CallEvent retrying = recorder.Single(CallEventKind.Retrying);
+        var retrying = recorder.Single(CallEventKind.Retrying);
         Assert.Equal(2, retrying.AttemptNumber);
         Assert.Equal(TimeSpan.FromSeconds(1), retrying.Delay);
         Assert.IsType<IOException>(retrying.Exception);
@@ -217,7 +217,7 @@ public sealed class TelemetryTests
             [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Exhausted],
             recorder.Kinds);
 
-        CallEvent exhausted = recorder.Single(CallEventKind.Exhausted);
+        var exhausted = recorder.Single(CallEventKind.Exhausted);
         Assert.Equal(StopReason.AttemptsExhausted, exhausted.Reason);
         Assert.Equal(2, exhausted.AttemptNumber);
         Assert.IsType<IOException>(exhausted.Exception);
@@ -253,7 +253,7 @@ public sealed class TelemetryTests
             CallEventKind.Exhausted,
         ];
 
-        CallEvent terminal = Assert.Single(recorder.Events, e => terminals.Contains(e.Kind));
+        var terminal = Assert.Single(recorder.Events, e => terminals.Contains(e.Kind));
         Assert.Equal(kind, terminal.Kind);
         Assert.Equal(reason, terminal.Reason);
         Assert.Equal(terminal, recorder.Events[^1]);
@@ -308,7 +308,7 @@ public sealed class TelemetryTests
 
         Assert.Equal([CallEventKind.Attempt, CallEventKind.NotRetried], recorder.Kinds);
 
-        CallEvent notRetried = recorder.Single(CallEventKind.NotRetried);
+        var notRetried = recorder.Single(CallEventKind.NotRetried);
         Assert.IsType<InvalidOperationException>(notRetried.Exception);
         Assert.Equal(VerdictKind.Permanent, notRetried.Verdict.Kind);
         Assert.Equal(1, notRetried.AttemptNumber);
@@ -322,7 +322,7 @@ public sealed class TelemetryTests
         var recorder = new Recorder();
         var time = new FakeTimeProvider();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 5,
             Deadline = TimeSpan.FromSeconds(1),
@@ -332,7 +332,7 @@ public sealed class TelemetryTests
             OnEvent = recorder.Listener,
         };
 
-        CallResult<int> result = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time);
+        var result = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time);
 
         Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
         Assert.Equal(1, recorder.Count(CallEventKind.DeadlineExceeded));
@@ -351,7 +351,7 @@ public sealed class TelemetryTests
         var time = new FakeTimeProvider();
 
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2, Time = time });
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 2,
             Backoff = Backoff.None,
@@ -364,16 +364,16 @@ public sealed class TelemetryTests
         };
 
         // Two failing attempts trip it; the operation still reports its own failure.
-        CallResult<int> first = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("down")), time);
+        var first = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("down")), time);
         Assert.Equal(StopReason.AttemptsExhausted, first.StopReason);
         Assert.Equal(1, recorder.Count(CallEventKind.BreakerOpened));
         Assert.Equal(BreakerState.Open, breaker.State);
 
-        CallResult<int> second = await RunAsync(policy, static ct => Task.FromResult(1), time);
+        var second = await RunAsync(policy, static ct => Task.FromResult(1), time);
 
         Assert.Equal(StopReason.DependencyUnavailable, second.StopReason);
 
-        CallEvent rejected = recorder.Single(CallEventKind.Rejected);
+        var rejected = recorder.Single(CallEventKind.Rejected);
         Assert.Equal(1, rejected.AttemptNumber);
         Assert.Equal(TimeSpan.FromMilliseconds(100), rejected.Delay);
     }
@@ -395,7 +395,7 @@ public sealed class TelemetryTests
             Time = time,
         });
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 1,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
@@ -435,7 +435,7 @@ public sealed class TelemetryTests
             Time = time,
         });
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 1,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
@@ -466,7 +466,7 @@ public sealed class TelemetryTests
 
         Assert.Empty(recorder.Events);
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 1,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
@@ -476,7 +476,7 @@ public sealed class TelemetryTests
             OnEvent = recorder.Listener,
         };
 
-        CallResult<int> result = await RunAsync(policy, static ct => Task.FromResult(1), time);
+        var result = await RunAsync(policy, static ct => Task.FromResult(1), time);
 
         Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
         Assert.Equal([CallEventKind.Rejected], recorder.Kinds);
@@ -488,7 +488,7 @@ public sealed class TelemetryTests
         var recorder = new Recorder();
         var time = new FakeTimeProvider();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 2,
             Backoff = Backoff.None,
@@ -499,15 +499,15 @@ public sealed class TelemetryTests
             OnEvent = recorder.Listener,
         };
 
-        StopReason last = StopReason.Succeeded;
-        for (int i = 0; i < 40 && last != StopReason.BudgetExhausted; i++)
+        var last = StopReason.Succeeded;
+        for (var i = 0; i < 40 && last != StopReason.BudgetExhausted; i++)
         {
             last = (await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time)).StopReason;
         }
 
         Assert.Equal(StopReason.BudgetExhausted, last);
 
-        CallEvent rejected = recorder.Events.Last(e => e.Kind == CallEventKind.Rejected);
+        var rejected = recorder.Events.Last(e => e.Kind == CallEventKind.Rejected);
         Assert.Equal(1, rejected.AttemptNumber);
         Assert.Equal(TimeSpan.FromMilliseconds(100), rejected.Delay);
         Assert.IsType<IOException>(rejected.Exception);
@@ -526,7 +526,7 @@ public sealed class TelemetryTests
         var recorder = new Recorder();
         var release = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 1,
             AttemptTimeout = TimeSpan.FromMilliseconds(20),
@@ -535,12 +535,12 @@ public sealed class TelemetryTests
         };
 
         // The callback never looks at its token, which is the whole point.
-        Task<CallResult<int>> call = policy.TryRunAsync(_ => release.Task).AsTask();
+        var call = policy.TryRunAsync(_ => release.Task).AsTask();
 
         await Task.Delay(TimeSpan.FromMilliseconds(1_100));
         release.SetResult(3);
 
-        CallResult<int> result = await call;
+        var result = await call;
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, recorder.Count(CallEventKind.OrphanedWork));
@@ -552,7 +552,7 @@ public sealed class TelemetryTests
     {
         var recorder = new Recorder();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 1,
             AttemptTimeout = TimeSpan.FromMilliseconds(20),
@@ -560,7 +560,7 @@ public sealed class TelemetryTests
             OnEvent = recorder.Listener,
         };
 
-        CallResult<int> result = await policy.TryRunAsync(async ct =>
+        var result = await policy.TryRunAsync(async ct =>
         {
             await Task.Delay(Timeout.InfiniteTimeSpan, ct);
             return 1;
@@ -580,9 +580,9 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_listener_that_throws_does_not_fail_the_call()
     {
-        int seen = 0;
+        var seen = 0;
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             OnEvent = _ =>
             {
@@ -633,7 +633,7 @@ public sealed class TelemetryTests
 
         await (Instant(recorder) with { Name = "api" }).RunAsync(static ct => Task.FromResult(1));
 
-        string text = recorder.Single(CallEventKind.Attempt).ToString();
+        var text = recorder.Single(CallEventKind.Attempt).ToString();
 
         Assert.Contains("[api]", text, StringComparison.Ordinal);
         Assert.Contains("Attempt #1", text, StringComparison.Ordinal);

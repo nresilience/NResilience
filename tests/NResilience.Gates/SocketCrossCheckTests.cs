@@ -33,14 +33,14 @@ public sealed class SocketCrossCheckTests
     [Fact]
     public async Task Real_socket_io_agrees_with_the_yield_gate()
     {
-        await using LoopbackEcho echo = await LoopbackEcho.StartAsync();
+        await using var echo = await LoopbackEcho.StartAsync();
 
-        Func<CancellationToken, Task<int>> callback = echo.RoundTripAsync;
+        var callback = echo.RoundTripAsync;
         Func<CancellationToken, ValueTask<int>> pollyCallback = ct => new ValueTask<int>(echo.RoundTripAsync(ct));
 
-        Resilience trivial = ShippingScenarios.Trivial;
-        Resilience full = Resilience.Default;
-        ResiliencePipeline pollyRetryTimeout = PollyScenarios.BuildRetryTimeout();
+        var trivial = ShippingScenarios.Trivial;
+        var full = Resilience.Default;
+        var pollyRetryTimeout = PollyScenarios.BuildRetryTimeout();
 
         // A socket round trip is slower and noisier than a yield, so fewer iterations and more
         // repeats: the estimator takes the minimum, and more repeats give it more chances at a
@@ -49,7 +49,7 @@ public sealed class SocketCrossCheckTests
         const int Iterations = 500;
         const int Repeats = 9;
 
-        AllocationMeasurement raw = await AllocationProbe.MeasureAsync(
+        var raw = await AllocationProbe.MeasureAsync(
             "socket: raw round trip", () => new ValueTask<int>(echo.RoundTripAsync(CancellationToken.None)),
             AllocationCounter.ProcessWide, Warmup, Iterations, Repeats);
 
@@ -59,21 +59,21 @@ public sealed class SocketCrossCheckTests
         // structurally cannot see, because Task.Yield ignores the token it is given, and it is the
         // price of never handing user code a pooled source's token - an arrangement that tried to
         // avoid it measured worse.
-        AllocationMeasurement fusedNoTimeoutResult = await AllocationProbe.MeasureAsync(
+        var fusedNoTimeoutResult = await AllocationProbe.MeasureAsync(
             "socket: lib, no timeout", () => trivial.RunAsync(callback),
             AllocationCounter.ProcessWide, Warmup, Iterations, Repeats);
 
-        AllocationMeasurement fused = await AllocationProbe.MeasureAsync(
+        var fused = await AllocationProbe.MeasureAsync(
             "socket: lib, Default", () => full.RunAsync(callback),
             AllocationCounter.ProcessWide, Warmup, Iterations, Repeats);
 
-        AllocationMeasurement polly = await AllocationProbe.MeasureAsync(
+        var polly = await AllocationProbe.MeasureAsync(
             "socket: polly, retry + timeout", () => pollyRetryTimeout.ExecuteAsync(pollyCallback, CancellationToken.None),
             AllocationCounter.ProcessWide, Warmup, Iterations, Repeats);
 
-        double fusedOverhead = fused.BytesPerOperation - raw.BytesPerOperation;
-        double pollyOverhead = polly.BytesPerOperation - raw.BytesPerOperation;
-        double ratio = pollyOverhead / fusedOverhead;
+        var fusedOverhead = fused.BytesPerOperation - raw.BytesPerOperation;
+        var pollyOverhead = polly.BytesPerOperation - raw.BytesPerOperation;
+        var ratio = pollyOverhead / fusedOverhead;
 
         var report = new StringBuilder();
         report.AppendLine("LOOPBACK SOCKET CROSS-CHECK (process-wide counter)");

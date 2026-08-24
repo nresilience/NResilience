@@ -41,7 +41,7 @@ Wrap any asynchronous work - such as a queue read, a database call, or a third-p
 ```csharp
 var api = Resilience.Default;
 
-string name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
+var name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
 ```
 <!-- endsnippet -->
 
@@ -60,9 +60,9 @@ Pass the `attempt` token into your work to ensure that timed-out attempts actual
 
 <!-- snippet: quick-start-outcome -->
 ```csharp
-CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+var result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
-if (!result.TryGetValue(out User? user))
+if (!result.TryGetValue(out var user))
 {
     // Why it stopped, and everything that happened on the way.
     Console.WriteLine(result.StopReason);   // AttemptsExhausted

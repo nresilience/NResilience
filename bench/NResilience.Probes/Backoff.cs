@@ -29,12 +29,12 @@ public static class ProbeBackoff
             return pushback > policy.BackoffMax ? policy.BackoffMax : pushback;
         }
 
-        TimeSpan @base = verdict.Kind == VerdictKind.Throttled
+        var @base = verdict.Kind == VerdictKind.Throttled
             ? policy.ThrottledBase
             : policy.TransientBase;
 
-        double ticks = @base.Ticks * Math.Pow(policy.BackoffFactor, attemptsSoFar - 1);
-        double capped = Math.Min(ticks, policy.BackoffMax.Ticks);
+        var ticks = @base.Ticks * Math.Pow(policy.BackoffFactor, attemptsSoFar - 1);
+        var capped = Math.Min(ticks, policy.BackoffMax.Ticks);
 
         if (!policy.Jitter)
         {
@@ -56,8 +56,8 @@ public static class ProbeBackoff
             Seed();
         }
 
-        uint result = BitOperations.RotateLeft(t_s1 * 5, 7) * 9;
-        uint t = t_s1 << 9;
+        var result = BitOperations.RotateLeft(t_s1 * 5, 7) * 9;
+        var t = t_s1 << 9;
 
         t_s2 ^= t_s0;
         t_s3 ^= t_s1;
@@ -71,7 +71,7 @@ public static class ProbeBackoff
 
     private static void Seed()
     {
-        ulong x = (ulong)Environment.TickCount64 ^ ((ulong)Environment.CurrentManagedThreadId << 32) ^ 0x9E3779B97F4A7C15UL;
+        var x = (ulong)Environment.TickCount64 ^ ((ulong)Environment.CurrentManagedThreadId << 32) ^ 0x9E3779B97F4A7C15UL;
         t_s0 = SplitMix(ref x);
         t_s1 = SplitMix(ref x);
         t_s2 = SplitMix(ref x);
@@ -86,7 +86,7 @@ public static class ProbeBackoff
         static uint SplitMix(ref ulong state)
         {
             state += 0x9E3779B97F4A7C15UL;
-            ulong z = state;
+            var z = state;
             z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
             z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
             return (uint)((z ^ (z >> 31)) >> 32);

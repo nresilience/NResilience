@@ -64,8 +64,8 @@ internal sealed class KnownSymbols
 
     internal static bool TryCreate(Compilation compilation, out KnownSymbols known)
     {
-        INamedTypeSymbol? resilience = compilation.GetTypeByMetadataName("NResilience.Resilience");
-        INamedTypeSymbol? token = compilation.GetTypeByMetadataName("System.Threading.CancellationToken");
+        var resilience = compilation.GetTypeByMetadataName("NResilience.Resilience");
+        var token = compilation.GetTypeByMetadataName("System.Threading.CancellationToken");
 
         if (resilience is null || token is null)
         {

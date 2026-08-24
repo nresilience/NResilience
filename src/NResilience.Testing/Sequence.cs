@@ -95,7 +95,7 @@ public sealed class Sequence<T>
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             Returns(result);
         }
@@ -127,7 +127,7 @@ public sealed class Sequence<T>
         ArgumentNullException.ThrowIfNull(exception);
         ArgumentOutOfRangeException.ThrowIfNegative(count);
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             Throws(exception);
         }
@@ -166,7 +166,7 @@ public sealed class Sequence<T>
     /// <exception cref="InvalidOperationException">The script has run out of steps.</exception>
     public Task<T> NextAsync(CancellationToken cancellationToken = default)
     {
-        int index = Interlocked.Increment(ref _served) - 1;
+        var index = Interlocked.Increment(ref _served) - 1;
 
         if (index >= _steps.Count)
         {
@@ -177,7 +177,7 @@ public sealed class Sequence<T>
                     : " Script the calls the policy will actually make - retries included.")));
         }
 
-        Step step = _steps[index];
+        var step = _steps[index];
 
         return step.Delay <= TimeSpan.Zero
             ? step.Complete()
@@ -203,7 +203,7 @@ public sealed class Sequence<T>
 
     private TimeSpan TakePendingDelay()
     {
-        TimeSpan delay = _pendingDelay;
+        var delay = _pendingDelay;
         _pendingDelay = TimeSpan.Zero;
         _hasPendingDelay = false;
         return delay;

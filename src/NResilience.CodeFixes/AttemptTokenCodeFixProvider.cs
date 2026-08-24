@@ -36,16 +36,16 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
     /// <inheritdoc />
     public override async Task RegisterCodeFixesAsync(CodeFixContext context)
     {
-        SyntaxNode? root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
+        var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
 
         if (root is null)
         {
             return;
         }
 
-        foreach (Diagnostic diagnostic in context.Diagnostics)
+        foreach (var diagnostic in context.Diagnostics)
         {
-            SyntaxNode reported = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
+            var reported = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
 
             if (reported.FirstAncestorOrSelf<AnonymousFunctionExpressionSyntax>() is null)
             {
@@ -63,23 +63,23 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
 
     private static async Task<Document> Fix(Document document, Diagnostic diagnostic, CancellationToken cancellationToken)
     {
-        SyntaxNode? root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
+        var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
 
         if (root is null)
         {
             return document;
         }
 
-        SyntaxNode reported = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
+        var reported = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
 
         if (reported.FirstAncestorOrSelf<AnonymousFunctionExpressionSyntax>() is not { } lambda)
         {
             return document;
         }
 
-        diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.AttemptNameProperty, out string? declared);
-        ParameterSyntax? parameter = TokenParameter(lambda, declared);
-        string name = declared == Discard || declared is null ? AvailableName(lambda) : declared;
+        diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.AttemptNameProperty, out var declared);
+        var parameter = TokenParameter(lambda, declared);
+        var name = declared == Discard || declared is null ? AvailableName(lambda) : declared;
 
         var edits = new Dictionary<SyntaxNode, SyntaxNode>();
 
@@ -108,7 +108,7 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
     /// <summary>Adds the omitted argument, named unless the analyzer found it could go last.</summary>
     private static SyntaxNode? WithTokenArgument(SyntaxNode call, Diagnostic diagnostic, string name)
     {
-        ArgumentListSyntax? arguments = call switch
+        var arguments = call switch
         {
             InvocationExpressionSyntax invocation => invocation.ArgumentList,
             ObjectCreationExpressionSyntax creation => creation.ArgumentList,
@@ -121,17 +121,17 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
             return null;
         }
 
-        diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.PositionalProperty, out string? positional);
-        diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.ParameterNameProperty, out string? parameterName);
+        diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.PositionalProperty, out var positional);
+        diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.ParameterNameProperty, out var parameterName);
 
-        ArgumentSyntax token = Argument(IdentifierName(name));
+        var token = Argument(IdentifierName(name));
 
         if (positional != "true" && !string.IsNullOrEmpty(parameterName))
         {
             token = token.WithNameColon(NameColon(IdentifierName(parameterName!)));
         }
 
-        ArgumentListSyntax updated = arguments.WithArguments(arguments.Arguments.Add(token));
+        var updated = arguments.WithArguments(arguments.Arguments.Add(token));
 
         return call switch
         {
@@ -160,7 +160,7 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
     /// </summary>
     private static string AvailableName(SyntaxNode lambda)
     {
-        SyntaxNode scope = lambda.FirstAncestorOrSelf<MemberDeclarationSyntax>() ?? lambda;
+        var scope = lambda.FirstAncestorOrSelf<MemberDeclarationSyntax>() ?? lambda;
         HashSet<string> taken = new(scope.DescendantTokens()
             .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
             .Select(token => token.ValueText));
@@ -170,9 +170,9 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
             return "attempt";
         }
 
-        for (int suffix = 0; ; suffix++)
+        for (var suffix = 0; ; suffix++)
         {
-            string candidate = suffix == 0
+            var candidate = suffix == 0
                 ? "attemptToken"
                 : "attemptToken" + suffix.ToString(CultureInfo.InvariantCulture);
 

@@ -5,7 +5,7 @@ using NResilience.Http;
 // The HTTP handler, driven against an in-process fake transport so the sample needs no network.
 var transport = new FakeTransport();
 
-using HttpClient client = ResilienceHttp.CreateClient(
+using var client = ResilienceHttp.CreateClient(
     Resilience.Http with
     {
         Name = "orders",
@@ -16,7 +16,7 @@ using HttpClient client = ResilienceHttp.CreateClient(
     transport);
 
 Console.WriteLine("A GET that gets a 503 and then a 200:");
-using (HttpResponseMessage response = await client.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None))
+using (var response = await client.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None))
 {
     Console.WriteLine($"  -> {(int)response.StatusCode} after {transport.Sends} send(s)");
 }
@@ -25,7 +25,7 @@ Console.WriteLine();
 Console.WriteLine("A POST is not retried, because a retried POST is a duplicate order:");
 transport.Reset();
 using (var post = new HttpRequestMessage(HttpMethod.Post, "https://orders.example") { Content = new StringContent("{}") })
-using (HttpResponseMessage response = await client.SendAsync(post, CancellationToken.None))
+using (var response = await client.SendAsync(post, CancellationToken.None))
 {
     Console.WriteLine($"  -> {(int)response.StatusCode} after {transport.Sends} send(s)");
 }
@@ -38,7 +38,7 @@ using (var post = new HttpRequestMessage(HttpMethod.Post, "https://orders.exampl
     post.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
     post.Options.Set(ResilienceHttp.Repeatable, true);
 
-    using HttpResponseMessage response = await client.SendAsync(post, CancellationToken.None);
+    using var response = await client.SendAsync(post, CancellationToken.None);
     Console.WriteLine($"  -> {(int)response.StatusCode} after {transport.Sends} send(s)");
 }
 
@@ -47,10 +47,10 @@ Console.WriteLine("The handler's own view, per host - what a health endpoint wou
 var handler = new ResilienceHandler(new FakeTransport(), Resilience.Http);
 using (HttpClient probe = new(handler))
 {
-    using HttpResponseMessage _ = await probe.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);
+    using var _ = await probe.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);
 }
 
-foreach ((string host, Breaker breaker) in handler.BreakersByHost())
+foreach ((var host, var breaker) in handler.BreakersByHost())
 {
     Console.WriteLine($"  {host}: {breaker.State}");
 }

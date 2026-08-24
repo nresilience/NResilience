@@ -87,7 +87,7 @@ For a console spike, a logger factory is one line:
 
 <!-- snippet: logging-console -->
 ```csharp
-using ILoggerFactory factory = LoggerFactory.Create(b => b
+using var factory = LoggerFactory.Create(b => b
     .AddConsole()
     .SetMinimumLevel(LogLevel.Debug));
 

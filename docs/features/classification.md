@@ -24,11 +24,11 @@ By using a single classifier, NResilience ensures that retry logic, backoff curv
 
 <!-- snippet: classifier-http-table -->
 ```csharp
-Classifier http = Classifier.Http;
+var http = Classifier.Http;
 
-Verdict throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));  // Throttled
-Verdict transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway));       // Transient
-Verdict answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound));            // Ok - a 404 is an answer
+var throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));  // Throttled
+var transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway));       // Transient
+var answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound));            // Ok - a 404 is an answer
 ```
 <!-- endsnippet -->
 

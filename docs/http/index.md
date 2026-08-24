@@ -36,9 +36,9 @@ To use the handler, create a long-lived `HttpClient` using `ResilienceHttp.Creat
 // nothing to a client that is rebuilt per call.
 private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cancellationToken)
 {
-    using HttpClient client = ResilienceHttp.CreateClient();
+    using var client = ResilienceHttp.CreateClient();
 
-    using HttpResponseMessage response = await client.GetAsync(
+    using var response = await client.GetAsync(
         new Uri("https://api.example.com/orders/1"), cancellationToken);
 
     return response.StatusCode;
@@ -54,7 +54,7 @@ You can customize the handler's behavior using `HttpResilienceOptions`.
 
 <!-- snippet: http-options -->
 ```csharp
-using HttpClient client = ResilienceHttp.CreateClient(
+using var client = ResilienceHttp.CreateClient(
     Resilience.Http with { Attempts = 4 },
     new HttpResilienceOptions
     {

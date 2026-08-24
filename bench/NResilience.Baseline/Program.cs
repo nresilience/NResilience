@@ -22,7 +22,7 @@ internal static class Program
 
     private static async Task<int> Main(string[] args)
     {
-        IReadOnlyList<BenchmarkResult> results = await BenchmarkHarness.Create(args)
+        var results = await BenchmarkHarness.Create(args)
             .AddFromAssembly<SuspendingPathBenchmarks>()
             // Reports land under artifacts/, which .gitignore already covers. The default writes
             // timestamped files into the working directory, and a benchmark run should not leave

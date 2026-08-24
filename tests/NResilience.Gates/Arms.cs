@@ -55,10 +55,10 @@ public static class Arms
 {
     public static IReadOnlyList<Arm> Suspending()
     {
-        Scenarios.RetryArm standInRetry = Scenarios.BuildFusedRetry();
-        ShippingScenarios.RetryArm shippingRetry = ShippingScenarios.BuildRetry();
-        PollyScenarios.PollyRetryArm pollyRetry = PollyScenarios.BuildRetryArm();
-        ShippingScenarios.LimitArm shippingLimited = ShippingScenarios.BuildLimited();
+        var standInRetry = Scenarios.BuildFusedRetry();
+        var shippingRetry = ShippingScenarios.BuildRetry();
+        var pollyRetry = PollyScenarios.BuildRetryArm();
+        var shippingLimited = ShippingScenarios.BuildLimited();
 
         return
         [
@@ -128,7 +128,7 @@ public static class Arms
         int repeats = AllocationProbe.DefaultRepeats)
     {
         var results = new Dictionary<string, AllocationMeasurement>(StringComparer.Ordinal);
-        foreach (Arm arm in arms)
+        foreach (var arm in arms)
         {
             results[arm.Name] = await arm.MeasureAsync(warmup, iterations, repeats);
         }

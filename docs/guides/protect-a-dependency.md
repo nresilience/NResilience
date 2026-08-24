@@ -58,7 +58,7 @@ You can monitor the health of your dependencies by reading the state of the circ
 <!-- snippet: guide-health-endpoint -->
 ```csharp
 // A breaker is an object with a name and a state, so an operator can be told about it.
-string report = dependencies.Payments.State switch
+var report = dependencies.Payments.State switch
 {
     BreakerState.Closed => "healthy",
     BreakerState.HalfOpen => "recovering",

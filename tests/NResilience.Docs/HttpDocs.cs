@@ -10,15 +10,15 @@ public sealed class HttpDocs
     [Fact]
     public async Task A_client_with_the_handler_in_front_of_it()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Status(HttpStatusCode.OK));
 
-        using HttpClient client = ResilienceHttp.CreateClient(
+        using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
-        using HttpResponseMessage retried = await client.GetAsync(
+        using var retried = await client.GetAsync(
             new Uri("https://api.example.com/orders/1"), cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
@@ -30,9 +30,9 @@ public sealed class HttpDocs
     // nothing to a client that is rebuilt per call.
     private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cancellationToken)
     {
-        using HttpClient client = ResilienceHttp.CreateClient();
+        using var client = ResilienceHttp.CreateClient();
 
-        using HttpResponseMessage response = await client.GetAsync(
+        using var response = await client.GetAsync(
             new Uri("https://api.example.com/orders/1"), cancellationToken);
 
         return response.StatusCode;
@@ -43,7 +43,7 @@ public sealed class HttpDocs
     public void The_switches_that_are_properties_of_http_rather_than_of_resilience()
     {
         // <snippet:http-options>
-        using HttpClient client = ResilienceHttp.CreateClient(
+        using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Attempts = 4 },
             new HttpResilienceOptions
             {
@@ -61,11 +61,11 @@ public sealed class HttpDocs
     [Fact]
     public async Task A_post_carrying_an_idempotency_key_can_opt_in()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Status(HttpStatusCode.OK));
-        using HttpClient client = ResilienceHttp.CreateClient(
+        using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
         var key = Guid.NewGuid().ToString();
@@ -78,7 +78,7 @@ public sealed class HttpDocs
         request.Headers.Add("Idempotency-Key", key);
         request.Options.Set(ResilienceHttp.Repeatable, true);
 
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        using var response = await client.SendAsync(request, cancellationToken);
         // </snippet:http-repeatable>
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -92,10 +92,10 @@ public sealed class HttpDocs
 
         // <snippet:http-per-host>
         // A breaker whose scope is a variable with a name is one an operator can be told about.
-        IReadOnlyDictionary<string, Breaker> breakers = handler.BreakersByHost();
-        IReadOnlyDictionary<string, RetryBudget> budgets = handler.BudgetsByHost();
+        var breakers = handler.BreakersByHost();
+        var budgets = handler.BudgetsByHost();
 
-        foreach ((string host, Breaker breaker) in breakers)
+        foreach ((var host, var breaker) in breakers)
         {
             Console.WriteLine($"{host}: {breaker.State} since {breaker.OpenedAt:O}");
         }

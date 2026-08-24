@@ -59,7 +59,7 @@ internal static class Doubles
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             Requests.Add(request);
-            int index = Math.Min(_served++, responses.Length - 1);
+            var index = Math.Min(_served++, responses.Length - 1);
             return Task.FromResult(responses[index]());
         }
     }

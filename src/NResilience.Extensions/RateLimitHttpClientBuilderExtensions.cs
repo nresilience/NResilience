@@ -43,7 +43,7 @@ public static class RateLimitHttpClientBuilderExtensions
 
         Mark(builder);
 
-        string reported = name ?? builder.Name;
+        var reported = name ?? builder.Name;
         return builder.AddHttpMessageHandler(() => new RateLimitHandler(limiter, reported, owned: false));
     }
 
@@ -94,7 +94,7 @@ public static class RateLimitHttpClientBuilderExtensions
         options.Validate();
         Mark(builder);
 
-        string reported = options.Name ?? builder.Name;
+        var reported = options.Name ?? builder.Name;
 
         if (!options.PerHost)
         {

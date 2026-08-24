@@ -95,7 +95,7 @@ public sealed class ResilienceOptionsTests
             ("Jitter", "None"),
             ("Breaker:ConsecutiveFailures", "2")).Bind(options);
 
-        Resilience policy = options.ToPolicy();
+        var policy = options.ToPolicy();
 
         Assert.Same(Classifier.Http, policy.Classify);
         Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
@@ -122,9 +122,9 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void An_unset_property_leaves_the_baseline_alone()
     {
-        Resilience baseline = Resilience.Default with { Attempts = 9, Deadline = TimeSpan.FromMinutes(4) };
+        var baseline = Resilience.Default with { Attempts = 9, Deadline = TimeSpan.FromMinutes(4) };
 
-        Resilience policy = new ResilienceOptions { Attempts = 2 }.ToPolicy(baseline);
+        var policy = new ResilienceOptions { Attempts = 2 }.ToPolicy(baseline);
 
         Assert.Equal(2, policy.Attempts);
         Assert.Equal(TimeSpan.FromMinutes(4), policy.Deadline);
@@ -137,7 +137,7 @@ public sealed class ResilienceOptionsTests
     [InlineData("HTTP")]
     public void The_http_preset_resolves_case_insensitively(string preset)
     {
-        Resilience policy = new ResilienceOptions { Preset = preset }.ToPolicy();
+        var policy = new ResilienceOptions { Preset = preset }.ToPolicy();
 
         Assert.Same(Classifier.Http, policy.Classify);
     }
@@ -146,7 +146,7 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void A_preset_replaces_the_baseline()
     {
-        Resilience policy = new ResilienceOptions { Preset = "None" }.ToPolicy(Resilience.Http with { Attempts = 9 });
+        var policy = new ResilienceOptions { Preset = "None" }.ToPolicy(Resilience.Http with { Attempts = 9 });
 
         Assert.Equal(1, policy.Attempts);
     }
@@ -169,7 +169,7 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void Backoff_settings_project_onto_an_exponential_backoff()
     {
-        Resilience policy = new ResilienceOptions
+        var policy = new ResilienceOptions
         {
             MaxDelay = TimeSpan.FromSeconds(5),
             Jitter = Jitter.None,
@@ -189,9 +189,9 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void Jitter_alone_leaves_the_rest_of_the_backoff_alone()
     {
-        Resilience baseline = Resilience.Default with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(2)) };
+        var baseline = Resilience.Default with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(2)) };
 
-        Resilience policy = new ResilienceOptions { Jitter = Jitter.None }.ToPolicy(baseline);
+        var policy = new ResilienceOptions { Jitter = Jitter.None }.ToPolicy(baseline);
 
         Assert.Equal(Jitter.None, policy.Backoff.Jitter);
         Assert.Equal(TimeSpan.FromSeconds(2), Delay(policy, 2));
@@ -205,7 +205,7 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void A_zero_budget_fraction_turns_the_budget_off()
     {
-        Resilience policy = new ResilienceOptions { BudgetFraction = 0 }.ToPolicy();
+        var policy = new ResilienceOptions { BudgetFraction = 0 }.ToPolicy();
 
         Assert.Same(RetryBudget.None, policy.Budget);
     }
@@ -214,9 +214,9 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void A_named_budget_is_shared_by_name()
     {
-        Resilience first = new ResilienceOptions { SharedBudget = "tier-1" }.ToPolicy();
-        Resilience second = new ResilienceOptions { SharedBudget = "tier-1" }.ToPolicy();
-        Resilience other = new ResilienceOptions { SharedBudget = "tier-2" }.ToPolicy();
+        var first = new ResilienceOptions { SharedBudget = "tier-1" }.ToPolicy();
+        var second = new ResilienceOptions { SharedBudget = "tier-1" }.ToPolicy();
+        var other = new ResilienceOptions { SharedBudget = "tier-2" }.ToPolicy();
 
         Assert.Same(first.Budget, second.Budget);
         Assert.NotSame(first.Budget, other.Budget);
@@ -233,7 +233,7 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void Breaker_settings_project_onto_a_live_breaker()
     {
-        Resilience policy = new ResilienceOptions
+        var policy = new ResilienceOptions
         {
             Name = "payments",
             Breaker = new BreakerOptions
@@ -243,7 +243,7 @@ public sealed class ResilienceOptionsTests
             },
         }.ToPolicy();
 
-        Breaker breaker = Assert.IsType<Breaker>(policy.Breaker);
+        var breaker = Assert.IsType<Breaker>(policy.Breaker);
         Assert.Equal("payments", breaker.Name);
         Assert.Equal(2, breaker.Settings.ConsecutiveFailures);
         Assert.Equal(TimeSpan.FromSeconds(15), breaker.Settings.BreakDuration);
@@ -273,7 +273,7 @@ public sealed class ResilienceOptionsTests
             ("Breaker:SlowCallThreshold", "00:00:02"))
             .Bind(options);
 
-        Resilience policy = options.ToPolicy();
+        var policy = options.ToPolicy();
 
         Assert.Equal(5, policy.Attempts);
         Assert.Equal(TimeSpan.FromSeconds(10), policy.Deadline);

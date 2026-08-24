@@ -21,16 +21,16 @@ public static class SnippetEngine
     {
         var snippets = new Dictionary<string, Snippet>(StringComparer.Ordinal);
 
-        foreach (string file in SourceFiles(sourceRoot))
+        foreach (var file in SourceFiles(sourceRoot))
         {
-            string extension = Path.GetExtension(file);
+            var extension = Path.GetExtension(file);
             if (extension is ".json")
             {
                 Add(snippets, new Snippet(Path.GetFileName(file), "json", File.ReadAllText(file).TrimEnd(), file));
                 continue;
             }
 
-            foreach (Snippet snippet in FromSource(file))
+            foreach (var snippet in FromSource(file))
             {
                 Add(snippets, snippet);
             }
@@ -44,10 +44,10 @@ public static class SnippetEngine
     {
         var drift = new List<Drift>();
 
-        foreach (string file in MarkdownFiles(docsRoot))
+        foreach (var file in MarkdownFiles(docsRoot))
         {
-            string original = File.ReadAllText(file);
-            string updated = Rewrite(file, original, snippets, drift);
+            var original = File.ReadAllText(file);
+            var updated = Rewrite(file, original, snippets, drift);
 
             if (!string.Equals(original, updated, StringComparison.Ordinal))
             {
@@ -64,13 +64,13 @@ public static class SnippetEngine
 
     private static string Rewrite(string file, string markdown, Dictionary<string, Snippet> snippets, List<Drift> drift)
     {
-        string newline = markdown.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
-        string[] lines = markdown.Split(["\r\n", "\n"], StringSplitOptions.None);
+        var newline = markdown.Contains("\r\n", StringComparison.Ordinal) ? "\r\n" : "\n";
+        var lines = markdown.Split(["\r\n", "\n"], StringSplitOptions.None);
         var output = new List<string>(lines.Length);
 
-        for (int i = 0; i < lines.Length; i++)
+        for (var i = 0; i < lines.Length; i++)
         {
-            string line = lines[i];
+            var line = lines[i];
             output.Add(line);
 
             if (!line.TrimStart().StartsWith(OpenPrefix, StringComparison.Ordinal))
@@ -78,10 +78,10 @@ public static class SnippetEngine
                 continue;
             }
 
-            string name = line.Trim()[OpenPrefix.Length..].TrimEnd('>', '-', ' ').Trim();
+            var name = line.Trim()[OpenPrefix.Length..].TrimEnd('>', '-', ' ').Trim();
 
             // Skip whatever is currently between the markers; it is generated content.
-            int end = i + 1;
+            var end = i + 1;
             while (end < lines.Length && !lines[end].TrimStart().StartsWith(CloseMarker, StringComparison.Ordinal))
             {
                 end++;
@@ -93,7 +93,7 @@ public static class SnippetEngine
                 continue;
             }
 
-            if (!snippets.TryGetValue(name, out Snippet? snippet))
+            if (!snippets.TryGetValue(name, out var snippet))
             {
                 drift.Add(new Drift(file, $"snippet \"{name}\" does not exist in the snippet project"));
                 i = end - 1;
@@ -113,12 +113,12 @@ public static class SnippetEngine
 
     private static IEnumerable<Snippet> FromSource(string file)
     {
-        string[] lines = File.ReadAllLines(file);
+        var lines = File.ReadAllLines(file);
         var open = new Stack<(string Name, int Start)>();
 
-        for (int i = 0; i < lines.Length; i++)
+        for (var i = 0; i < lines.Length; i++)
         {
-            string trimmed = lines[i].Trim();
+            var trimmed = lines[i].Trim();
 
             if (trimmed.StartsWith("// <snippet:", StringComparison.Ordinal))
             {
@@ -128,7 +128,7 @@ public static class SnippetEngine
 
             if (trimmed.StartsWith("// </snippet:", StringComparison.Ordinal))
             {
-                (string name, int start) = open.Pop();
+                (var name, var start) = open.Pop();
                 yield return new Snippet(name, "csharp", Dedent(lines[start..i]), file);
             }
         }
@@ -138,7 +138,7 @@ public static class SnippetEngine
     {
         var kept = body.Where(static line => !line.Trim().StartsWith("// snippet-hide", StringComparison.Ordinal)).ToArray();
 
-        int indent = kept
+        var indent = kept
             .Where(static line => line.Trim().Length > 0)
             .Select(static line => line.Length - line.TrimStart().Length)
             .DefaultIfEmpty(0)

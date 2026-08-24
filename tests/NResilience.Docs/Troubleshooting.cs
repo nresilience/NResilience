@@ -11,8 +11,8 @@ public sealed class Troubleshooting
     [Fact]
     public async Task Nothing_was_retried_because_the_exception_was_not_recognized()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new MyDbException()).Returns(1);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new MyDbException()).Returns(1);
 
         // <snippet:troubleshoot-not-retried>
         // Classifier.Default treats an exception type it has never heard of as Permanent. Teach it
@@ -30,19 +30,19 @@ public sealed class Troubleshooting
     [Fact]
     public async Task The_history_of_a_failed_call()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException(), 3);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new IOException(), 3);
         var api = Resilience.Default with { Backoff = Backoff.None };
 
         // <snippet:troubleshoot-attempt-log>
         // Every failure carries its own history: on CallResult, on the exceptions the library
         // invents, and on Exception.Data for an original exception it rethrew unchanged.
-        CallResult<int> result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 
         Console.WriteLine(result.StopReason);   // AttemptsExhausted
         Console.WriteLine(result.Attempts);     // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
 
-        foreach (Attempt attempt in result.Attempts)
+        foreach (var attempt in result.Attempts)
         {
             Console.WriteLine($"#{attempt.Number} {attempt.Verdict.Kind} after {attempt.DelayBefore.TotalMilliseconds}ms");
         }
@@ -70,11 +70,11 @@ public sealed class Troubleshooting
     [Fact]
     public async Task A_post_is_not_retried_until_you_say_it_is_safe()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Status(HttpStatusCode.OK));
-        using HttpClient client = ResilienceHttp.CreateClient(
+        using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
@@ -83,7 +83,7 @@ public sealed class Troubleshooting
         request.Options.Set(ResilienceHttp.Repeatable, true);   // this one carries an idempotency key
         // </snippet:troubleshoot-post-not-retried>
 
-        using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+        using var response = await client.SendAsync(request, cancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

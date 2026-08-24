@@ -45,13 +45,13 @@ internal sealed class RateLimitHandler : DelegatingHandler
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        long start = Stopwatch.GetTimestamp();
+        var start = Stopwatch.GetTimestamp();
 
         // Disposing the lease is what releases a concurrency permit, and it has to happen when the
         // attempt ends however it ends - a timeout, a transport exception or a response. `using`
         // over the whole send is the only shape that holds for all three; a rate limiter's lease
         // holds nothing and disposing it is free.
-        using RateLimitLease lease = _partitioned is not null
+        using var lease = _partitioned is not null
             ? await _partitioned.AcquireAsync(request, 1, cancellationToken).ConfigureAwait(false)
             : await _limiter!.AcquireAsync(1, cancellationToken).ConfigureAwait(false);
 

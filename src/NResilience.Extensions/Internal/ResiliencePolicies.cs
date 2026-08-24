@@ -73,7 +73,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
         {
             if (name is not null)
             {
-                _projected.TryRemove(name, out Resilience? _);
+                _projected.TryRemove(name, out var _);
             }
         });
     }
@@ -114,7 +114,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
 
     private string Registered()
     {
-        string[] names = _names.Set.Keys.ToArray();
+        var names = _names.Set.Keys.ToArray();
         Array.Sort(names, StringComparer.Ordinal);
         return names.Length == 0 ? "(nothing)" : string.Join(", ", names);
     }
@@ -132,10 +132,10 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
 
     private static Resilience Build(string name, ResiliencePolicies self)
     {
-        ResiliencePolicyRegistration registration = self._registrations.Get(name);
-        ResilienceOptions options = self._options.Get(name);
+        var registration = self._registrations.Get(name);
+        var options = self._options.Get(name);
 
-        Resilience policy = options.ToPolicy(registration.Baseline);
+        var policy = options.ToPolicy(registration.Baseline);
 
         // The registration name wins over a name the policy value already carried, and only an
         // explicit ResilienceOptions.Name overrides it. The reason is Resilience.Http: it is named
@@ -158,7 +158,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             policy = configure(policy) ?? policy;
         }
 
-        bool telemetry = options.Telemetry ?? true;
+        var telemetry = options.Telemetry ?? true;
         if (telemetry)
         {
             policy = policy.WithTelemetry();
@@ -166,17 +166,17 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
 
         // After the configure callback, so a callback that assigns OnEvent does not lose logging and
         // one that calls WithLogging itself wins under the first-attach-wins rule.
-        ResilienceLogProfile profile = ResilienceLogging.ProfileFor(options.Logging, self._logging.Profile);
+        var profile = ResilienceLogging.ProfileFor(options.Logging, self._logging.Profile);
         if (profile != ResilienceLogProfile.Off && self._loggerFactory is { } factory)
         {
-            ResilienceLoggingOptions logging = self.LoggingFor(profile);
+            var logging = self.LoggingFor(profile);
             policy = policy.WithLogging(factory, logging);
 
             // Provenance. Binding a section is silently partial, so one line per policy per
             // resolution says what actually came out - and a reload produces a fresh one, which is
             // exactly when somebody wants to know what it changed to.
-            ILogger logger = factory.CreateLogger(ResilienceLogging.CategoryFor(policy.Name));
-            string reported = policy.Name ?? name;
+            var logger = factory.CreateLogger(ResilienceLogging.CategoryFor(policy.Name));
+            var reported = policy.Name ?? name;
 
             if (logger.IsEnabled(LogLevel.Debug))
             {
@@ -223,7 +223,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
     /// </summary>
     private Resilience Reuse(string name, Resilience policy)
     {
-        LiveState live = _live.GetOrAdd(name, static _ => new LiveState());
+        var live = _live.GetOrAdd(name, static _ => new LiveState());
 
         lock (live)
         {

@@ -53,13 +53,13 @@ public sealed class BaselineReportTests
 
     private static async Task AppendAsync(StringBuilder report, string title, IReadOnlyList<Arm> arms)
     {
-        Dictionary<string, AllocationMeasurement> results = await Arms.MeasureAsync(arms);
+        var results = await Arms.MeasureAsync(arms);
 
         report.AppendLine();
         report.AppendLine(title);
-        foreach (Arm arm in arms)
+        foreach (var arm in arms)
         {
-            AllocationMeasurement m = results[arm.Name];
+            var m = results[arm.Name];
             report.Append(CultureInfo.InvariantCulture, $"  {arm.Name,-36} {m.BytesPerOperation,9:0.0} B/op");
             report.AppendLine();
         }

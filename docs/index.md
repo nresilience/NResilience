@@ -52,13 +52,13 @@ var api = Resilience.Http;
 var slow = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
 // 3. Run any callback through one method. The token handed to your work is the attempt's own.
-User? user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
-HttpResponseMessage response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
+var user = await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url, attempt), cancellationToken);
+var response = await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 await slow.RunAsync(attempt => queue.FlushAsync(attempt), cancellationToken);
 
 // 4. Want the outcome without an exception? `TryRunAsync` hands it back to branch on.
-CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
-User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGood;
+var result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+var best = result.TryGetValue(out var fetched) ? fetched : cache.LastKnownGood;
 ```
 <!-- endsnippet -->
 

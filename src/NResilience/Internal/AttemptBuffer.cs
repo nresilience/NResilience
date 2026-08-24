@@ -46,8 +46,8 @@ internal struct AttemptRecord
     public void Set(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed)
     {
         _startOffsetTicks = startOffsetTicks < 0 ? 0 : startOffsetTicks;
-        long clamped = elapsedTicks < 0 ? 0 : (elapsedTicks > TicksMask ? TicksMask : elapsedTicks);
-        byte packed = (byte)((byte)verdict | (selfImposed ? Verdict.SelfImposedFlag : 0));
+        var clamped = elapsedTicks < 0 ? 0 : (elapsedTicks > TicksMask ? TicksMask : elapsedTicks);
+        var packed = (byte)((byte)verdict | (selfImposed ? Verdict.SelfImposedFlag : 0));
         _elapsedAndVerdict = clamped | ((long)packed << VerdictShift);
     }
 }
@@ -95,7 +95,7 @@ internal struct AttemptSink
 
     public void Record(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed, Exception? error)
     {
-        int index = _count++;
+        var index = _count++;
 
         if (index < AttemptBuffer.Capacity)
         {
@@ -103,7 +103,7 @@ internal struct AttemptSink
         }
         else
         {
-            int spillIndex = index - AttemptBuffer.Capacity;
+            var spillIndex = index - AttemptBuffer.Capacity;
             if (_spill is null)
             {
                 _spill = new AttemptRecord[AttemptBuffer.Capacity];
@@ -139,16 +139,16 @@ internal struct AttemptSink
         var attempts = new Attempt[_count];
         long previousEnd = 0;
 
-        for (int i = 0; i < _count; i++)
+        for (var i = 0; i < _count; i++)
         {
-            AttemptRecord record = i < AttemptBuffer.Capacity ? _inline[i] : _spill![i - AttemptBuffer.Capacity];
+            var record = i < AttemptBuffer.Capacity ? _inline[i] : _spill![i - AttemptBuffer.Capacity];
 
-            long start = record.StartOffsetTicks;
-            long delay = i == 0 ? 0 : start - previousEnd;
+            var start = record.StartOffsetTicks;
+            var delay = i == 0 ? 0 : start - previousEnd;
             previousEnd = start + record.ElapsedTicks;
 
-            Exception? error = _exceptions is not null && i < _exceptions.Length ? _exceptions[i] : null;
-            TimeSpan remaining = bounded
+            var error = _exceptions is not null && i < _exceptions.Length ? _exceptions[i] : null;
+            var remaining = bounded
                 ? (deadline.Ticks > start ? TimeSpan.FromTicks(deadline.Ticks - start) : TimeSpan.Zero)
                 : Timeout.InfiniteTimeSpan;
 

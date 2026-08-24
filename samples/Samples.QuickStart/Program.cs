@@ -14,17 +14,17 @@ var api = Resilience.Default with
 
 Console.WriteLine("A call that fails twice and then succeeds:");
 var flaky = new FakeDependency(failuresBeforeSuccess: 2);
-string value = await api.RunAsync(attempt => flaky.ReadAsync(attempt), CancellationToken.None);
+var value = await api.RunAsync(attempt => flaky.ReadAsync(attempt), CancellationToken.None);
 Console.WriteLine($"  -> {value}");
 
 Console.WriteLine();
 Console.WriteLine("A call that never succeeds, reported rather than thrown:");
 var broken = new FakeDependency(failuresBeforeSuccess: int.MaxValue);
-CallResult<string> result = await api.TryRunAsync(attempt => broken.ReadAsync(attempt), CancellationToken.None);
+var result = await api.TryRunAsync(attempt => broken.ReadAsync(attempt), CancellationToken.None);
 
 Console.WriteLine($"  -> {result.StopReason}");
 Console.WriteLine($"  -> {result.Attempts}");
-Console.WriteLine($"  -> falling back to the cached value: {(result.TryGetValue(out string? v) ? v : "(cached)")}");
+Console.WriteLine($"  -> falling back to the cached value: {(result.TryGetValue(out var v) ? v : "(cached)")}");
 
 Console.WriteLine();
 Console.WriteLine("What the classifier will and will not retry:");

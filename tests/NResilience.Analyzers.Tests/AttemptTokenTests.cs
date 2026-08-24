@@ -8,7 +8,7 @@ public sealed class AttemptTokenTests
     [Fact]
     public void The_attempt_token_passed_to_the_call_is_the_whole_point()
     {
-        string[] ids = Harness.Ids(Harness.InMethod(
+        var ids = Harness.Ids(Harness.InMethod(
             "        await api.RunAsync(attempt => Client.GetAsync(url, attempt), cancellationToken);"));
 
         Assert.Equal([], ids);
@@ -17,7 +17,7 @@ public sealed class AttemptTokenTests
     [Fact]
     public void The_callers_token_inside_the_callback_is_the_bug_this_exists_for()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InMethod(
+        var reported = Assert.Single(Harness.Run(Harness.InMethod(
             "        await api.RunAsync(attempt => Client.GetAsync(url, cancellationToken), cancellationToken);")));
 
         Assert.Equal("NRES002", reported.Id);
@@ -42,7 +42,7 @@ public sealed class AttemptTokenTests
     [Fact]
     public void An_omitted_optional_token_is_a_call_the_attempt_timeout_cannot_reach()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InMethod(
+        var reported = Assert.Single(Harness.Run(Harness.InMethod(
             "        await api.RunAsync(attempt => Helper(), cancellationToken);")));
 
         Assert.Equal("NRES001", reported.Id);

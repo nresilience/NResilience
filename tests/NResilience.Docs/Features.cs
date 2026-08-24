@@ -11,14 +11,14 @@ public sealed class Features
     [Fact]
     public async Task Attempts_is_the_total()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException(), 2).Returns(42);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new IOException(), 2).Returns(42);
 
         // <snippet:retry-attempts>
         // Three attempts: try, retry, retry. Not "one call plus three retries".
         var api = Resilience.Default with { Attempts = 3 };
 
-        int value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        var value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         // </snippet:retry-attempts>
 
         Assert.Equal(42, value);
@@ -60,8 +60,8 @@ public sealed class Features
     [Fact]
     public async Task Backoff_can_be_computed()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException()).Returns(7);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new IOException()).Returns(7);
 
         // <snippet:retry-custom-backoff>
         var api = Resilience.Default with
@@ -78,9 +78,9 @@ public sealed class Features
     [Fact]
     public async Task Work_that_has_to_be_rebuilt_goes_in_BeforeAttempt()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var tokens = new TokenSource();
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
+        var calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
 
         // <snippet:retry-before-attempt>
         var api = Resilience.Http with
@@ -114,11 +114,11 @@ public sealed class Features
 
         Assert.Equal(TimeSpan.FromSeconds(3), api.AttemptTimeout);
 
-        Sequence<int> calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(30)).Returns(1);
-        Task<CallResult<int>> pending = RunAsync(api with { Time = time, Attempts = 1 }, calls);
+        var calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(30)).Returns(1);
+        var pending = RunAsync(api with { Time = time, Attempts = 1 }, calls);
 
         time.Advance(TimeSpan.FromSeconds(4));
-        CallResult<int> result = await pending;
+        var result = await pending;
 
         Assert.IsType<AttemptTimeoutException>(result.Exception);
         Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
@@ -129,11 +129,11 @@ public sealed class Features
     {
         var time = new FakeTimeProvider();
         var api = Resilience.Default with { Time = time, Deadline = TimeSpan.FromSeconds(5), AttemptTimeout = Timeout.InfiniteTimeSpan };
-        Sequence<int> calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(30)).Returns(1);
+        var calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(30)).Returns(1);
 
-        Task<CallResult<int>> pending = RunAsync(api, calls);
+        var pending = RunAsync(api, calls);
         time.Advance(TimeSpan.FromSeconds(6));
-        CallResult<int> result = await pending;
+        var result = await pending;
 
         // <snippet:deadline-handle-exception>
         // DeadlineExceededException and AttemptTimeoutException are both TimeoutException, so one
@@ -158,8 +158,8 @@ public sealed class Features
     [Fact]
     public async Task A_classifier_teaches_the_policy_about_your_own_exceptions()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new MyDbException()).Returns(1);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new MyDbException()).Returns(1);
 
         // <snippet:classifier-custom-exception>
         // Classifier.Default does not retry an exception type it has never heard of - retrying a
@@ -178,8 +178,8 @@ public sealed class Features
     [Fact]
     public async Task A_result_rule_classifies_what_a_call_returned()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<Reply> calls = Sequence.For<Reply>()
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<Reply>()
             .Returns(new Reply("BUSY"))
             .Returns(new Reply("OK"));
 
@@ -197,7 +197,7 @@ public sealed class Features
         };
         // </snippet:classifier-result-rule>
 
-        Reply reply = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        var reply = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
         Assert.Equal("OK", reply.Code);
     }
 
@@ -217,11 +217,11 @@ public sealed class Features
     public void The_http_classifier_reads_status_codes_the_way_they_are_meant()
     {
         // <snippet:classifier-http-table>
-        Classifier http = Classifier.Http;
+        var http = Classifier.Http;
 
-        Verdict throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));  // Throttled
-        Verdict transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway));       // Transient
-        Verdict answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound));            // Ok - a 404 is an answer
+        var throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests));  // Throttled
+        var transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway));       // Transient
+        var answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound));            // Ok - a 404 is an answer
         // </snippet:classifier-http-table>
 
         Assert.Equal(VerdictKind.Throttled, throttled.Kind);

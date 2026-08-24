@@ -36,13 +36,13 @@ public sealed class HttpRateLimitTests
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using ServiceProvider provider = Provider(
+        using var provider = Provider(
             services => services.AddHttpClient("api")
                                 .AddResilience(Instant, telemetry: false)
                                 .AddRateLimit(limiter, "api"),
             transport);
 
-        using HttpResponseMessage response = await Client(provider).GetAsync(Thing);
+        using var response = await Client(provider).GetAsync(Thing);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(3, transport.Requests.Count);
@@ -61,13 +61,13 @@ public sealed class HttpRateLimitTests
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using ServiceProvider provider = Provider(
+        using var provider = Provider(
             services => services.AddHttpClient("api")
                                 .AddResilience(Instant, telemetry: false)
                                 .AddRateLimit(limiter, "api"),
             transport);
 
-        using HttpResponseMessage response = await Client(provider).GetAsync(Thing);
+        using var response = await Client(provider).GetAsync(Thing);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -91,7 +91,7 @@ public sealed class HttpRateLimitTests
 
         await Assert.ThrowsAsync<RateLimitedException>(() => client.GetAsync(Thing));
 
-        RetryBudget budget = Assert.Single(handler.BudgetsByHost()).Value;
+        var budget = Assert.Single(handler.BudgetsByHost()).Value;
         Assert.Equal(0, budget.Utilization);
         Assert.Empty(transport.Requests);
         limiter.Dispose();
@@ -105,8 +105,8 @@ public sealed class HttpRateLimitTests
         // One permit for the whole client. If the first attempt's lease is not released when the
         // attempt times out, the second attempt can never get one and the call fails as limited
         // rather than succeeding.
-        using RateLimiter limiter = Limit.Concurrency(1);
-        int calls = 0;
+        using var limiter = Limit.Concurrency(1);
+        var calls = 0;
 
         var transport = new Transport(async (_, ct) =>
         {
@@ -118,20 +118,20 @@ public sealed class HttpRateLimitTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        Resilience policy = Resilience.Http with
+        var policy = Resilience.Http with
         {
             Backoff = Backoff.None,
             AttemptTimeout = TimeSpan.FromMilliseconds(100),
             Deadline = Timeout.InfiniteTimeSpan,
         };
 
-        using ServiceProvider provider = Provider(
+        using var provider = Provider(
             services => services.AddHttpClient("api")
                                 .AddResilience(policy, telemetry: false)
                                 .AddRateLimit(limiter, "api"),
             transport);
 
-        using HttpResponseMessage response = await Client(provider).GetAsync(Thing);
+        using var response = await Client(provider).GetAsync(Thing);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -139,20 +139,20 @@ public sealed class HttpRateLimitTests
     [Fact]
     public async Task A_permit_is_released_when_the_transport_throws()
     {
-        using RateLimiter limiter = Limit.Concurrency(1);
-        int calls = 0;
+        using var limiter = Limit.Concurrency(1);
+        var calls = 0;
 
         var transport = new Transport((_, _) => calls++ == 0
             ? Task.FromException<HttpResponseMessage>(new HttpRequestException("reset"))
             : Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
 
-        using ServiceProvider provider = Provider(
+        using var provider = Provider(
             services => services.AddHttpClient("api")
                                 .AddResilience(Instant, telemetry: false)
                                 .AddRateLimit(limiter, "api"),
             transport);
 
-        using HttpResponseMessage response = await Client(provider).GetAsync(Thing);
+        using var response = await Client(provider).GetAsync(Thing);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
@@ -173,7 +173,7 @@ public sealed class HttpRateLimitTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        using ServiceProvider provider = Provider(
+        using var provider = Provider(
             services => services.AddHttpClient("api")
                                 .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
                                 .AddRateLimit(o =>
@@ -183,18 +183,18 @@ public sealed class HttpRateLimitTests
                                 }),
             transport);
 
-        HttpClient client = Client(provider);
+        var client = Client(provider);
 
         // The one permit for the first host is in flight and stays there. A second host has its own
         // permit, so it goes through - which is the same setup the PerHost = false arm below
         // refuses, and the only difference between them is the partitioning.
-        Task<HttpResponseMessage> held = client.GetAsync(Thing);
+        var held = client.GetAsync(Thing);
 
-        using HttpResponseMessage other = await client.GetAsync(Other);
+        using var other = await client.GetAsync(Other);
         Assert.Equal(HttpStatusCode.OK, other.StatusCode);
 
         gate.SetResult();
-        using HttpResponseMessage first = await held;
+        using var first = await held;
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
     }
 
@@ -212,7 +212,7 @@ public sealed class HttpRateLimitTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        using ServiceProvider provider = Provider(
+        using var provider = Provider(
             services => services.AddHttpClient("api")
                                 .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
                                 .AddRateLimit(o =>
@@ -222,16 +222,16 @@ public sealed class HttpRateLimitTests
                                 }),
             transport);
 
-        HttpClient client = Client(provider);
+        var client = Client(provider);
 
-        Task<HttpResponseMessage> held = client.GetAsync(Thing);
+        var held = client.GetAsync(Thing);
 
         // The one permit is in flight against the first host, so a different host is refused: that
         // is the whole difference PerHost makes.
         await Assert.ThrowsAsync<RateLimitedException>(() => client.GetAsync(Other));
 
         gate.SetResult();
-        using HttpResponseMessage first = await held;
+        using var first = await held;
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
     }
 
@@ -242,7 +242,7 @@ public sealed class HttpRateLimitTests
     {
         var services = new ServiceCollection();
 
-        ResilienceConfigurationException error = Assert.Throws<ResilienceConfigurationException>(
+        var error = Assert.Throws<ResilienceConfigurationException>(
             () => services.AddHttpClient("api")
                           .AddRateLimit(o => o.PermitsPerSecond = 10)
                           .AddResilience(Instant, telemetry: false));
@@ -291,7 +291,7 @@ public sealed class HttpRateLimitTests
     [Fact]
     public async Task A_limiter_the_caller_passed_in_outlives_the_handler()
     {
-        using RateLimiter limiter = Limit.Concurrency(1);
+        using var limiter = Limit.Concurrency(1);
         var transport = new Transport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
         var handler = new RateLimitHandler(limiter, "api", owned: false) { InnerHandler = transport };
@@ -299,7 +299,7 @@ public sealed class HttpRateLimitTests
 
         // Still usable: one limiter shared across several clients must not be disposed by the first
         // handler that goes away.
-        using RateLimitLease lease = await limiter.AcquireOrThrowAsync();
+        using var lease = await limiter.AcquireOrThrowAsync();
         Assert.True(lease.IsAcquired);
     }
 
@@ -338,7 +338,7 @@ public sealed class HttpRateLimitTests
 
         private RateLimitLease Next()
         {
-            int index = Interlocked.Increment(ref _acquisitions) - 1;
+            var index = Interlocked.Increment(ref _acquisitions) - 1;
             return new Lease(_grants[Math.Min(index, _grants.Length - 1)], retryAfter);
         }
 
@@ -388,7 +388,7 @@ public sealed class HttpRateLimitTests
                 Requests.Add(request);
             }
 
-            int index = Math.Min(Interlocked.Increment(ref _index), _steps.Length - 1);
+            var index = Math.Min(Interlocked.Increment(ref _index), _steps.Length - 1);
             return _steps[index](request, cancellationToken);
         }
     }

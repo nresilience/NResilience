@@ -38,7 +38,7 @@ public sealed class EventRecorderTests
 
         await (Instant with { Name = "api", OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
 
-        CallEvent succeeded = events.Single(CallEventKind.Succeeded);
+        var succeeded = events.Single(CallEventKind.Succeeded);
 
         Assert.Equal("api", succeeded.PolicyName);
         Assert.Equal(2, succeeded.AttemptNumber);
@@ -101,7 +101,7 @@ public sealed class EventRecorderTests
         var policy = Instant with { OnEvent = events.Record };
 
         await policy.RunAsync(_ => Task.FromResult(1));
-        IReadOnlyList<CallEvent> snapshot = events.Events;
+        var snapshot = events.Events;
 
         await policy.RunAsync(_ => Task.FromResult(1));
 
@@ -115,7 +115,7 @@ public sealed class EventRecorderTests
         var events = new EventRecorder();
         var also = new EventRecorder();
 
-        Action<CallEvent> both = events.Record;
+        var both = events.Record;
         both += also.Record;
 
         await (Instant with { OnEvent = both }).RunAsync(_ => Task.FromResult(1));
@@ -139,10 +139,10 @@ public sealed class EventRecorderTests
 
         var calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(30)).Returns(1);
 
-        ValueTask<CallResult<int>> pending = policy.TryRunAsync(ct => calls.NextAsync(ct));
+        var pending = policy.TryRunAsync(ct => calls.NextAsync(ct));
         time.Advance(TimeSpan.FromSeconds(2));
 
-        CallResult<int> result = await pending;
+        var result = await pending;
 
         Assert.False(result.IsSuccess);
         Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);

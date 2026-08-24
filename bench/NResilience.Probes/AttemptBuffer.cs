@@ -59,7 +59,7 @@ internal struct InlineAttemptSink : IAttemptSink
             return;
         }
 
-        ref AttemptRecord slot = ref _buffer[index];
+        ref var slot = ref _buffer[index];
         slot.StartedTimestamp = startedTimestamp;
         slot.ElapsedTicks = elapsedTicks;
         slot.Verdict = verdict;
@@ -68,9 +68,9 @@ internal struct InlineAttemptSink : IAttemptSink
     /// <summary>Called only on the failing path to materialize the log in the shipping design.</summary>
     public AttemptRecord[] Materialize(int count)
     {
-        int n = Math.Min(count, AttemptBuffer.Capacity);
+        var n = Math.Min(count, AttemptBuffer.Capacity);
         var result = new AttemptRecord[n];
-        for (int i = 0; i < n; i++)
+        for (var i = 0; i < n; i++)
         {
             result[i] = _buffer[i];
         }

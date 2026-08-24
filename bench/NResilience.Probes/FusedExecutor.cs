@@ -66,15 +66,15 @@ public sealed class FusedExecutor
         where TInvoker : struct, IInvoker<TState, T>
         where TSink : struct, IAttemptSink
     {
-        FusedPolicy policy = _policy;
-        TimeProvider time = policy.Time;
-        ProbeBreaker? breaker = policy.Breaker;
-        ProbeBudget? budget = policy.Budget;
-        bool bounded = policy.Deadline != Timeout.InfiniteTimeSpan;
-        long startTimestamp = bounded ? time.GetTimestamp() : 0L;
+        var policy = _policy;
+        var time = policy.Time;
+        var breaker = policy.Breaker;
+        var budget = policy.Budget;
+        var bounded = policy.Deadline != Timeout.InfiniteTimeSpan;
+        var startTimestamp = bounded ? time.GetTimestamp() : 0L;
 
         TSink log = default;
-        int attempts = 0;
+        var attempts = 0;
         ExceptionDispatchInfo? lastError = null;
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -86,17 +86,17 @@ public sealed class FusedExecutor
                 throw new ProbeBreakerOpenException();
             }
 
-            TimeSpan remaining = Remaining(policy, time, startTimestamp, bounded);
+            var remaining = Remaining(policy, time, startTimestamp, bounded);
             if (remaining == TimeSpan.Zero)
             {
                 throw new ProbeDeadlineException();
             }
 
-            TimeSpan effective = Effective(policy.AttemptTimeout, remaining);
+            var effective = Effective(policy.AttemptTimeout, remaining);
 
             CancellationTokenSource? timer = null;
             CancellationTokenSource? linked = null;
-            CancellationToken attemptToken = cancellationToken;
+            var attemptToken = cancellationToken;
 
             if (effective != Timeout.InfiniteTimeSpan)
             {
@@ -112,10 +112,10 @@ public sealed class FusedExecutor
                 attemptToken = linked.Token;
             }
 
-            long attemptStart = time.GetTimestamp();
+            var attemptStart = time.GetTimestamp();
             Verdict verdict;
             T result = default!;
-            bool succeeded = false;
+            var succeeded = false;
 
             try
             {
@@ -168,7 +168,7 @@ public sealed class FusedExecutor
                 breaker?.RecordFailure(time);
             }
 
-            bool retryable = verdict.Kind is VerdictKind.Transient or VerdictKind.Throttled;
+            var retryable = verdict.Kind is VerdictKind.Transient or VerdictKind.Throttled;
             if (!retryable || attempts >= policy.Attempts)
             {
                 break;
@@ -179,10 +179,10 @@ public sealed class FusedExecutor
                 break;
             }
 
-            TimeSpan delay = ProbeBackoff.Compute(policy, verdict, attempts);
+            var delay = ProbeBackoff.Compute(policy, verdict, attempts);
             if (bounded)
             {
-                TimeSpan left = Remaining(policy, time, startTimestamp, bounded: true);
+                var left = Remaining(policy, time, startTimestamp, bounded: true);
                 if (left == TimeSpan.Zero || delay >= left)
                 {
                     break;
@@ -211,8 +211,8 @@ public sealed class FusedExecutor
             return Timeout.InfiniteTimeSpan;
         }
 
-        TimeSpan elapsed = time.GetElapsedTime(startTimestamp);
-        TimeSpan left = policy.Deadline - elapsed;
+        var elapsed = time.GetElapsedTime(startTimestamp);
+        var left = policy.Deadline - elapsed;
         return left > TimeSpan.Zero ? left : TimeSpan.Zero;
     }
 

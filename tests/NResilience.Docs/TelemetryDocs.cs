@@ -13,8 +13,8 @@ public sealed class TelemetryDocs
     [Fact]
     public async Task A_listener_is_a_lambda()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
 
         // <snippet:telemetry-listener>
         var api = Resilience.Http with
@@ -33,9 +33,9 @@ public sealed class TelemetryDocs
     [Fact]
     public async Task Every_call_ends_with_exactly_one_terminal_event()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var events = new EventRecorder();
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
+        var calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
 
         // <snippet:telemetry-recorder>
         var api = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
@@ -67,7 +67,7 @@ public sealed class TelemetryDocs
     public async Task An_event_prints_itself()
     {
         var events = new EventRecorder();
-        Resilience api = Resilience.Default with { Name = "api", Attempts = 1, OnEvent = events.Record };
+        var api = Resilience.Default with { Name = "api", Attempts = 1, OnEvent = events.Record };
 
         await api.RunAsync(attempt => Task.FromResult(1), TestContext.Current.CancellationToken);
 

@@ -11,10 +11,10 @@ public sealed class CtsPoolTests
     [Fact]
     public void A_returned_source_is_handed_back_on_the_next_rent()
     {
-        CancellationTokenSource first = CtsPool.Rent(TimeProvider.System);
+        var first = CtsPool.Rent(TimeProvider.System);
         CtsPool.Return(first, TimeProvider.System);
 
-        CancellationTokenSource second = CtsPool.Rent(TimeProvider.System);
+        var second = CtsPool.Rent(TimeProvider.System);
 
         Assert.Same(first, second);
         CtsPool.Return(second, TimeProvider.System);
@@ -23,7 +23,7 @@ public sealed class CtsPoolTests
     [Fact]
     public void A_fired_source_is_disposed_not_returned()
     {
-        CancellationTokenSource fired = CtsPool.Rent(TimeProvider.System);
+        var fired = CtsPool.Rent(TimeProvider.System);
         fired.Cancel();
 
         CtsPool.Return(fired, TimeProvider.System);
@@ -39,20 +39,20 @@ public sealed class CtsPoolTests
         // the first tenant before overwriting the slot, rather than leaving it for the finalizer.
         // We cannot observe the disposed state directly without disposing the slot we just returned,
         // but we can verify the second return lands and the pool stays usable.
-        CancellationTokenSource first = CtsPool.Rent(TimeProvider.System);
+        var first = CtsPool.Rent(TimeProvider.System);
         CtsPool.Return(first, TimeProvider.System);
 
-        CancellationTokenSource second = CtsPool.Rent(TimeProvider.System);
+        var second = CtsPool.Rent(TimeProvider.System);
         Assert.Same(first, second);
 
         // Rent a fresh source (emptying the slot), return it, then return another - the slot is
         // overwritten and the previous tenant (first) is disposed by the overwrite.
-        CancellationTokenSource third = CtsPool.Rent(TimeProvider.System);
+        var third = CtsPool.Rent(TimeProvider.System);
         CtsPool.Return(third, TimeProvider.System);
         CtsPool.Return(new CancellationTokenSource(), TimeProvider.System);
 
         // The next rent hands back the last-returned source, not a leaked one.
-        CancellationTokenSource fourth = CtsPool.Rent(TimeProvider.System);
+        var fourth = CtsPool.Rent(TimeProvider.System);
         Assert.NotSame(first, fourth);
         CtsPool.Return(fourth, TimeProvider.System);
     }

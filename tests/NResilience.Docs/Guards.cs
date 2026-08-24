@@ -54,8 +54,8 @@ public sealed class Guards
         var breaker = new Breaker { Name = "payments" };
 
         // <snippet:breaker-admin>
-        BreakerState state = breaker.State;         // Closed, Open, HalfOpen or Isolated
-        DateTimeOffset? since = breaker.OpenedAt;   // null while it is closed
+        var state = breaker.State;         // Closed, Open, HalfOpen or Isolated
+        var since = breaker.OpenedAt;   // null while it is closed
 
         breaker.Isolate();                          // force it open and keep it there
         breaker.Reset();                            // close it and forget the history
@@ -72,12 +72,12 @@ public sealed class Guards
         var time = new FakeTimeProvider();
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1, Time = time }) { Name = "payments" };
         var api = Resilience.Default with { Time = time, Attempts = 1, Breaker = breaker, Backoff = Backoff.None };
-        Sequence<int> calls = Sequence.For<int>(time).Throws(new IOException(), 2).Returns(1);
+        var calls = Sequence.For<int>(time).Throws(new IOException(), 2).Returns(1);
 
         await api.TryRunAsync(attempt => calls.NextAsync(attempt));
-        Task<CallResult<int>> rejected = api.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
+        var rejected = api.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
         time.Advance(TimeSpan.FromMilliseconds(100));
-        CallResult<int> result = await rejected;
+        var result = await rejected;
 
         // <snippet:breaker-rejection>
         // A refused call reports itself rather than the dependency's last exception, and it says
@@ -136,12 +136,12 @@ public sealed class Guards
     [Fact]
     public void A_budget_reports_how_much_of_it_is_spent()
     {
-        RetryBudget budget = RetryBudget.Of();
+        var budget = RetryBudget.Of();
 
         // <snippet:budget-utilization>
         // For a dashboard: a budget sitting near 1 is a client whose retries are being refused,
         // which is a symptom to alert on rather than a steady state.
-        double spent = budget.Utilization;   // 0 to 1
+        var spent = budget.Utilization;   // 0 to 1
         // </snippet:budget-utilization>
 
         Assert.Equal(0, spent);

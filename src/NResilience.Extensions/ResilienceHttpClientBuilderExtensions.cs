@@ -37,7 +37,7 @@ public static class ResilienceHttpClientBuilderExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        Resilience effective = Named(policy ?? Resilience.Http, builder.Name);
+        var effective = Named(policy ?? Resilience.Http, builder.Name);
 
         effective.Validate();
 
@@ -81,7 +81,7 @@ public static class ResilienceHttpClientBuilderExtensions
             builder,
             services =>
             {
-                Resilience resolved = services.GetRequiredService<IResiliencePolicies>()[policyName];
+                var resolved = services.GetRequiredService<IResiliencePolicies>()[policyName];
 
                 // Not renamed: a policy resolved by name was already named by its registration, and
                 // that name is what the rest of the process reports it under.
@@ -107,7 +107,7 @@ public static class ResilienceHttpClientBuilderExtensions
             return policy;
         }
 
-        ResilienceLoggingOptions? process = services.GetService<IOptions<ResilienceLoggingOptions>>()?.Value;
+        var process = services.GetService<IOptions<ResilienceLoggingOptions>>()?.Value;
 
         if (profile is null)
         {
@@ -146,7 +146,7 @@ public static class ResilienceHttpClientBuilderExtensions
         var options = new HttpResilienceOptions();
         configureOptions?.Invoke(options);
 
-        HandlerOrder order = HandlerOrder.For(builder.Services);
+        var order = HandlerOrder.For(builder.Services);
         if (order.RateLimitClients.ContainsKey(builder.Name))
         {
             throw new ResilienceConfigurationException(
@@ -168,7 +168,7 @@ public static class ResilienceHttpClientBuilderExtensions
         {
             // First, so it is outermost: the span has to cover every attempt, and the handler added
             // next is the one that makes the attempts.
-            string name = builder.Name;
+            var name = builder.Name;
             builder.AddHttpMessageHandler(() => new ResilienceTelemetryHandler(name));
         }
 

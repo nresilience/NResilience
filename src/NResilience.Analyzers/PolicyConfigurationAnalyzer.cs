@@ -33,7 +33,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(static start =>
         {
-            if (!KnownSymbols.TryCreate(start.Compilation, out KnownSymbols known))
+            if (!KnownSymbols.TryCreate(start.Compilation, out var known))
             {
                 return;
             }
@@ -44,7 +44,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
 
     private static void Analyze(OperationAnalysisContext context, KnownSymbols known)
     {
-        IObjectOrCollectionInitializerOperation? initializer = context.Operation switch
+        var initializer = context.Operation switch
         {
             IObjectCreationOperation creation when known.IsPolicy(creation.Type) => creation.Initializer,
             IWithOperation with when known.IsPolicy(with.Type) => with.Initializer,
@@ -56,7 +56,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        Dictionary<string, IOperation> settings = Settings(initializer);
+        var settings = Settings(initializer);
 
         CheckAttempts(context, settings);
         CheckDuration(context, settings, known, "Deadline");
@@ -68,7 +68,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
     {
         var settings = new Dictionary<string, IOperation>(StringComparer.Ordinal);
 
-        foreach (IOperation assignment in initializer.Initializers)
+        foreach (var assignment in initializer.Initializers)
         {
             if (assignment is ISimpleAssignmentOperation { Target: IPropertyReferenceOperation property } simple)
             {
@@ -81,7 +81,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
 
     private static void CheckAttempts(OperationAnalysisContext context, Dictionary<string, IOperation> settings)
     {
-        if (!settings.TryGetValue("Attempts", out IOperation? attempts)
+        if (!settings.TryGetValue("Attempts", out var attempts)
             || !attempts.ConstantValue.HasValue
             || attempts.ConstantValue.Value is not int count
             || count >= 1)
@@ -102,8 +102,8 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
         KnownSymbols known,
         string name)
     {
-        if (!settings.TryGetValue(name, out IOperation? setting)
-            || !TimeSpanValue.TryEvaluate(setting, known, out TimeSpan value)
+        if (!settings.TryGetValue(name, out var setting)
+            || !TimeSpanValue.TryEvaluate(setting, known, out var value)
             || value.IsUnbounded()
             || value > TimeSpan.Zero)
         {
@@ -132,10 +132,10 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
         Dictionary<string, IOperation> settings,
         KnownSymbols known)
     {
-        if (!settings.TryGetValue("AttemptTimeout", out IOperation? attemptTimeout)
-            || !settings.TryGetValue("Deadline", out IOperation? deadline)
-            || !TimeSpanValue.TryEvaluate(attemptTimeout, known, out TimeSpan attempt)
-            || !TimeSpanValue.TryEvaluate(deadline, known, out TimeSpan whole)
+        if (!settings.TryGetValue("AttemptTimeout", out var attemptTimeout)
+            || !settings.TryGetValue("Deadline", out var deadline)
+            || !TimeSpanValue.TryEvaluate(attemptTimeout, known, out var attempt)
+            || !TimeSpanValue.TryEvaluate(deadline, known, out var whole)
             || attempt.IsUnbounded()
             || whole.IsUnbounded()
             || attempt <= whole)

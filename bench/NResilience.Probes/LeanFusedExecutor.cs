@@ -16,7 +16,7 @@ public sealed class LeanFusedExecutor
 
     public async ValueTask<T> RunAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default)
     {
-        int attempts = 0;
+        var attempts = 0;
 
         while (true)
         {

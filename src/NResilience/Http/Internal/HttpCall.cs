@@ -67,10 +67,10 @@ internal sealed class HttpCall(
         _previous?.Dispose();
         _previous = null;
 
-        HttpRequestMessage attempt = _clone ? Clone() : _original;
+        var attempt = _clone ? Clone() : _original;
         try
         {
-            HttpResponseMessage response = await _send(attempt, cancellationToken).ConfigureAwait(false);
+            var response = await _send(attempt, cancellationToken).ConfigureAwait(false);
             _previous = response;
             return response;
         }
@@ -92,12 +92,12 @@ internal sealed class HttpCall(
             VersionPolicy = _original.VersionPolicy,
         };
 
-        foreach (KeyValuePair<string, IEnumerable<string>> header in _original.Headers)
+        foreach (var header in _original.Headers)
         {
             clone.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
 
-        foreach (KeyValuePair<string, object?> option in (IDictionary<string, object?>)_original.Options)
+        foreach (var option in (IDictionary<string, object?>)_original.Options)
         {
             ((IDictionary<string, object?>)clone.Options)[option.Key] = option.Value;
         }
@@ -109,7 +109,7 @@ internal sealed class HttpCall(
             // ByteArrayContent invents a Content-Length and nothing else; the original's headers -
             // Content-Type above all - are the ones the server was going to be told about.
             content.Headers.Clear();
-            foreach (KeyValuePair<string, IEnumerable<string>> header in original.Headers)
+            foreach (var header in original.Headers)
             {
                 content.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }

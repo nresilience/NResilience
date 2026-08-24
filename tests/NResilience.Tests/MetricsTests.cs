@@ -60,7 +60,7 @@ public sealed class MetricsTests
             where T : struct
         {
             var copied = new Dictionary<string, object?>(StringComparer.Ordinal);
-            foreach (KeyValuePair<string, object?> tag in tags)
+            foreach (var tag in tags)
             {
                 copied[tag.Key] = tag.Value;
             }
@@ -102,7 +102,7 @@ public sealed class MetricsTests
     public async Task Retries_count_attempts_without_counting_extra_calls()
     {
         using var recording = new Recording();
-        int calls = 0;
+        var calls = 0;
 
         await (Instant("t-retry") with { Attempts = 3 }).RunAsync(ct =>
             ++calls < 3 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(1));
@@ -159,7 +159,7 @@ public sealed class MetricsTests
 
         // Filtered by policy: a MeterListener sees the whole process, and the suite runs in
         // parallel, so "the only rejection recorded" is not a claim a test can make.
-        Dictionary<string, object?> rejection = Assert.Single(
+        var rejection = Assert.Single(
             recording.TagsFor("nresilience.rejections"),
             tags => Equals(tags["nresilience.policy"], "t-breaker"));
 
@@ -225,9 +225,9 @@ public sealed class MetricsTests
     public async Task WithTelemetry_keeps_the_listener_that_was_already_there()
     {
         using var recording = new Recording();
-        int seen = 0;
+        var seen = 0;
 
-        Resilience policy = (Resilience.Default with
+        var policy = (Resilience.Default with
         {
             Name = "t-chained",
             Backoff = Backoff.None,
@@ -257,10 +257,10 @@ public sealed class MetricsTests
 
         ActivitySource.AddActivityListener(listener);
 
-        using Activity? activity = ResilienceTelemetry.ActivitySource.StartActivity("test");
+        using var activity = ResilienceTelemetry.ActivitySource.StartActivity("test");
         Assert.NotNull(activity);
 
-        int calls = 0;
+        var calls = 0;
         await (Instant("t-trace") with { Attempts = 3 }).RunAsync(ct =>
             ++calls < 2 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(1));
 

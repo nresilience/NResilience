@@ -6,7 +6,7 @@ public sealed class PolicyTests
     [Fact]
     public void The_defaults_are_the_ones_the_design_declares()
     {
-        Resilience policy = Resilience.Default;
+        var policy = Resilience.Default;
 
         Assert.Equal(3, policy.Attempts);
         Assert.Equal(TimeSpan.FromSeconds(30), policy.Deadline);
@@ -19,7 +19,7 @@ public sealed class PolicyTests
     [Fact]
     public void None_turns_every_bound_off()
     {
-        Resilience policy = Resilience.None;
+        var policy = Resilience.None;
 
         Assert.Equal(1, policy.Attempts);
         Assert.Equal(Timeout.InfiniteTimeSpan, policy.Deadline);
@@ -36,7 +36,7 @@ public sealed class PolicyTests
     [Fact]
     public void Deriving_with_with_leaves_the_original_alone()
     {
-        Resilience derived = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
+        var derived = Resilience.Http with { Attempts = 5, Deadline = TimeSpan.FromSeconds(20) };
 
         Assert.Equal(5, derived.Attempts);
         Assert.Equal(3, Resilience.Http.Attempts);
@@ -46,8 +46,8 @@ public sealed class PolicyTests
     [Fact]
     public async Task Executing_a_policy_does_not_disturb_its_equality()
     {
-        Resilience a = Resilience.Default with { Name = "a" };
-        Resilience b = Resilience.Default with { Name = "a" };
+        var a = Resilience.Default with { Name = "a" };
+        var b = Resilience.Default with { Name = "a" };
 
         Assert.Equal(a, b);
         Assert.Equal(a.GetHashCode(), b.GetHashCode());
@@ -63,14 +63,14 @@ public sealed class PolicyTests
     [Fact]
     public void Validate_reports_every_problem_at_once()
     {
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 0,
             Deadline = TimeSpan.Zero,
             AttemptTimeout = TimeSpan.FromSeconds(-5),
         };
 
-        ResilienceConfigurationException caught = Assert.Throws<ResilienceConfigurationException>(policy.Validate);
+        var caught = Assert.Throws<ResilienceConfigurationException>(policy.Validate);
 
         Assert.Equal(3, caught.Problems.Count);
         Assert.Contains(caught.Problems, p => p.Contains("Attempts", StringComparison.Ordinal));
@@ -89,7 +89,7 @@ public sealed class PolicyTests
     [Fact]
     public async Task An_invalid_policy_fails_on_first_execution()
     {
-        Resilience policy = Resilience.Default with { Attempts = 0 };
+        var policy = Resilience.Default with { Attempts = 0 };
 
         await Assert.ThrowsAsync<ResilienceConfigurationException>(async () =>
             await policy.RunAsync(ct => Task.FromResult(1)));

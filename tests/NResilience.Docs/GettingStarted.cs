@@ -24,11 +24,11 @@ public sealed class GettingStarted
         var transport = new Doubles.ScriptedTransport(
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Json(new User("ada")));
-        using HttpClient client = ResilienceHttp.CreateClient(
+        using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
-        User? user = await client.GetFromJsonAsync<User>(
+        var user = await client.GetFromJsonAsync<User>(
             new Uri("https://api.example.com/users/1"), TestContext.Current.CancellationToken);
 
         Assert.Equal("ada", user?.Name);
@@ -38,14 +38,14 @@ public sealed class GettingStarted
     [Fact]
     public async Task Any_call_that_takes_the_attempts_token()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var db = new Doubles.Database("ada");
-        int id = 1;
+        var id = 1;
 
         // <snippet:quick-start-run-any-call>
         var api = Resilience.Default;
 
-        string name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
+        var name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
         // </snippet:quick-start-run-any-call>
 
         Assert.Equal("ada", name);
@@ -55,13 +55,13 @@ public sealed class GettingStarted
     [Fact]
     public async Task The_outcome_without_an_exception()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
         var api = Resilience.Default with { Attempts = 2, Backoff = Backoff.None };
 
         // <snippet:quick-start-outcome>
-        CallResult<User> result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+        var result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
-        if (!result.TryGetValue(out User? user))
+        if (!result.TryGetValue(out var user))
         {
             // Why it stopped, and everything that happened on the way.
             Console.WriteLine(result.StopReason);   // AttemptsExhausted

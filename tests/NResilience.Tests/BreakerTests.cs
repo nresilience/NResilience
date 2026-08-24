@@ -28,7 +28,7 @@ public sealed class BreakerTests
 
     private static void Sample(Breaker breaker, VerdictKind kind, int count = 1, TimeSpan duration = default)
     {
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             Assert.True(breaker.TryEnter(out _), "admission was refused before the test expected it");
             breaker.Record(kind, duration);
@@ -41,7 +41,7 @@ public sealed class BreakerTests
     public void Five_consecutive_failures_open_it()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
         Sample(breaker, VerdictKind.Transient, 4);
         Assert.Equal(BreakerState.Closed, breaker.State);
@@ -57,7 +57,7 @@ public sealed class BreakerTests
     public void A_success_resets_the_consecutive_counter()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
         Sample(breaker, VerdictKind.Transient, 4);
         Sample(breaker, VerdictKind.Ok);
@@ -70,7 +70,7 @@ public sealed class BreakerTests
     public void Throttling_is_not_evidence_about_the_dependency()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
         // A 429 means the dependency is working correctly and defending itself. Counting it as a
         // failure turns throttling into an outage.
@@ -83,7 +83,7 @@ public sealed class BreakerTests
     public void Permanent_failures_are_not_evidence_about_the_dependency()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
         // Overwhelmingly a client-side fact. Five NullReferenceExceptions in your own mapping code
         // must not open a circuit against a dependency that never misbehaved.
@@ -96,7 +96,7 @@ public sealed class BreakerTests
     public void The_failure_ratio_trips_it_alongside_the_consecutive_counter()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 100,
             FailureRatio = 0.5,
@@ -116,7 +116,7 @@ public sealed class BreakerTests
     public void The_failure_ratio_waits_for_the_minimum_call_count()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 100,
             FailureRatio = 0.5,
@@ -136,7 +136,7 @@ public sealed class BreakerTests
     public void Slow_calls_trip_it_even_though_they_succeeded()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             SlowCallThreshold = TimeSpan.FromSeconds(1),
             SlowCallRatio = 0.5,
@@ -158,7 +158,7 @@ public sealed class BreakerTests
     public void The_window_forgets_failures_that_fall_out_of_it()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 100,
             FailureRatio = 0.5,
@@ -182,7 +182,7 @@ public sealed class BreakerTests
     public void An_expired_break_reports_half_open_without_consuming_a_probe()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
+        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
 
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(14));
@@ -201,7 +201,7 @@ public sealed class BreakerTests
     public void Half_open_is_a_trickle_rather_than_a_surge()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(1) });
+        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(1) });
 
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(1));
@@ -217,7 +217,7 @@ public sealed class BreakerTests
     public void Closing_takes_two_successful_probes()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(1) });
+        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(1) });
 
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(1));
@@ -234,7 +234,7 @@ public sealed class BreakerTests
     public void A_slow_probe_is_not_a_recovery()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(1),
             SlowCallThreshold = TimeSpan.FromSeconds(1),
@@ -254,7 +254,7 @@ public sealed class BreakerTests
     public void The_break_doubles_on_each_consecutive_open()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(10),
             MaxBreakDuration = TimeSpan.FromMinutes(2),
@@ -279,7 +279,7 @@ public sealed class BreakerTests
     public void The_growth_is_capped_by_the_maximum()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(10),
             MaxBreakDuration = TimeSpan.FromSeconds(20),
@@ -287,7 +287,7 @@ public sealed class BreakerTests
 
         Sample(breaker, VerdictKind.Transient, 5);
 
-        for (int open = 0; open < 5; open++)
+        for (var open = 0; open < 5; open++)
         {
             time.Advance(TimeSpan.FromSeconds(20));
             Assert.True(breaker.TryEnter(out _));
@@ -302,7 +302,7 @@ public sealed class BreakerTests
     public void A_clean_close_resets_the_accumulated_growth()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(10) });
+        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(10) });
 
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(10));
@@ -326,7 +326,7 @@ public sealed class BreakerTests
     public void Isolate_never_self_heals()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
         breaker.Isolate();
 
@@ -343,7 +343,7 @@ public sealed class BreakerTests
     public void Reset_closes_it_from_any_state()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
         breaker.Isolate();
         breaker.Reset();
@@ -376,10 +376,10 @@ public sealed class BreakerTests
     public void With_copies_the_reference_so_scope_is_visible_in_the_code()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
-        Resilience payments = Instant(time) with { Breaker = breaker };
-        Resilience derived = payments with { Attempts = 9 };
+        var payments = Instant(time) with { Breaker = breaker };
+        var derived = payments with { Attempts = 9 };
 
         Assert.Same(breaker, payments.Breaker);
         Assert.Same(breaker, derived.Breaker);
@@ -396,11 +396,11 @@ public sealed class BreakerTests
     public async Task An_isolated_breaker_refuses_the_call_without_running_it()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
         breaker.Isolate();
 
-        bool ran = false;
-        Task<CallResult<int>> call = (Instant(time) with { Breaker = breaker })
+        var ran = false;
+        var call = (Instant(time) with { Breaker = breaker })
             .TryRunAsync(_ =>
             {
                 ran = true;
@@ -409,7 +409,7 @@ public sealed class BreakerTests
             .AsTask();
 
         time.Advance(TimeSpan.FromMilliseconds(100));
-        CallResult<int> result = await call;
+        var result = await call;
 
         Assert.False(ran);
         Assert.False(result.IsSuccess);
@@ -422,10 +422,10 @@ public sealed class BreakerTests
     public async Task A_refusal_waits_before_it_is_reported()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
         breaker.Isolate();
 
-        Task<CallResult<int>> call = (Instant(time) with { Breaker = breaker })
+        var call = (Instant(time) with { Breaker = breaker })
             .TryRunAsync(_ => Task.FromResult(1))
             .AsTask();
 
@@ -444,11 +444,11 @@ public sealed class BreakerTests
     public async Task The_refusal_pause_is_bounded_by_the_deadline()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
         breaker.Isolate();
 
-        Resilience policy = Instant(time) with { Breaker = breaker, Deadline = TimeSpan.FromMilliseconds(40) };
-        Task<CallResult<int>> call = policy.TryRunAsync(_ => Task.FromResult(1)).AsTask();
+        var policy = Instant(time) with { Breaker = breaker, Deadline = TimeSpan.FromMilliseconds(40) };
+        var call = policy.TryRunAsync(_ => Task.FromResult(1)).AsTask();
 
         // A refusal must never make a call overrun the budget its caller set.
         time.Advance(TimeSpan.FromMilliseconds(40));
@@ -460,15 +460,15 @@ public sealed class BreakerTests
     public async Task A_refusal_carries_a_retry_after_hint()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
+        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
         Sample(breaker, VerdictKind.Transient, 5);
 
-        Task<CallResult<int>> call = (Instant(time) with { Breaker = breaker })
+        var call = (Instant(time) with { Breaker = breaker })
             .TryRunAsync(_ => Task.FromResult(1))
             .AsTask();
 
         time.Advance(TimeSpan.FromMilliseconds(100));
-        CallResult<int> result = await call;
+        var result = await call;
 
         var rejected = Assert.IsType<CallRejectedException>(result.Exception);
 
@@ -481,15 +481,15 @@ public sealed class BreakerTests
     public async Task A_refusal_reports_itself_and_keeps_the_earlier_failure_as_its_cause()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 1 });
+        var breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 1 });
 
-        Resilience policy = Instant(time) with { Breaker = breaker, Attempts = 3 };
-        Task<CallResult<int>> call = policy
+        var policy = Instant(time) with { Breaker = breaker, Attempts = 3 };
+        var call = policy
             .TryRunAsync(_ => Task.FromException<int>(new IOException("down")))
             .AsTask();
 
         time.Advance(TimeSpan.FromMilliseconds(100));
-        CallResult<int> result = await call;
+        var result = await call;
 
         // The first attempt tripped the breaker, so the second was refused. Reporting the
         // IOException would describe a call that was never made.
@@ -504,9 +504,9 @@ public sealed class BreakerTests
     public async Task The_breaker_samples_attempts_rather_than_operations()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 3 });
+        var breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 3 });
 
-        Resilience policy = Instant(time) with
+        var policy = Instant(time) with
         {
             Breaker = breaker,
             Attempts = 3,
@@ -526,7 +526,7 @@ public sealed class BreakerTests
     public async Task Caller_cancellation_is_never_counted_against_the_breaker()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 1 });
+        var breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 1 });
 
         using var caller = new CancellationTokenSource();
         await caller.CancelAsync();
@@ -543,9 +543,9 @@ public sealed class BreakerTests
     public async Task A_successful_call_passes_through_a_closed_breaker_untouched()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time);
+        var breaker = Build(time);
 
-        int value = await (Instant(time) with { Breaker = breaker }).RunAsync(_ => Task.FromResult(42));
+        var value = await (Instant(time) with { Breaker = breaker }).RunAsync(_ => Task.FromResult(42));
 
         Assert.Equal(42, value);
         Assert.Equal(BreakerState.Closed, breaker.State);
@@ -560,7 +560,7 @@ public sealed class BreakerTests
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {
-        Task<CallResult<int>> call = policy.TryRunAsync(work).AsTask();
+        var call = policy.TryRunAsync(work).AsTask();
 
         while (!call.IsCompleted)
         {
@@ -575,7 +575,7 @@ public sealed class BreakerTests
     public async Task Caller_cancellation_during_a_half_open_probe_releases_the_slot()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 1,
             BreakDuration = TimeSpan.FromSeconds(1),
@@ -584,7 +584,7 @@ public sealed class BreakerTests
             Time = time,
         });
 
-        Resilience single = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var single = Instant(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
@@ -608,7 +608,7 @@ public sealed class BreakerTests
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
 
         // The slot came back: the next call is admitted as a probe and succeeds.
-        CallResult<int> probe = await RunAsync(single, _ => Task.FromResult(1), time);
+        var probe = await RunAsync(single, _ => Task.FromResult(1), time);
         Assert.True(probe.IsSuccess);
         Assert.Equal(BreakerState.Closed, breaker.State);
     }
@@ -617,7 +617,7 @@ public sealed class BreakerTests
     public async Task A_deadline_exceeded_after_admission_releases_the_probe_slot()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 1,
             BreakDuration = TimeSpan.FromSeconds(1),
@@ -626,7 +626,7 @@ public sealed class BreakerTests
             Time = time,
         });
 
-        Resilience single = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var single = Instant(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
@@ -635,7 +635,7 @@ public sealed class BreakerTests
 
         // The next call is admitted as a probe. The BeforeAttempt hook advances time past the
         // deadline, so the recheck after the hook breaks the loop without recording - the leak path.
-        Resilience withDeadline = Instant(time) with
+        var withDeadline = Instant(time) with
         {
             Attempts = 1,
             Breaker = breaker,
@@ -647,7 +647,7 @@ public sealed class BreakerTests
             },
         };
 
-        DeadlineExceededException caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
+        var caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
             await withDeadline.RunAsync(_ => Task.FromResult(1)));
 
         // The breaker transitioned to HalfOpen when TryEnter admitted, and the slot was released
@@ -655,8 +655,8 @@ public sealed class BreakerTests
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
 
         // The slot was released, so the next call through a policy with a live deadline can probe.
-        Resilience live = Instant(time) with { Attempts = 1, Breaker = breaker };
-        CallResult<int> probe = await RunAsync(live, _ => Task.FromResult(1), time);
+        var live = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var probe = await RunAsync(live, _ => Task.FromResult(1), time);
         Assert.True(probe.IsSuccess);
         Assert.Equal(BreakerState.Closed, breaker.State);
     }
@@ -665,7 +665,7 @@ public sealed class BreakerTests
     public async Task A_before_attempt_hook_that_throws_releases_the_probe_slot()
     {
         var time = new FakeTimeProvider();
-        Breaker breaker = Build(time, new BreakerSettings
+        var breaker = Build(time, new BreakerSettings
         {
             ConsecutiveFailures = 1,
             BreakDuration = TimeSpan.FromSeconds(1),
@@ -674,7 +674,7 @@ public sealed class BreakerTests
             Time = time,
         });
 
-        Resilience single = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var single = Instant(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
@@ -682,7 +682,7 @@ public sealed class BreakerTests
         time.Advance(TimeSpan.FromSeconds(2));
 
         // The BeforeAttempt hook throws after admission. The probe slot must come back.
-        Resilience withHook = single with
+        var withHook = single with
         {
             BeforeAttempt = _ => Task.FromException(new InvalidOperationException("hook failed")),
         };
@@ -693,7 +693,7 @@ public sealed class BreakerTests
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
 
         // The next call is admitted as a probe and closes the breaker.
-        CallResult<int> probe = await RunAsync(single, _ => Task.FromResult(1), time);
+        var probe = await RunAsync(single, _ => Task.FromResult(1), time);
         Assert.True(probe.IsSuccess);
         Assert.Equal(BreakerState.Closed, breaker.State);
     }

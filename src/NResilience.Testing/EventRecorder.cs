@@ -109,7 +109,7 @@ public sealed class EventRecorder
     /// </exception>
     public CallEvent Single(CallEventKind kind)
     {
-        IReadOnlyList<CallEvent> matches = OfKind(kind);
+        var matches = OfKind(kind);
 
         return matches.Count == 1
             ? matches[0]

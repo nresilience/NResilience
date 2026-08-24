@@ -12,12 +12,12 @@ public sealed class SnippetSyncTests
     [Fact]
     public void Every_snippet_block_in_the_docs_matches_its_source()
     {
-        string root = RepositoryRoot();
-        Dictionary<string, Snippet> snippets = SnippetEngine.Collect(Path.Combine(root, "tests", "NResilience.Docs"));
+        var root = RepositoryRoot();
+        var snippets = SnippetEngine.Collect(Path.Combine(root, "tests", "NResilience.Docs"));
 
         Assert.NotEmpty(snippets);
 
-        IReadOnlyList<Drift> drift = SnippetEngine.Sync(root, snippets, write: false);
+        var drift = SnippetEngine.Sync(root, snippets, write: false);
 
         Assert.Empty(drift.Select(d => $"{Path.GetRelativePath(root, d.File)}: {d.Detail}"));
     }
@@ -25,17 +25,17 @@ public sealed class SnippetSyncTests
     [Fact]
     public void Every_snippet_is_referenced_by_a_page()
     {
-        string root = RepositoryRoot();
-        Dictionary<string, Snippet> snippets = SnippetEngine.Collect(Path.Combine(root, "tests", "NResilience.Docs"));
+        var root = RepositoryRoot();
+        var snippets = SnippetEngine.Collect(Path.Combine(root, "tests", "NResilience.Docs"));
 
-        string[] pages = Directory
+        var pages = Directory
             .EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
             .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Select(File.ReadAllText)
             .ToArray();
 
         // An unreferenced snippet is dead sample code: it still compiles, so nothing else notices.
-        string[] orphans = snippets.Keys
+        var orphans = snippets.Keys
             .Where(name => !pages.Any(page => page.Contains($"<!-- snippet: {name} -->", StringComparison.Ordinal)))
             .ToArray();
 

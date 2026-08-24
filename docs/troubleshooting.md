@@ -150,12 +150,12 @@ For more details, see [Testing](../testing/index.md).
 ```csharp
 // Every failure carries its own history: on CallResult, on the exceptions the library
 // invents, and on Exception.Data for an original exception it rethrew unchanged.
-CallResult<int> result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
 
 Console.WriteLine(result.StopReason);   // AttemptsExhausted
 Console.WriteLine(result.Attempts);     // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
 
-foreach (Attempt attempt in result.Attempts)
+foreach (var attempt in result.Attempts)
 {
     Console.WriteLine($"#{attempt.Number} {attempt.Verdict.Kind} after {attempt.DelayBefore.TotalMilliseconds}ms");
 }

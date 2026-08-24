@@ -24,7 +24,7 @@ public sealed class LoggingDocs
         // an appsettings.json filter matches.
         // </snippet:logging-registered>
 
-        Resilience payments = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["payments"];
+        var payments = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["payments"];
 
         Assert.Equal("NResilience.payments", ResilienceLogging.CategoryFor(payments.Name));
         Assert.NotNull(payments.OnEvent);
@@ -53,7 +53,7 @@ public sealed class LoggingDocs
         services.AddLogging(b => b.AddProvider(provider).SetMinimumLevel(LogLevel.Trace));
         services.AddResilience(configuration.GetSection("Resilience"));
 
-        IResiliencePolicies policies = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>();
+        var policies = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>();
 
         Assert.NotNull(policies["payments"].OnEvent);
 
@@ -67,7 +67,7 @@ public sealed class LoggingDocs
     public async Task A_hand_built_policy_opts_in()
     {
         ILogger logger = new FakeLogger();
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
+        var cancellationToken = TestContext.Current.CancellationToken;
 
         // <snippet:logging-hand-built>
         // A policy registered in a container logs for you. A policy in a static field does not -
@@ -82,7 +82,7 @@ public sealed class LoggingDocs
     public void A_console_logger_is_one_line()
     {
         // <snippet:logging-console>
-        using ILoggerFactory factory = LoggerFactory.Create(b => b
+        using var factory = LoggerFactory.Create(b => b
             .AddConsole()
             .SetMinimumLevel(LogLevel.Debug));
 
@@ -133,8 +133,8 @@ public sealed class LoggingDocs
     [Fact]
     public async Task Records_are_asserted_on_with_a_fake_logger()
     {
-        CancellationToken cancellationToken = TestContext.Current.CancellationToken;
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
 
         // <snippet:logging-assert>
         var logger = new FakeLogger();

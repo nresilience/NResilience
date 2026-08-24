@@ -30,9 +30,9 @@ You can use the result to provide a fallback value when a resilience operation f
 ```csharp
 private async Task<User> ReadUserAsync(UserCache cache, CancellationToken cancellationToken)
 {
-    CallResult<User> result = await Resilience.Http.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+    var result = await Resilience.Http.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
 
-    if (result.TryGetValue(out User? user))
+    if (result.TryGetValue(out var user))
     {
         return user;
     }

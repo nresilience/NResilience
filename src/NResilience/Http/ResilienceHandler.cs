@@ -103,16 +103,16 @@ public sealed class ResilienceHandler : DelegatingHandler
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        HostScope scope = _hosts.For(request.RequestUri?.Authority ?? string.Empty);
-        bool retrying = ShouldRetry(request);
-        Resilience policy = retrying ? scope.Retrying : scope.Single;
+        var scope = _hosts.For(request.RequestUri?.Authority ?? string.Empty);
+        var retrying = ShouldRetry(request);
+        var policy = retrying ? scope.Retrying : scope.Single;
 
-        bool nested = false;
-        bool wasInside = false;
+        var nested = false;
+        var wasInside = false;
         if (retrying && _options.DetectNestedRetries)
         {
             wasInside = InsideRetryingClient.Value;
-            bool inbound = request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
+            var inbound = request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
             nested = wasInside || inbound;
             if (nested && policy.OnEvent is { } listener)
             {
@@ -176,7 +176,7 @@ public sealed class ResilienceHandler : DelegatingHandler
         where T : class
     {
         var found = new Dictionary<string, T>(StringComparer.OrdinalIgnoreCase);
-        foreach (HostScope scope in _hosts.Scopes)
+        foreach (var scope in _hosts.Scopes)
         {
             if (guard(scope) is { } value)
             {
@@ -193,7 +193,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     {
         // An explicit declaration beats everything, in both directions: whoever wrote the request
         // knows whether it carries an idempotency key, and the client registration does not.
-        if (request.Options.TryGetValue(ResilienceHttp.Repeatable, out bool declared))
+        if (request.Options.TryGetValue(ResilienceHttp.Repeatable, out var declared))
         {
             return declared;
         }

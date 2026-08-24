@@ -36,9 +36,9 @@ public sealed class FalsificationTests
     [Fact]
     public void Fusing_the_loop_substantially_beats_a_composed_pipeline_for_a_realistic_policy()
     {
-        double fused = _baseline.SuspendingOverhead(Baseline.LibDefault);
-        double polly = _baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
-        double ratio = polly / fused;
+        var fused = _baseline.SuspendingOverhead(Baseline.LibDefault);
+        var polly = _baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
+        var ratio = polly / fused;
 
         _output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
@@ -74,9 +74,9 @@ public sealed class FalsificationTests
     [Fact]
     public void A_trivial_policy_stays_at_parity_with_a_pipeline_that_does_nothing()
     {
-        double fused = _baseline.SuspendingOverhead(Baseline.LibTrivial);
-        double polly = _baseline.SuspendingOverhead(Baseline.PollyEmpty);
-        double ratio = fused / polly;
+        var fused = _baseline.SuspendingOverhead(Baseline.LibTrivial);
+        var polly = _baseline.SuspendingOverhead(Baseline.PollyEmpty);
+        var ratio = fused / polly;
 
         _output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
@@ -99,8 +99,8 @@ public sealed class FalsificationTests
     [Fact]
     public void Fusing_the_loop_beats_a_composed_pipeline_when_retries_actually_happen()
     {
-        double fused = _baseline.SuspendingBytes(Baseline.LibRetry);
-        double polly = _baseline.SuspendingBytes(Baseline.PollyRetry);
+        var fused = _baseline.SuspendingBytes(Baseline.LibRetry);
+        var polly = _baseline.SuspendingBytes(Baseline.PollyRetry);
 
         _output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,
@@ -121,8 +121,8 @@ public sealed class FalsificationTests
     [Fact]
     public void The_harness_reproduces_the_published_polly_baseline()
     {
-        double empty = _baseline.SuspendingOverhead(Baseline.PollyEmpty);
-        double retryTimeout = _baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
+        var empty = _baseline.SuspendingOverhead(Baseline.PollyEmpty);
+        var retryTimeout = _baseline.SuspendingOverhead(Baseline.PollyRetryTimeout);
 
         _output.WriteLine(string.Create(
             CultureInfo.InvariantCulture,

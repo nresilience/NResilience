@@ -4,20 +4,20 @@ using NResilience.DocSnippets;
 //
 //   dotnet run --project tools/NResilience.DocSnippets -- --write
 //   dotnet run --project tools/NResilience.DocSnippets -- --check
-bool write = args.Contains("--write", StringComparer.Ordinal);
-string repositoryRoot = Path.GetFullPath(
+var write = args.Contains("--write", StringComparer.Ordinal);
+var repositoryRoot = Path.GetFullPath(
     args.FirstOrDefault(static a => !a.StartsWith("--", StringComparison.Ordinal))
     ?? Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
 
-string sources = Path.Combine(repositoryRoot, "tests", "NResilience.Docs");
+var sources = Path.Combine(repositoryRoot, "tests", "NResilience.Docs");
 if (!Directory.Exists(sources))
 {
     Console.Error.WriteLine($"No snippet project at {sources}.");
     return 2;
 }
 
-Dictionary<string, Snippet> snippets = SnippetEngine.Collect(sources);
-IReadOnlyList<Drift> drift = SnippetEngine.Sync(repositoryRoot, snippets, write);
+var snippets = SnippetEngine.Collect(sources);
+var drift = SnippetEngine.Sync(repositoryRoot, snippets, write);
 
 Console.WriteLine($"{snippets.Count} snippet(s) from {sources}.");
 
@@ -27,7 +27,7 @@ if (drift.Count == 0)
     return 0;
 }
 
-foreach (Drift item in drift)
+foreach (var item in drift)
 {
     Console.WriteLine($"{(write ? "updated" : "STALE")}: {Path.GetRelativePath(repositoryRoot, item.File)} - {item.Detail}");
 }

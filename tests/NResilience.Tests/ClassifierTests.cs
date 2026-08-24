@@ -34,7 +34,7 @@ public sealed class ClassifierTests
     [Fact]
     public void A_rule_you_add_beats_the_one_it_was_derived_from()
     {
-        Classifier classifier = Classifier.Default.On<IOException>(Verdict.Permanent);
+        var classifier = Classifier.Default.On<IOException>(Verdict.Permanent);
 
         Assert.Equal(VerdictKind.Permanent, classifier.ClassifyException(new IOException()).Kind);
         Assert.Equal(VerdictKind.Transient, Classifier.Default.ClassifyException(new IOException()).Kind);
@@ -43,14 +43,14 @@ public sealed class ClassifierTests
     [Fact]
     public void Rules_match_subclasses()
     {
-        Classifier classifier = Classifier.Default.On<InvalidOperationException>(Verdict.Transient);
+        var classifier = Classifier.Default.On<InvalidOperationException>(Verdict.Transient);
         Assert.Equal(VerdictKind.Transient, classifier.ClassifyException(new ObjectDisposedException("x")).Kind);
     }
 
     [Fact]
     public void A_predicate_rule_can_inspect_the_exception()
     {
-        Classifier classifier = Classifier.Default.On<InvalidOperationException>(
+        var classifier = Classifier.Default.On<InvalidOperationException>(
             static e => e.Message == "retry" ? Verdict.Transient : Verdict.Permanent);
 
         Assert.Equal(VerdictKind.Transient, classifier.ClassifyException(new InvalidOperationException("retry")).Kind);
@@ -67,10 +67,10 @@ public sealed class ClassifierTests
     [Fact]
     public void Result_rules_are_matched_by_exact_type_and_cached_per_type()
     {
-        Classifier classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok);
+        var classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok);
 
         // Alternating result types exercises the per-type cache in both directions.
-        for (int i = 0; i < 3; i++)
+        for (var i = 0; i < 3; i++)
         {
             Assert.Equal(VerdictKind.Transient, classifier.ClassifyResult(-1).Kind);
             Assert.Equal(VerdictKind.Ok, classifier.ClassifyResult("anything").Kind);
@@ -80,8 +80,8 @@ public sealed class ClassifierTests
     [Fact]
     public void Two_classifiers_do_not_share_a_result_cache()
     {
-        Classifier a = Classifier.Default.OnResult<int>(static _ => Verdict.Transient);
-        Classifier b = Classifier.Default.OnResult<int>(static _ => Verdict.Permanent);
+        var a = Classifier.Default.OnResult<int>(static _ => Verdict.Transient);
+        var b = Classifier.Default.OnResult<int>(static _ => Verdict.Permanent);
 
         Assert.Equal(VerdictKind.Transient, a.ClassifyResult(1).Kind);
         Assert.Equal(VerdictKind.Permanent, b.ClassifyResult(1).Kind);
@@ -110,7 +110,7 @@ public sealed class ClassifierTests
         using var response = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
         response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(7));
 
-        Verdict verdict = Classifier.Http.ClassifyResult(response);
+        var verdict = Classifier.Http.ClassifyResult(response);
 
         Assert.Equal(VerdictKind.Throttled, verdict.Kind);
         Assert.Equal(TimeSpan.FromSeconds(7), verdict.RetryAfter);
@@ -122,7 +122,7 @@ public sealed class ClassifierTests
         using var response = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable);
         response.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromSeconds(3));
 
-        Verdict verdict = Classifier.Http.ClassifyResult(response);
+        var verdict = Classifier.Http.ClassifyResult(response);
 
         Assert.Equal(VerdictKind.Throttled, verdict.Kind);
         Assert.Equal(TimeSpan.FromSeconds(3), verdict.RetryAfter);
@@ -137,7 +137,7 @@ public sealed class ClassifierTests
     [Fact]
     public void The_active_ruleset_is_printable()
     {
-        string dump = Classifier.Http.ToString();
+        var dump = Classifier.Http.ToString();
 
         Assert.Contains("HttpRequestException", dump, StringComparison.Ordinal);
         Assert.Contains("HttpResponseMessage", dump, StringComparison.Ordinal);

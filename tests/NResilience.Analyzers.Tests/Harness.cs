@@ -39,9 +39,9 @@ internal static class Harness
 
     internal static ImmutableArray<Diagnostic> Run(string source, OutputKind kind = OutputKind.DynamicallyLinkedLibrary)
     {
-        Compilation compilation = Compile(source, kind);
+        var compilation = Compile(source, kind);
 
-        CompilationWithAnalyzers withAnalyzers = compilation.WithAnalyzers(
+        var withAnalyzers = compilation.WithAnalyzers(
             ImmutableArray.Create<DiagnosticAnalyzer>(
                 new AttemptTokenAnalyzer(),
                 new PolicyConfigurationAnalyzer(),
@@ -86,18 +86,18 @@ internal static class Harness
     {
         using var workspace = new AdhocWorkspace();
 
-        ProjectId projectId = ProjectId.CreateNewId();
-        DocumentId documentId = DocumentId.CreateNewId(projectId);
+        var projectId = ProjectId.CreateNewId();
+        var documentId = DocumentId.CreateNewId(projectId);
 
-        Solution solution = workspace.CurrentSolution
+        var solution = workspace.CurrentSolution
             .AddProject(projectId, "Snippet", "Snippet", LanguageNames.CSharp)
             .WithProjectCompilationOptions(projectId, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
             .WithProjectParseOptions(projectId, new CSharpParseOptions(LanguageVersion.Latest))
             .AddMetadataReferences(projectId, References)
             .AddDocument(documentId, "Snippet.cs", SourceText.From(source));
 
-        Document document = solution.GetDocument(documentId)!;
-        Diagnostic diagnostic = Run(source)
+        var document = solution.GetDocument(documentId)!;
+        var diagnostic = Run(source)
             .OrderBy(static reported => reported.Location.SourceSpan.Start)
             .First();
 
@@ -112,9 +112,9 @@ internal static class Harness
             .GetAwaiter()
             .GetResult();
 
-        CodeAction fix = Assert.Single(actions);
+        var fix = Assert.Single(actions);
 
-        ApplyChangesOperation change = fix
+        var change = fix
             .GetOperationsAsync(TestContext.Current.CancellationToken)
             .GetAwaiter()
             .GetResult()
@@ -137,7 +137,7 @@ internal static class Harness
             References,
             new CSharpCompilationOptions(kind, nullableContextOptions: NullableContextOptions.Enable));
 
-        string[] errors = compilation.GetDiagnostics(TestContext.Current.CancellationToken)
+        var errors = compilation.GetDiagnostics(TestContext.Current.CancellationToken)
             .Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
             .Select(static diagnostic => diagnostic.ToString())
             .ToArray();

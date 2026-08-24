@@ -160,7 +160,7 @@ public static class RateLimiterExtensions
     {
         ArgumentNullException.ThrowIfNull(limiter);
 
-        RateLimitLease lease = await limiter.AcquireAsync(1, cancellationToken).ConfigureAwait(false);
+        var lease = await limiter.AcquireAsync(1, cancellationToken).ConfigureAwait(false);
         return Check(lease, name);
     }
 
@@ -191,7 +191,7 @@ public static class RateLimiterExtensions
     {
         ArgumentNullException.ThrowIfNull(limiter);
 
-        RateLimitLease lease = await limiter.AcquireAsync(key, 1, cancellationToken).ConfigureAwait(false);
+        var lease = await limiter.AcquireAsync(key, 1, cancellationToken).ConfigureAwait(false);
         return Check(lease, name);
     }
 
@@ -200,7 +200,7 @@ public static class RateLimiterExtensions
     /// backoff curve to decide the delay.
     /// </summary>
     internal static TimeSpan? RetryAfterOf(RateLimitLease lease) =>
-        lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter) ? retryAfter : null;
+        lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter) ? retryAfter : null;
 
     private static RateLimitLease Check(RateLimitLease lease, string? name)
     {
@@ -211,7 +211,7 @@ public static class RateLimiterExtensions
 
         // A denied lease still holds the limiter's metadata, and still has to be disposed - the
         // hint is read out of it first and the exception carries it instead.
-        TimeSpan? retryAfter = RetryAfterOf(lease);
+        var retryAfter = RetryAfterOf(lease);
         lease.Dispose();
 
         throw new RateLimitedException(name, retryAfter);

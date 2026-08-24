@@ -43,9 +43,9 @@ public sealed class LoopbackEcho : IAsyncDisposable
         listener.Listen(1);
 
         var client = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        Task<Socket> accepting = listener.AcceptAsync();
+        var accepting = listener.AcceptAsync();
         await client.ConnectAsync((IPEndPoint)listener.LocalEndPoint!).ConfigureAwait(false);
-        Socket server = await accepting.ConfigureAwait(false);
+        var server = await accepting.ConfigureAwait(false);
 
         client.NoDelay = true;
         server.NoDelay = true;
@@ -67,7 +67,7 @@ public sealed class LoopbackEcho : IAsyncDisposable
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                int read = await server.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
+                var read = await server.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
                 if (read == 0)
                 {
                     return;

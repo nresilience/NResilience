@@ -57,7 +57,7 @@ public static class CtsFacts
     /// <summary>The arrangement the executor uses: a pooled timer source that is reset and reused.</summary>
     public static ValueTask<int> PooledSourceReused()
     {
-        CancellationTokenSource cts = CtsPool.Rent(TimeProvider.System);
+        var cts = CtsPool.Rent(TimeProvider.System);
         cts.CancelAfter(TimeSpan.FromSeconds(30));
         s_sink += cts.Token.CanBeCanceled ? 1 : 0;
         CtsPool.Return(cts, TimeProvider.System);
@@ -68,7 +68,7 @@ public static class CtsFacts
     public static ValueTask<int> DelayCreatedThenCancelled()
     {
         using var cts = new CancellationTokenSource();
-        Task delay = Task.Delay(TimeSpan.FromSeconds(30), cts.Token);
+        var delay = Task.Delay(TimeSpan.FromSeconds(30), cts.Token);
         cts.Cancel();
         s_sink += delay.IsCompleted ? 1 : 0;
         return new ValueTask<int>(s_sink);

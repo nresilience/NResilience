@@ -24,10 +24,10 @@ You can inspect the state of breakers and budgets for all hosts seen by the hand
 <!-- snippet: http-per-host -->
 ```csharp
 // A breaker whose scope is a variable with a name is one an operator can be told about.
-IReadOnlyDictionary<string, Breaker> breakers = handler.BreakersByHost();
-IReadOnlyDictionary<string, RetryBudget> budgets = handler.BudgetsByHost();
+var breakers = handler.BreakersByHost();
+var budgets = handler.BudgetsByHost();
 
-foreach ((string host, Breaker breaker) in breakers)
+foreach ((var host, var breaker) in breakers)
 {
     Console.WriteLine($"{host}: {breaker.State} since {breaker.OpenedAt:O}");
 }

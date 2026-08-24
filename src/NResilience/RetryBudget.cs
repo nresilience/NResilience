@@ -130,7 +130,7 @@ public sealed class RetryBudget
             lock (_gate)
             {
                 Refill();
-                double spent = 1 - (_tokens / _capacity);
+                var spent = 1 - (_tokens / _capacity);
                 return spent < 0 ? 0 : spent > 1 ? 1 : spent;
             }
         }
@@ -194,7 +194,7 @@ public sealed class RetryBudget
 
         lock (_gate)
         {
-            double needed = 1 - _tokens;
+            var needed = 1 - _tokens;
             return needed <= 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(needed / _refillPerSecond);
         }
     }
@@ -223,8 +223,8 @@ public sealed class RetryBudget
 
     private void Refill()
     {
-        long now = _time!.GetTimestamp();
-        double seconds = _time.GetElapsedTime(_refilledAt, now).TotalSeconds;
+        var now = _time!.GetTimestamp();
+        var seconds = _time.GetElapsedTime(_refilledAt, now).TotalSeconds;
         if (seconds <= 0)
         {
             return;

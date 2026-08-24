@@ -108,8 +108,8 @@ You can monitor the state of the breaker or manually control its behavior.
 
 <!-- snippet: breaker-admin -->
 ```csharp
-BreakerState state = breaker.State;         // Closed, Open, HalfOpen or Isolated
-DateTimeOffset? since = breaker.OpenedAt;   // null while it is closed
+var state = breaker.State;         // Closed, Open, HalfOpen or Isolated
+var since = breaker.OpenedAt;   // null while it is closed
 
 breaker.Isolate();                          // force it open and keep it there
 breaker.Reset();                            // close it and forget the history

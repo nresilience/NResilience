@@ -34,7 +34,7 @@ internal static class Program
         Log($"server GC    : {System.Runtime.GCSettings.IsServerGC}");
         Console.WriteLine();
 
-        int failures = 0;
+        var failures = 0;
 
         failures += await CorrectnessAsync().ConfigureAwait(false);
         failures += await ShippingLibraryAsync().ConfigureAwait(false);
@@ -49,11 +49,11 @@ internal static class Program
     /// <summary>The published binary has to do the thing, not merely start.</summary>
     private static async Task<int> CorrectnessAsync()
     {
-        int failures = 0;
+        var failures = 0;
 
         var executor = new FusedExecutor(FusedPolicy.Default);
 
-        int value = await executor.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
+        var value = await executor.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("suspending call returns the callback's value", value == Gate.Value);
 
         value = await executor.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0).ConfigureAwait(false);
@@ -64,7 +64,7 @@ internal static class Program
         failures += Check("two transient failures are retried to success", value == Gate.Value);
 
         var permanent = new FusedExecutor(FusedPolicy.NoTimeout with { Attempts = 3 });
-        bool threw = false;
+        var threw = false;
         try
         {
             await permanent.RunAsync(static _ => Task.FromException<int>(new InvalidOperationException("permanent"))).ConfigureAwait(false);
@@ -78,7 +78,7 @@ internal static class Program
 
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync().ConfigureAwait(false);
-        bool cancelledCorrectly = false;
+        var cancelledCorrectly = false;
         try
         {
             await executor.RunAsync(Gate.SuspendAsync, cancelled.Token).ConfigureAwait(false);
@@ -105,20 +105,20 @@ internal static class Program
     private static async Task<int> ShippingLibraryAsync()
     {
         Console.WriteLine();
-        int failures = 0;
+        var failures = 0;
 
-        int value = await Resilience.Default.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
+        var value = await Resilience.Default.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("library: a suspending call returns the callback's value", value == Gate.Value);
 
         value = await Resilience.Default.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0).ConfigureAwait(false);
         failures += Check("library: the stateful overload returns the callback's value", value == Gate.Value);
 
-        Resilience instant = Resilience.Default with { Backoff = Backoff.None, Attempts = 3 };
+        var instant = Resilience.Default with { Backoff = Backoff.None, Attempts = 3 };
         var counter = new Gate.FailCounter(failures: 2);
         value = await instant.RunAsync(Gate.SuspendThenFailAsync, counter).ConfigureAwait(false);
         failures += Check("library: two transient failures are retried to success", value == Gate.Value);
 
-        bool threw = false;
+        var threw = false;
         try
         {
             await instant.RunAsync(static _ => Task.FromException<int>(new InvalidOperationException("permanent"))).ConfigureAwait(false);
@@ -132,20 +132,20 @@ internal static class Program
 
         // The result-classification cache is the one place a naive implementation would reach for
         // reflection, so it is exercised over two distinct result types in one process.
-        Resilience classified = instant with
+        var classified = instant with
         {
             Classify = Classifier.Default.OnResult<int>(static v => v == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
-        CallResult<int> failing = await classified.TryRunAsync(static ct => Task.FromResult(503)).ConfigureAwait(false);
+        var failing = await classified.TryRunAsync(static ct => Task.FromResult(503)).ConfigureAwait(false);
         failures += Check("library: a result rule fires under AOT", !failing.IsSuccess && failing.Attempts.Count == 3);
 
-        CallResult<string> unjudged = await classified.TryRunAsync(static ct => Task.FromResult("fine")).ConfigureAwait(false);
+        var unjudged = await classified.TryRunAsync(static ct => Task.FromResult("fine")).ConfigureAwait(false);
         failures += Check("library: an unjudged result type is a success under AOT", unjudged.IsSuccess);
 
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync().ConfigureAwait(false);
-        bool cancelledCorrectly = false;
+        var cancelledCorrectly = false;
         try
         {
             await Resilience.Default.RunAsync(Gate.SuspendAsync, cancelled.Token).ConfigureAwait(false);
@@ -174,12 +174,12 @@ internal static class Program
     private static async Task<int> HttpPackageAsync()
     {
         Console.WriteLine();
-        int failures = 0;
+        var failures = 0;
 
         var events = new EventRecorder();
         var transport = new SequencedTransport(HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK);
 
-        Resilience policy = Resilience.Http with
+        var policy = Resilience.Http with
         {
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
@@ -195,7 +195,7 @@ internal static class Program
         };
         request.Headers.Add("X-Trace", "abc");
 
-        using HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
+        using var response = await client.SendAsync(request).ConfigureAwait(false);
 
         failures += Check("http: a 503 is retried to a 200", response.StatusCode == HttpStatusCode.OK);
         failures += Check("http: each attempt got its own request", transport.Sent == 2);
@@ -216,16 +216,16 @@ internal static class Program
     private static async Task<int> TestingPackageAsync()
     {
         Console.WriteLine();
-        int failures = 0;
+        var failures = 0;
 
         var events = new EventRecorder();
-        Resilience instant = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
+        var instant = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
         var calls = Sequence.For<int>()
             .Throws(new TimeoutException())
             .Returns(Gate.Value);
 
-        CallResult<int> result = await instant.TryRunAsync(ct => calls.NextAsync(ct)).ConfigureAwait(false);
+        var result = await instant.TryRunAsync(ct => calls.NextAsync(ct)).ConfigureAwait(false);
 
         failures += Check("testing: a scripted sequence retries to success", result.IsSuccess && result.Value == Gate.Value);
         failures += Check("testing: the sequence served every scripted step", calls.CallCount == 2 && calls.Remaining == 0);
@@ -248,12 +248,12 @@ internal static class Program
     /// </summary>
     private static async Task<int> TelemetryAsync()
     {
-        int failures = 0;
+        var failures = 0;
 
         var kinds = new List<CallEventKind>();
         var results = new List<object?>();
 
-        Resilience watched = Resilience.Default with
+        var watched = Resilience.Default with
         {
             Attempts = 2,
             Backoff = Backoff.None,
@@ -267,7 +267,7 @@ internal static class Program
             },
         };
 
-        int value = await watched.RunAsync(static _ => Task.FromResult(41)).ConfigureAwait(false);
+        var value = await watched.RunAsync(static _ => Task.FromResult(41)).ConfigureAwait(false);
 
         failures += Check("library: a successful call raises Attempt then Succeeded under AOT",
             value == 41 && kinds is [CallEventKind.Attempt, CallEventKind.Succeeded]);
@@ -293,9 +293,9 @@ internal static class Program
     /// </summary>
     private static async Task<int> GuardsAsync()
     {
-        int failures = 0;
+        var failures = 0;
 
-        Resilience instant = Resilience.Default with
+        var instant = Resilience.Default with
         {
             Backoff = Backoff.None,
             Deadline = Timeout.InfiniteTimeSpan,
@@ -303,10 +303,10 @@ internal static class Program
         };
 
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2 }) { Name = "aot" };
-        Resilience guarded = instant with { Breaker = breaker, Attempts = 2, Budget = RetryBudget.None };
+        var guarded = instant with { Breaker = breaker, Attempts = 2, Budget = RetryBudget.None };
 
-        bool ran = false;
-        CallResult<int> tripped = await guarded.TryRunAsync(
+        var ran = false;
+        var tripped = await guarded.TryRunAsync(
             static _ => Task.FromException<int>(new IOException("aot")))
             .ConfigureAwait(false);
 
@@ -314,7 +314,7 @@ internal static class Program
         failures += Check("library: the breaker records an opening time", breaker.OpenedAt is not null);
         failures += Check("library: the tripped operation still reports its own failure", !tripped.IsSuccess);
 
-        CallResult<int> refused = await guarded.TryRunAsync(_ =>
+        var refused = await guarded.TryRunAsync(_ =>
         {
             ran = true;
             return Task.FromResult(1);
@@ -330,10 +330,10 @@ internal static class Program
 
         // A quarter of a token per success and no floor, so the bucket funds exactly one retry and
         // the operation after it is refused at the throttle step rather than at admission.
-        Resilience metered = instant with { Attempts = 3, Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0) };
+        var metered = instant with { Attempts = 3, Budget = RetryBudget.Of(fraction: 0.25, minimumPerSecond: 0) };
 
         await metered.TryRunAsync(static _ => Task.FromException<int>(new IOException("aot"))).ConfigureAwait(false);
-        CallResult<int> throttled = await metered
+        var throttled = await metered
             .TryRunAsync(static _ => Task.FromException<int>(new IOException("aot")))
             .ConfigureAwait(false);
 
@@ -366,7 +366,7 @@ internal static class Program
     private static async Task<int> ExtensionsAsync()
     {
         Console.WriteLine();
-        int failures = 0;
+        var failures = 0;
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -386,10 +386,10 @@ internal static class Program
         services.AddResilience(configuration.GetSection("Resilience"));
         services.AddHttpClient("probe").AddResilience("api", o => o.OwnTransportTimeout = true);
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        IResiliencePolicies policies = provider.GetRequiredService<IResiliencePolicies>();
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
 
-        Resilience api = policies["api"];
+        var api = policies["api"];
 
         failures += Check("configuration binds under AOT (attempts)", api.Attempts == 4);
         failures += Check("configuration binds under AOT (deadline)", api.Deadline == TimeSpan.FromSeconds(20));
@@ -398,7 +398,7 @@ internal static class Program
         failures += Check("a configured breaker is live under AOT", api.Breaker is { Settings.ConsecutiveFailures: 2 });
         failures += Check("the policy is named after its registration", api.Name == "api");
 
-        int result = await api.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
+        var result = await api.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("a resolved policy executes under AOT", result == Gate.Value);
 
         // Publishing proves [LoggerMessage] compiled; only running proves the generator ran and the
@@ -439,12 +439,12 @@ internal static class Program
         clientServices.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = transport));
 
-        using ServiceProvider clientProvider = clientServices.BuildServiceProvider();
-        using HttpClient client = clientProvider.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
+        using var clientProvider = clientServices.BuildServiceProvider();
+        using var client = clientProvider.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
 
         failures += Check("the registration owns the transport timeout", client.Timeout == Timeout.InfiniteTimeSpan);
 
-        using HttpResponseMessage response = await client
+        using var response = await client
             .GetAsync(new Uri("https://api.test/thing"))
             .ConfigureAwait(false);
 
@@ -462,7 +462,7 @@ internal static class Program
     /// </summary>
     private static async Task<int> RateLimitAsync()
     {
-        int failures = 0;
+        var failures = 0;
 
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -477,14 +477,14 @@ internal static class Program
 
         failures += Check("limiter options bind under AOT", options is { Concurrency: 1, PerHost: true, QueueLimit: 0 });
 
-        using System.Threading.RateLimiting.RateLimiter limiter = options.ToLimiter();
+        using var limiter = options.ToLimiter();
 
         using (await limiter.AcquireOrThrowAsync("probe").ConfigureAwait(false))
         {
-            bool refused = false;
+            var refused = false;
             try
             {
-                using System.Threading.RateLimiting.RateLimitLease _ =
+                using var _ =
                     await limiter.AcquireOrThrowAsync("probe").ConfigureAwait(false);
             }
             catch (RateLimitedException error)
@@ -498,7 +498,7 @@ internal static class Program
         // The one behavior this whole block exists for, re-checked under AOT: the refusal is
         // throttling that the retry budget is not charged for.
         var budget = RetryBudget.Of(minimumPerSecond: 1);
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 3,
             Backoff = Backoff.None,
@@ -507,7 +507,7 @@ internal static class Program
             Budget = budget,
         };
 
-        CallResult<int> limited = await policy
+        var limited = await policy
             .TryRunAsync(static (CancellationToken _) => Task.FromException<int>(new RateLimitedException("probe")))
             .ConfigureAwait(false);
 
@@ -521,7 +521,7 @@ internal static class Program
     private static async Task<int> BudgetsAsync()
     {
         Console.WriteLine();
-        int failures = 0;
+        var failures = 0;
 
         // .NET 10 / .NET 8, arm64: bytes above an identical un-wrapped callback.
         const double NoiseFloor = 8;
@@ -530,10 +530,10 @@ internal static class Program
         const double TryRunSuspendingBudget = 640;       // measured 561 (553 before the breaker and budget)
         const double ListenerAllowance = 72;             // measured 48: two boxed int results
 
-        double rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
-        double noneSync = await MeasureAsync("None (sync)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
-        double trivialSync = await MeasureAsync("trivial, static+state (sync)", ShippingScenarios.TrivialSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
-        double defaultSync = await MeasureAsync("Default, static+state (sync)", ShippingScenarios.DefaultSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+        var rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+        var noneSync = await MeasureAsync("None (sync)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+        var trivialSync = await MeasureAsync("trivial, static+state (sync)", ShippingScenarios.TrivialSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
+        var defaultSync = await MeasureAsync("Default, static+state (sync)", ShippingScenarios.DefaultSyncState, AllocationCounter.ThreadLocal).ConfigureAwait(false);
 
         failures += Check("no AOT cliff: passthrough is free on the synchronous path", noneSync - rawSync <= 0);
         failures += Check("no AOT cliff: static lambda + state is free on the synchronous path", trivialSync - rawSync <= 0);
@@ -543,12 +543,12 @@ internal static class Program
         // own token must never be handed to user code.
         failures += Check("no AOT cliff: an attempt timeout still costs exactly one linked source", defaultSync - rawSync <= 72);
 
-        double rawSuspending = await MeasureAsync("raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double noneSuspending = await MeasureAsync("None (suspending)", ShippingScenarios.NoneSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double trivialSuspending = await MeasureAsync("trivial (suspending)", ShippingScenarios.TrivialSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double defaultSuspending = await MeasureAsync("Default (suspending)", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double tryRunSuspending = await MeasureAsync("TryRunAsync, Default (suspending)", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
-        double listenerSuspending = await MeasureAsync("Default + listener (suspending)", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        var rawSuspending = await MeasureAsync("raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        var noneSuspending = await MeasureAsync("None (suspending)", ShippingScenarios.NoneSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        var trivialSuspending = await MeasureAsync("trivial (suspending)", ShippingScenarios.TrivialSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        var defaultSuspending = await MeasureAsync("Default (suspending)", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        var tryRunSuspending = await MeasureAsync("TryRunAsync, Default (suspending)", ShippingScenarios.TryRunDefaultSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
+        var listenerSuspending = await MeasureAsync("Default + listener (suspending)", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide).ConfigureAwait(false);
 
         failures += Check("no AOT cliff: passthrough is free on the suspending path", noneSuspending - rawSuspending <= NoiseFloor);
         failures += Check(
@@ -576,7 +576,7 @@ internal static class Program
 
     private static async Task<double> MeasureAsync<T>(string name, Func<ValueTask<T>> body, AllocationCounter counter)
     {
-        AllocationMeasurement measurement = await AllocationProbe.MeasureAsync(name, body, counter).ConfigureAwait(false);
+        var measurement = await AllocationProbe.MeasureAsync(name, body, counter).ConfigureAwait(false);
         Log($"  {name,-36} {measurement.BytesPerOperation,9:0.0} B/op");
         return measurement.BytesPerOperation;
     }
@@ -673,7 +673,7 @@ internal static class Program
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            LastTrace = request.Headers.TryGetValues("X-Trace", out IEnumerable<string>? trace) ? trace.FirstOrDefault() : null;
+            LastTrace = request.Headers.TryGetValues("X-Trace", out var trace) ? trace.FirstOrDefault() : null;
             LastStamped = request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
             LastBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 

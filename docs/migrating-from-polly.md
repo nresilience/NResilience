@@ -86,8 +86,8 @@ In this migration, `Attempts` represents the total number of calls, so `MaxRetry
 
 <!-- snippet: migration-fallback -->
 ```csharp
-CallResult<string> result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
-string value = result.TryGetValue(out string? fetched) ? fetched : "cached";
+var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+var value = result.TryGetValue(out var fetched) ? fetched : "cached";
 ```
 <!-- endsnippet -->
 
@@ -190,7 +190,7 @@ try
 }
 catch (HttpRequestException e)
 {
-    AttemptLog? attempts = AttemptLog.Of(e);
+    var attempts = AttemptLog.Of(e);
     Console.WriteLine(attempts);   // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
 }
 ```

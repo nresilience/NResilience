@@ -89,7 +89,7 @@ public static class ResilienceLogging
         ArgumentNullException.ThrowIfNull(policy);
         ArgumentNullException.ThrowIfNull(logger);
 
-        ResilienceLoggingOptions effective = options ?? new ResilienceLoggingOptions();
+        var effective = options ?? new ResilienceLoggingOptions();
 
         if (effective.Profile == ResilienceLogProfile.Off || Attached(policy.OnEvent))
         {
@@ -169,7 +169,7 @@ public static class ResilienceLogging
 
         if (policy.Breaker is { } breaker)
         {
-            BreakerSettings settings = breaker.Settings;
+            var settings = breaker.Settings;
             text.Append(", breaker ");
 
             if (settings.FailureRatio is { } ratio)
@@ -215,7 +215,7 @@ public static class ResilienceLogging
             return false;
         }
 
-        foreach (Delegate entry in existing.GetInvocationList())
+        foreach (var entry in existing.GetInvocationList())
         {
             if (entry.Target is LogListener)
             {

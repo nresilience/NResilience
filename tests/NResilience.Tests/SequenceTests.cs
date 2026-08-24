@@ -95,7 +95,7 @@ public sealed class SequenceTests
         var time = new FakeTimeProvider();
         var calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(5)).Returns(1);
 
-        Task<int> pending = calls.NextAsync();
+        var pending = calls.NextAsync();
         Assert.False(pending.IsCompleted);
 
         time.Advance(TimeSpan.FromSeconds(5));
@@ -112,7 +112,7 @@ public sealed class SequenceTests
             .Delays(TimeSpan.FromSeconds(3))
             .Returns(1);
 
-        Task<int> pending = calls.NextAsync();
+        var pending = calls.NextAsync();
 
         time.Advance(TimeSpan.FromSeconds(4));
         Assert.False(pending.IsCompleted);
@@ -127,7 +127,7 @@ public sealed class SequenceTests
         var time = new FakeTimeProvider();
         var calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(5)).Returns(1).Returns(2);
 
-        Task<int> pending = calls.NextAsync();
+        var pending = calls.NextAsync();
         time.Advance(TimeSpan.FromSeconds(5));
         await pending;
 
@@ -141,7 +141,7 @@ public sealed class SequenceTests
         var calls = Sequence.For<int>(time).Delays(TimeSpan.FromSeconds(5)).Returns(1);
         using var cts = new CancellationTokenSource();
 
-        Task<int> pending = calls.NextAsync(cts.Token);
+        var pending = calls.NextAsync(cts.Token);
         await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
@@ -160,12 +160,12 @@ public sealed class SequenceTests
     {
         var calls = Sequence.For<int>();
 
-        for (int i = 0; i < 64; i++)
+        for (var i = 0; i < 64; i++)
         {
             calls.Returns(i);
         }
 
-        int[] served = await Task.WhenAll(Enumerable.Range(0, 64).Select(_ => Task.Run(() => calls.NextAsync())));
+        var served = await Task.WhenAll(Enumerable.Range(0, 64).Select(_ => Task.Run(() => calls.NextAsync())));
 
         Assert.Equal(Enumerable.Range(0, 64), served.Order());
     }
@@ -182,7 +182,7 @@ public sealed class SequenceTests
             Deadline = Timeout.InfiniteTimeSpan,
         };
 
-        CallResult result = await policy.TryRunAsync(ct => calls.NextVoidAsync(ct));
+        var result = await policy.TryRunAsync(ct => calls.NextVoidAsync(ct));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, calls.CallCount);
@@ -203,7 +203,7 @@ public sealed class SequenceTests
             .Throws(new TimeoutException())
             .Returns(200);
 
-        CallResult<int> result = await policy.TryRunAsync(ct => calls.NextAsync(ct));
+        var result = await policy.TryRunAsync(ct => calls.NextAsync(ct));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(200, result.Value);

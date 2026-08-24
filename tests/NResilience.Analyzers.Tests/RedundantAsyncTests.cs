@@ -8,7 +8,7 @@ public sealed class RedundantAsyncTests
     [Fact]
     public void An_async_callback_that_awaits_one_call_does_not_need_to_be_async()
     {
-        Diagnostic reported = Assert.Single(Harness.Run(Harness.InMethod(
+        var reported = Assert.Single(Harness.Run(Harness.InMethod(
             "        await api.RunAsync(async attempt => await Client.GetAsync(url, attempt), cancellationToken);")));
 
         Assert.Equal("NRES007", reported.Id);

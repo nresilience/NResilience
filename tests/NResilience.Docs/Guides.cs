@@ -20,7 +20,7 @@ public sealed class Guides
             () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
             () => Doubles.Json(new Order("A-1", "shipped")));
 
-        Order? order = await ReadOrderAsync(
+        var order = await ReadOrderAsync(
             ResilienceHttp.CreateClient(Resilience.Http with { Backoff = Backoff.None }, innerHandler: transport),
             "A-1",
             TestContext.Current.CancellationToken);
@@ -36,11 +36,11 @@ public sealed class Guides
         // answer. Three attempts, a 30 s deadline and a 10 s attempt ceiling are the defaults.
         var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) };
 
-        CallResult<Order?> result = await api.TryRunAsync(
+        var result = await api.TryRunAsync(
             attempt => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), attempt),
             cancellationToken);
 
-        if (result.TryGetValue(out Order? order))
+        if (result.TryGetValue(out var order))
         {
             return order;
         }
@@ -57,7 +57,7 @@ public sealed class Guides
         var dependencies = new Dependencies();
         Assert.Equal(BreakerState.Closed, dependencies.Payments.State);
 
-        CallResult<string> result = await dependencies.Charge.TryRunAsync(
+        var result = await dependencies.Charge.TryRunAsync(
             attempt => Task.FromResult("charged"),
             TestContext.Current.CancellationToken);
 
@@ -98,7 +98,7 @@ public sealed class Guides
 
         // <snippet:guide-health-endpoint>
         // A breaker is an object with a name and a state, so an operator can be told about it.
-        string report = dependencies.Payments.State switch
+        var report = dependencies.Payments.State switch
         {
             BreakerState.Closed => "healthy",
             BreakerState.HalfOpen => "recovering",
@@ -113,7 +113,7 @@ public sealed class Guides
     [Fact]
     public void Configure_from_appsettings_end_to_end()
     {
-        IConfigurationRoot configuration = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddJsonFile("appsettings.resilience.json")
             .Build();
         var services = new ServiceCollection();
@@ -127,8 +127,8 @@ public sealed class Guides
         services.AddHttpClient("orders").AddResilience("api");
         // </snippet:guide-configure-from-configuration>
 
-        using ServiceProvider provider = services.BuildServiceProvider();
-        IResiliencePolicies policies = provider.GetRequiredService<IResiliencePolicies>();
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
 
         Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
         Assert.NotNull(provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders"));

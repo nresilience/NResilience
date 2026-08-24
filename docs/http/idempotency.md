@@ -36,7 +36,7 @@ using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example
 request.Headers.Add("Idempotency-Key", key);
 request.Options.Set(ResilienceHttp.Repeatable, true);
 
-using HttpResponseMessage response = await client.SendAsync(request, cancellationToken);
+using var response = await client.SendAsync(request, cancellationToken);
 ```
 <!-- endsnippet -->
 

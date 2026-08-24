@@ -106,7 +106,7 @@ public static class ResilienceTelemetry
     {
         ArgumentNullException.ThrowIfNull(policy);
 
-        Action<CallEvent>? existing = policy.OnEvent;
+        var existing = policy.OnEvent;
         if (existing is null)
         {
             return policy with { OnEvent = Listener };
@@ -150,7 +150,7 @@ public static class ResilienceTelemetry
 
     private static void Record(CallEvent e)
     {
-        string policy = e.PolicyName ?? "(unnamed)";
+        var policy = e.PolicyName ?? "(unnamed)";
 
         switch (e.Kind)
         {
@@ -201,7 +201,7 @@ public static class ResilienceTelemetry
     private static void Terminal(CallEvent e, string policy)
     {
         var policyTag = new KeyValuePair<string, object?>("nresilience.policy", policy);
-        KeyValuePair<string, object?> outcome = Outcome(e);
+        var outcome = Outcome(e);
 
         CallCounter.Add(1, policyTag, outcome);
         CallDuration.Record(e.Duration.TotalSeconds, policyTag, outcome);

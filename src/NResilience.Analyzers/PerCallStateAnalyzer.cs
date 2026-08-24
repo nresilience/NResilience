@@ -33,7 +33,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(static start =>
         {
-            if (!KnownSymbols.TryCreate(start.Compilation, out KnownSymbols known))
+            if (!KnownSymbols.TryCreate(start.Compilation, out var known))
             {
                 return;
             }
@@ -56,7 +56,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     private static void AnalyzeInvocation(OperationAnalysisContext context, KnownSymbols known)
     {
         var invocation = (IInvocationOperation)context.Operation;
-        IMethodSymbol method = invocation.TargetMethod;
+        var method = invocation.TargetMethod;
 
         // RetryBudget.Shared(name) is looked up by name, so calling it per call is correct: it is
         // Of() - a fresh bucket every time - that throws the window away.
@@ -84,7 +84,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         string guardKind,
         string cannotEver)
     {
-        if (!IsPolicySetting(guard, known) || !InsideSomethingCalledRepeatedly(context, known, out string container))
+        if (!IsPolicySetting(guard, known) || !InsideSomethingCalledRepeatedly(context, known, out var container))
         {
             return;
         }
@@ -101,7 +101,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     {
         // The `using` form is the one that is provably per call: the client is disposed where it was
         // made. A plain local may be returned to something that holds it for the process's life.
-        if (!IsDisposedWhereItIsMade(client.Syntax) || !InsideSomethingCalledRepeatedly(context, known, out string container))
+        if (!IsDisposedWhereItIsMade(client.Syntax) || !InsideSomethingCalledRepeatedly(context, known, out var container))
         {
             return;
         }
@@ -115,7 +115,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     /// <summary>True when the operation is the value of <c>Breaker =</c> or <c>Budget =</c> in a policy initializer.</summary>
     private static bool IsPolicySetting(IOperation operation, KnownSymbols known)
     {
-        IOperation? parent = operation.Parent;
+        var parent = operation.Parent;
 
         while (parent is IConversionOperation)
         {
@@ -157,7 +157,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     /// </summary>
     private static bool IsDisposedWhereItIsMade(SyntaxNode node)
     {
-        for (SyntaxNode? current = node; current is not null; current = current.Parent)
+        for (var current = node; current is not null; current = current.Parent)
         {
             switch (current)
             {

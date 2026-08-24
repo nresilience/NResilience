@@ -33,7 +33,7 @@ internal sealed class Callback
             return false;
         }
 
-        IArgumentOperation? work = invocation.Arguments
+        var work = invocation.Arguments
             .FirstOrDefault(argument => argument.Parameter?.Name == "work");
 
         if (work?.Value is not IDelegateCreationOperation creation
@@ -42,7 +42,7 @@ internal sealed class Callback
             return false;
         }
 
-        IParameterSymbol? token = function.Symbol.Parameters
+        var token = function.Symbol.Parameters
             .LastOrDefault(parameter => known.IsCancellationToken(parameter.Type));
 
         if (token is null)

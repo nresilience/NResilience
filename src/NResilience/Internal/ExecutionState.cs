@@ -85,7 +85,7 @@ internal sealed class ExecutionState
             return t_lastState!;
         }
 
-        ExecutionState state = Table.GetValue(policy, Create);
+        var state = Table.GetValue(policy, Create);
         t_lastState = state;
         t_lastPolicy = policy;
         return state;

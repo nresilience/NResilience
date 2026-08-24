@@ -113,27 +113,27 @@ public readonly record struct Backoff
     /// <returns>The delay, never negative.</returns>
     public TimeSpan Compute(in NextAttempt next)
     {
-        Backoff effective = Normalized();
+        var effective = Normalized();
 
         if (effective._kind == BackoffKind.Custom)
         {
-            TimeSpan custom = effective._custom!(next);
+            var custom = effective._custom!(next);
             return custom > TimeSpan.Zero ? custom : TimeSpan.Zero;
         }
 
         if (next.PreviousVerdict.RetryAfter is { } pushback)
         {
-            TimeSpan capped = effective._max != Timeout.InfiniteTimeSpan && pushback > effective._max ? effective._max : pushback;
+            var capped = effective._max != Timeout.InfiniteTimeSpan && pushback > effective._max ? effective._max : pushback;
             return capped > TimeSpan.Zero ? capped : TimeSpan.Zero;
         }
 
-        TimeSpan @base = next.PreviousVerdict.Kind == VerdictKind.Throttled ? effective._throttledBase : effective._transientBase;
+        var @base = next.PreviousVerdict.Kind == VerdictKind.Throttled ? effective._throttledBase : effective._transientBase;
         if (@base <= TimeSpan.Zero)
         {
             return TimeSpan.Zero;
         }
 
-        double ticks = effective._kind == BackoffKind.Constant
+        var ticks = effective._kind == BackoffKind.Constant
             ? @base.Ticks
             : @base.Ticks * Math.Pow(effective._factor, Math.Max(0, next.Number - 2));
 
@@ -158,13 +158,13 @@ public readonly record struct Backoff
             return TimeSpan.Zero;
         }
 
-        long clamped = ticks > long.MaxValue ? long.MaxValue : (long)ticks;
+        var clamped = ticks > long.MaxValue ? long.MaxValue : (long)ticks;
         return TimeSpan.FromTicks(clamped);
     }
 
     internal void Validate(List<string> problems)
     {
-        Backoff effective = Normalized();
+        var effective = Normalized();
         if (effective._kind == BackoffKind.Exponential && (double.IsNaN(effective._factor) || effective._factor <= 0))
         {
             problems.Add($"Backoff factor must be greater than zero; it is {effective._factor}.");

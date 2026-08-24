@@ -29,7 +29,7 @@ public sealed class RateLimitTests
     /// </summary>
     private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
     {
-        Task<CallResult<int>> call = policy.TryRunAsync(work).AsTask();
+        var call = policy.TryRunAsync(work).AsTask();
 
         while (!call.IsCompleted)
         {
@@ -45,7 +45,7 @@ public sealed class RateLimitTests
     [Fact]
     public void Limited_is_throttling_that_knows_where_it_came_from()
     {
-        Verdict limited = Verdict.Limited(TimeSpan.FromSeconds(2));
+        var limited = Verdict.Limited(TimeSpan.FromSeconds(2));
 
         Assert.Equal(VerdictKind.Throttled, limited.Kind);
         Assert.True(limited.SelfImposed);
@@ -84,10 +84,10 @@ public sealed class RateLimitTests
     public async Task Self_imposed_refusal_does_not_spend_retry_budget()
     {
         var time = new FakeTimeProvider();
-        RetryBudget budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
-        Resilience policy = Instant(time) with { Attempts = 4, Budget = budget };
+        var budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
+        var policy = Instant(time) with { Attempts = 4, Budget = budget };
 
-        CallResult<int> result = await RunAsync(
+        var result = await RunAsync(
             policy,
             _ => throw new RateLimitedException("api"),
             time);
@@ -104,15 +104,15 @@ public sealed class RateLimitTests
     public async Task Server_throttling_still_spends_retry_budget()
     {
         var time = new FakeTimeProvider();
-        RetryBudget budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
-        Resilience policy = Instant(time) with
+        var budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
+        var policy = Instant(time) with
         {
             Attempts = 4,
             Budget = budget,
             Classify = Classifier.Default.On<InvalidOperationException>(Verdict.Throttled()),
         };
 
-        CallResult<int> result = await RunAsync(
+        var result = await RunAsync(
             policy,
             _ => throw new InvalidOperationException("429 from the server"),
             time);
@@ -125,16 +125,16 @@ public sealed class RateLimitTests
     public async Task A_budget_already_exhausted_still_does_not_stop_a_self_imposed_retry()
     {
         var time = new FakeTimeProvider();
-        RetryBudget budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
+        var budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
 
         // Drain it, so any charge at all would refuse the retry.
         while (budget.TrySpend())
         {
         }
 
-        Resilience policy = Instant(time) with { Attempts = 3, Budget = budget };
+        var policy = Instant(time) with { Attempts = 3, Budget = budget };
 
-        CallResult<int> result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
 
         Assert.Equal(3, result.Attempts.Count);
         Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
@@ -147,9 +147,9 @@ public sealed class RateLimitTests
     {
         var time = new FakeTimeProvider();
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2, Time = time });
-        Resilience policy = Instant(time) with { Attempts = 6, Breaker = breaker };
+        var policy = Instant(time) with { Attempts = 6, Breaker = breaker };
 
-        CallResult<int> result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
 
         Assert.Equal(6, result.Attempts.Count);
         Assert.Equal(BreakerState.Closed, breaker.State);
@@ -167,7 +167,7 @@ public sealed class RateLimitTests
             Time = time,
         });
 
-        Resilience single = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var single = Instant(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
@@ -176,10 +176,10 @@ public sealed class RateLimitTests
 
         // The probe is refused by local admission control rather than by the dependency. The slot
         // has to come back, or the breaker never probes again and wedges half-open forever.
-        CallResult<int> refused = await RunAsync(single, _ => throw new RateLimitedException("api"), time);
+        var refused = await RunAsync(single, _ => throw new RateLimitedException("api"), time);
         Assert.False(refused.IsSuccess);
 
-        CallResult<int> probe = await RunAsync(single, _ => Task.FromResult(1), time);
+        var probe = await RunAsync(single, _ => Task.FromResult(1), time);
         Assert.True(probe.IsSuccess, "the refused probe did not release its slot");
     }
 
@@ -191,7 +191,7 @@ public sealed class RateLimitTests
         var time = new FakeTimeProvider();
         var delays = new List<TimeSpan>();
 
-        Resilience policy = Resilience.Default with
+        var policy = Resilience.Default with
         {
             Attempts = 2,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
@@ -207,7 +207,7 @@ public sealed class RateLimitTests
             },
         };
 
-        CallResult<int> result = await RunAsync(
+        var result = await RunAsync(
             policy,
             _ => throw new RateLimitedException("api", TimeSpan.FromSeconds(3)),
             time);
@@ -224,7 +224,7 @@ public sealed class RateLimitTests
         var time = new FakeTimeProvider();
         var seen = new List<Type>();
 
-        Resilience policy = Instant(time) with
+        var policy = Instant(time) with
         {
             Attempts = 2,
             Classify = Classifier.RetryEverything.On<Exception>(ex =>
@@ -234,7 +234,7 @@ public sealed class RateLimitTests
             }),
         };
 
-        CallResult<int> result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
 
         Assert.Empty(seen);
         Assert.True(result.Attempts[0].Verdict.SelfImposed);
@@ -249,9 +249,9 @@ public sealed class RateLimitTests
 
         // Six attempts, so four land in the inline buffer and two in the spill array. The flag
         // rides in the packed verdict byte and has to survive both paths.
-        Resilience policy = Instant(time) with { Attempts = 6, Budget = RetryBudget.None };
+        var policy = Instant(time) with { Attempts = 6, Budget = RetryBudget.None };
 
-        CallResult<int> result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
 
         Assert.Equal(6, result.Attempts.Count);
         Assert.All(result.Attempts, attempt =>
@@ -265,16 +265,16 @@ public sealed class RateLimitTests
     public async Task Server_throttling_is_distinguishable_from_self_throttling_in_the_log()
     {
         var time = new FakeTimeProvider();
-        int calls = 0;
+        var calls = 0;
 
-        Resilience policy = Instant(time) with
+        var policy = Instant(time) with
         {
             Attempts = 3,
             Budget = RetryBudget.None,
             Classify = Classifier.Default.On<InvalidOperationException>(Verdict.Throttled()),
         };
 
-        CallResult<int> result = await RunAsync(
+        var result = await RunAsync(
             policy,
             _ => calls++ == 0
                 ? throw new InvalidOperationException("429")
@@ -292,9 +292,9 @@ public sealed class RateLimitTests
     public async Task The_refusal_is_what_surfaces_when_the_attempts_run_out()
     {
         var time = new FakeTimeProvider();
-        Resilience policy = Instant(time) with { Attempts = 2, Budget = RetryBudget.None };
+        var policy = Instant(time) with { Attempts = 2, Budget = RetryBudget.None };
 
-        Task<int> call = policy.RunAsync(
+        var call = policy.RunAsync(
             (CancellationToken _) => Task.FromException<int>(new RateLimitedException("payments", TimeSpan.FromSeconds(4)))).AsTask();
 
         while (!call.IsCompleted)
@@ -303,7 +303,7 @@ public sealed class RateLimitTests
             await Task.Delay(1);
         }
 
-        RateLimitedException error = await Assert.ThrowsAsync<RateLimitedException>(() => call);
+        var error = await Assert.ThrowsAsync<RateLimitedException>(() => call);
 
         Assert.Equal("payments", error.Limiter);
         Assert.Equal(TimeSpan.FromSeconds(4), error.RetryAfter);
@@ -317,9 +317,9 @@ public sealed class RateLimitTests
     {
         using var limiter = Limit.Concurrency(1);
 
-        using System.Threading.RateLimiting.RateLimitLease held = await limiter.AcquireOrThrowAsync("bulk");
+        using var held = await limiter.AcquireOrThrowAsync("bulk");
 
-        RateLimitedException error = await Assert.ThrowsAsync<RateLimitedException>(
+        var error = await Assert.ThrowsAsync<RateLimitedException>(
             async () => await limiter.AcquireOrThrowAsync("bulk"));
 
         Assert.Equal("bulk", error.Limiter);
@@ -334,7 +334,7 @@ public sealed class RateLimitTests
         {
         }
 
-        using System.Threading.RateLimiting.RateLimitLease second = await limiter.AcquireOrThrowAsync();
+        using var second = await limiter.AcquireOrThrowAsync();
         Assert.True(second.IsAcquired);
     }
 
@@ -348,9 +348,9 @@ public sealed class RateLimitTests
         using var limiter = Limit.Concurrency(2);
         var held = new List<System.Threading.RateLimiting.RateLimitLease>();
 
-        Resilience policy = Instant(time) with { Attempts = 3, Budget = RetryBudget.None };
+        var policy = Instant(time) with { Attempts = 3, Budget = RetryBudget.None };
 
-        CallResult<int> result = await RunAsync(
+        var result = await RunAsync(
             policy,
             async ct =>
             {
@@ -365,7 +365,7 @@ public sealed class RateLimitTests
         Assert.False(result.Attempts[1].Verdict.SelfImposed);
         Assert.True(result.Attempts[2].Verdict.SelfImposed);
 
-        foreach (System.Threading.RateLimiting.RateLimitLease lease in held)
+        foreach (var lease in held)
         {
             lease.Dispose();
         }
@@ -376,7 +376,7 @@ public sealed class RateLimitTests
     [Fact]
     public void Options_describing_no_limiter_are_refused()
     {
-        ResilienceConfigurationException error = Assert.Throws<ResilienceConfigurationException>(
+        var error = Assert.Throws<ResilienceConfigurationException>(
             () => new RateLimitOptions().Validate());
 
         Assert.Contains("Set one of", Assert.Single(error.Problems), StringComparison.Ordinal);
@@ -385,7 +385,7 @@ public sealed class RateLimitTests
     [Fact]
     public void Options_describing_two_limiters_are_refused_rather_than_resolved()
     {
-        ResilienceConfigurationException error = Assert.Throws<ResilienceConfigurationException>(
+        var error = Assert.Throws<ResilienceConfigurationException>(
             () => new RateLimitOptions { PermitsPerSecond = 10, Concurrency = 2 }.Validate());
 
         Assert.Contains("three different guards", Assert.Single(error.Problems), StringComparison.Ordinal);
@@ -394,7 +394,7 @@ public sealed class RateLimitTests
     [Fact]
     public void A_window_needs_both_halves()
     {
-        ResilienceConfigurationException error = Assert.Throws<ResilienceConfigurationException>(
+        var error = Assert.Throws<ResilienceConfigurationException>(
             () => new RateLimitOptions { Permits = 100 }.Validate());
 
         Assert.Contains("must be set together", Assert.Single(error.Problems), StringComparison.Ordinal);
@@ -403,7 +403,7 @@ public sealed class RateLimitTests
     [Fact]
     public void Every_problem_is_listed_at_once()
     {
-        ResilienceConfigurationException error = Assert.Throws<ResilienceConfigurationException>(
+        var error = Assert.Throws<ResilienceConfigurationException>(
             () => new RateLimitOptions { PermitsPerSecond = 0, QueueLimit = -1 }.Validate());
 
         Assert.Equal(2, error.Problems.Count);

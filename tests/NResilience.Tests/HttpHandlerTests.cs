@@ -28,8 +28,8 @@ public sealed class HttpHandlerTests
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport);
-        using HttpResponseMessage response = await client.GetAsync(new Uri("https://api.test/thing"));
+        using var client = Client(transport);
+        using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(2, transport.Requests.Count);
@@ -40,8 +40,8 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.NotFound));
 
-        using HttpClient client = Client(transport);
-        using HttpResponseMessage response = await client.GetAsync(new Uri("https://api.test/missing"));
+        using var client = Client(transport);
+        using var response = await client.GetAsync(new Uri("https://api.test/missing"));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Single(transport.Requests);
@@ -52,8 +52,8 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
 
-        using HttpClient client = Client(transport);
-        using HttpResponseMessage response = await client.GetAsync(new Uri("https://api.test/thing"));
+        using var client = Client(transport);
+        using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Equal(3, transport.Requests.Count);
@@ -66,8 +66,8 @@ public sealed class HttpHandlerTests
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport);
-        using HttpResponseMessage response = await client.GetAsync(new Uri("https://api.test/thing"));
+        using var client = Client(transport);
+        using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         // Re-sending one HttpRequestMessage throws "The request message was already sent"; the
         // point of cloning is that these are two distinct objects.
@@ -82,7 +82,7 @@ public sealed class HttpHandlerTests
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport);
+        using var client = Client(transport);
 
         using var request = new HttpRequestMessage(HttpMethod.Put, new Uri("https://api.test/thing?q=1"))
         {
@@ -90,9 +90,9 @@ public sealed class HttpHandlerTests
         };
         request.Headers.Add("X-Trace", "abc");
 
-        using HttpResponseMessage response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request);
 
-        HttpRequestMessage second = transport.Requests[1];
+        var second = transport.Requests[1];
         Assert.Equal(HttpMethod.Put, second.Method);
         Assert.Equal(new Uri("https://api.test/thing?q=1"), second.RequestUri);
         Assert.Equal("abc", second.Headers.GetValues("X-Trace").Single());
@@ -106,8 +106,8 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
 
-        using HttpClient client = Client(transport);
-        using HttpResponseMessage response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
+        using var client = Client(transport);
+        using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
         Assert.Single(transport.Requests);
@@ -118,8 +118,8 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport);
-        using HttpResponseMessage response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
+        using var client = Client(transport);
+        using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Single(transport.Requests);
@@ -133,8 +133,8 @@ public sealed class HttpHandlerTests
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
-        using HttpResponseMessage response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
+        using var client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
+        using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(2, transport.Requests.Count);
@@ -148,7 +148,7 @@ public sealed class HttpHandlerTests
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport);
+        using var client = Client(transport);
 
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("https://api.test/orders"))
         {
@@ -156,7 +156,7 @@ public sealed class HttpHandlerTests
         };
         request.Options.Set(ResilienceHttp.Repeatable, true);
 
-        using HttpResponseMessage response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(2, transport.Requests.Count);
@@ -167,12 +167,12 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
 
-        using HttpClient client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
+        using var client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
         request.Options.Set(ResilienceHttp.Repeatable, false);
 
-        using HttpResponseMessage response = await client.SendAsync(request);
+        using var response = await client.SendAsync(request);
 
         Assert.Single(transport.Requests);
     }
@@ -211,8 +211,8 @@ public sealed class HttpHandlerTests
         var second = new HttpResponseMessage(HttpStatusCode.OK) { Content = new TrackedContent() };
         var transport = new ScriptedTransport(() => first, () => second);
 
-        using HttpClient client = Client(transport);
-        using HttpResponseMessage response = await client.GetAsync(new Uri("https://api.test/thing"));
+        using var client = Client(transport);
+        using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.True(((TrackedContent)first.Content).Disposed);
         Assert.False(((TrackedContent)second.Content!).Disposed);
@@ -229,7 +229,7 @@ public sealed class HttpHandlerTests
         (await client.GetAsync(new Uri("https://two.test/a"))).Dispose();
         (await client.GetAsync(new Uri("https://one.test/b"))).Dispose();
 
-        IReadOnlyDictionary<string, Breaker> breakers = handler.BreakersByHost();
+        var breakers = handler.BreakersByHost();
         Assert.Equal(2, breakers.Count);
         Assert.NotSame(breakers["one.test"], breakers["two.test"]);
         Assert.Equal(2, handler.BudgetsByHost().Count);
@@ -255,7 +255,7 @@ public sealed class HttpHandlerTests
             new HttpResilienceOptions { BreakerSettings = new BreakerSettings { ConsecutiveFailures = 2 } });
         using var client = new HttpClient(handler);
 
-        for (int i = 0; i < 2; i++)
+        for (var i = 0; i < 2; i++)
         {
             (await client.GetAsync(new Uri("https://dead.test/a"))).Dispose();
         }
@@ -266,7 +266,7 @@ public sealed class HttpHandlerTests
         await Assert.ThrowsAsync<CallRejectedException>(async () =>
             await client.GetAsync(new Uri("https://dead.test/a")));
 
-        using HttpResponseMessage healthy = await client.GetAsync(new Uri("https://healthy.test/a"));
+        using var healthy = await client.GetAsync(new Uri("https://healthy.test/a"));
         Assert.Equal(HttpStatusCode.OK, healthy.StatusCode);
     }
 
@@ -282,7 +282,7 @@ public sealed class HttpHandlerTests
         (await client.GetAsync(new Uri("https://one.test/a"))).Dispose();
         (await client.GetAsync(new Uri("https://two.test/a"))).Dispose();
 
-        IReadOnlyDictionary<string, Breaker> breakers = handler.BreakersByHost();
+        var breakers = handler.BreakersByHost();
         Assert.Same(shared, breakers["one.test"]);
         Assert.Same(shared, breakers["two.test"]);
     }
@@ -292,7 +292,7 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport);
+        using var client = Client(transport);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.True(transport.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
@@ -303,7 +303,7 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport, policy: Instant with { Attempts = 1 });
+        using var client = Client(transport, policy: Instant with { Attempts = 1 });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.False(transport.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
@@ -315,7 +315,7 @@ public sealed class HttpHandlerTests
         var recorder = new EventRecorder();
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport, policy: Instant with { OnEvent = recorder.Record });
+        using var client = Client(transport, policy: Instant with { OnEvent = recorder.Record });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
         request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
@@ -330,7 +330,7 @@ public sealed class HttpHandlerTests
     {
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport);
+        using var client = Client(transport);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
         request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
@@ -346,14 +346,14 @@ public sealed class HttpHandlerTests
         var recorder = new EventRecorder();
 
         var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
-        using HttpClient innerClient = Client(inner, policy: Instant with { OnEvent = recorder.Record });
+        using var innerClient = Client(inner, policy: Instant with { OnEvent = recorder.Record });
 
         // The outer client's transport is the inner client: exactly the shape a service that calls
         // another service has, and the one whose amplification nothing in .NET reports.
         var outerTransport = new ScriptedTransport(async (request, ct) =>
             await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
 
-        using HttpClient outerClient = Client(outerTransport);
+        using var outerClient = Client(outerTransport);
         (await outerClient.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.True(recorder.Contains(CallEventKind.NestedRetry));
@@ -363,14 +363,14 @@ public sealed class HttpHandlerTests
     public async Task An_in_process_nested_retry_stamps_the_header_on_the_inner_request()
     {
         var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
-        using HttpClient innerClient = Client(inner);
+        using var innerClient = Client(inner);
 
         // The inner transport receives a different request than the outer one, so the header
         // must be stamped on it independently of the outer request's header.
         var outerTransport = new ScriptedTransport(async (request, ct) =>
             await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
 
-        using HttpClient outerClient = Client(outerTransport);
+        using var outerClient = Client(outerTransport);
         (await outerClient.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.True(inner.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
@@ -382,7 +382,7 @@ public sealed class HttpHandlerTests
         var recorder = new EventRecorder();
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(
+        using var client = Client(
             transport,
             new HttpResilienceOptions { DetectNestedRetries = false },
             Instant with { OnEvent = recorder.Record });
@@ -403,12 +403,12 @@ public sealed class HttpHandlerTests
         // is still detected as nested when it runs inside an outer retrying client.
         var recorder = new EventRecorder();
         var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
-        using HttpClient innerClient = Client(inner, policy: Instant with { OnEvent = recorder.Record });
+        using var innerClient = Client(inner, policy: Instant with { OnEvent = recorder.Record });
 
         var outerTransport = new ScriptedTransport(async (request, ct) =>
             await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
 
-        using HttpClient outerClient = Client(outerTransport);
+        using var outerClient = Client(outerTransport);
 
         // Two sequential calls: each one runs the inner client inside the outer, and each must
         // report nesting. A finally that cleared the flag unconditionally would leave the second
@@ -427,10 +427,10 @@ public sealed class HttpHandlerTests
     [Fact]
     public void CreateClient_takes_ownership_of_the_transport_timeout()
     {
-        using HttpClient owned = ResilienceHttp.CreateClient(Instant, innerHandler: new ScriptedTransport());
+        using var owned = ResilienceHttp.CreateClient(Instant, innerHandler: new ScriptedTransport());
         Assert.Equal(Timeout.InfiniteTimeSpan, owned.Timeout);
 
-        using HttpClient borrowed = ResilienceHttp.CreateClient(
+        using var borrowed = ResilienceHttp.CreateClient(
             Instant,
             new HttpResilienceOptions { OwnTransportTimeout = false },
             new ScriptedTransport());
@@ -445,8 +445,8 @@ public sealed class HttpHandlerTests
 
         var transport = new ScriptedTransport(() => throttled, () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport, policy: Instant with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
-        using HttpResponseMessage response = await client.GetAsync(new Uri("https://api.test/thing"));
+        using var client = Client(transport, policy: Instant with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
+        using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         // A five-minute backoff would have made this test time out; the server's own hint is the
         // one that was served.
@@ -459,7 +459,7 @@ public sealed class HttpHandlerTests
         var recorder = new EventRecorder();
         var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = Client(transport, policy: Instant with { OnEvent = recorder.Record });
+        using var client = Client(transport, policy: Instant with { OnEvent = recorder.Record });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.Equal("http:api.test", recorder[0].PolicyName);
@@ -481,7 +481,7 @@ public sealed class HttpHandlerTests
             },
         ]);
 
-        using HttpClient client = Client(transport);
+        using var client = Client(transport);
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
             await client.GetAsync(new Uri("https://api.test/thing"), cancellation.Token));
@@ -548,7 +548,7 @@ public sealed class HttpHandlerTests
 
             // The last step repeats, so "always 503" is one step rather than as many as the policy
             // happens to allow.
-            int next = Math.Min(Interlocked.Increment(ref _index), _steps.Length - 1);
+            var next = Math.Min(Interlocked.Increment(ref _index), _steps.Length - 1);
             return await _steps[next](request, cancellationToken).ConfigureAwait(false);
         }
     }

@@ -222,7 +222,7 @@ public sealed class RateLimitedException : Exception
 
     private static string Describe(string? limiter, TimeSpan? retryAfter)
     {
-        string who = limiter is null ? "A rate limiter" : $"Rate limiter '{limiter}'";
+        var who = limiter is null ? "A rate limiter" : $"Rate limiter '{limiter}'";
         return retryAfter is { } after
             ? $"{who} refused the attempt; a permit is expected in {after.TotalSeconds:0.###}s."
             : $"{who} refused the attempt.";

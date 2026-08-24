@@ -52,7 +52,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void A_registered_policy_resolves_by_name()
     {
-        IResiliencePolicies policies = Build(s =>
+        var policies = Build(s =>
             s.AddResilience("api", Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) }));
 
         Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
@@ -63,7 +63,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void A_registered_policy_is_named_after_its_registration()
     {
-        IResiliencePolicies policies = Build(s => s.AddResilience("payments", Resilience.Default));
+        var policies = Build(s => s.AddResilience("payments", Resilience.Default));
 
         Assert.Equal("payments", policies["payments"].Name);
     }
@@ -77,7 +77,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void The_registration_name_beats_a_preset_name()
     {
-        IResiliencePolicies policies = Build(s => s
+        var policies = Build(s => s
             .AddResilience("api", Resilience.Http)
             .AddResilience("reports", Resilience.Http));
 
@@ -89,7 +89,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void An_explicitly_configured_name_is_not_overwritten()
     {
-        IResiliencePolicies policies = Build(s => s.AddResilience("api", o =>
+        var policies = Build(s => s.AddResilience("api", o =>
         {
             o.Preset = "Http";
             o.Name = "upstream";
@@ -115,7 +115,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void An_unknown_name_throws_and_lists_what_is_registered()
     {
-        IResiliencePolicies policies = Build(s => s
+        var policies = Build(s => s
             .AddResilience("api", Resilience.Http)
             .AddResilience("reports", Resilience.Http));
 
@@ -128,11 +128,11 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void TryGet_does_not_throw_on_an_unknown_name()
     {
-        IResiliencePolicies policies = Build(s => s.AddResilience("api", Resilience.Http));
+        var policies = Build(s => s.AddResilience("api", Resilience.Http));
 
-        Assert.False(policies.TryGet("nope", out Resilience missing));
+        Assert.False(policies.TryGet("nope", out var missing));
         Assert.Equal(Resilience.Default, missing);
-        Assert.True(policies.TryGet("api", out Resilience found));
+        Assert.True(policies.TryGet("api", out var found));
         Assert.Equal("api", found.Name);
     }
 
@@ -140,7 +140,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void Resolving_twice_returns_the_same_instance()
     {
-        IResiliencePolicies policies = Build(s => s.AddResilience("api", Resilience.Http));
+        var policies = Build(s => s.AddResilience("api", Resilience.Http));
 
         Assert.Same(policies["api"], policies["api"]);
     }
@@ -160,7 +160,7 @@ public sealed class DependencyInjectionTests
             ["Resilience:reports:Deadline"] = "00:05:00",
         });
 
-        IResiliencePolicies policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
+        var policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
 
         Assert.Equal(["api", "reports"], policies.Names.OrderBy(n => n, StringComparer.Ordinal));
         Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
@@ -174,7 +174,7 @@ public sealed class DependencyInjectionTests
     {
         var source = new Source(new Dictionary<string, string?> { ["api:Attempts"] = "7" });
 
-        IResiliencePolicies policies = Build(s =>
+        var policies = Build(s =>
         {
             s.AddResilience("api", Resilience.Http with { Deadline = TimeSpan.FromSeconds(11) });
             s.AddResilience("api", source.Configuration.GetSection("api"));
@@ -192,9 +192,9 @@ public sealed class DependencyInjectionTests
     public void The_configure_callback_runs_after_configuration()
     {
         var source = new Source(new Dictionary<string, string?> { ["api:Attempts"] = "7" });
-        Classifier custom = Classifier.RetryEverything;
+        var custom = Classifier.RetryEverything;
 
-        IResiliencePolicies policies = Build(s => s.AddResilience(
+        var policies = Build(s => s.AddResilience(
             "api",
             source.Configuration.GetSection("api"),
             p => p with { Classify = custom, Attempts = p.Attempts + 1 }));
@@ -206,7 +206,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void A_policy_can_be_configured_in_code_without_a_section()
     {
-        IResiliencePolicies policies = Build(s => s.AddResilience("api", o =>
+        var policies = Build(s => s.AddResilience("api", o =>
         {
             o.Preset = "Http";
             o.Attempts = 4;
@@ -220,7 +220,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void An_empty_section_yields_an_empty_roster()
     {
-        IResiliencePolicies policies = Build(s =>
+        var policies = Build(s =>
             s.AddResilience(new ConfigurationBuilder().Build().GetSection("Resilience")));
 
         Assert.Empty(policies.Names);
@@ -240,7 +240,7 @@ public sealed class DependencyInjectionTests
             ["Resilience:api:Attempts"] = "3",
         });
 
-        IResiliencePolicies policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
+        var policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
 
         Assert.Equal(3, policies["api"].Attempts);
 
@@ -257,9 +257,9 @@ public sealed class DependencyInjectionTests
     public void A_policy_captured_into_a_field_does_not_see_the_swap()
     {
         var source = new Source(new Dictionary<string, string?> { ["Resilience:api:Attempts"] = "3" });
-        IResiliencePolicies policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
+        var policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
 
-        Resilience captured = policies["api"];
+        var captured = policies["api"];
 
         source.Replace(new Dictionary<string, string?> { ["Resilience:api:Attempts"] = "9" });
 
@@ -282,9 +282,9 @@ public sealed class DependencyInjectionTests
             ["Resilience:api:Breaker:ConsecutiveFailures"] = "1",
         });
 
-        IResiliencePolicies policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
+        var policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
 
-        Breaker breaker = policies["api"].Breaker!;
+        var breaker = policies["api"].Breaker!;
         breaker.Isolate();
         Assert.Equal(BreakerState.Isolated, breaker.State);
 
@@ -309,9 +309,9 @@ public sealed class DependencyInjectionTests
     public void A_live_budget_survives_a_reload_even_when_it_was_never_configured()
     {
         var source = new Source(new Dictionary<string, string?> { ["Resilience:api:Attempts"] = "3" });
-        IResiliencePolicies policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
+        var policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
 
-        RetryBudget budget = policies["api"].Budget!;
+        var budget = policies["api"].Budget!;
 
         source.Replace(new Dictionary<string, string?> { ["Resilience:api:Attempts"] = "9" });
 
@@ -322,7 +322,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void A_single_attempt_policy_gets_no_budget()
     {
-        IResiliencePolicies policies = Build(s => s.AddResilience("once", Resilience.Default with { Attempts = 1 }));
+        var policies = Build(s => s.AddResilience("once", Resilience.Default with { Attempts = 1 }));
 
         Assert.Null(policies["once"].Budget);
     }
@@ -336,7 +336,7 @@ public sealed class DependencyInjectionTests
     {
         var shared = new Breaker { Name = "shared" };
 
-        IResiliencePolicies policies = Build(s => s
+        var policies = Build(s => s
             .AddResilience("api", Resilience.Http, p => p with { Breaker = shared })
             .AddResilience("reports", Resilience.Http, p => p with { Breaker = shared }));
 
@@ -348,7 +348,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void Two_policies_do_not_share_a_breaker_by_accident()
     {
-        IResiliencePolicies policies = Build(s => s
+        var policies = Build(s => s
             .AddResilience("api", o => o.Breaker = new BreakerOptions { ConsecutiveFailures = 2 })
             .AddResilience("reports", o => o.Breaker = new BreakerOptions { ConsecutiveFailures = 2 }));
 

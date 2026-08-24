@@ -189,9 +189,9 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
         text.Append(_attempts.Length).Append(_attempts.Length == 1 ? " attempt over " : " attempts over ");
         text.Append(Format(Elapsed)).Append(':').Append(' ');
 
-        for (int i = 0; i < _attempts.Length; i++)
+        for (var i = 0; i < _attempts.Length; i++)
         {
-            Attempt attempt = _attempts[i];
+            var attempt = _attempts[i];
             if (i > 0)
             {
                 text.Append(", +").Append(Format(attempt.DelayBefore)).Append(", ");

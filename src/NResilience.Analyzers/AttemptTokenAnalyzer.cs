@@ -47,7 +47,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(static start =>
         {
-            if (!KnownSymbols.TryCreate(start.Compilation, out KnownSymbols known))
+            if (!KnownSymbols.TryCreate(start.Compilation, out var known))
             {
                 return;
             }
@@ -60,14 +60,14 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
     {
         var invocation = (IInvocationOperation)context.Operation;
 
-        if (!Callback.TryGet(invocation, known, out Callback callback)
+        if (!Callback.TryGet(invocation, known, out var callback)
             || callback.Function.Body is null
             || callback.UsesAttemptToken())
         {
             return;
         }
 
-        foreach (IArgumentOperation argument in TokenArguments(callback.Function.Body, known))
+        foreach (var argument in TokenArguments(callback.Function.Body, known))
         {
             context.ReportDiagnostic(Diagnose(argument, callback.AttemptToken));
         }
@@ -85,7 +85,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
 
     private static Diagnostic Diagnose(IArgumentOperation argument, IParameterSymbol attemptToken)
     {
-        ImmutableDictionary<string, string?>.Builder properties = ImmutableDictionary.CreateBuilder<string, string?>();
+        var properties = ImmutableDictionary.CreateBuilder<string, string?>();
         properties.Add(AttemptNameProperty, attemptToken.Name);
 
         if (argument.ArgumentKind != ArgumentKind.DefaultValue)
@@ -100,7 +100,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
         }
 
         // Omitted, so the location has to be the call rather than an argument that is not written down.
-        IOperation call = argument.Parent ?? argument;
+        var call = argument.Parent ?? argument;
         properties.Add(ParameterNameProperty, argument.Parameter?.Name);
         properties.Add(PositionalProperty, CanAppendPositionally(call, argument) ? "true" : "false");
 
@@ -124,7 +124,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        ImmutableArray<IArgumentOperation> arguments = call switch
+        var arguments = call switch
         {
             IInvocationOperation invocation => invocation.Arguments,
             IObjectCreationOperation creation => creation.Arguments,
@@ -136,8 +136,8 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
             return false;
         }
 
-        bool isLastParameter = token.Parameter.Ordinal == arguments.Length - 1;
-        bool everythingElseWritten = arguments.All(argument =>
+        var isLastParameter = token.Parameter.Ordinal == arguments.Length - 1;
+        var everythingElseWritten = arguments.All(argument =>
             ReferenceEquals(argument, token)
             || (argument.ArgumentKind == ArgumentKind.Explicit && argument.Syntax is ArgumentSyntax { NameColon: null }));
 

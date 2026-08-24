@@ -13,13 +13,13 @@ public sealed class TestingDocs
     public async Task A_scripted_callback_is_the_double()
     {
         // <snippet:testing-sequence>
-        Sequence<HttpResponseMessage> calls = Sequence.For<HttpResponseMessage>()
+        var calls = Sequence.For<HttpResponseMessage>()
             .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), count: 2)
             .Returns(new HttpResponseMessage(HttpStatusCode.OK));
 
         var policy = Resilience.Http with { Backoff = Backoff.None };
 
-        CallResult<HttpResponseMessage> result = await policy.TryRunAsync(attempt => calls.NextAsync(attempt));
+        var result = await policy.TryRunAsync(attempt => calls.NextAsync(attempt));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, calls.CallCount);
@@ -35,7 +35,7 @@ public sealed class TestingDocs
         // sleep - and a real sleep is what makes timing tests slow and flaky.
         var time = new FakeTimeProvider();
 
-        Sequence<int> calls = Sequence.For<int>(time)
+        var calls = Sequence.For<int>(time)
             .Delays(TimeSpan.FromSeconds(30))   // longer than the attempt timeout
             .Returns(1);
 
@@ -46,10 +46,10 @@ public sealed class TestingDocs
             AttemptTimeout = TimeSpan.FromSeconds(3),
         };
 
-        Task<CallResult<int>> pending = policy.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
+        var pending = policy.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
         time.Advance(TimeSpan.FromSeconds(4));
 
-        CallResult<int> result = await pending;
+        var result = await pending;
 
         Assert.IsType<AttemptTimeoutException>(result.Exception);
         // </snippet:testing-fake-time>
@@ -60,7 +60,7 @@ public sealed class TestingDocs
     {
         // <snippet:testing-event-recorder>
         var events = new EventRecorder();
-        Sequence<int> calls = Sequence.For<int>().Throws(new IOException()).Returns(42);
+        var calls = Sequence.For<int>().Throws(new IOException()).Returns(42);
 
         var policy = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
@@ -86,11 +86,11 @@ public sealed class TestingDocs
             () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
             () => new HttpResponseMessage(HttpStatusCode.OK));
 
-        using HttpClient client = ResilienceHttp.CreateClient(
+        using var client = ResilienceHttp.CreateClient(
             Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
-        using HttpResponseMessage response = await client.GetAsync(new Uri("https://api.example.com/orders/1"));
+        using var response = await client.GetAsync(new Uri("https://api.example.com/orders/1"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(2, transport.Requests.Count);

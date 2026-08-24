@@ -24,7 +24,7 @@ internal static class TimeSpanValue
 
         if (operation is IUnaryOperation { OperatorKind: UnaryOperatorKind.Minus } negation)
         {
-            if (!TryEvaluate(negation.Operand, known, out TimeSpan operand))
+            if (!TryEvaluate(negation.Operand, known, out var operand))
             {
                 return false;
             }
@@ -89,7 +89,7 @@ internal static class TimeSpanValue
 
         if (!SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, known.TimeSpan)
             || invocation.Arguments.Length != 1
-            || !TryConstant(invocation.Arguments[0].Value, out double amount))
+            || !TryConstant(invocation.Arguments[0].Value, out var amount))
         {
             return false;
         }
@@ -137,9 +137,9 @@ internal static class TimeSpanValue
             return false;
         }
 
-        double[] parts = new double[creation.Arguments.Length];
+        var parts = new double[creation.Arguments.Length];
 
-        for (int i = 0; i < creation.Arguments.Length; i++)
+        for (var i = 0; i < creation.Arguments.Length; i++)
         {
             if (!TryConstant(creation.Arguments[i].Value, out parts[i]))
             {
@@ -176,7 +176,7 @@ internal static class TimeSpanValue
     private static bool TryConstant(IOperation operation, out double value)
     {
         value = 0;
-        IOperation unwrapped = operation is IConversionOperation conversion ? conversion.Operand : operation;
+        var unwrapped = operation is IConversionOperation conversion ? conversion.Operand : operation;
 
         if (!unwrapped.ConstantValue.HasValue || unwrapped.ConstantValue.Value is null)
         {
