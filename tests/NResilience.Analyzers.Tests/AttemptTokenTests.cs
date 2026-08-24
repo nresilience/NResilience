@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace NResilience.Analyzers.Tests;
 
 /// <summary>NRES001 and NRES002: the callback's token has to reach the work.</summary>

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NResilience.Extensions;
-using NResilience.Http;
 
 namespace NResilience.Docs;
 

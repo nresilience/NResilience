@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text;
 using NResilience.Probes;
 using NResilience.Probes.Polly;
-using Polly;
 using Xunit;
 
 namespace NResilience.Gates;

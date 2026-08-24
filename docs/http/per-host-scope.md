@@ -27,7 +27,7 @@ You can inspect the state of breakers and budgets for all hosts seen by the hand
 var breakers = handler.BreakersByHost();
 var budgets = handler.BudgetsByHost();
 
-foreach ((var host, var breaker) in breakers)
+foreach (var (host, breaker) in breakers)
 {
     Console.WriteLine($"{host}: {breaker.State} since {breaker.OpenedAt:O}");
 }

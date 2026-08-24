@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http;
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Http;
 using NResilience.Testing;

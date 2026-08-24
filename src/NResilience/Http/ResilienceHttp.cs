@@ -1,5 +1,3 @@
-using System.Net.Http;
-
 namespace NResilience.Http;
 
 /// <summary>

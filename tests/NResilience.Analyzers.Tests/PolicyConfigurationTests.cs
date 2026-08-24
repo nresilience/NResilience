@@ -1,5 +1,3 @@
-using Microsoft.CodeAnalysis;
-
 namespace NResilience.Analyzers.Tests;
 
 /// <summary>NRES003 and NRES004: what the policy would say on first execution, said at build time.</summary>

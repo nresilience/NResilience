@@ -1,8 +1,6 @@
 using System.Net;
-using System.Net.Http;
 using Microsoft.Extensions.DependencyInjection;
 using NResilience.Extensions;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Docs;
