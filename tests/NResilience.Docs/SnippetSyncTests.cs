@@ -1,3 +1,5 @@
+using NResilience.DocSnippets;
+
 namespace NResilience.Docs;
 
 /// <summary>

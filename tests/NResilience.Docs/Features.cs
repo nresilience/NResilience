@@ -31,16 +31,11 @@ public sealed class Features
         // <snippet:retry-backoff-tuning>
         var api = Resilience.Http with
         {
-            // snippet-show: Backoff = Backoff.Exponential(
-            // snippet-show:     transientBase: TimeSpan.FromMilliseconds(200),   // the first delay after a transient failure
-            // snippet-show:     throttledBase: TimeSpan.FromSeconds(2),          // the first delay after being throttled
-            // snippet-show:     factor: 2,                                       // doubling
-            // snippet-show:     max: TimeSpan.FromSeconds(10)),                  // the cap on any single delay
             Backoff = Backoff.Exponential(
-                TimeSpan.FromMilliseconds(200), // the first delay after a transient failure
-                TimeSpan.FromSeconds(2), // the first delay after being throttled
-                2, // doubling
-                TimeSpan.FromSeconds(10)), // the cap on any single delay
+                transientBase: TimeSpan.FromMilliseconds(200),   // the first delay after a transient failure
+                throttledBase: TimeSpan.FromSeconds(2),          // the first delay after being throttled
+                factor: 2,                                       // doubling
+                max: TimeSpan.FromSeconds(10)),                  // the cap on any single delay
         };
 
         // </snippet:retry-backoff-tuning>

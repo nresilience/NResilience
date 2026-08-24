@@ -1,0 +1,18 @@
+# NResilience.Docs snippet sources: keep named arguments.
+#
+# The code samples in this project are inlined verbatim into the documentation, where named
+# arguments are part of the prose. ReSharper's code cleanup removes named arguments by default;
+# these settings override that for this directory so the docs and the source stay in sync
+# without the IDE stripping the names.
+#
+# See https://www.jetbrains.com/help/resharper/Argument_Style.html for the full reference.
+
+[*.cs]
+# Literal values (bool, int, double, etc.): e.g. RetryBudget.Of(fraction: 0.2, minimumPerSecond: 10)
+resharper_csharp_arguments_literal = named
+# String literal values: e.g. RetryBudget.Shared("payments", fraction: 0.1, minimumPerSecond: 3)
+resharper_csharp_arguments_string_literal = named
+# Named expressions (variables, properties, method calls): e.g. Backoff.Exponential(transientBase: ..., max: ...)
+resharper_csharp_arguments_named = named
+# Other expressions not covered above
+resharper_csharp_arguments_other = named

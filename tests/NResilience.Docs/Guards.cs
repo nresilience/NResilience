@@ -105,8 +105,7 @@ public sealed class Guards
         // Retries compose multiplicatively: three layers each retrying three times is 27 attempts
         // at the bottom. A budget bounds retries as a fraction of traffic - 10% here - so the
         // aggregate is bounded whether or not anybody coordinates.
-        // snippet-show: var budget = RetryBudget.Shared("payments", fraction: 0.1, minimumPerSecond: 3);
-        var budget = RetryBudget.Shared("payments");
+        var budget = RetryBudget.Shared("payments", fraction: 0.1, minimumPerSecond: 3);
 
         var charge = Resilience.Http with { Budget = budget };
         var refund = Resilience.Http with { Budget = budget };
@@ -132,8 +131,7 @@ public sealed class Guards
         var unbudgeted = Resilience.Default with { Budget = RetryBudget.None };
 
         // Or tune it, privately to whoever holds the instance.
-        // snippet-show: var generous = Resilience.Default with { Budget = RetryBudget.Of(fraction: 0.2, minimumPerSecond: 10) };
-        var generous = Resilience.Default with { Budget = RetryBudget.Of(0.2, 10) };
+        var generous = Resilience.Default with { Budget = RetryBudget.Of(fraction: 0.2, minimumPerSecond: 10) };
 
         // </snippet:budget-off>
 #pragma warning restore NRES005
