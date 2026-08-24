@@ -1,0 +1,53 @@
+name: Deploy Documentation
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy docs from"
+        required: false
+        default: "main"
+        type: string
+
+jobs:
+  deploy-docs:
+    name: Deploy Documentation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.branch || 'main' }}
+
+      - name: Checkout docs.nresilience.net repo
+        uses: actions/checkout@v7
+        with:
+          repository: nresilience/docs.nresilience.net
+          token: ${{ secrets.DOCS_NRESILIENCE_NET_TOKEN }}
+          path: ./docs-site
+
+      - name: Deploy to docs.nresilience.net
+        run: |
+          mkdir -p ./docs-site/docs
+          # Clear the published docs tree, but keep any dotfiles such as
+          # docs/.vitepress, which holds the site's SSG config.
+          find ./docs-site/docs -mindepth 1 -maxdepth 1 \
+            ! -name '.*' -exec rm -rf {} +
+          cp -r ./docs/* ./docs-site/docs/
+
+          cd ./docs-site
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update documentation from NResilience"
+            git push origin main
+          fi
