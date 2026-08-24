@@ -17,13 +17,15 @@ The NResilience handler helps you identify these nested loops by detecting and r
 `DetectNestedRetries` is enabled by default. The handler uses two mechanisms to detect nesting:
 
 - **Within a single process**: A flag in the current execution context tracks whether the send operation is already running inside a retrying handler's attempt.
-- **Across process boundaries**: The handler adds a specific HTTP header to every request it sends:
+- **Across process boundaries**: The handler adds a specific HTTP header to every request it can retry:
 
 ```
 X-NResilience-Retrying: 1
 ```
 
 You can use the `ResilienceHttp.NestedRetryHeader` constant to refer to this header in your code.
+
+The header means the sender has retries enabled for this request - not that this particular request is a retry. It is present on the first attempt, which is the one that matters: by the time a retry goes out, the amplification has already happened.
 
 When the handler detects nesting, it fires a `NestedRetry` [event](../features/telemetry.md) and then proceeds with the call. The library reports the nesting but does not intervene; silently dropping configured retries would be an unexpected behavior that could lead to difficult-to-debug failures.
 

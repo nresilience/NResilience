@@ -79,7 +79,7 @@ public sealed class HttpResilienceOptions
     /// <summary>
     /// Whether the handler stamps <see cref="ResilienceHttp.NestedRetryHeader"/> on outbound
     /// requests and reports nesting it detects. On by default; it costs one header on a request
-    /// that is already being retried.
+    /// that can be retried.
     /// </summary>
     public bool DetectNestedRetries { get; set; } = true;
 }

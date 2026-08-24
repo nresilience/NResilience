@@ -326,6 +326,21 @@ public sealed class HttpHandlerTests
     }
 
     [Fact]
+    public async Task An_inbound_stamp_is_not_duplicated_on_the_outbound_request()
+    {
+        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+
+        using HttpClient client = Client(transport);
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
+        request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
+
+        (await client.SendAsync(request)).Dispose();
+
+        Assert.Single(transport.Requests[0].Headers.GetValues(ResilienceHttp.NestedRetryHeader));
+    }
+
+    [Fact]
     public async Task One_retrying_client_inside_another_is_a_reported_nested_retry()
     {
         var recorder = new EventRecorder();
@@ -342,6 +357,23 @@ public sealed class HttpHandlerTests
         (await outerClient.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.True(recorder.Contains(CallEventKind.NestedRetry));
+    }
+
+    [Fact]
+    public async Task An_in_process_nested_retry_stamps_the_header_on_the_inner_request()
+    {
+        var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        using HttpClient innerClient = Client(inner);
+
+        // The inner transport receives a different request than the outer one, so the header
+        // must be stamped on it independently of the outer request's header.
+        var outerTransport = new ScriptedTransport(async (request, ct) =>
+            await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
+
+        using HttpClient outerClient = Client(outerTransport);
+        (await outerClient.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+
+        Assert.True(inner.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
     }
 
     [Fact]

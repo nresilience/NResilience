@@ -112,13 +112,14 @@ public sealed class ResilienceHandler : DelegatingHandler
         if (retrying && _options.DetectNestedRetries)
         {
             wasInside = InsideRetryingClient.Value;
-            nested = wasInside || request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
+            bool inbound = request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
+            nested = wasInside || inbound;
             if (nested && policy.OnEvent is { } listener)
             {
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
             }
 
-            if (!nested)
+            if (!inbound)
             {
                 request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, "1");
             }

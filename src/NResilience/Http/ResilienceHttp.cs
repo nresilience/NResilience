@@ -31,7 +31,7 @@ public static class ResilienceHttp
     public static HttpRequestOptionsKey<bool> Repeatable { get; } = new("NResilience.Repeatable");
 
     /// <summary>
-    /// The header a retrying client stamps on every request it sends, so the service receiving it
+    /// The header a retrying client stamps on every request it can retry, so the service receiving it
     /// can see that its caller will retry.
     /// <para>
     /// Retries compose multiplicatively - three layers each retrying three times is 27 attempts at
