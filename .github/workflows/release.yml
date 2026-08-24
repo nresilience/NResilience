@@ -47,7 +47,7 @@ jobs:
         run: dotnet test tests/NResilience.Tests/NResilience.Tests.csproj -c Release --no-build
 
       - name: Allocation gate
-        run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build --logger "console;verbosity=detailed"
+        run: dotnet test tests/NResilience.Gates/NResilience.Gates.csproj -c Release --no-build -- --output detailed
 
       - name: Analyzer suite
         run: dotnet test tests/NResilience.Analyzers.Tests/NResilience.Analyzers.Tests.csproj -c Release --no-build
@@ -109,7 +109,7 @@ jobs:
         run: |
           binary=$(find tests/NResilience.AotProbe/bin/Release/${{ matrix.tfm }} -type f \
                      \( -name 'NResilience.AotProbe' -o -name 'NResilience.AotProbe.exe' \) \
-                     -path '*/publish/*' | head -1)
+                     -path '*/publish/*' ! -ipath '*.dsym/*' | head -1)
           if [ -z "$binary" ]; then
             echo "No published binary found - the AOT gate cannot pass without one." >&2
             exit 1
