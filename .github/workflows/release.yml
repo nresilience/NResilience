@@ -6,9 +6,6 @@ name: Release
 #   2. Pack all three shipping csprojs with the version taken from the tag.
 #   3. Publish the .nupkg and .snupkg to nuget.org via OIDC trusted publishing.
 #   4. Create a GitHub Release, marked as a prerelease when the tag contains a hyphen.
-#
-# The docs deploy step is commented out. Enable it once the docs site repo exists
-# (see the commented `deploy-docs` job at the bottom).
 
 on:
   push:
@@ -251,49 +248,44 @@ jobs:
           body: |
             See [CHANGELOG.md](https://github.com/nresilience/NResilience/blob/main/CHANGELOG.md) for release notes.
 
-# # Deploy the docs site. Enable once the docs site repo exists.
-# #
-# # The job checks out this repo and the docs site repo, copies the published
-# # docs tree over, and pushes. It depends on `pack` (not publish) so a failed
-# # nuget push does not block a docs update, and on `create-release` so the
-# # release notes are available before the site points at them.
-# #
-# # Prerequisites:
-# #   - A docs site repo (e.g. nresilience/docs.nresilience.net) exists.
-# #   - A `DOCS_NRESILIENCE_NET_TOKEN` secret is set on this repo with push access.
-# #
-#   deploy-docs:
-#     name: Deploy Documentation
-#     needs: [pack, create-release]
-#     runs-on: ubuntu-latest
-#     permissions:
-#       contents: read
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v7
-#
-#       - name: Checkout docs.nresilience.net repo
-#         uses: actions/checkout@v7
-#         with:
-#           repository: nresilience/docs.nresilience.net
-#           token: ${{ secrets.DOCS_NRESILIENCE_NET_TOKEN }}
-#           path: ./docs-site
-#
-#       - name: Deploy to docs.nresilience.net
-#         run: |
-#           mkdir -p ./docs-site/docs
-#           find ./docs-site/docs -mindepth 1 -maxdepth 1 \
-#             ! -name '.*' -exec rm -rf {} +
-#           cp -r ./docs/* ./docs-site/docs/
-#
-#           cd ./docs-site
-#           git config user.name "github-actions[bot]"
-#           git config user.email "github-actions[bot]@users.noreply.github.com"
-#
-#           git add -A
-#           if git diff --cached --quiet; then
-#             echo "No changes to commit"
-#           else
-#             git commit -m "docs: update documentation from NResilience release ${{ github.ref }}"
-#             git push origin main
-#           fi
+  # Deploy the docs site
+  #
+  # The job checks out this repo and the docs site repo, copies the published
+  # docs tree over, and pushes. It depends on `pack` (not publish) so a failed
+  # nuget push does not block a docs update, and on `create-release` so the
+  # release notes are available before the site points at them.
+  deploy-docs:
+    name: Deploy Documentation
+    needs: [pack, create-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Checkout docs.nresilience.net repo
+        uses: actions/checkout@v7
+        with:
+          repository: nresilience/docs.nresilience.net
+          token: ${{ secrets.DOCS_NRESILIENCE_NET_TOKEN }}
+          path: ./docs-site
+
+      - name: Deploy to docs.nresilience.net
+        run: |
+          mkdir -p ./docs-site/docs
+          find ./docs-site/docs -mindepth 1 -maxdepth 1 \
+            ! -name '.*' -exec rm -rf {} +
+          cp -r ./docs/* ./docs-site/docs/
+
+          cd ./docs-site
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "docs: update documentation from NResilience release ${{ github.ref }}"
+            git push origin main
+          fi
