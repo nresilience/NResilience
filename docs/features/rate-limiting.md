@@ -14,7 +14,7 @@ It is a different guard from the two the library turns on for you. The [circuit 
 
 <!-- snippet: limit-http -->
 ```csharp
-services.AddHttpClient("api")
+services.AddHttpClient(name: "api")
     .AddResilience() // outer: makes the attempts
     .AddRateLimit(o =>
     {
@@ -34,7 +34,7 @@ The other order would take one permit for an operation that then makes three cal
 // Handlers run in registration order, outermost first, so this puts the limiter *outside*
 // the retries - one permit for an operation that goes on to make three calls. Refused at
 // registration rather than accepted and silently wrong.
-var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient("api")
+var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient(name: "api")
     .AddRateLimit(o => o.PermitsPerSecond = 100)
     .AddResilience());
 ```
@@ -48,7 +48,7 @@ The limiter goes inside the callback, not around the call.
 ```csharp
 // 100 calls per second, with one second of burst. The limiter is an object you hold: give
 // it the lifetime of whatever it protects, and dispose it with that.
-using var limiter = Limit.PerSecond(100);
+using var limiter = Limit.PerSecond(permits: 100);
 
 var api = Resilience.Http;
 
@@ -57,8 +57,8 @@ var value = await api.RunAsync(async ct =>
     // Inside the callback, not around the call. Retry re-invokes the callback, so a permit
     // taken here is taken once per attempt - and `using` is what releases a concurrency
     // permit when the attempt ends, however it ends.
-    using var lease = await limiter.AcquireOrThrowAsync(ct);
-    return await FetchAsync(ct);
+    using var lease = await limiter.AcquireOrThrowAsync(cancellationToken: ct);
+    return await FetchAsync(cancellationToken: ct);
 });
 ```
 <!-- endsnippet -->
@@ -70,14 +70,14 @@ var value = await api.RunAsync(async ct =>
 <!-- snippet: limit-shapes -->
 ```csharp
 // A published per-second quota.
-using var perSecond = Limit.PerSecond(100);
+using var perSecond = Limit.PerSecond(permits: 100);
 
 // A longer quota. The window slides in eight segments, so you cannot spend it all at the
 // end of one window and all of the next at the start of the following one.
-using var perMinute = Limit.PerWindow(1_000, TimeSpan.FromMinutes(1));
+using var perMinute = Limit.PerWindow(permits: 1_000, window: TimeSpan.FromMinutes(value: 1));
 
 // The bulkhead: at most 20 calls in flight at once, whatever their rate.
-using var inFlight = Limit.Concurrency(20);
+using var inFlight = Limit.Concurrency(permits: 20);
 ```
 <!-- endsnippet -->
 
@@ -98,16 +98,16 @@ A refusal is throttling that knows where it came from.
 <!-- snippet: limit-verdict -->
 ```csharp
 var result = await api.TryRunAsync(_ =>
-    Task.FromException<int>(new RateLimitedException("payments", TimeSpan.FromSeconds(2))));
+    Task.FromException<int>(exception: new RateLimitedException(limiter: "payments", retryAfter: TimeSpan.FromSeconds(value: 2))));
 
-var refused = result.Attempts[0];
+var refused = result.Attempts[index: 0];
 
 // Throttling, so it takes the long backoff curve and honors the limiter's own hint.
-Assert.Equal(VerdictKind.Throttled, refused.Verdict.Kind);
+Assert.Equal(expected: VerdictKind.Throttled, actual: refused.Verdict.Kind);
 
 // And it says where it came from. This is the bit the retry budget reads: a refusal that
 // never left the process is not charged, because retrying it costs the dependency nothing.
-Assert.True(refused.Verdict.SelfImposed);
+Assert.True(condition: refused.Verdict.SelfImposed);
 ```
 <!-- endsnippet -->
 

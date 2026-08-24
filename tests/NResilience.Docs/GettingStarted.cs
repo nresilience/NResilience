@@ -12,7 +12,7 @@ public sealed class GettingStarted
     private static readonly HttpClient Client = ResilienceHttp.CreateClient();
 
     private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
-        await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
+        await Client.GetFromJsonAsync<User>(requestUri: new Uri(uriString: $"https://api.example.com/users/{id}"), cancellationToken: cancellationToken);
 
     // </snippet:quick-start-http-client>
 
@@ -20,36 +20,36 @@ public sealed class GettingStarted
     public async Task The_first_call_is_a_client_call()
     {
         var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Json(new User("ada")));
+            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
+            () => Doubles.Json(value: new User(Name: "ada")));
 
         using var client = ResilienceHttp.CreateClient(
-            Resilience.Http with { Backoff = Backoff.None },
+            policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
         var user = await client.GetFromJsonAsync<User>(
-            new Uri("https://api.example.com/users/1"), TestContext.Current.CancellationToken);
+            requestUri: new Uri(uriString: "https://api.example.com/users/1"), cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.Equal("ada", user?.Name);
-        Assert.Equal(2, transport.Requests.Count);
+        Assert.Equal(expected: "ada", actual: user?.Name);
+        Assert.Equal(expected: 2, actual: transport.Requests.Count);
     }
 
     [Fact]
     public async Task Any_call_that_takes_the_attempts_token()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var db = new Doubles.Database("ada");
+        var db = new Doubles.Database(name: "ada");
         var id = 1;
 
         // <snippet:quick-start-run-any-call>
         var api = Resilience.Default;
 
-        var name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
+        var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationToken: attempt), cancellationToken: cancellationToken);
 
         // </snippet:quick-start-run-any-call>
 
-        Assert.Equal("ada", name);
-        Assert.Equal(2, db.Reads);
+        Assert.Equal(expected: "ada", actual: name);
+        Assert.Equal(expected: 2, actual: db.Reads);
     }
 
     [Fact]
@@ -59,19 +59,19 @@ public sealed class GettingStarted
         var api = Resilience.Default with { Attempts = 2, Backoff = Backoff.None };
 
         // <snippet:quick-start-outcome>
-        var result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+        var result = await api.TryRunAsync(attempt => FetchAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
-        if (!result.TryGetValue(out var user))
+        if (!result.TryGetValue(value: out var user))
         {
             // Why it stopped, and everything that happened on the way.
-            Console.WriteLine(result.StopReason); // AttemptsExhausted
-            Console.WriteLine(result.Attempts); // 2 attempts over 1.2ms: Transient IOException (0.6ms), ...
+            Console.WriteLine(value: result.StopReason); // AttemptsExhausted
+            Console.WriteLine(value: result.Attempts); // 2 attempts over 1.2ms: Transient IOException (0.6ms), ...
         }
 
         // </snippet:quick-start-outcome>
 
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
-        Assert.Equal(2, result.Attempts.Count);
+        Assert.Equal(expected: StopReason.AttemptsExhausted, actual: result.StopReason);
+        Assert.Equal(expected: 2, actual: result.Attempts.Count);
     }
 
     [Fact]
@@ -79,17 +79,17 @@ public sealed class GettingStarted
     {
         // <snippet:key-concepts-policy-value>
         var api = Resilience.Http; // a preset
-        var patient = api with { Deadline = TimeSpan.FromMinutes(1) }; // a variant
+        var patient = api with { Deadline = TimeSpan.FromMinutes(value: 1) }; // a variant
         var once = patient with { Attempts = 1 }; // a variant of the variant
 
-        Console.WriteLine(api == Resilience.Http); // True - it is a value
-        Console.WriteLine(once.Deadline); // 00:01:00 - `with` copies the rest
+        Console.WriteLine(value: api == Resilience.Http); // True - it is a value
+        Console.WriteLine(value: once.Deadline); // 00:01:00 - `with` copies the rest
 
         // </snippet:key-concepts-policy-value>
 
-        Assert.True(api == Resilience.Http);
-        Assert.Equal(TimeSpan.FromMinutes(1), once.Deadline);
-        Assert.Equal(1, once.Attempts);
+        Assert.True(condition: api == Resilience.Http);
+        Assert.Equal(expected: TimeSpan.FromMinutes(value: 1), actual: once.Deadline);
+        Assert.Equal(expected: 1, actual: once.Attempts);
     }
 
     [Fact]
@@ -98,14 +98,14 @@ public sealed class GettingStarted
         // <snippet:key-concepts-two-bounds>
         var api = Resilience.Http with
         {
-            Deadline = TimeSpan.FromSeconds(10), // the whole call, retries and backoff included
-            AttemptTimeout = TimeSpan.FromSeconds(3), // one attempt, capped by whatever is left of the deadline
+            Deadline = TimeSpan.FromSeconds(value: 10), // the whole call, retries and backoff included
+            AttemptTimeout = TimeSpan.FromSeconds(value: 3), // one attempt, capped by whatever is left of the deadline
         };
 
         // </snippet:key-concepts-two-bounds>
 
-        Assert.Equal(TimeSpan.FromSeconds(10), api.Deadline);
-        Assert.Equal(TimeSpan.FromSeconds(3), api.AttemptTimeout);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: api.Deadline);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 3), actual: api.AttemptTimeout);
     }
 
     [Fact]
@@ -113,21 +113,21 @@ public sealed class GettingStarted
     {
         // <snippet:key-concepts-verdicts>
         var classify = Classifier.Http
-            .On<MyTransportException>(Verdict.Transient) // retried, short curve
-            .On<MyQuotaException>(ex => Verdict.Throttled(ex.RetryAfter)) // retried, long curve or the server's own delay
-            .On<MyValidationException>(Verdict.Permanent); // never retried
+            .On<MyTransportException>(verdict: Verdict.Transient) // retried, short curve
+            .On<MyQuotaException>(ex => Verdict.Throttled(retryAfter: ex.RetryAfter)) // retried, long curve or the server's own delay
+            .On<MyValidationException>(verdict: Verdict.Permanent); // never retried
 
         var api = Resilience.Http with { Classify = classify };
 
         // </snippet:key-concepts-verdicts>
 
-        Assert.Equal(VerdictKind.Transient, api.Classify.ClassifyException(new MyTransportException()).Kind);
-        Assert.Equal(VerdictKind.Permanent, api.Classify.ClassifyException(new MyValidationException()).Kind);
-        Assert.Equal(TimeSpan.FromSeconds(4), api.Classify.ClassifyException(new MyQuotaException()).RetryAfter);
+        Assert.Equal(expected: VerdictKind.Transient, actual: api.Classify.ClassifyException(exception: new MyTransportException()).Kind);
+        Assert.Equal(expected: VerdictKind.Permanent, actual: api.Classify.ClassifyException(exception: new MyValidationException()).Kind);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 4), actual: api.Classify.ClassifyException(exception: new MyQuotaException()).RetryAfter);
     }
 
     private static Task<User> FetchAsync(CancellationToken cancellationToken) =>
-        Task.FromException<User>(new IOException("the socket went away"));
+        Task.FromException<User>(exception: new IOException(message: "the socket went away"));
 
     private sealed record User(string Name);
 
@@ -137,7 +137,7 @@ public sealed class GettingStarted
 
     private sealed class MyQuotaException : Exception
     {
-        internal TimeSpan RetryAfter => TimeSpan.FromSeconds(4);
+        internal TimeSpan RetryAfter => TimeSpan.FromSeconds(value: 4);
     }
 }
 
@@ -146,14 +146,14 @@ public static class Policies
 {
     public static readonly Resilience Api = Resilience.Http with
     {
-        Deadline = TimeSpan.FromSeconds(10),
-        AttemptTimeout = TimeSpan.FromSeconds(3),
+        Deadline = TimeSpan.FromSeconds(value: 10),
+        AttemptTimeout = TimeSpan.FromSeconds(value: 3),
     };
 
     public static readonly Resilience Realtime = Api with
     {
         Attempts = 1,
-        AttemptTimeout = TimeSpan.FromMilliseconds(250),
+        AttemptTimeout = TimeSpan.FromMilliseconds(value: 250),
     };
 }
 

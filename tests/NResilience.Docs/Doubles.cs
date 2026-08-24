@@ -11,14 +11,14 @@ namespace NResilience.Docs;
 internal static class Doubles
 {
     internal static HttpClient Client(params Func<HttpResponseMessage>[] responses) =>
-        new(new ScriptedTransport(responses)) { BaseAddress = new Uri("https://api.example.com") };
+        new(handler: new ScriptedTransport(responses: responses)) { BaseAddress = new Uri(uriString: "https://api.example.com") };
 
-    internal static HttpResponseMessage Status(HttpStatusCode status) => new(status);
+    internal static HttpResponseMessage Status(HttpStatusCode status) => new(statusCode: status);
 
     internal static HttpResponseMessage Json<T>(T value) =>
-        new(HttpStatusCode.OK)
+        new(statusCode: HttpStatusCode.OK)
         {
-            Content = new StringContent(JsonSerializer.Serialize(value), Encoding.UTF8, "application/json"),
+            Content = new StringContent(content: JsonSerializer.Serialize(value: value), encoding: Encoding.UTF8, mediaType: "application/json"),
         };
 
     internal sealed class Cache<T>(T lastKnownGood)
@@ -33,8 +33,8 @@ internal static class Doubles
 
         internal Task<string> ReadNameAsync(int id, CancellationToken cancellationToken) =>
             Reads++ == 0
-                ? Task.FromException<string>(new IOException($"the connection dropped reading {id}"))
-                : Task.FromResult(name);
+                ? Task.FromException<string>(exception: new IOException(message: $"the connection dropped reading {id}"))
+                : Task.FromResult(result: name);
     }
 
     internal sealed class Queue
@@ -57,9 +57,9 @@ internal static class Doubles
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            Requests.Add(request);
-            var index = Math.Min(_served++, responses.Length - 1);
-            return Task.FromResult(responses[index]());
+            Requests.Add(item: request);
+            var index = Math.Min(val1: _served++, val2: responses.Length - 1);
+            return Task.FromResult(result: responses[index]());
         }
     }
 }

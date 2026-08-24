@@ -19,8 +19,8 @@ public sealed class Guards
 
         // </snippet:breaker-construct>
 
-        Assert.Same(breaker, paymentsWrites.Breaker);
-        Assert.Equal(BreakerState.Closed, breaker.State);
+        Assert.Same(expected: breaker, actual: paymentsWrites.Breaker);
+        Assert.Equal(expected: BreakerState.Closed, actual: breaker.State);
     }
 
     [Fact]
@@ -30,15 +30,15 @@ public sealed class Guards
         // The most common real degradation is not errors, it is a dependency answering 200s at
         // 30x normal latency. A breaker that only counts errors stays closed through the whole
         // incident, because the responses are not failing - they are just slow.
-        var breaker = new Breaker(new BreakerSettings
+        var breaker = new Breaker(settings: new BreakerSettings
         {
             ConsecutiveFailures = 5, // the default trip condition
-            SlowCallThreshold = TimeSpan.FromSeconds(2), // anything slower counts against
+            SlowCallThreshold = TimeSpan.FromSeconds(value: 2), // anything slower counts against
             SlowCallRatio = 0.5, // half the window being slow trips it
             MinimumCalls = 20, // below this, a ratio means nothing
-            Window = TimeSpan.FromSeconds(30),
-            BreakDuration = TimeSpan.FromSeconds(15), // doubles per consecutive open
-            MaxBreakDuration = TimeSpan.FromMinutes(2),
+            Window = TimeSpan.FromSeconds(value: 30),
+            BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
+            MaxBreakDuration = TimeSpan.FromMinutes(value: 2),
             ProbeSuccesses = 2, // two good probes to close, not one
         })
         {
@@ -47,7 +47,7 @@ public sealed class Guards
 
         // </snippet:breaker-slow-calls>
 
-        Assert.Equal(TimeSpan.FromSeconds(2), breaker.Settings.SlowCallThreshold);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 2), actual: breaker.Settings.SlowCallThreshold);
     }
 
     [Fact]
@@ -64,22 +64,22 @@ public sealed class Guards
 
         // </snippet:breaker-admin>
 
-        Assert.Equal(BreakerState.Closed, breaker.State);
-        Assert.Null(since);
-        Assert.Equal(BreakerState.Closed, state);
+        Assert.Equal(expected: BreakerState.Closed, actual: breaker.State);
+        Assert.Null(value: since);
+        Assert.Equal(expected: BreakerState.Closed, actual: state);
     }
 
     [Fact]
     public async Task An_open_breaker_rejects_the_call()
     {
         var time = new FakeTimeProvider();
-        var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1, Time = time }) { Name = "payments" };
+        var breaker = new Breaker(settings: new BreakerSettings { ConsecutiveFailures = 1, Time = time }) { Name = "payments" };
         var api = Resilience.Default with { Time = time, Attempts = 1, Breaker = breaker, Backoff = Backoff.None };
-        var calls = Sequence.For<int>(time).Throws(new IOException(), 2).Returns(1);
+        var calls = Sequence.For<int>(time: time).Throws(exception: new IOException(), count: 2).Returns(result: 1);
 
-        await api.TryRunAsync(attempt => calls.NextAsync(attempt));
-        var rejected = api.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
-        time.Advance(TimeSpan.FromMilliseconds(100));
+        await api.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt));
+        var rejected = api.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt)).AsTask();
+        time.Advance(delta: TimeSpan.FromMilliseconds(value: 100));
         var result = await rejected;
 
         // <snippet:breaker-rejection>
@@ -88,14 +88,14 @@ public sealed class Guards
         // does not have to guess.
         if (result.Exception is CallRejectedException rejection)
         {
-            Console.WriteLine(rejection.Reason); // DependencyUnavailable, or BudgetExhausted
-            Console.WriteLine(rejection.RetryAfter); // when to come back, when there is an answer
+            Console.WriteLine(value: rejection.Reason); // DependencyUnavailable, or BudgetExhausted
+            Console.WriteLine(value: rejection.RetryAfter); // when to come back, when there is an answer
         }
 
         // </snippet:breaker-rejection>
 
-        Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
-        Assert.Equal(BreakerState.Open, breaker.State);
+        Assert.Equal(expected: StopReason.DependencyUnavailable, actual: result.StopReason);
+        Assert.Equal(expected: BreakerState.Open, actual: breaker.State);
     }
 
     [Fact]
@@ -105,16 +105,16 @@ public sealed class Guards
         // Retries compose multiplicatively: three layers each retrying three times is 27 attempts
         // at the bottom. A budget bounds retries as a fraction of traffic - 10% here - so the
         // aggregate is bounded whether or not anybody coordinates.
-        var budget = RetryBudget.Shared("payments", fraction: 0.1, minimumPerSecond: 3);
+        var budget = RetryBudget.Shared(name: "payments", fraction: 0.1, minimumPerSecond: 3);
 
         var charge = Resilience.Http with { Budget = budget };
         var refund = Resilience.Http with { Budget = budget };
 
         // </snippet:budget-shared>
 
-        Assert.Same(budget, charge.Budget);
-        Assert.Same(budget, refund.Budget);
-        Assert.Equal("payments", budget.Name);
+        Assert.Same(expected: budget, actual: charge.Budget);
+        Assert.Same(expected: budget, actual: refund.Budget);
+        Assert.Equal(expected: "payments", actual: budget.Name);
     }
 
     [Fact]
@@ -136,8 +136,8 @@ public sealed class Guards
         // </snippet:budget-off>
 #pragma warning restore NRES005
 
-        Assert.NotNull(unbudgeted.Budget);
-        Assert.Equal(0, generous.Budget!.Utilization);
+        Assert.NotNull(@object: unbudgeted.Budget);
+        Assert.Equal(expected: 0, actual: generous.Budget!.Utilization);
     }
 
     [Fact]
@@ -152,6 +152,6 @@ public sealed class Guards
 
         // </snippet:budget-utilization>
 
-        Assert.Equal(0, spent);
+        Assert.Equal(expected: 0, actual: spent);
     }
 }

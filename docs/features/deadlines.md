@@ -29,8 +29,8 @@ The effective ceiling for any attempt is the minimum of the `AttemptTimeout` and
 ```csharp
 var api = Resilience.Default with
 {
-    Deadline = TimeSpan.FromSeconds(10), // the whole call
-    AttemptTimeout = TimeSpan.FromSeconds(3), // one attempt
+    Deadline = TimeSpan.FromSeconds(value: 10), // the whole call
+    AttemptTimeout = TimeSpan.FromSeconds(value: 3), // one attempt
 };
 
 // Attempt 1 gets 3 s. An attempt starting with 2 s left on the deadline gets 2 s, not 3 -
@@ -57,11 +57,11 @@ try
 }
 catch (DeadlineExceededException deadline)
 {
-    Console.WriteLine($"gave up after {deadline.Deadline.TotalSeconds}s and {deadline.Attempts.Count} attempt(s)");
+    Console.WriteLine(value: $"gave up after {deadline.Deadline.TotalSeconds}s and {deadline.Attempts.Count} attempt(s)");
 }
 catch (TimeoutException attempt)
 {
-    Console.WriteLine($"one attempt overran: {attempt.Message}");
+    Console.WriteLine(value: $"one attempt overran: {attempt.Message}");
 }
 ```
 <!-- endsnippet -->

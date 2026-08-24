@@ -29,7 +29,7 @@ var budgets = handler.BudgetsByHost();
 
 foreach (var (host, breaker) in breakers)
 {
-    Console.WriteLine($"{host}: {breaker.State} since {breaker.OpenedAt:O}");
+    Console.WriteLine(value: $"{host}: {breaker.State} since {breaker.OpenedAt:O}");
 }
 ```
 <!-- endsnippet -->

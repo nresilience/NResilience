@@ -14,7 +14,7 @@ public sealed class RateLimiting
         // <snippet:limit-callback>
         // 100 calls per second, with one second of burst. The limiter is an object you hold: give
         // it the lifetime of whatever it protects, and dispose it with that.
-        using var limiter = Limit.PerSecond(100);
+        using var limiter = Limit.PerSecond(permits: 100);
 
         var api = Resilience.Http;
 
@@ -23,13 +23,13 @@ public sealed class RateLimiting
             // Inside the callback, not around the call. Retry re-invokes the callback, so a permit
             // taken here is taken once per attempt - and `using` is what releases a concurrency
             // permit when the attempt ends, however it ends.
-            using var lease = await limiter.AcquireOrThrowAsync(ct);
-            return await FetchAsync(ct);
+            using var lease = await limiter.AcquireOrThrowAsync(cancellationToken: ct);
+            return await FetchAsync(cancellationToken: ct);
         });
 
         // </snippet:limit-callback>
 
-        Assert.Equal(42, value);
+        Assert.Equal(expected: 42, actual: value);
     }
 
     [Fact]
@@ -37,20 +37,20 @@ public sealed class RateLimiting
     {
         // <snippet:limit-shapes>
         // A published per-second quota.
-        using var perSecond = Limit.PerSecond(100);
+        using var perSecond = Limit.PerSecond(permits: 100);
 
         // A longer quota. The window slides in eight segments, so you cannot spend it all at the
         // end of one window and all of the next at the start of the following one.
-        using var perMinute = Limit.PerWindow(1_000, TimeSpan.FromMinutes(1));
+        using var perMinute = Limit.PerWindow(permits: 1_000, window: TimeSpan.FromMinutes(value: 1));
 
         // The bulkhead: at most 20 calls in flight at once, whatever their rate.
-        using var inFlight = Limit.Concurrency(20);
+        using var inFlight = Limit.Concurrency(permits: 20);
 
         // </snippet:limit-shapes>
 
-        Assert.NotNull(perSecond);
-        Assert.NotNull(perMinute);
-        Assert.NotNull(inFlight);
+        Assert.NotNull(@object: perSecond);
+        Assert.NotNull(@object: perMinute);
+        Assert.NotNull(@object: inFlight);
     }
 
     [Fact]
@@ -67,20 +67,20 @@ public sealed class RateLimiting
 
         // <snippet:limit-verdict>
         var result = await api.TryRunAsync(_ =>
-            Task.FromException<int>(new RateLimitedException("payments", TimeSpan.FromSeconds(2))));
+            Task.FromException<int>(exception: new RateLimitedException(limiter: "payments", retryAfter: TimeSpan.FromSeconds(value: 2))));
 
-        var refused = result.Attempts[0];
+        var refused = result.Attempts[index: 0];
 
         // Throttling, so it takes the long backoff curve and honors the limiter's own hint.
-        Assert.Equal(VerdictKind.Throttled, refused.Verdict.Kind);
+        Assert.Equal(expected: VerdictKind.Throttled, actual: refused.Verdict.Kind);
 
         // And it says where it came from. This is the bit the retry budget reads: a refusal that
         // never left the process is not charged, because retrying it costs the dependency nothing.
-        Assert.True(refused.Verdict.SelfImposed);
+        Assert.True(condition: refused.Verdict.SelfImposed);
 
         // </snippet:limit-verdict>
 
-        Assert.Equal(0, budget.Utilization);
+        Assert.Equal(expected: 0, actual: budget.Utilization);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public sealed class RateLimiting
         var services = new ServiceCollection();
 
         // <snippet:limit-http>
-        services.AddHttpClient("api")
+        services.AddHttpClient(name: "api")
             .AddResilience() // outer: makes the attempts
             .AddRateLimit(o =>
             {
@@ -103,10 +103,10 @@ public sealed class RateLimiting
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new Ok()));
 
         using var provider = services.BuildServiceProvider();
-        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("api");
-        using var response = await client.GetAsync(new Uri("https://api.test/thing"));
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "api");
+        using var response = await client.GetAsync(requestUri: new Uri(uriString: "https://api.test/thing"));
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
     }
 
     [Fact]
@@ -118,13 +118,13 @@ public sealed class RateLimiting
         // Handlers run in registration order, outermost first, so this puts the limiter *outside*
         // the retries - one permit for an operation that goes on to make three calls. Refused at
         // registration rather than accepted and silently wrong.
-        var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient("api")
+        var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient(name: "api")
             .AddRateLimit(o => o.PermitsPerSecond = 100)
             .AddResilience());
 
         // </snippet:limit-order>
 
-        Assert.Contains("AddRateLimit() before AddResilience()", error.Message, StringComparison.Ordinal);
+        Assert.Contains(expectedSubstring: "AddRateLimit() before AddResilience()", actualString: error.Message, comparisonType: StringComparison.Ordinal);
     }
 
     [Fact]
@@ -137,14 +137,14 @@ public sealed class RateLimiting
 
         // </snippet:limit-validate>
 
-        Assert.Single(error.Problems);
+        Assert.Single(collection: error.Problems);
     }
 
-    private static Task<int> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(42);
+    private static Task<int> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(result: 42);
 
     private sealed class Ok : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+            Task.FromResult(result: new HttpResponseMessage(statusCode: HttpStatusCode.OK));
     }
 }

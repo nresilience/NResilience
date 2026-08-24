@@ -14,7 +14,7 @@ To bind policies from configuration, use the `AddResilience` method with a confi
 
 <!-- snippet: di-register-section -->
 ```csharp
-services.AddResilience(configuration.GetSection("Resilience"));
+services.AddResilience(section: configuration.GetSection(key: "Resilience"));
 ```
 <!-- endsnippet -->
 
@@ -87,11 +87,11 @@ The callback runs last - after the configuration section is applied and live obj
 // a lambda and JSON cannot hold one, so this is where one goes - along with a hook, or a
 // breaker you mean to share with something else.
 services.AddResilience(
-    "api",
-    configuration.GetSection("Resilience:api"),
+    name: "api",
+    section: configuration.GetSection(key: "Resilience:api"),
     policy => policy with
     {
-        Classify = Classifier.Http.On<MyTransportException>(Verdict.Transient),
+        Classify = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
         Breaker = shared,
     });
 ```

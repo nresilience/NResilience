@@ -18,7 +18,7 @@ dotnet add package NResilience
 private static readonly HttpClient Client = ResilienceHttp.CreateClient();
 
 private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
-    await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);
+    await Client.GetFromJsonAsync<User>(requestUri: new Uri(uriString: $"https://api.example.com/users/{id}"), cancellationToken: cancellationToken);
 ```
 <!-- endsnippet -->
 
@@ -41,7 +41,7 @@ Wrap any asynchronous work - such as a queue read, a database call, or a third-p
 ```csharp
 var api = Resilience.Default;
 
-var name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
+var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationToken: attempt), cancellationToken: cancellationToken);
 ```
 <!-- endsnippet -->
 
@@ -60,13 +60,13 @@ Pass the `attempt` token into your work to ensure that timed-out attempts actual
 
 <!-- snippet: quick-start-outcome -->
 ```csharp
-var result = await api.TryRunAsync(attempt => FetchAsync(attempt), cancellationToken);
+var result = await api.TryRunAsync(attempt => FetchAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
-if (!result.TryGetValue(out var user))
+if (!result.TryGetValue(value: out var user))
 {
     // Why it stopped, and everything that happened on the way.
-    Console.WriteLine(result.StopReason); // AttemptsExhausted
-    Console.WriteLine(result.Attempts); // 2 attempts over 1.2ms: Transient IOException (0.6ms), ...
+    Console.WriteLine(value: result.StopReason); // AttemptsExhausted
+    Console.WriteLine(value: result.Attempts); // 2 attempts over 1.2ms: Transient IOException (0.6ms), ...
 }
 ```
 <!-- endsnippet -->

@@ -18,15 +18,15 @@ public sealed class DependencyInjectionDocs
         services.AddHttpClient<OrdersClient>().AddResilience();
 
         // Or with a policy of your own, or a registered one by name.
-        services.AddHttpClient("reports").AddResilience(Resilience.Http with { Attempts = 5 });
-        services.AddHttpClient("payments").AddResilience("api", o => o.RetryUnsafeMethods = false);
+        services.AddHttpClient(name: "reports").AddResilience(policy: Resilience.Http with { Attempts = 5 });
+        services.AddHttpClient(name: "payments").AddResilience(policyName: "api", o => o.RetryUnsafeMethods = false);
 
         // </snippet:di-http-client>
 
-        services.AddResilience("api", Resilience.Http);
+        services.AddResilience(name: "api", policy: Resilience.Http);
         using var provider = services.BuildServiceProvider();
 
-        Assert.NotNull(provider.GetRequiredService<IHttpClientFactory>().CreateClient("reports"));
+        Assert.NotNull(@object: provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "reports"));
     }
 
     [Fact]
@@ -36,14 +36,14 @@ public sealed class DependencyInjectionDocs
 
         // <snippet:di-register-named>
         // Say what a dependency is worth once, in one place.
-        services.AddResilience("api", Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) });
+        services.AddResilience(name: "api", policy: Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10) });
 
         // Or in code, without a policy value.
-        services.AddResilience("reports", o =>
+        services.AddResilience(name: "reports", o =>
         {
             o.Preset = "Http";
             o.Attempts = 5;
-            o.Deadline = TimeSpan.FromMinutes(5);
+            o.Deadline = TimeSpan.FromMinutes(value: 5);
         });
 
         // </snippet:di-register-named>
@@ -51,38 +51,38 @@ public sealed class DependencyInjectionDocs
         using var provider = services.BuildServiceProvider();
         var policies = provider.GetRequiredService<IResiliencePolicies>();
 
-        Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
-        Assert.Equal(5, policies["reports"].Attempts);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: policies[name: "api"].Deadline);
+        Assert.Equal(expected: 5, actual: policies[name: "reports"].Attempts);
     }
 
     [Fact]
     public void A_section_registers_one_policy_per_child()
     {
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.resilience.json")
+            .AddJsonFile(path: "appsettings.resilience.json")
             .Build();
 
         var services = new ServiceCollection();
 
         // <snippet:di-register-section>
-        services.AddResilience(configuration.GetSection("Resilience"));
+        services.AddResilience(section: configuration.GetSection(key: "Resilience"));
 
         // </snippet:di-register-section>
 
         using var provider = services.BuildServiceProvider();
         var policies = provider.GetRequiredService<IResiliencePolicies>();
 
-        Assert.Equal(["api", "reports"], policies.Names.OrderBy(n => n, StringComparer.Ordinal));
-        Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
-        Assert.Equal(TimeSpan.FromSeconds(15), policies["api"].Breaker!.Settings.BreakDuration);
-        Assert.Equal(5, policies["reports"].Attempts);
+        Assert.Equal(expected: ["api", "reports"], actual: policies.Names.OrderBy(n => n, comparer: StringComparer.Ordinal));
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: policies[name: "api"].Deadline);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 15), actual: policies[name: "api"].Breaker!.Settings.BreakDuration);
+        Assert.Equal(expected: 5, actual: policies[name: "reports"].Attempts);
     }
 
     [Fact]
     public void The_configure_callback_holds_what_json_cannot()
     {
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.resilience.json")
+            .AddJsonFile(path: "appsettings.resilience.json")
             .Build();
 
         var services = new ServiceCollection();
@@ -93,33 +93,33 @@ public sealed class DependencyInjectionDocs
         // a lambda and JSON cannot hold one, so this is where one goes - along with a hook, or a
         // breaker you mean to share with something else.
         services.AddResilience(
-            "api",
-            configuration.GetSection("Resilience:api"),
+            name: "api",
+            section: configuration.GetSection(key: "Resilience:api"),
             policy => policy with
             {
-                Classify = Classifier.Http.On<MyTransportException>(Verdict.Transient),
+                Classify = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
                 Breaker = shared,
             });
 
         // </snippet:di-configure-callback>
 
         using var provider = services.BuildServiceProvider();
-        var api = provider.GetRequiredService<IResiliencePolicies>()["api"];
+        var api = provider.GetRequiredService<IResiliencePolicies>()[name: "api"];
 
-        Assert.Same(shared, api.Breaker);
-        Assert.Equal(VerdictKind.Transient, api.Classify.ClassifyException(new MyTransportException()).Kind);
+        Assert.Same(expected: shared, actual: api.Breaker);
+        Assert.Equal(expected: VerdictKind.Transient, actual: api.Classify.ClassifyException(exception: new MyTransportException()).Kind);
     }
 
     [Fact]
     public async Task Inject_the_roster_and_resolve_per_call()
     {
         var services = new ServiceCollection();
-        services.AddResilience("api", Resilience.Default with { Attempts = 1 });
+        services.AddResilience(name: "api", policy: Resilience.Default with { Attempts = 1 });
         using var provider = services.BuildServiceProvider();
 
-        var client = new Orders(provider.GetRequiredService<IResiliencePolicies>());
+        var client = new Orders(policies: provider.GetRequiredService<IResiliencePolicies>());
 
-        Assert.Equal("ok", await client.ReadAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(expected: "ok", actual: await client.ReadAsync(cancellationToken: TestContext.Current.CancellationToken));
     }
 
     // <snippet:di-inject>
@@ -129,9 +129,9 @@ public sealed class DependencyInjectionDocs
         // construction time is a snapshot, and a configuration reload will never reach it.
         // The indexer is a dictionary lookup.
         public Task<string> ReadAsync(CancellationToken cancellationToken) =>
-            policies["api"].RunAsync(attempt => FetchAsync(attempt), cancellationToken).AsTask();
+            policies[name: "api"].RunAsync(attempt => FetchAsync(cancellationToken: attempt), cancellationToken: cancellationToken).AsTask();
 
-        private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult("ok");
+        private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(result: "ok");
     }
 
     // </snippet:di-inject>

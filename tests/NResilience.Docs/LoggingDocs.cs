@@ -17,51 +17,51 @@ public sealed class LoggingDocs
 
         // <snippet:logging-registered>
         services.AddLogging();
-        services.AddResilience("payments", Resilience.Http);
+        services.AddResilience(name: "payments", policy: Resilience.Http);
 
         // Nothing else to call. The policy logs under "NResilience.payments", which is the category
         // an appsettings.json filter matches.
         // </snippet:logging-registered>
 
-        var payments = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["payments"];
+        var payments = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()[name: "payments"];
 
-        Assert.Equal("NResilience.payments", ResilienceLogging.CategoryFor(payments.Name));
-        Assert.NotNull(payments.OnEvent);
+        Assert.Equal(expected: "NResilience.payments", actual: ResilienceLogging.CategoryFor(policyName: payments.Name));
+        Assert.NotNull(@object: payments.OnEvent);
     }
 
     [Fact]
     public void The_filter_is_read_from_configuration()
     {
         IConfiguration configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.logging.json")
+            .AddJsonFile(path: "appsettings.logging.json")
             .Build();
 
-        Assert.Equal("Warning", configuration["Logging:LogLevel:NResilience"]);
-        Assert.Equal("Debug", configuration["Logging:LogLevel:NResilience.payments"]);
+        Assert.Equal(expected: "Warning", actual: configuration[key: "Logging:LogLevel:NResilience"]);
+        Assert.Equal(expected: "Debug", actual: configuration[key: "Logging:LogLevel:NResilience.payments"]);
     }
 
     [Fact]
     public void A_section_chooses_the_profile_per_policy()
     {
         IConfiguration configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.logging-verbose.json")
+            .AddJsonFile(path: "appsettings.logging-verbose.json")
             .Build();
 
         var provider = new FakeLoggerProvider();
         var services = new ServiceCollection();
-        services.AddLogging(b => b.AddProvider(provider).SetMinimumLevel(LogLevel.Trace));
-        services.AddResilience(configuration.GetSection("Resilience"));
+        services.AddLogging(b => b.AddProvider(provider: provider).SetMinimumLevel(level: LogLevel.Trace));
+        services.AddResilience(section: configuration.GetSection(key: "Resilience"));
 
         var policies = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>();
 
-        Assert.NotNull(policies["payments"].OnEvent);
+        Assert.NotNull(@object: policies[name: "payments"].OnEvent);
 
         // "Off" attaches no listener at all, so it costs nothing rather than costing a suppressed
         // call. Telemetry is unaffected, which is why OnEvent is still not null.
-        Assert.Contains("logging Verbose", provider.Collector.GetSnapshot().First(r => r.Id.Id == 1020).Message,
-            StringComparison.Ordinal);
+        Assert.Contains(expectedSubstring: "logging Verbose", actualString: provider.Collector.GetSnapshot().First(r => r.Id.Id == 1020).Message,
+            comparisonType: StringComparison.Ordinal);
 
-        Assert.NotNull(policies["reports"].OnEvent);
+        Assert.NotNull(@object: policies[name: "reports"].OnEvent);
     }
 
     [Fact]
@@ -73,11 +73,11 @@ public sealed class LoggingDocs
         // <snippet:logging-hand-built>
         // A policy registered in a container logs for you. A policy in a static field does not -
         // this says it, and the logger's category is what a filter matches.
-        var payments = (Resilience.Http with { Name = "payments" }).WithLogging(logger);
+        var payments = (Resilience.Http with { Name = "payments" }).WithLogging(logger: logger);
 
         // </snippet:logging-hand-built>
 
-        Assert.Equal(1, await payments.RunAsync(_ => Task.FromResult(1), cancellationToken));
+        Assert.Equal(expected: 1, actual: await payments.RunAsync(_ => Task.FromResult(result: 1), cancellationToken: cancellationToken));
     }
 
     [Fact]
@@ -86,14 +86,14 @@ public sealed class LoggingDocs
         // <snippet:logging-console>
         using var factory = LoggerFactory.Create(b => b
             .AddConsole()
-            .SetMinimumLevel(LogLevel.Debug));
+            .SetMinimumLevel(level: LogLevel.Debug));
 
         var payments = (Resilience.Http with { Name = "payments" })
-            .WithLogging(factory.CreateLogger(ResilienceLogging.CategoryFor("payments")));
+            .WithLogging(logger: factory.CreateLogger(categoryName: ResilienceLogging.CategoryFor(policyName: "payments")));
 
         // </snippet:logging-console>
 
-        Assert.NotNull(payments.OnEvent);
+        Assert.NotNull(@object: payments.OnEvent);
     }
 
     [Fact]
@@ -105,15 +105,15 @@ public sealed class LoggingDocs
         // Event 1013 is "the circuit breaker opened". Everything else keeps the profile's level:
         // return null to say nothing, or LogLevel.None to drop the record.
         var payments = (Resilience.Http with { Name = "payments" }).WithLogging(
-            logger,
-            new ResilienceLoggingOptions
+            logger: logger,
+            options: new ResilienceLoggingOptions
             {
                 Level = (id, _) => id.Id == 1013 ? LogLevel.Critical : null,
             });
 
         // </snippet:logging-level>
 
-        Assert.NotNull(payments.OnEvent);
+        Assert.NotNull(@object: payments.OnEvent);
     }
 
     [Fact]
@@ -130,27 +130,27 @@ public sealed class LoggingDocs
 
         // </snippet:logging-correlation>
 
-        services.AddResilience("payments", Resilience.Http);
+        services.AddResilience(name: "payments", policy: Resilience.Http);
 
-        Assert.NotNull(services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["payments"].OnEvent);
+        Assert.NotNull(@object: services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()[name: "payments"].OnEvent);
     }
 
     [Fact]
     public async Task Records_are_asserted_on_with_a_fake_logger()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
+        var calls = Sequence.For<int>().Throws(exception: new IOException()).Returns(result: 1);
 
         // <snippet:logging-assert>
         var logger = new FakeLogger();
 
         var payments = (Resilience.Http with { Name = "payments", Backoff = Backoff.None })
-            .WithLogging(logger);
+            .WithLogging(logger: logger);
 
-        await payments.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        await payments.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
         // 1005 is "succeeded on attempt N". Every ID is tabled in docs/reference/events.md.
-        Assert.Contains(1005, logger.Collector.GetSnapshot().Select(record => record.Id.Id));
+        Assert.Contains(expected: 1005, collection: logger.Collector.GetSnapshot().Select(record => record.Id.Id));
 
         // </snippet:logging-assert>
     }

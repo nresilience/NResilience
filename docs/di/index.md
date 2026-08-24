@@ -28,8 +28,8 @@ You can add resilience to a typed or named `HttpClient` with a single method cal
 services.AddHttpClient<OrdersClient>().AddResilience();
 
 // Or with a policy of your own, or a registered one by name.
-services.AddHttpClient("reports").AddResilience(Resilience.Http with { Attempts = 5 });
-services.AddHttpClient("payments").AddResilience("api", o => o.RetryUnsafeMethods = false);
+services.AddHttpClient(name: "reports").AddResilience(policy: Resilience.Http with { Attempts = 5 });
+services.AddHttpClient(name: "payments").AddResilience(policyName: "api", o => o.RetryUnsafeMethods = false);
 ```
 <!-- endsnippet -->
 
@@ -46,14 +46,14 @@ Named policies allow you to define the resilience requirements for a dependency 
 <!-- snippet: di-register-named -->
 ```csharp
 // Say what a dependency is worth once, in one place.
-services.AddResilience("api", Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) });
+services.AddResilience(name: "api", policy: Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10) });
 
 // Or in code, without a policy value.
-services.AddResilience("reports", o =>
+services.AddResilience(name: "reports", o =>
 {
     o.Preset = "Http";
     o.Attempts = 5;
-    o.Deadline = TimeSpan.FromMinutes(5);
+    o.Deadline = TimeSpan.FromMinutes(value: 5);
 });
 ```
 <!-- endsnippet -->
@@ -72,9 +72,9 @@ public sealed class Orders(IResiliencePolicies policies)
     // construction time is a snapshot, and a configuration reload will never reach it.
     // The indexer is a dictionary lookup.
     public Task<string> ReadAsync(CancellationToken cancellationToken) =>
-        policies["api"].RunAsync(attempt => FetchAsync(attempt), cancellationToken).AsTask();
+        policies[name: "api"].RunAsync(attempt => FetchAsync(cancellationToken: attempt), cancellationToken: cancellationToken).AsTask();
 
-    private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult("ok");
+    private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(result: "ok");
 }
 ```
 <!-- endsnippet -->

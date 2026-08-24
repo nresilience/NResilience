@@ -62,8 +62,8 @@ var response = await pipeline.ExecuteAsync(ct => Send(ct), cancellationToken);
 var api = Resilience.Http with
 {
     Attempts = 3, // total, including the first
-    AttemptTimeout = TimeSpan.FromSeconds(3), // per attempt
-    Deadline = TimeSpan.FromSeconds(10), // the whole call
+    AttemptTimeout = TimeSpan.FromSeconds(value: 3), // per attempt
+    Deadline = TimeSpan.FromSeconds(value: 10), // the whole call
     Breaker = new Breaker { Name = "api" },
 };
 ```
@@ -86,8 +86,8 @@ In this migration, `Attempts` represents the total number of calls, so `MaxRetry
 
 <!-- snippet: migration-fallback -->
 ```csharp
-var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
-var value = result.TryGetValue(out var fetched) ? fetched : "cached";
+var result = await api.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
+var value = result.TryGetValue(value: out var fetched) ? fetched : "cached";
 ```
 <!-- endsnippet -->
 
@@ -129,7 +129,7 @@ var api = Resilience.Http with
 {
     Backoff = Backoff.None,
     Classify = Classifier.Http.OnResult<HttpResponseMessage>(r =>
-        r.StatusCode == HttpStatusCode.Conflict ? Verdict.Transient : Classifier.Http.ClassifyResult(r)),
+        r.StatusCode == HttpStatusCode.Conflict ? Verdict.Transient : Classifier.Http.ClassifyResult(value: r)),
 };
 ```
 <!-- endsnippet -->
@@ -154,13 +154,13 @@ services.AddHttpClient<PaymentClient>()
     .AddRateLimit(options => options.Concurrency = 10);
 
 // For any other callback
-using var limiter = Limit.Concurrency(10);
+using var limiter = Limit.Concurrency(permits: 10);
 
 var result = await policy.RunAsync(async ct =>
 {
-    using var lease = await limiter.AcquireOrThrowAsync(ct);
-    return await dependency.CallAsync(ct);
-}, cancellationToken);
+    using var lease = await limiter.AcquireOrThrowAsync(cancellationToken: ct);
+    return await dependency.CallAsync(cancellationToken: ct);
+}, cancellationToken: cancellationToken);
 ```
 <!-- endsnippet -->
 
@@ -186,12 +186,12 @@ For a complete guide with real-world examples, see [Resource isolation with bulk
 // blocks keep working. The history rides along on Exception.Data.
 try
 {
-    await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+    await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 }
 catch (HttpRequestException e)
 {
-    var attempts = AttemptLog.Of(e);
-    Console.WriteLine(attempts); // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
+    var attempts = AttemptLog.Of(exception: e);
+    Console.WriteLine(value: attempts); // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
 }
 ```
 <!-- endsnippet -->

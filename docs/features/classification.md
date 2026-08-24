@@ -26,9 +26,9 @@ By using a single classifier, NResilience ensures that retry logic, backoff curv
 ```csharp
 var http = Classifier.Http;
 
-var throttled = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.TooManyRequests)); // Throttled
-var transient = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.BadGateway)); // Transient
-var answer = http.ClassifyResult(new HttpResponseMessage(HttpStatusCode.NotFound)); // Ok - a 404 is an answer
+var throttled = http.ClassifyResult(value: new HttpResponseMessage(statusCode: HttpStatusCode.TooManyRequests)); // Throttled
+var transient = http.ClassifyResult(value: new HttpResponseMessage(statusCode: HttpStatusCode.BadGateway)); // Transient
+var answer = http.ClassifyResult(value: new HttpResponseMessage(statusCode: HttpStatusCode.NotFound)); // Ok - a 404 is an answer
 ```
 <!-- endsnippet -->
 
@@ -52,7 +52,7 @@ You can teach a classifier about your specific exception types using the `On` me
 // about yours is one line, and the receiver is unchanged.
 var api = Resilience.Default with
 {
-    Classify = Classifier.Default.On<MyDbException>(Verdict.Transient),
+    Classify = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
     Backoff = Backoff.None,
 };
 ```
@@ -65,9 +65,9 @@ You can also use a predicate to inspect the exception for more granular control:
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
 var classify = Classifier.Http
-    .On<MyTransportException>(Verdict.Transient) // retried, short curve
-    .On<MyQuotaException>(ex => Verdict.Throttled(ex.RetryAfter)) // retried, long curve or the server's own delay
-    .On<MyValidationException>(Verdict.Permanent); // never retried
+    .On<MyTransportException>(verdict: Verdict.Transient) // retried, short curve
+    .On<MyQuotaException>(ex => Verdict.Throttled(retryAfter: ex.RetryAfter)) // retried, long curve or the server's own delay
+    .On<MyValidationException>(verdict: Verdict.Permanent); // never retried
 
 var api = Resilience.Http with { Classify = classify };
 ```
@@ -86,7 +86,7 @@ var api = Resilience.Default with
     Classify = Classifier.Default.OnResult<Reply>(reply => reply.Code switch
     {
         "OK" => Verdict.Ok,
-        "BUSY" => Verdict.Throttled(TimeSpan.FromMilliseconds(50)),
+        "BUSY" => Verdict.Throttled(retryAfter: TimeSpan.FromMilliseconds(value: 50)),
         _ => Verdict.Permanent,
     }),
 };
@@ -104,7 +104,7 @@ You can print a classifier to see all active rules and their evaluation order.
 <!-- snippet: classifier-print -->
 ```csharp
 // "What will this actually retry?" without reading the library's source.
-Console.WriteLine(Classifier.Http);
+Console.WriteLine(value: Classifier.Http);
 ```
 <!-- endsnippet -->
 

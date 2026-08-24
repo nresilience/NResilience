@@ -18,17 +18,17 @@ private static async Task<Order?> ReadOrderAsync(HttpClient client, string id, C
 {
     // Resilience.Http knows that a 503 is transient, a 429 is throttling and a 404 is an
     // answer. Three attempts, a 30 s deadline and a 10 s attempt ceiling are the defaults.
-    var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) };
+    var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10) };
 
     var result = await api.TryRunAsync(
-        attempt => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), attempt),
-        cancellationToken);
+        attempt => client.GetFromJsonAsync<Order>(requestUri: new Uri(uriString: $"https://api.example.com/orders/{id}"), cancellationToken: attempt),
+        cancellationToken: cancellationToken);
 
-    if (result.TryGetValue(out var order))
+    if (result.TryGetValue(value: out var order))
         return order;
 
     // The failure, and everything that led to it, without an exception.
-    Console.WriteLine($"{result.StopReason}: {result.Attempts}");
+    Console.WriteLine(value: $"{result.StopReason}: {result.Attempts}");
     return null;
 }
 ```
@@ -57,7 +57,7 @@ private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cance
     using var client = ResilienceHttp.CreateClient();
 
     using var response = await client.GetAsync(
-        new Uri("https://api.example.com/orders/1"), cancellationToken);
+        requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);
 
     return response.StatusCode;
 }

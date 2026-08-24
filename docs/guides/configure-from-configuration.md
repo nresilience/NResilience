@@ -17,9 +17,9 @@ The following example demonstrates how to register policies from a configuration
 // One policy per child of the section, each named by its key. Values reload; the roster is
 // read once, because a name that appears in the file after the container is built has
 // nothing to be injected into.
-services.AddResilience(configuration.GetSection("Resilience"));
+services.AddResilience(section: configuration.GetSection(key: "Resilience"));
 
-services.AddHttpClient("orders").AddResilience("api");
+services.AddHttpClient(name: "orders").AddResilience(policyName: "api");
 ```
 <!-- endsnippet -->
 
@@ -75,9 +75,9 @@ public sealed class Orders(IResiliencePolicies policies)
     // construction time is a snapshot, and a configuration reload will never reach it.
     // The indexer is a dictionary lookup.
     public Task<string> ReadAsync(CancellationToken cancellationToken) =>
-        policies["api"].RunAsync(attempt => FetchAsync(attempt), cancellationToken).AsTask();
+        policies[name: "api"].RunAsync(attempt => FetchAsync(cancellationToken: attempt), cancellationToken: cancellationToken).AsTask();
 
-    private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult("ok");
+    private static Task<string> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(result: "ok");
 }
 ```
 <!-- endsnippet -->
@@ -97,11 +97,11 @@ JSON cannot store lambdas or live objects. To configure classifiers, hooks, or s
 // a lambda and JSON cannot hold one, so this is where one goes - along with a hook, or a
 // breaker you mean to share with something else.
 services.AddResilience(
-    "api",
-    configuration.GetSection("Resilience:api"),
+    name: "api",
+    section: configuration.GetSection(key: "Resilience:api"),
     policy => policy with
     {
-        Classify = Classifier.Http.On<MyTransportException>(Verdict.Transient),
+        Classify = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
         Breaker = shared,
     });
 ```

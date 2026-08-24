@@ -20,24 +20,24 @@ public sealed class Dependencies
 {
     // One breaker per dependency, held where its lifetime is obvious. A storm against payments
     // must not trip calls to search, and here that is a property of the code.
-    public Breaker Payments { get; } = new(new BreakerSettings
+    public Breaker Payments { get; } = new(settings: new BreakerSettings
     {
         ConsecutiveFailures = 5,
-        SlowCallThreshold = TimeSpan.FromSeconds(2),
-        BreakDuration = TimeSpan.FromSeconds(15),
+        SlowCallThreshold = TimeSpan.FromSeconds(value: 2),
+        BreakDuration = TimeSpan.FromSeconds(value: 15),
     })
     {
         Name = "payments",
     };
 
-    public RetryBudget PaymentsBudget { get; } = RetryBudget.Shared("payments");
+    public RetryBudget PaymentsBudget { get; } = RetryBudget.Shared(name: "payments");
 
     public Resilience Charge => Resilience.Http with
     {
         Name = "payments",
         Breaker = Payments,
         Budget = PaymentsBudget,
-        Deadline = TimeSpan.FromSeconds(8),
+        Deadline = TimeSpan.FromSeconds(value: 8),
     };
 }
 ```

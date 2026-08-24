@@ -23,7 +23,7 @@ var api = Resilience.Http with
     Name = "payments",
     Backoff = Backoff.None,
     OnEvent = e => _logger.LogInformation(
-        "{Policy} {Kind} attempt {Attempt}: {Verdict} in {Ms}ms",
+        message: "{Policy} {Kind} attempt {Attempt}: {Verdict} in {Ms}ms",
         e.PolicyName, e.Kind, e.AttemptNumber, e.Verdict.Kind, e.Duration.TotalMilliseconds),
 };
 ```
@@ -56,10 +56,10 @@ A lambda is still the right answer for anything that is not an `ILogger`. If it 
 ```csharp
 var api = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
-await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
 // Attempt, Retrying, Attempt, Succeeded
-Console.WriteLine(string.Join(", ", events.Kinds));
+Console.WriteLine(value: string.Join(separator: ", ", values: events.Kinds));
 ```
 <!-- endsnippet -->
 
@@ -70,7 +70,7 @@ Console.WriteLine(string.Join(", ", events.Kinds));
 <!-- snippet: telemetry-tostring -->
 ```csharp
 // [PolicyName] Kind #N VerdictKind ExceptionType (duration) +delay
-Console.WriteLine(events[0]); // [api] Attempt #1 Ok (0.1ms)
+Console.WriteLine(value: events[index: 0]); // [api] Attempt #1 Ok (0.1ms)
 ```
 <!-- endsnippet -->
 

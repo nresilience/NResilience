@@ -27,7 +27,7 @@ Classify = Classifier.Default.On<MyDbException>(Verdict.Transient)
 var api = Resilience.Default with
 {
     Backoff = Backoff.None,
-    Classify = Classifier.Default.On<MyDbException>(Verdict.Transient),
+    Classify = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
 };
 ```
 <!-- endsnippet -->
@@ -54,8 +54,8 @@ request.Options.Set(ResilienceHttp.Repeatable, true);
 
 <!-- snippet: troubleshoot-post-not-retried -->
 ```csharp
-using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders");
-request.Options.Set(ResilienceHttp.Repeatable, true); // this one carries an idempotency key
+using var request = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders");
+request.Options.Set(key: ResilienceHttp.Repeatable, value: true); // this one carries an idempotency key
 ```
 <!-- endsnippet -->
 
@@ -112,11 +112,11 @@ If you store a policy in a `readonly` field, configuration reloads will never re
 
 <!-- snippet: troubleshoot-validate -->
 ```csharp
-var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(-1) };
+var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(value: -1) };
 
-var problem = Assert.Throws<ResilienceConfigurationException>(api.Validate);
+var problem = Assert.Throws<ResilienceConfigurationException>(testCode: api.Validate);
 
-Console.WriteLine(string.Join(Environment.NewLine, problem.Problems));
+Console.WriteLine(value: string.Join(separator: Environment.NewLine, values: problem.Problems));
 
 // Attempts must be at least 1; it is 0.
 // Deadline must be positive, or Timeout.InfiniteTimeSpan for no bound; it is -00:00:01.
@@ -151,14 +151,14 @@ For more details, see [Testing](../testing/index.md).
 ```csharp
 // Every failure carries its own history: on CallResult, on the exceptions the library
 // invents, and on Exception.Data for an original exception it rethrew unchanged.
-var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+var result = await api.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
-Console.WriteLine(result.StopReason); // AttemptsExhausted
-Console.WriteLine(result.Attempts); // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
+Console.WriteLine(value: result.StopReason); // AttemptsExhausted
+Console.WriteLine(value: result.Attempts); // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
 
 foreach (var attempt in result.Attempts)
 {
-    Console.WriteLine($"#{attempt.Number} {attempt.Verdict.Kind} after {attempt.DelayBefore.TotalMilliseconds}ms");
+    Console.WriteLine(value: $"#{attempt.Number} {attempt.Verdict.Kind} after {attempt.DelayBefore.TotalMilliseconds}ms");
 }
 ```
 <!-- endsnippet -->

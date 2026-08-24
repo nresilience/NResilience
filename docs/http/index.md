@@ -39,7 +39,7 @@ private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cance
     using var client = ResilienceHttp.CreateClient();
 
     using var response = await client.GetAsync(
-        new Uri("https://api.example.com/orders/1"), cancellationToken);
+        requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);
 
     return response.StatusCode;
 }
@@ -55,8 +55,8 @@ You can customize the handler's behavior using `HttpResilienceOptions`.
 <!-- snippet: http-options -->
 ```csharp
 using var client = ResilienceHttp.CreateClient(
-    Resilience.Http with { Attempts = 4 },
-    new HttpResilienceOptions
+    policy: Resilience.Http with { Attempts = 4 },
+    options: new HttpResilienceOptions
     {
         RetryUnsafeMethods = false, // POST and PATCH are not retried. The default.
         OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
@@ -86,7 +86,7 @@ If you manually instantiate an `HttpClient` and pass it a `ResilienceHandler`, t
 // HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence, so it
 // silently caps any deadline longer than that. On a client you build yourself, hand the
 // bound to the policy.
-using var client = new HttpClient(new ResilienceHandler(new HttpClientHandler()))
+using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: new HttpClientHandler()))
 {
     Timeout = Timeout.InfiniteTimeSpan,
 };
@@ -99,11 +99,11 @@ You can use the `WillRetry` method to determine if the handler will retry a spec
 
 <!-- snippet: http-will-retry -->
 ```csharp
-using var get = new HttpRequestMessage(HttpMethod.Get, "https://api.example.com/orders/1");
-using var post = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders");
+using var get = new HttpRequestMessage(method: HttpMethod.Get, requestUri: "https://api.example.com/orders/1");
+using var post = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders");
 
-Console.WriteLine(handler.WillRetry(get)); // True
-Console.WriteLine(handler.WillRetry(post)); // False
+Console.WriteLine(value: handler.WillRetry(request: get)); // True
+Console.WriteLine(value: handler.WillRetry(request: post)); // False
 ```
 <!-- endsnippet -->
 

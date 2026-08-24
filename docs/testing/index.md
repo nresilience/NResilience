@@ -23,16 +23,16 @@ Use the `Sequence<T>` class to create a script of outcomes (returns, throws, or 
 <!-- snippet: testing-sequence -->
 ```csharp
 var calls = Sequence.For<HttpResponseMessage>()
-    .Returns(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable), 2)
-    .Returns(new HttpResponseMessage(HttpStatusCode.OK));
+    .Returns(result: new HttpResponseMessage(statusCode: HttpStatusCode.ServiceUnavailable), count: 2)
+    .Returns(result: new HttpResponseMessage(statusCode: HttpStatusCode.OK));
 
 var policy = Resilience.Http with { Backoff = Backoff.None };
 
-var result = await policy.TryRunAsync(attempt => calls.NextAsync(attempt));
+var result = await policy.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt));
 
-Assert.True(result.IsSuccess);
-Assert.Equal(3, calls.CallCount);
-Assert.Equal(3, result.Attempts.Count);
+Assert.True(condition: result.IsSuccess);
+Assert.Equal(expected: 3, actual: calls.CallCount);
+Assert.Equal(expected: 3, actual: result.Attempts.Count);
 ```
 <!-- endsnippet -->
 
@@ -54,23 +54,23 @@ To test timeouts or deadlines without actually waiting for the clock, provide a 
 // sleep - and a real sleep is what makes timing tests slow and flaky.
 var time = new FakeTimeProvider();
 
-var calls = Sequence.For<int>(time)
-    .Delays(TimeSpan.FromSeconds(30)) // longer than the attempt timeout
-    .Returns(1);
+var calls = Sequence.For<int>(time: time)
+    .Delays(delay: TimeSpan.FromSeconds(value: 30)) // longer than the attempt timeout
+    .Returns(result: 1);
 
 var policy = Resilience.Default with
 {
     Time = time,
     Attempts = 1,
-    AttemptTimeout = TimeSpan.FromSeconds(3),
+    AttemptTimeout = TimeSpan.FromSeconds(value: 3),
 };
 
-var pending = policy.TryRunAsync(attempt => calls.NextAsync(attempt)).AsTask();
-time.Advance(TimeSpan.FromSeconds(4));
+var pending = policy.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt)).AsTask();
+time.Advance(delta: TimeSpan.FromSeconds(value: 4));
 
 var result = await pending;
 
-Assert.IsType<AttemptTimeoutException>(result.Exception);
+Assert.IsType<AttemptTimeoutException>(@object: result.Exception);
 ```
 <!-- endsnippet -->
 
@@ -84,21 +84,21 @@ You can verify that a policy is emitting the correct events in the correct order
 <!-- snippet: testing-event-recorder -->
 ```csharp
 var events = new EventRecorder();
-var calls = Sequence.For<int>().Throws(new IOException()).Returns(42);
+var calls = Sequence.For<int>().Throws(exception: new IOException()).Returns(result: 42);
 
 var policy = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
-await policy.RunAsync(attempt => calls.NextAsync(attempt));
+await policy.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt));
 
 // Assert on the order, not just the membership: if a telemetry surface raises the right
 // events in the wrong order, the log it produces is misleading even though every event
 // is present.
 Assert.Equal(
-    [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
-    events.Kinds);
+    expected: [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
+    actual: events.Kinds);
 
-Assert.Equal(VerdictKind.Transient, events.OfKind(CallEventKind.Attempt)[0].Verdict.Kind);
-Assert.Equal(42, events.Single(CallEventKind.Succeeded).Result);
+Assert.Equal(expected: VerdictKind.Transient, actual: events.OfKind(kind: CallEventKind.Attempt)[index: 0].Verdict.Kind);
+Assert.Equal(expected: 42, actual: events.Single(kind: CallEventKind.Succeeded).Result);
 ```
 <!-- endsnippet -->
 
@@ -111,17 +111,17 @@ You can test resilient `HttpClient` configurations by providing a scripted `Http
 <!-- snippet: testing-http-handler -->
 ```csharp
 var transport = new ScriptedTransport(
-    () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-    () => new HttpResponseMessage(HttpStatusCode.OK));
+    () => new HttpResponseMessage(statusCode: HttpStatusCode.ServiceUnavailable),
+    () => new HttpResponseMessage(statusCode: HttpStatusCode.OK));
 
 using var client = ResilienceHttp.CreateClient(
-    Resilience.Http with { Backoff = Backoff.None },
+    policy: Resilience.Http with { Backoff = Backoff.None },
     innerHandler: transport);
 
-using var response = await client.GetAsync(new Uri("https://api.example.com/orders/1"));
+using var response = await client.GetAsync(requestUri: new Uri(uriString: "https://api.example.com/orders/1"));
 
-Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-Assert.Equal(2, transport.Requests.Count);
+Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
+Assert.Equal(expected: 2, actual: transport.Requests.Count);
 ```
 <!-- endsnippet -->
 

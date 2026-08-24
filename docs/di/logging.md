@@ -11,7 +11,7 @@ A policy registered in a DI container writes log records through `ILogger`. No c
 <!-- snippet: logging-registered -->
 ```csharp
 services.AddLogging();
-services.AddResilience("payments", Resilience.Http);
+services.AddResilience(name: "payments", policy: Resilience.Http);
 
 // Nothing else to call. The policy logs under "NResilience.payments", which is the category
 // an appsettings.json filter matches.

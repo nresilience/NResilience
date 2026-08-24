@@ -17,7 +17,7 @@ The `Attempts` property specifies the total number of attempts, including the fi
 // Three attempts: try, retry, retry. Not "one call plus three retries".
 var api = Resilience.Default with { Attempts = 3 };
 
-var value = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+var value = await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 ```
 <!-- endsnippet -->
 
@@ -37,10 +37,10 @@ NResilience provides two base delays to handle throttling and transient failures
 var api = Resilience.Http with
 {
     Backoff = Backoff.Exponential(
-        transientBase: TimeSpan.FromMilliseconds(200),   // the first delay after a transient failure
-        throttledBase: TimeSpan.FromSeconds(2),          // the first delay after being throttled
-        factor: 2,                                       // doubling
-        max: TimeSpan.FromSeconds(10)),                  // the cap on any single delay
+        transientBase: TimeSpan.FromMilliseconds(value: 200), // the first delay after a transient failure
+        throttledBase: TimeSpan.FromSeconds(value: 2), // the first delay after being throttled
+        factor: 2, // doubling
+        max: TimeSpan.FromSeconds(value: 10)), // the cap on any single delay
 };
 ```
 <!-- endsnippet -->
@@ -74,8 +74,8 @@ Use `Backoff.Custom` to define your own delay logic.
 var api = Resilience.Default with
 {
     Backoff = Backoff.Custom(next => next.PreviousVerdict.Kind == VerdictKind.Throttled
-        ? TimeSpan.FromSeconds(5)
-        : TimeSpan.FromMilliseconds(50 * next.Number)),
+        ? TimeSpan.FromSeconds(value: 5)
+        : TimeSpan.FromMilliseconds(value: 50 * next.Number)),
 };
 ```
 <!-- endsnippet -->
@@ -92,7 +92,7 @@ var api = Resilience.Http with
 {
     // Runs before every attempt, including the first. The place to refresh a token or
     // rebuild a request, because a retry re-invokes the callback from the top.
-    BeforeAttempt = next => tokens.RefreshAsync(next.CancellationToken),
+    BeforeAttempt = next => tokens.RefreshAsync(cancellationToken: next.CancellationToken),
 };
 ```
 <!-- endsnippet -->

@@ -32,11 +32,11 @@ If you know a specific `POST` or `PATCH` request is safe to repeat - for example
 ```csharp
 // POST is not retried by default, because a retried POST is a duplicate order. Per request,
 // this is the finer instrument, and it beats the per-client switch in both directions.
-using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders") { Content = body };
-request.Headers.Add("Idempotency-Key", key);
-request.Options.Set(ResilienceHttp.Repeatable, true);
+using var request = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders") { Content = body };
+request.Headers.Add(name: "Idempotency-Key", value: key);
+request.Options.Set(key: ResilienceHttp.Repeatable, value: true);
 
-using var response = await client.SendAsync(request, cancellationToken);
+using var response = await client.SendAsync(request: request, cancellationToken: cancellationToken);
 ```
 <!-- endsnippet -->
 

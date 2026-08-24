@@ -14,7 +14,7 @@ public sealed class TelemetryDocs
     public async Task A_listener_is_a_lambda()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
+        var calls = Sequence.For<int>().Throws(exception: new IOException()).Returns(result: 1);
 
         // <snippet:telemetry-listener>
         var api = Resilience.Http with
@@ -22,13 +22,13 @@ public sealed class TelemetryDocs
             Name = "payments",
             Backoff = Backoff.None,
             OnEvent = e => _logger.LogInformation(
-                "{Policy} {Kind} attempt {Attempt}: {Verdict} in {Ms}ms",
+                message: "{Policy} {Kind} attempt {Attempt}: {Verdict} in {Ms}ms",
                 e.PolicyName, e.Kind, e.AttemptNumber, e.Verdict.Kind, e.Duration.TotalMilliseconds),
         };
 
         // </snippet:telemetry-listener>
 
-        Assert.Equal(1, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
+        Assert.Equal(expected: 1, actual: await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken));
     }
 
     [Fact]
@@ -36,21 +36,21 @@ public sealed class TelemetryDocs
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var events = new EventRecorder();
-        var calls = Sequence.For<int>().Throws(new IOException()).Returns(1);
+        var calls = Sequence.For<int>().Throws(exception: new IOException()).Returns(result: 1);
 
         // <snippet:telemetry-recorder>
         var api = Resilience.Default with { Backoff = Backoff.None, OnEvent = events.Record };
 
-        await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
         // Attempt, Retrying, Attempt, Succeeded
-        Console.WriteLine(string.Join(", ", events.Kinds));
+        Console.WriteLine(value: string.Join(separator: ", ", values: events.Kinds));
 
         // </snippet:telemetry-recorder>
 
         Assert.Equal(
-            [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
-            events.Kinds);
+            expected: [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
+            actual: events.Kinds);
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public sealed class TelemetryDocs
 
         // </snippet:telemetry-with-telemetry>
 
-        Assert.NotNull(api.OnEvent);
+        Assert.NotNull(@object: api.OnEvent);
     }
 
     [Fact]
@@ -72,14 +72,14 @@ public sealed class TelemetryDocs
         var events = new EventRecorder();
         var api = Resilience.Default with { Name = "api", Attempts = 1, OnEvent = events.Record };
 
-        await api.RunAsync(attempt => Task.FromResult(1), TestContext.Current.CancellationToken);
+        await api.RunAsync(attempt => Task.FromResult(result: 1), cancellationToken: TestContext.Current.CancellationToken);
 
         // <snippet:telemetry-tostring>
         // [PolicyName] Kind #N VerdictKind ExceptionType (duration) +delay
-        Console.WriteLine(events[0]); // [api] Attempt #1 Ok (0.1ms)
+        Console.WriteLine(value: events[index: 0]); // [api] Attempt #1 Ok (0.1ms)
 
         // </snippet:telemetry-tostring>
 
-        Assert.StartsWith("[api] Attempt #1 Ok", events[0].ToString(), StringComparison.Ordinal);
+        Assert.StartsWith(expectedStartString: "[api] Attempt #1 Ok", actualString: events[index: 0].ToString(), comparisonType: StringComparison.Ordinal);
     }
 }

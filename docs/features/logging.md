@@ -63,8 +63,8 @@ To retune a specific record in code, set the `Level` property. Return `null` to 
 // Event 1013 is "the circuit breaker opened". Everything else keeps the profile's level:
 // return null to say nothing, or LogLevel.None to drop the record.
 var payments = (Resilience.Http with { Name = "payments" }).WithLogging(
-    logger,
-    new ResilienceLoggingOptions
+    logger: logger,
+    options: new ResilienceLoggingOptions
     {
         Level = (id, _) => id.Id == 1013 ? LogLevel.Critical : null,
     });
@@ -79,7 +79,7 @@ Policies in static fields are not in a container, so they do not log by default.
 ```csharp
 // A policy registered in a container logs for you. A policy in a static field does not -
 // this says it, and the logger's category is what a filter matches.
-var payments = (Resilience.Http with { Name = "payments" }).WithLogging(logger);
+var payments = (Resilience.Http with { Name = "payments" }).WithLogging(logger: logger);
 ```
 <!-- endsnippet -->
 
@@ -89,10 +89,10 @@ For a console spike, a logger factory is one line:
 ```csharp
 using var factory = LoggerFactory.Create(b => b
     .AddConsole()
-    .SetMinimumLevel(LogLevel.Debug));
+    .SetMinimumLevel(level: LogLevel.Debug));
 
 var payments = (Resilience.Http with { Name = "payments" })
-    .WithLogging(factory.CreateLogger(ResilienceLogging.CategoryFor("payments")));
+    .WithLogging(logger: factory.CreateLogger(categoryName: ResilienceLogging.CategoryFor(policyName: "payments")));
 ```
 <!-- endsnippet -->
 
@@ -131,12 +131,12 @@ Use `FakeLogger` from `Microsoft.Extensions.Diagnostics.Testing` to assert on wh
 var logger = new FakeLogger();
 
 var payments = (Resilience.Http with { Name = "payments", Backoff = Backoff.None })
-    .WithLogging(logger);
+    .WithLogging(logger: logger);
 
-await payments.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+await payments.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
 // 1005 is "succeeded on attempt N". Every ID is tabled in docs/reference/events.md.
-Assert.Contains(1005, logger.Collector.GetSnapshot().Select(record => record.Id.Id));
+Assert.Contains(expected: 1005, collection: logger.Collector.GetSnapshot().Select(record => record.Id.Id));
 ```
 <!-- endsnippet -->
 

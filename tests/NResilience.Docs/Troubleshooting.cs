@@ -11,7 +11,7 @@ public sealed class Troubleshooting
     public async Task Nothing_was_retried_because_the_exception_was_not_recognized()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var calls = Sequence.For<int>().Throws(new MyDbException()).Returns(1);
+        var calls = Sequence.For<int>().Throws(exception: new MyDbException()).Returns(result: 1);
 
         // <snippet:troubleshoot-not-retried>
         // Classifier.Default treats an exception type it has never heard of as Permanent. Teach it
@@ -19,37 +19,37 @@ public sealed class Troubleshooting
         var api = Resilience.Default with
         {
             Backoff = Backoff.None,
-            Classify = Classifier.Default.On<MyDbException>(Verdict.Transient),
+            Classify = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
         };
 
         // </snippet:troubleshoot-not-retried>
 
-        Assert.Equal(1, await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken));
+        Assert.Equal(expected: 1, actual: await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken));
     }
 
     [Fact]
     public async Task The_history_of_a_failed_call()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var calls = Sequence.For<int>().Throws(new IOException(), 3);
+        var calls = Sequence.For<int>().Throws(exception: new IOException(), count: 3);
         var api = Resilience.Default with { Backoff = Backoff.None };
 
         // <snippet:troubleshoot-attempt-log>
         // Every failure carries its own history: on CallResult, on the exceptions the library
         // invents, and on Exception.Data for an original exception it rethrew unchanged.
-        var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+        var result = await api.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
-        Console.WriteLine(result.StopReason); // AttemptsExhausted
-        Console.WriteLine(result.Attempts); // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
+        Console.WriteLine(value: result.StopReason); // AttemptsExhausted
+        Console.WriteLine(value: result.Attempts); // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
 
         foreach (var attempt in result.Attempts)
         {
-            Console.WriteLine($"#{attempt.Number} {attempt.Verdict.Kind} after {attempt.DelayBefore.TotalMilliseconds}ms");
+            Console.WriteLine(value: $"#{attempt.Number} {attempt.Verdict.Kind} after {attempt.DelayBefore.TotalMilliseconds}ms");
         }
 
         // </snippet:troubleshoot-attempt-log>
 
-        Assert.Equal(3, result.Attempts.Count);
+        Assert.Equal(expected: 3, actual: result.Attempts.Count);
     }
 
     [Fact]
@@ -59,14 +59,14 @@ public sealed class Troubleshooting
         // HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence, so it
         // silently caps any deadline longer than that. On a client you build yourself, hand the
         // bound to the policy.
-        using var client = new HttpClient(new ResilienceHandler(new HttpClientHandler()))
+        using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: new HttpClientHandler()))
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };
 
         // </snippet:troubleshoot-transport-timeout>
 
-        Assert.Equal(Timeout.InfiniteTimeSpan, client.Timeout);
+        Assert.Equal(expected: Timeout.InfiniteTimeSpan, actual: client.Timeout);
     }
 
     [Fact]
@@ -75,22 +75,22 @@ public sealed class Troubleshooting
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Status(HttpStatusCode.OK));
+            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
+            () => Doubles.Status(status: HttpStatusCode.OK));
 
         using var client = ResilienceHttp.CreateClient(
-            Resilience.Http with { Backoff = Backoff.None },
+            policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
         // <snippet:troubleshoot-post-not-retried>
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders");
-        request.Options.Set(ResilienceHttp.Repeatable, true); // this one carries an idempotency key
+        using var request = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders");
+        request.Options.Set(key: ResilienceHttp.Repeatable, value: true); // this one carries an idempotency key
 
         // </snippet:troubleshoot-post-not-retried>
 
-        using var response = await client.SendAsync(request, cancellationToken);
+        using var response = await client.SendAsync(request: request, cancellationToken: cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
     }
 
     [Fact]
@@ -101,18 +101,18 @@ public sealed class Troubleshooting
 #pragma warning disable NRES003
 
         // <snippet:troubleshoot-validate>
-        var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(-1) };
+        var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(value: -1) };
 
-        var problem = Assert.Throws<ResilienceConfigurationException>(api.Validate);
+        var problem = Assert.Throws<ResilienceConfigurationException>(testCode: api.Validate);
 
-        Console.WriteLine(string.Join(Environment.NewLine, problem.Problems));
+        Console.WriteLine(value: string.Join(separator: Environment.NewLine, values: problem.Problems));
 
         // Attempts must be at least 1; it is 0.
         // Deadline must be positive, or Timeout.InfiniteTimeSpan for no bound; it is -00:00:01.
         // </snippet:troubleshoot-validate>
 #pragma warning restore NRES003
 
-        Assert.Equal(2, problem.Problems.Count);
+        Assert.Equal(expected: 2, actual: problem.Problems.Count);
     }
 
     internal sealed class MyDbException : Exception;

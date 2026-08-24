@@ -21,32 +21,32 @@ public sealed class Migration
         var api = Resilience.Http with
         {
             Attempts = 3, // total, including the first
-            AttemptTimeout = TimeSpan.FromSeconds(3), // per attempt
-            Deadline = TimeSpan.FromSeconds(10), // the whole call
+            AttemptTimeout = TimeSpan.FromSeconds(value: 3), // per attempt
+            Deadline = TimeSpan.FromSeconds(value: 10), // the whole call
             Breaker = new Breaker { Name = "api" },
         };
 
         // </snippet:migration-pipeline>
 #pragma warning restore NRES005
 
-        Assert.Equal(3, api.Attempts);
-        Assert.NotNull(api.Breaker);
+        Assert.Equal(expected: 3, actual: api.Attempts);
+        Assert.NotNull(@object: api.Breaker);
     }
 
     [Fact]
     public async Task A_fallback_becomes_an_if()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var calls = Sequence.For<string>().Throws(new IOException(), 3);
+        var calls = Sequence.For<string>().Throws(exception: new IOException(), count: 3);
         var api = Resilience.Default with { Backoff = Backoff.None };
 
         // <snippet:migration-fallback>
-        var result = await api.TryRunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
-        var value = result.TryGetValue(out var fetched) ? fetched : "cached";
+        var result = await api.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
+        var value = result.TryGetValue(value: out var fetched) ? fetched : "cached";
 
         // </snippet:migration-fallback>
 
-        Assert.Equal("cached", value);
+        Assert.Equal(expected: "cached", actual: value);
     }
 
     [Fact]
@@ -60,14 +60,14 @@ public sealed class Migration
         // </snippet:migration-registration>
 
         using var provider = services.BuildServiceProvider();
-        Assert.NotNull(provider.GetRequiredService<Client>());
+        Assert.NotNull(@object: provider.GetRequiredService<Client>());
     }
 
     [Fact]
     public async Task The_original_exception_still_comes_out()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var calls = Sequence.For<int>().Throws(new HttpRequestException("down"), 3);
+        var calls = Sequence.For<int>().Throws(exception: new HttpRequestException(message: "down"), count: 3);
         var api = Resilience.Http with { Backoff = Backoff.None };
 
         // <snippet:migration-exceptions>
@@ -75,17 +75,17 @@ public sealed class Migration
         // blocks keep working. The history rides along on Exception.Data.
         try
         {
-            await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
+            await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
         }
         catch (HttpRequestException e)
         {
-            var attempts = AttemptLog.Of(e);
-            Console.WriteLine(attempts); // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
+            var attempts = AttemptLog.Of(exception: e);
+            Console.WriteLine(value: attempts); // 3 attempts over 1.4ms: Transient HttpRequestException (0.5ms), ...
         }
 
         // </snippet:migration-exceptions>
 
-        Assert.Equal(3, calls.CallCount);
+        Assert.Equal(expected: 3, actual: calls.CallCount);
     }
 
     [Fact]
@@ -94,8 +94,8 @@ public sealed class Migration
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var calls = Sequence.For<HttpResponseMessage>()
-            .Returns(new HttpResponseMessage(HttpStatusCode.Conflict))
-            .Returns(new HttpResponseMessage(HttpStatusCode.OK));
+            .Returns(result: new HttpResponseMessage(statusCode: HttpStatusCode.Conflict))
+            .Returns(result: new HttpResponseMessage(statusCode: HttpStatusCode.OK));
 
         // <snippet:migration-predicate>
         // Classifier.Http already knows that a 429 is throttling, a 5xx or 408 is transient and a
@@ -105,13 +105,13 @@ public sealed class Migration
         {
             Backoff = Backoff.None,
             Classify = Classifier.Http.OnResult<HttpResponseMessage>(r =>
-                r.StatusCode == HttpStatusCode.Conflict ? Verdict.Transient : Classifier.Http.ClassifyResult(r)),
+                r.StatusCode == HttpStatusCode.Conflict ? Verdict.Transient : Classifier.Http.ClassifyResult(value: r)),
         };
 
         // </snippet:migration-predicate>
 
-        using var response = await api.RunAsync(attempt => calls.NextAsync(attempt), cancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var response = await api.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
+        Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
     }
 
     [Fact]
@@ -129,17 +129,17 @@ public sealed class Migration
             .AddRateLimit(options => options.Concurrency = 10);
 
         // For any other callback
-        using var limiter = Limit.Concurrency(10);
+        using var limiter = Limit.Concurrency(permits: 10);
 
         var result = await policy.RunAsync(async ct =>
         {
-            using var lease = await limiter.AcquireOrThrowAsync(ct);
-            return await dependency.CallAsync(ct);
-        }, cancellationToken);
+            using var lease = await limiter.AcquireOrThrowAsync(cancellationToken: ct);
+            return await dependency.CallAsync(cancellationToken: ct);
+        }, cancellationToken: cancellationToken);
 
         // </snippet:migration-bulkhead>
 
-        Assert.Equal(1, result);
+        Assert.Equal(expected: 1, actual: result);
     }
 
     internal sealed class Client(HttpClient client)
@@ -154,6 +154,6 @@ public sealed class Migration
 
     internal sealed class Dependency
     {
-        internal Task<int> CallAsync(CancellationToken cancellationToken) => Task.FromResult(1);
+        internal Task<int> CallAsync(CancellationToken cancellationToken) => Task.FromResult(result: 1);
     }
 }

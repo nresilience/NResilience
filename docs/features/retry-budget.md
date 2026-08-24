@@ -42,7 +42,7 @@ Sharing a budget is opt-in. Use a shared budget to bound the aggregate number of
 // Retries compose multiplicatively: three layers each retrying three times is 27 attempts
 // at the bottom. A budget bounds retries as a fraction of traffic - 10% here - so the
 // aggregate is bounded whether or not anybody coordinates.
-var budget = RetryBudget.Shared("payments", fraction: 0.1, minimumPerSecond: 3);
+var budget = RetryBudget.Shared(name: "payments", fraction: 0.1, minimumPerSecond: 3);
 
 var charge = Resilience.Http with { Budget = budget };
 var refund = Resilience.Http with { Budget = budget };
@@ -68,8 +68,8 @@ The first attempt always runs; a budget throttles only the retries. When a budge
 // does not have to guess.
 if (result.Exception is CallRejectedException rejection)
 {
-    Console.WriteLine(rejection.Reason); // DependencyUnavailable, or BudgetExhausted
-    Console.WriteLine(rejection.RetryAfter); // when to come back, when there is an answer
+    Console.WriteLine(value: rejection.Reason); // DependencyUnavailable, or BudgetExhausted
+    Console.WriteLine(value: rejection.RetryAfter); // when to come back, when there is an answer
 }
 ```
 <!-- endsnippet -->

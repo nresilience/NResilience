@@ -12,18 +12,18 @@ public sealed class HttpDocs
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Status(HttpStatusCode.OK));
+            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
+            () => Doubles.Status(status: HttpStatusCode.OK));
 
         using var client = ResilienceHttp.CreateClient(
-            Resilience.Http with { Backoff = Backoff.None },
+            policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
         using var retried = await client.GetAsync(
-            new Uri("https://api.example.com/orders/1"), cancellationToken);
+            requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
-        Assert.Equal(2, transport.Requests.Count);
+        Assert.Equal(expected: HttpStatusCode.OK, actual: retried.StatusCode);
+        Assert.Equal(expected: 2, actual: transport.Requests.Count);
     }
 
     // <snippet:http-create-client>
@@ -34,7 +34,7 @@ public sealed class HttpDocs
         using var client = ResilienceHttp.CreateClient();
 
         using var response = await client.GetAsync(
-            new Uri("https://api.example.com/orders/1"), cancellationToken);
+            requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);
 
         return response.StatusCode;
     }
@@ -46,8 +46,8 @@ public sealed class HttpDocs
     {
         // <snippet:http-options>
         using var client = ResilienceHttp.CreateClient(
-            Resilience.Http with { Attempts = 4 },
-            new HttpResilienceOptions
+            policy: Resilience.Http with { Attempts = 4 },
+            options: new HttpResilienceOptions
             {
                 RetryUnsafeMethods = false, // POST and PATCH are not retried. The default.
                 OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
@@ -58,7 +58,7 @@ public sealed class HttpDocs
 
         // </snippet:http-options>
 
-        Assert.Equal(Timeout.InfiniteTimeSpan, client.Timeout);
+        Assert.Equal(expected: Timeout.InfiniteTimeSpan, actual: client.Timeout);
     }
 
     [Fact]
@@ -67,35 +67,35 @@ public sealed class HttpDocs
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Status(HttpStatusCode.OK));
+            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
+            () => Doubles.Status(status: HttpStatusCode.OK));
 
         using var client = ResilienceHttp.CreateClient(
-            Resilience.Http with { Backoff = Backoff.None },
+            policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
         var key = Guid.NewGuid().ToString();
-        HttpContent body = new StringContent("{}");
+        HttpContent body = new StringContent(content: "{}");
 
         // <snippet:http-repeatable>
         // POST is not retried by default, because a retried POST is a duplicate order. Per request,
         // this is the finer instrument, and it beats the per-client switch in both directions.
-        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders") { Content = body };
-        request.Headers.Add("Idempotency-Key", key);
-        request.Options.Set(ResilienceHttp.Repeatable, true);
+        using var request = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders") { Content = body };
+        request.Headers.Add(name: "Idempotency-Key", value: key);
+        request.Options.Set(key: ResilienceHttp.Repeatable, value: true);
 
-        using var response = await client.SendAsync(request, cancellationToken);
+        using var response = await client.SendAsync(request: request, cancellationToken: cancellationToken);
 
         // </snippet:http-repeatable>
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(2, transport.Requests.Count);
+        Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
+        Assert.Equal(expected: 2, actual: transport.Requests.Count);
     }
 
     [Fact]
     public void Per_host_state_is_readable_for_a_health_endpoint()
     {
-        var handler = new ResilienceHandler(new Doubles.ScriptedTransport(() => Doubles.Status(HttpStatusCode.OK)));
+        var handler = new ResilienceHandler(innerHandler: new Doubles.ScriptedTransport(() => Doubles.Status(status: HttpStatusCode.OK)));
 
         // <snippet:http-per-host>
         // A breaker whose scope is a variable with a name is one an operator can be told about.
@@ -104,30 +104,30 @@ public sealed class HttpDocs
 
         foreach (var (host, breaker) in breakers)
         {
-            Console.WriteLine($"{host}: {breaker.State} since {breaker.OpenedAt:O}");
+            Console.WriteLine(value: $"{host}: {breaker.State} since {breaker.OpenedAt:O}");
         }
 
         // </snippet:http-per-host>
 
-        Assert.Empty(breakers);
-        Assert.Empty(budgets);
+        Assert.Empty(collection: breakers);
+        Assert.Empty(collection: budgets);
     }
 
     [Fact]
     public void Whether_a_request_will_be_retried_is_a_question_you_can_ask()
     {
-        var handler = new ResilienceHandler(new Doubles.ScriptedTransport(() => Doubles.Status(HttpStatusCode.OK)));
+        var handler = new ResilienceHandler(innerHandler: new Doubles.ScriptedTransport(() => Doubles.Status(status: HttpStatusCode.OK)));
 
         // <snippet:http-will-retry>
-        using var get = new HttpRequestMessage(HttpMethod.Get, "https://api.example.com/orders/1");
-        using var post = new HttpRequestMessage(HttpMethod.Post, "https://api.example.com/orders");
+        using var get = new HttpRequestMessage(method: HttpMethod.Get, requestUri: "https://api.example.com/orders/1");
+        using var post = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders");
 
-        Console.WriteLine(handler.WillRetry(get)); // True
-        Console.WriteLine(handler.WillRetry(post)); // False
+        Console.WriteLine(value: handler.WillRetry(request: get)); // True
+        Console.WriteLine(value: handler.WillRetry(request: post)); // False
 
         // </snippet:http-will-retry>
 
-        Assert.True(handler.WillRetry(get));
-        Assert.False(handler.WillRetry(post));
+        Assert.True(condition: handler.WillRetry(request: get));
+        Assert.False(condition: handler.WillRetry(request: post));
     }
 }

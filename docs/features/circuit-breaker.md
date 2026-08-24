@@ -62,15 +62,15 @@ A circuit breaker can trip based on consecutive failures or based on rates of fa
 // The most common real degradation is not errors, it is a dependency answering 200s at
 // 30x normal latency. A breaker that only counts errors stays closed through the whole
 // incident, because the responses are not failing - they are just slow.
-var breaker = new Breaker(new BreakerSettings
+var breaker = new Breaker(settings: new BreakerSettings
 {
     ConsecutiveFailures = 5, // the default trip condition
-    SlowCallThreshold = TimeSpan.FromSeconds(2), // anything slower counts against
+    SlowCallThreshold = TimeSpan.FromSeconds(value: 2), // anything slower counts against
     SlowCallRatio = 0.5, // half the window being slow trips it
     MinimumCalls = 20, // below this, a ratio means nothing
-    Window = TimeSpan.FromSeconds(30),
-    BreakDuration = TimeSpan.FromSeconds(15), // doubles per consecutive open
-    MaxBreakDuration = TimeSpan.FromMinutes(2),
+    Window = TimeSpan.FromSeconds(value: 30),
+    BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
+    MaxBreakDuration = TimeSpan.FromMinutes(value: 2),
     ProbeSuccesses = 2, // two good probes to close, not one
 })
 {
@@ -92,8 +92,8 @@ When a circuit breaker refuses a call, it serves a short pause before returning.
 // does not have to guess.
 if (result.Exception is CallRejectedException rejection)
 {
-    Console.WriteLine(rejection.Reason); // DependencyUnavailable, or BudgetExhausted
-    Console.WriteLine(rejection.RetryAfter); // when to come back, when there is an answer
+    Console.WriteLine(value: rejection.Reason); // DependencyUnavailable, or BudgetExhausted
+    Console.WriteLine(value: rejection.RetryAfter); // when to come back, when there is an answer
 }
 ```
 <!-- endsnippet -->

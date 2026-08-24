@@ -14,16 +14,16 @@ public sealed class Guides
     public async Task Retry_an_http_call_end_to_end()
     {
         var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Json(new Order("A-1", "shipped")));
+            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
+            () => Doubles.Json(value: new Order(Id: "A-1", Status: "shipped")));
 
         var order = await ReadOrderAsync(
-            ResilienceHttp.CreateClient(Resilience.Http with { Backoff = Backoff.None }, innerHandler: transport),
-            "A-1",
-            TestContext.Current.CancellationToken);
+            client: ResilienceHttp.CreateClient(policy: Resilience.Http with { Backoff = Backoff.None }, innerHandler: transport),
+            id: "A-1",
+            cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.Equal("shipped", order?.Status);
-        Assert.Equal(2, transport.Requests.Count);
+        Assert.Equal(expected: "shipped", actual: order?.Status);
+        Assert.Equal(expected: 2, actual: transport.Requests.Count);
     }
 
     // <snippet:guide-retry-an-http-call>
@@ -31,17 +31,17 @@ public sealed class Guides
     {
         // Resilience.Http knows that a 503 is transient, a 429 is throttling and a 404 is an
         // answer. Three attempts, a 30 s deadline and a 10 s attempt ceiling are the defaults.
-        var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(10) };
+        var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10) };
 
         var result = await api.TryRunAsync(
-            attempt => client.GetFromJsonAsync<Order>(new Uri($"https://api.example.com/orders/{id}"), attempt),
-            cancellationToken);
+            attempt => client.GetFromJsonAsync<Order>(requestUri: new Uri(uriString: $"https://api.example.com/orders/{id}"), cancellationToken: attempt),
+            cancellationToken: cancellationToken);
 
-        if (result.TryGetValue(out var order))
+        if (result.TryGetValue(value: out var order))
             return order;
 
         // The failure, and everything that led to it, without an exception.
-        Console.WriteLine($"{result.StopReason}: {result.Attempts}");
+        Console.WriteLine(value: $"{result.StopReason}: {result.Attempts}");
         return null;
     }
 
@@ -51,13 +51,13 @@ public sealed class Guides
     public async Task Protect_one_dependency_without_touching_the_others()
     {
         var dependencies = new Dependencies();
-        Assert.Equal(BreakerState.Closed, dependencies.Payments.State);
+        Assert.Equal(expected: BreakerState.Closed, actual: dependencies.Payments.State);
 
         var result = await dependencies.Charge.TryRunAsync(
-            attempt => Task.FromResult("charged"),
-            TestContext.Current.CancellationToken);
+            attempt => Task.FromResult(result: "charged"),
+            cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.True(result.IsSuccess);
+        Assert.True(condition: result.IsSuccess);
     }
 
     [Fact]
@@ -77,14 +77,14 @@ public sealed class Guides
 
         // </snippet:guide-health-endpoint>
 
-        Assert.Equal("healthy", report);
+        Assert.Equal(expected: "healthy", actual: report);
     }
 
     [Fact]
     public void Configure_from_appsettings_end_to_end()
     {
         var configuration = new ConfigurationBuilder()
-            .AddJsonFile("appsettings.resilience.json")
+            .AddJsonFile(path: "appsettings.resilience.json")
             .Build();
 
         var services = new ServiceCollection();
@@ -93,17 +93,17 @@ public sealed class Guides
         // One policy per child of the section, each named by its key. Values reload; the roster is
         // read once, because a name that appears in the file after the container is built has
         // nothing to be injected into.
-        services.AddResilience(configuration.GetSection("Resilience"));
+        services.AddResilience(section: configuration.GetSection(key: "Resilience"));
 
-        services.AddHttpClient("orders").AddResilience("api");
+        services.AddHttpClient(name: "orders").AddResilience(policyName: "api");
 
         // </snippet:guide-configure-from-configuration>
 
         using var provider = services.BuildServiceProvider();
         var policies = provider.GetRequiredService<IResiliencePolicies>();
 
-        Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
-        Assert.NotNull(provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders"));
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: policies[name: "api"].Deadline);
+        Assert.NotNull(@object: provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "orders"));
     }
 
     private sealed record Order(string Id, string Status);
@@ -113,24 +113,24 @@ public sealed class Guides
     {
         // One breaker per dependency, held where its lifetime is obvious. A storm against payments
         // must not trip calls to search, and here that is a property of the code.
-        public Breaker Payments { get; } = new(new BreakerSettings
+        public Breaker Payments { get; } = new(settings: new BreakerSettings
         {
             ConsecutiveFailures = 5,
-            SlowCallThreshold = TimeSpan.FromSeconds(2),
-            BreakDuration = TimeSpan.FromSeconds(15),
+            SlowCallThreshold = TimeSpan.FromSeconds(value: 2),
+            BreakDuration = TimeSpan.FromSeconds(value: 15),
         })
         {
             Name = "payments",
         };
 
-        public RetryBudget PaymentsBudget { get; } = RetryBudget.Shared("payments");
+        public RetryBudget PaymentsBudget { get; } = RetryBudget.Shared(name: "payments");
 
         public Resilience Charge => Resilience.Http with
         {
             Name = "payments",
             Breaker = Payments,
             Budget = PaymentsBudget,
-            Deadline = TimeSpan.FromSeconds(8),
+            Deadline = TimeSpan.FromSeconds(value: 8),
         };
     }
 

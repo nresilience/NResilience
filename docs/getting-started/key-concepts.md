@@ -15,11 +15,11 @@ In NResilience, a policy is a value, not a built pipeline. Store a policy in a f
 <!-- snippet: key-concepts-policy-value -->
 ```csharp
 var api = Resilience.Http; // a preset
-var patient = api with { Deadline = TimeSpan.FromMinutes(1) }; // a variant
+var patient = api with { Deadline = TimeSpan.FromMinutes(value: 1) }; // a variant
 var once = patient with { Attempts = 1 }; // a variant of the variant
 
-Console.WriteLine(api == Resilience.Http); // True - it is a value
-Console.WriteLine(once.Deadline); // 00:01:00 - `with` copies the rest
+Console.WriteLine(value: api == Resilience.Http); // True - it is a value
+Console.WriteLine(value: once.Deadline); // 00:01:00 - `with` copies the rest
 ```
 <!-- endsnippet -->
 
@@ -33,14 +33,14 @@ public static class Policies
 {
     public static readonly Resilience Api = Resilience.Http with
     {
-        Deadline = TimeSpan.FromSeconds(10),
-        AttemptTimeout = TimeSpan.FromSeconds(3),
+        Deadline = TimeSpan.FromSeconds(value: 10),
+        AttemptTimeout = TimeSpan.FromSeconds(value: 3),
     };
 
     public static readonly Resilience Realtime = Api with
     {
         Attempts = 1,
-        AttemptTimeout = TimeSpan.FromMilliseconds(250),
+        AttemptTimeout = TimeSpan.FromMilliseconds(value: 250),
     };
 }
 ```
@@ -61,8 +61,8 @@ A retried call requires two distinct time bounds. Mixing these bounds is a commo
 ```csharp
 var api = Resilience.Http with
 {
-    Deadline = TimeSpan.FromSeconds(10), // the whole call, retries and backoff included
-    AttemptTimeout = TimeSpan.FromSeconds(3), // one attempt, capped by whatever is left of the deadline
+    Deadline = TimeSpan.FromSeconds(value: 10), // the whole call, retries and backoff included
+    AttemptTimeout = TimeSpan.FromSeconds(value: 3), // one attempt, capped by whatever is left of the deadline
 };
 ```
 <!-- endsnippet -->
@@ -85,9 +85,9 @@ A call returns a value or throws an exception. The library then decides whether 
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
 var classify = Classifier.Http
-    .On<MyTransportException>(Verdict.Transient) // retried, short curve
-    .On<MyQuotaException>(ex => Verdict.Throttled(ex.RetryAfter)) // retried, long curve or the server's own delay
-    .On<MyValidationException>(Verdict.Permanent); // never retried
+    .On<MyTransportException>(verdict: Verdict.Transient) // retried, short curve
+    .On<MyQuotaException>(ex => Verdict.Throttled(retryAfter: ex.RetryAfter)) // retried, long curve or the server's own delay
+    .On<MyValidationException>(verdict: Verdict.Permanent); // never retried
 
 var api = Resilience.Http with { Classify = classify };
 ```

@@ -13,45 +13,45 @@ public sealed class SnippetSyncTests
     public void Every_snippet_block_in_the_docs_matches_its_source()
     {
         var root = RepositoryRoot();
-        var snippets = SnippetEngine.Collect(Path.Combine(root, "tests", "NResilience.Docs"));
+        var snippets = SnippetEngine.Collect(sourceRoot: Path.Combine(path1: root, path2: "tests", path3: "NResilience.Docs"));
 
-        Assert.NotEmpty(snippets);
+        Assert.NotEmpty(collection: snippets);
 
-        var drift = SnippetEngine.Sync(root, snippets, false);
+        var drift = SnippetEngine.Sync(docsRoot: root, snippets: snippets, write: false);
 
-        Assert.Empty(drift.Select(d => $"{Path.GetRelativePath(root, d.File)}: {d.Detail}"));
+        Assert.Empty(collection: drift.Select(d => $"{Path.GetRelativePath(relativeTo: root, path: d.File)}: {d.Detail}"));
     }
 
     [Fact]
     public void Every_snippet_is_referenced_by_a_page()
     {
         var root = RepositoryRoot();
-        var snippets = SnippetEngine.Collect(Path.Combine(root, "tests", "NResilience.Docs"));
+        var snippets = SnippetEngine.Collect(sourceRoot: Path.Combine(path1: root, path2: "tests", path3: "NResilience.Docs"));
 
         var pages = Directory
-            .EnumerateFiles(root, "*.md", SearchOption.AllDirectories)
-            .Where(file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            .Select(File.ReadAllText)
+            .EnumerateFiles(path: root, searchPattern: "*.md", searchOption: SearchOption.AllDirectories)
+            .Where(file => !file.Contains(value: $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", comparisonType: StringComparison.Ordinal))
+            .Select(selector: File.ReadAllText)
             .ToArray();
 
         // An unreferenced snippet is dead sample code: it still compiles, so nothing else notices.
         var orphans = snippets.Keys
-            .Where(name => !pages.Any(page => page.Contains($"<!-- snippet: {name} -->", StringComparison.Ordinal)))
+            .Where(name => !pages.Any(page => page.Contains(value: $"<!-- snippet: {name} -->", comparisonType: StringComparison.Ordinal)))
             .ToArray();
 
-        Assert.Equal([], orphans);
+        Assert.Equal(expectedSpan: [], actualArray: orphans);
     }
 
     private static string RepositoryRoot()
     {
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        var directory = new DirectoryInfo(path: AppContext.BaseDirectory);
 
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "NResilience.slnx")))
+        while (directory is not null && !File.Exists(path: Path.Combine(path1: directory.FullName, path2: "NResilience.slnx")))
         {
             directory = directory.Parent;
         }
 
-        Assert.NotNull(directory);
+        Assert.NotNull(@object: directory);
         return directory.FullName;
     }
 }
