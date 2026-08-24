@@ -114,6 +114,19 @@ public sealed class HttpHandlerTests
     }
 
     [Fact]
+    public async Task A_non_retryable_POST_body_reaches_the_wire()
+    {
+        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+
+        using HttpClient client = Client(transport);
+        using HttpResponseMessage response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Single(transport.Requests);
+        Assert.Equal("order", transport.Bodies[0]);
+    }
+
+    [Fact]
     public async Task A_POST_is_retried_when_the_client_opts_in()
     {
         var transport = new ScriptedTransport(

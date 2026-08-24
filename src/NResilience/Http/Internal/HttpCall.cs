@@ -55,13 +55,19 @@ internal sealed class HttpCall(
     /// <i>next</i> attempt rather than at the end of this one is what keeps the final response -
     /// the one handed back to the caller, whether it succeeded or is a 503 the policy ran out of
     /// attempts on - alive.
+    /// <para>
+    /// A repeatable request is cloned for each attempt, because an <see cref="HttpRequestMessage"/>
+    /// may be sent once and the body is buffered so the clone carries it. A non-repeatable request
+    /// is sent directly: it has one attempt, the caller's <see cref="HttpClient"/> already marked it
+    /// as sent, and cloning without a buffered body would lose the content.
+    /// </para>
     /// </remarks>
     internal async Task<HttpResponseMessage> SendAsync(CancellationToken cancellationToken)
     {
         _previous?.Dispose();
         _previous = null;
 
-        HttpRequestMessage attempt = Clone();
+        HttpRequestMessage attempt = _clone ? Clone() : _original;
         try
         {
             HttpResponseMessage response = await _send(attempt, cancellationToken).ConfigureAwait(false);
@@ -70,7 +76,10 @@ internal sealed class HttpCall(
         }
         finally
         {
-            attempt.Dispose();
+            if (_clone)
+            {
+                attempt.Dispose();
+            }
         }
     }
 
