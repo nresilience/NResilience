@@ -50,6 +50,35 @@ jobs:
       - name: Run the analyzer suite
         run: dotnet test tests/NResilience.Analyzers.Tests/NResilience.Analyzers.Tests.csproj -c Release --no-build
 
+  # Real-IO integration suite.
+  #
+  # The behavioural suite composes the real executor over scripted in-memory transports. This
+  # job runs the full Resilience.Http preset over a real loopback socket and exercises cancellation,
+  # disposal, and telemetry composition that a scripted double cannot produce. One TFM: the
+  # behavioural suite already covers the no-cliff-on-net8 claim.
+  integration:
+    name: Integration tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - run: dotnet restore NResilience.slnx
+
+      - run: dotnet build NResilience.slnx -c Release --no-restore
+
+      - name: Run the integration suite
+        run: dotnet test tests/NResilience.IntegrationTests/NResilience.IntegrationTests.csproj -c Release --no-build
+
   # Docs gate.
   #
   # Every snippet in the README and under docs/ lives in tests/NResilience.Docs as compiled,

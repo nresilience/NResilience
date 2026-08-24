@@ -60,6 +60,7 @@
   <ItemGroup>
     <!-- The behavioral suite constructs NextAttempt and reads the inline log directly. -->
     <InternalsVisibleTo Include="NResilience.Tests"/>
+    <InternalsVisibleTo Include="NResilience.IntegrationTests"/>
 
     <!--
       The allocation gate asserts the inline attempt log's layout - capacity times record size -

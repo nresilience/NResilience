@@ -70,6 +70,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="NResilience.Tests"/>
+    <InternalsVisibleTo Include="NResilience.IntegrationTests"/>
   </ItemGroup>
 
   <!-- Shared package metadata: authors, repository URL, source link, symbols, readme. -->

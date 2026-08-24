@@ -19,6 +19,7 @@
     <Project Path="tests/NResilience.Docs/NResilience.Docs.csproj" />
     <Project Path="tests/NResilience.Gates/NResilience.Gates.csproj" />
     <Project Path="tests/NResilience.Tests/NResilience.Tests.csproj" />
+    <Project Path="tests/NResilience.IntegrationTests/NResilience.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/Tools/">
     <Project Path="tools/NResilience.DocSnippets/NResilience.DocSnippets.csproj" />

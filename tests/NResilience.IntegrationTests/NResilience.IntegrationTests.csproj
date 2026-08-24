@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NResilience.IntegrationTests</RootNamespace>
+    <IsTestProject>true</IsTestProject>
+
+    <!--
+      xUnit1051 wants every call taking a CancellationToken to be handed the test's own. This
+      suite is about what a policy does with the token it is given, so the token is the subject
+      rather than plumbing, and threading the test's token through would change what is measured.
+    -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3"/>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing"/>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+    <PackageReference Include="Microsoft.Extensions.Hosting"/>
+    <PackageReference Include="Microsoft.Extensions.Http"/>
+    <PackageReference Include="Microsoft.Extensions.Logging"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj"/>
+  </ItemGroup>
+
+</Project>
