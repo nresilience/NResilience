@@ -8,12 +8,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NBenchmark" />
+    <PackageReference Include="NBenchmark"/>
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../NResilience.Probes/NResilience.Probes.csproj" />
-    <ProjectReference Include="../NResilience.Probes.Polly/NResilience.Probes.Polly.csproj" />
+    <ProjectReference Include="../NResilience.Probes/NResilience.Probes.csproj"/>
+    <ProjectReference Include="../NResilience.Probes.Polly/NResilience.Probes.Polly.csproj"/>
   </ItemGroup>
 
 </Project>

@@ -11,14 +11,14 @@
       The arms that drive the gates, the trend benchmarks and the Native AOT probe all
       live here beside the hand-written stand-in fused loop they are measured against.
     -->
-    <ProjectReference Include="../../src/NResilience/NResilience.csproj" />
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
 
     <!--
       The log listener's arm. Referenced so the "a disabled level allocates nothing" gate is a
       difference against the telemetry-only arm measured in the same sweep, rather than a subtraction
       across two harnesses.
     -->
-    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj" />
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
   </ItemGroup>
 
 </Project>

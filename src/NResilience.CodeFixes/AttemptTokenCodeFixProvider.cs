@@ -11,9 +11,9 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 namespace NResilience.Analyzers;
 
 /// <summary>
-/// The fix for NRES001 and NRES002: pass the attempt's token. Where the callback declared its
-/// parameter as <c>_</c> the fix names it first, because a token you cannot refer to cannot be
-/// passed.
+///     The fix for NRES001 and NRES002: pass the attempt's token. Where the callback declared its
+///     parameter as <c>_</c> the fix names it first, because a token you cannot refer to cannot be
+///     passed.
 /// </summary>
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(AttemptTokenCodeFixProvider))]
 [Shared]
@@ -35,24 +35,20 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
 
         if (root is null)
-        {
             return;
-        }
 
         foreach (var diagnostic in context.Diagnostics)
         {
             var reported = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
 
             if (reported.FirstAncestorOrSelf<AnonymousFunctionExpressionSyntax>() is null)
-            {
                 continue;
-            }
 
             context.RegisterCodeFix(
                 CodeAction.Create(
                     Title,
                     token => Fix(context.Document, diagnostic, token),
-                    equivalenceKey: nameof(AttemptTokenCodeFixProvider)),
+                    nameof(AttemptTokenCodeFixProvider)),
                 diagnostic);
         }
     }
@@ -62,16 +58,12 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
         var root = await document.GetSyntaxRootAsync(cancellationToken).ConfigureAwait(false);
 
         if (root is null)
-        {
             return document;
-        }
 
         var reported = root.FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
 
         if (reported.FirstAncestorOrSelf<AnonymousFunctionExpressionSyntax>() is not { } lambda)
-        {
             return document;
-        }
 
         diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.AttemptNameProperty, out var declared);
         var parameter = TokenParameter(lambda, declared);
@@ -80,22 +72,14 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
         var edits = new Dictionary<SyntaxNode, SyntaxNode>();
 
         if (parameter is not null && parameter.Identifier.ValueText != name)
-        {
             edits[parameter] = parameter.WithIdentifier(Identifier(name).WithTriviaFrom(parameter.Identifier));
-        }
 
         if (diagnostic.Id == Diagnostics.WrongTokenPassedId)
-        {
             edits[reported] = IdentifierName(name).WithTriviaFrom(reported);
-        }
         else if (WithTokenArgument(reported, diagnostic, name) is { } rewritten)
-        {
             edits[reported] = rewritten;
-        }
         else
-        {
             return document;
-        }
 
         SyntaxNode fixedLambda = lambda.ReplaceNodes(edits.Keys, (original, _) => edits[original]);
         return document.WithSyntaxRoot(root.ReplaceNode(lambda, fixedLambda));
@@ -113,9 +97,7 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
         };
 
         if (arguments is null)
-        {
             return null;
-        }
 
         diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.PositionalProperty, out var positional);
         diagnostic.Properties.TryGetValue(AttemptTokenAnalyzer.ParameterNameProperty, out var parameterName);
@@ -123,9 +105,7 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
         var token = Argument(IdentifierName(name));
 
         if (positional != "true" && !string.IsNullOrEmpty(parameterName))
-        {
             token = token.WithNameColon(NameColon(IdentifierName(parameterName!)));
-        }
 
         var updated = arguments.WithArguments(arguments.Arguments.Add(token));
 
@@ -150,32 +130,29 @@ public sealed class AttemptTokenCodeFixProvider : CodeFixProvider
     };
 
     /// <summary>
-    /// A name for a parameter that had none. Checked against the whole member rather than the
-    /// lambda, so the new name cannot shadow something the surrounding method is using, and every
-    /// candidate is checked so the name handed back is one nothing in scope has taken.
+    ///     A name for a parameter that had none. Checked against the whole member rather than the
+    ///     lambda, so the new name cannot shadow something the surrounding method is using, and every
+    ///     candidate is checked so the name handed back is one nothing in scope has taken.
     /// </summary>
     private static string AvailableName(SyntaxNode lambda)
     {
         var scope = lambda.FirstAncestorOrSelf<MemberDeclarationSyntax>() ?? lambda;
+
         HashSet<string> taken = new(scope.DescendantTokens()
             .Where(token => token.IsKind(SyntaxKind.IdentifierToken))
             .Select(token => token.ValueText));
 
         if (!taken.Contains("attempt"))
-        {
             return "attempt";
-        }
 
-        for (var suffix = 0; ; suffix++)
+        for (var suffix = 0;; suffix++)
         {
             var candidate = suffix == 0
                 ? "attemptToken"
                 : "attemptToken" + suffix.ToString(CultureInfo.InvariantCulture);
 
             if (!taken.Contains(candidate))
-            {
                 return candidate;
-            }
         }
     }
 }

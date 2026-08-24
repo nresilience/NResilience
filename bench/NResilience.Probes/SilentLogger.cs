@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 namespace NResilience.Probes;
 
 /// <summary>
-/// A logger that carries nothing. Every <see cref="ILogger.IsEnabled"/> call answers false, which is
-/// the state a process is in when nobody has turned the resilience category up - and therefore the
-/// state the allocation gate has to price.
+///     A logger that carries nothing. Every <see cref="ILogger.IsEnabled" /> call answers false, which is
+///     the state a process is in when nobody has turned the resilience category up - and therefore the
+///     state the allocation gate has to price.
 /// </summary>
 internal sealed class SilentLogger : ILogger
 {

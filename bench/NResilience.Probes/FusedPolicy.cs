@@ -1,9 +1,9 @@
 namespace NResilience.Probes;
 
 /// <summary>
-/// Stand-in for the shipping <c>Resilience</c> record. Only the fields the executor
-/// frame reads are present - this exists to give the fused loop realistic work to do, not to
-/// prototype the public surface.
+///     Stand-in for the shipping <c>Resilience</c> record. Only the fields the executor
+///     frame reads are present - this exists to give the fused loop realistic work to do, not to
+///     prototype the public surface.
 /// </summary>
 public sealed record FusedPolicy
 {

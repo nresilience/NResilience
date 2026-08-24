@@ -1,8 +1,10 @@
+using System.Net.Sockets;
+
 namespace NResilience.Probes;
 
 /// <summary>
-/// A stand-in for the shipping <c>VerdictKind</c>. The values and semantics match the
-/// shipping enum so the fused loop branches identically to the real executor.
+///     A stand-in for the shipping <c>VerdictKind</c>. The values and semantics match the
+///     shipping enum so the fused loop branches identically to the real executor.
 /// </summary>
 public enum VerdictKind : byte
 {
@@ -25,16 +27,16 @@ public readonly record struct Verdict(VerdictKind Kind, TimeSpan? RetryAfter = n
 }
 
 /// <summary>
-/// Implements the classification rules of <c>Classifier.Default</c> using a hard-coded switch. 
-/// This project measures the executor frame rather than classifier storage, so rule lookup is 
-/// a synchronous type switch - the same approach the shipping classifier uses on the hot path.
+///     Implements the classification rules of <c>Classifier.Default</c> using a hard-coded switch.
+///     This project measures the executor frame rather than classifier storage, so rule lookup is
+///     a synchronous type switch - the same approach the shipping classifier uses on the hot path.
 /// </summary>
 public static class ProbeClassifier
 {
     public static Verdict Classify(Exception exception) => exception switch
     {
         TimeoutException => Verdict.Transient,
-        System.Net.Sockets.SocketException => Verdict.Transient,
+        SocketException => Verdict.Transient,
         IOException => Verdict.Transient,
         _ => Verdict.Permanent,
     };

@@ -6,8 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Polly.Core" />
-    <ProjectReference Include="../NResilience.Probes/NResilience.Probes.csproj" />
+    <PackageReference Include="Polly.Core"/>
+    <ProjectReference Include="../NResilience.Probes/NResilience.Probes.csproj"/>
   </ItemGroup>
 
 </Project>

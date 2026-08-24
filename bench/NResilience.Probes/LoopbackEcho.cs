@@ -4,29 +4,27 @@ using System.Net.Sockets;
 namespace NResilience.Probes;
 
 /// <summary>
-/// A real loopback TCP round trip used to cross-check the <c>Task.Yield</c> gate.
-///
-/// <c>Task.Yield</c> is the appropriate primitive for a gate because it suspends 
-/// deterministically on every call, without I/O completion ports, synchronization 
-/// with a second thread, or variance. However, it is not I/O, and the design's performance 
-/// argument concerns the path real I/O takes. If a fused loop and a composed pipeline 
-/// disagree on the ratio over a real socket, the gate is measuring an artifact. 
-/// Appendix B of the design document reports 112 B per frame over a loopback socket, 
-/// providing a published figure for verification.
-///
-/// The callback passes its cancellation token to the socket calls, mimicking real code. 
-/// A wrapper that provides a cancellable token incurs the cost of the socket's 
-/// registration, which is a genuine cost rather than a harness artifact.
+///     A real loopback TCP round trip used to cross-check the <c>Task.Yield</c> gate.
+///     <c>Task.Yield</c> is the appropriate primitive for a gate because it suspends
+///     deterministically on every call, without I/O completion ports, synchronization
+///     with a second thread, or variance. However, it is not I/O, and the design's performance
+///     argument concerns the path real I/O takes. If a fused loop and a composed pipeline
+///     disagree on the ratio over a real socket, the gate is measuring an artifact.
+///     Appendix B of the design document reports 112 B per frame over a loopback socket,
+///     providing a published figure for verification.
+///     The callback passes its cancellation token to the socket calls, mimicking real code.
+///     A wrapper that provides a cancellable token incurs the cost of the socket's
+///     registration, which is a genuine cost rather than a harness artifact.
 /// </summary>
 public sealed class LoopbackEcho : IAsyncDisposable
 {
-    private readonly Socket _listener;
     private readonly Socket _client;
-    private readonly Socket _server;
-    private readonly byte[] _send = [1];
-    private readonly byte[] _receive = new byte[1];
-    private readonly CancellationTokenSource _shutdown = new();
+    private readonly Socket _listener;
     private readonly Task _pump;
+    private readonly byte[] _receive = new byte[1];
+    private readonly byte[] _send = [1];
+    private readonly Socket _server;
+    private readonly CancellationTokenSource _shutdown = new();
 
     private LoopbackEcho(Socket listener, Socket client, Socket server)
     {
@@ -34,6 +32,24 @@ public sealed class LoopbackEcho : IAsyncDisposable
         _client = client;
         _server = server;
         _pump = Task.Run(() => EchoAsync(server, _shutdown.Token));
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await _shutdown.CancelAsync().ConfigureAwait(false);
+
+        try
+        {
+            await _pump.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        _client.Dispose();
+        _server.Dispose();
+        _listener.Dispose();
+        _shutdown.Dispose();
     }
 
     public static async Task<LoopbackEcho> StartAsync()
@@ -63,15 +79,15 @@ public sealed class LoopbackEcho : IAsyncDisposable
     private static async Task EchoAsync(Socket server, CancellationToken cancellationToken)
     {
         var buffer = new byte[1];
+
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
                 var read = await server.ReceiveAsync(buffer, SocketFlags.None, cancellationToken).ConfigureAwait(false);
+
                 if (read == 0)
-                {
                     return;
-                }
 
                 await server.SendAsync(buffer.AsMemory(0, read), SocketFlags.None, cancellationToken).ConfigureAwait(false);
             }
@@ -85,23 +101,5 @@ public sealed class LoopbackEcho : IAsyncDisposable
         catch (ObjectDisposedException)
         {
         }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _shutdown.CancelAsync().ConfigureAwait(false);
-
-        try
-        {
-            await _pump.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-        }
-
-        _client.Dispose();
-        _server.Dispose();
-        _listener.Dispose();
-        _shutdown.Dispose();
     }
 }

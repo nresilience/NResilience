@@ -1,13 +1,12 @@
 namespace NResilience.Probes;
 
 /// <summary>
-/// Defines the A/B arms, shared by the hard gate, the benchmark harness, and the
-/// Native AOT probe. Sharing these arms ensures consistency: the baseline comparison
-/// in Appendix B used two different harnesses, whereas this project uses a single
-/// harness for all measurements.
-///
-/// Every arm is a <c>Func&lt;ValueTask&lt;int&gt;&gt;</c> built from a cached static delegate,
-/// ensuring no arm carries a closure that another avoids.
+///     Defines the A/B arms, shared by the hard gate, the benchmark harness, and the
+///     Native AOT probe. Sharing these arms ensures consistency: the baseline comparison
+///     in Appendix B used two different harnesses, whereas this project uses a single
+///     harness for all measurements.
+///     Every arm is a <c>Func&lt;ValueTask&lt;int&gt;&gt;</c> built from a cached static delegate,
+///     ensuring no arm carries a closure that another avoids.
 /// </summary>
 public static class Scenarios
 {
@@ -15,10 +14,10 @@ public static class Scenarios
     private static readonly Func<CancellationToken, Task<int>> CompleteCallback = Gate.CompleteAsync;
 
     /// <summary>
-    /// A caller token that can be cancelled but never is. This represents the production case
-    /// - such as an ASP.NET request abort token or a host shutdown token. Because this changes
-    /// the cost of the per-attempt link by an order of magnitude, the loop uses dedicated
-    /// arms instead of folding it into <c>CancellationToken.None</c>.
+    ///     A caller token that can be cancelled but never is. This represents the production case
+    ///     - such as an ASP.NET request abort token or a host shutdown token. Because this changes
+    ///     the cost of the per-attempt link by an order of magnitude, the loop uses dedicated
+    ///     arms instead of folding it into <c>CancellationToken.None</c>.
     /// </summary>
     public static readonly CancellationTokenSource CallerSource = new();
 
@@ -29,10 +28,10 @@ public static class Scenarios
     public static readonly LeanFusedExecutor Lean = new();
 
     /// <summary>A decomposition arm that uses the real loop but removes the inline attempt log. This is not a shipping shape.</summary>
-    public static readonly FusedExecutor NoTimeoutNoLog = new(FusedPolicy.NoTimeout, recordAttempts: false);
+    public static readonly FusedExecutor NoTimeoutNoLog = new(FusedPolicy.NoTimeout, false);
 
-    /// <summary>A decomposition arm similar to <see cref="NoTimeoutNoLog"/>, but with the attempt timeout enabled.</summary>
-    public static readonly FusedExecutor DefaultNoLog = new(FusedPolicy.Default, recordAttempts: false);
+    /// <summary>A decomposition arm similar to <see cref="NoTimeoutNoLog" />, but with the attempt timeout enabled.</summary>
+    public static readonly FusedExecutor DefaultNoLog = new(FusedPolicy.Default, false);
 
     // ---- Suspending path: the path every real I/O call takes. ----
 
@@ -63,18 +62,18 @@ public static class Scenarios
 
     /// <summary>A static lambda with state; it uses no closure or capture, and the state is a value type.</summary>
     public static ValueTask<int> FusedNoTimeoutSyncState() =>
-        NoTimeout.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0);
+        NoTimeout.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
 
     /// <summary>
-    /// The same call but with an attempt timeout in the policy. The difference between this
-    /// and <see cref="FusedNoTimeoutSyncState"/> is the per-attempt linked source - this is
-    /// why "full policy, completes synchronously, 0 bytes" requires a qualifier.
+    ///     The same call but with an attempt timeout in the policy. The difference between this
+    ///     and <see cref="FusedNoTimeoutSyncState" /> is the per-attempt linked source - this is
+    ///     why "full policy, completes synchronously, 0 bytes" requires a qualifier.
     /// </summary>
     public static ValueTask<int> FusedDefaultSyncState() =>
-        Default.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0);
+        Default.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
 
     public static ValueTask<int> FusedFullSyncState() =>
-        Full.RunAsync(static (int _, CancellationToken ct) => Gate.CompleteAsync(ct), 0);
+        Full.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
 
     /// <summary>The stateless overload that uses the caller's own closure and delegate, which is the cost of any lambda.</summary>
     public static ValueTask<int> FusedNoTimeoutSyncCallback() => NoTimeout.RunAsync(CompleteCallback);
@@ -82,27 +81,28 @@ public static class Scenarios
     // ---- Retry. ----
 
     /// <summary>
-    /// This arm simulates two transient failures followed by a success, with backoff disabled
-    /// and no timeout source. This isolates the cost of the retry machinery. The fault uses
-    /// a cached exception instance; throwing a new exception each attempt would measure
-    /// exception construction, which both arms incur identically.
+    ///     This arm simulates two transient failures followed by a success, with backoff disabled
+    ///     and no timeout source. This isolates the cost of the retry machinery. The fault uses
+    ///     a cached exception instance; throwing a new exception each attempt would measure
+    ///     exception construction, which both arms incur identically.
     /// </summary>
     public static RetryArm BuildFusedRetry(int failures = 2) => new(failures);
 
     public sealed class RetryArm
     {
+        private readonly Func<Gate.FailCounter, CancellationToken, Task<int>> _callback = Gate.SuspendThenFailAsync;
         private readonly Gate.FailCounter _counter;
         private readonly FusedExecutor _executor;
-        private readonly Func<Gate.FailCounter, CancellationToken, Task<int>> _callback = Gate.SuspendThenFailAsync;
 
         public RetryArm(int failures)
         {
             _counter = new Gate.FailCounter(failures);
+
             _executor = new FusedExecutor(FusedPolicy.NoTimeout with
             {
                 Attempts = failures + 1,
                 UseBackoff = false,
-                Budget = new ProbeBudget(capacity: int.MaxValue / 2),
+                Budget = new ProbeBudget(int.MaxValue / 2),
             });
         }
 

@@ -4,46 +4,43 @@ using System.Runtime.ExceptionServices;
 namespace NResilience.Probes;
 
 /// <summary>
-/// A stand-in for the shipping executor. It implements admission, deadline, 
-/// the attempt loop, per-attempt timeout, classification, breaker, budget, backoff, 
-/// and the inline attempt log, all within a single <c>async</c> method.
-///
-/// This implementation is deliberately comprehensive. The question it exists to answer is
-/// whether the fused-frame advantage survives contact with a realistic loop. This can only
-/// be answered by a loop that hoists a realistic amount of state across the attempt
-/// <c>await</c>. Every local variable below is live across that await and is therefore stored
-/// in the state-machine box.
+///     A stand-in for the shipping executor. It implements admission, deadline,
+///     the attempt loop, per-attempt timeout, classification, breaker, budget, backoff,
+///     and the inline attempt log, all within a single <c>async</c> method.
+///     This implementation is deliberately comprehensive. The question it exists to answer is
+///     whether the fused-frame advantage survives contact with a realistic loop. This can only
+///     be answered by a loop that hoists a realistic amount of state across the attempt
+///     <c>await</c>. Every local variable below is live across that await and is therefore stored
+///     in the state-machine box.
 /// </summary>
 public sealed class FusedExecutor
 {
-    private readonly FusedPolicy _policy;
     private readonly bool _passthrough;
     private readonly bool _recordAttempts;
 
     /// <param name="policy">The policy the loop enforces.</param>
     /// <param name="recordAttempts">
-    /// Whether the loop keeps the inline attempt log. This is always true in the 
-    /// shipping design. The false option exists so the log can be priced 
-    /// against the same loop without it.
+    ///     Whether the loop keeps the inline attempt log. This is always true in the
+    ///     shipping design. The false option exists so the log can be priced
+    ///     against the same loop without it.
     /// </param>
     public FusedExecutor(FusedPolicy policy, bool recordAttempts = true)
     {
-        _policy = policy;
+        Policy = policy;
         _passthrough = policy.IsPassthrough;
         _recordAttempts = recordAttempts;
     }
 
-    public FusedPolicy Policy => _policy;
+    public FusedPolicy Policy { get; }
 
     public ValueTask<T> RunAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default)
     {
         // Resilience.None is a single branch and returns the callback's own task. No frame, no box.
         if (_passthrough)
-        {
             return new ValueTask<T>(work(cancellationToken));
-        }
 
         var invoker = new StatelessInvoker<VoidResult, T>(work);
+
         return _recordAttempts
             ? RunCoreAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, InlineAttemptSink>(invoker, default, cancellationToken)
             : RunCoreAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, NoAttemptSink>(invoker, default, cancellationToken);
@@ -52,11 +49,10 @@ public sealed class FusedExecutor
     public ValueTask<T> RunAsync<TState, T>(Func<TState, CancellationToken, Task<T>> work, TState state, CancellationToken cancellationToken = default)
     {
         if (_passthrough)
-        {
             return new ValueTask<T>(work(state, cancellationToken));
-        }
 
         var invoker = new StatefulInvoker<TState, T>(work);
+
         return _recordAttempts
             ? RunCoreAsync<TState, T, StatefulInvoker<TState, T>, InlineAttemptSink>(invoker, state, cancellationToken)
             : RunCoreAsync<TState, T, StatefulInvoker<TState, T>, NoAttemptSink>(invoker, state, cancellationToken);
@@ -66,7 +62,7 @@ public sealed class FusedExecutor
         where TInvoker : struct, IInvoker<TState, T>
         where TSink : struct, IAttemptSink
     {
-        var policy = _policy;
+        var policy = Policy;
         var time = policy.Time;
         var breaker = policy.Breaker;
         var budget = policy.Budget;
@@ -82,15 +78,12 @@ public sealed class FusedExecutor
         while (true)
         {
             if (breaker is not null && !breaker.TryEnter(time))
-            {
                 throw new ProbeBreakerOpenException();
-            }
 
             var remaining = Remaining(policy, time, startTimestamp, bounded);
+
             if (remaining == TimeSpan.Zero)
-            {
                 throw new ProbeDeadlineException();
-            }
 
             var effective = Effective(policy.AttemptTimeout, remaining);
 
@@ -109,6 +102,7 @@ public sealed class FusedExecutor
                 linked = cancellationToken.CanBeCanceled
                     ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
                     : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
+
                 attemptToken = linked.Token;
             }
 
@@ -144,10 +138,9 @@ public sealed class FusedExecutor
             finally
             {
                 linked?.Dispose();
+
                 if (timer is not null)
-                {
                     CtsPool.Return(timer, time);
-                }
             }
 
             log.Record(attempts, attemptStart, time.GetTimestamp() - attemptStart, verdict.Kind);
@@ -164,29 +157,24 @@ public sealed class FusedExecutor
 
             // Only Transient is evidence about the dependency's health.
             if (verdict.Kind == VerdictKind.Transient)
-            {
                 breaker?.RecordFailure(time);
-            }
 
             var retryable = verdict.Kind is VerdictKind.Transient or VerdictKind.Throttled;
+
             if (!retryable || attempts >= policy.Attempts)
-            {
                 break;
-            }
 
             if (budget is not null && !budget.TrySpend())
-            {
                 break;
-            }
 
             var delay = ProbeBackoff.Compute(policy, verdict, attempts);
+
             if (bounded)
             {
-                var left = Remaining(policy, time, startTimestamp, bounded: true);
+                var left = Remaining(policy, time, startTimestamp, true);
+
                 if (left == TimeSpan.Zero || delay >= left)
-                {
                     break;
-                }
             }
 
             if (delay > TimeSpan.Zero)
@@ -207,9 +195,7 @@ public sealed class FusedExecutor
     private static TimeSpan Remaining(FusedPolicy policy, TimeProvider time, long startTimestamp, bool bounded)
     {
         if (!bounded)
-        {
             return Timeout.InfiniteTimeSpan;
-        }
 
         var elapsed = time.GetElapsedTime(startTimestamp);
         var left = policy.Deadline - elapsed;
@@ -220,14 +206,10 @@ public sealed class FusedExecutor
     private static TimeSpan Effective(TimeSpan attemptTimeout, TimeSpan remaining)
     {
         if (attemptTimeout == Timeout.InfiniteTimeSpan)
-        {
             return remaining;
-        }
 
         if (remaining == Timeout.InfiniteTimeSpan)
-        {
             return attemptTimeout;
-        }
 
         return attemptTimeout < remaining ? attemptTimeout : remaining;
     }

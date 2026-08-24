@@ -3,15 +3,15 @@ using System.Runtime.CompilerServices;
 namespace NResilience.Probes;
 
 /// <summary>
-/// A consecutive-failure breaker reduced to the state the executor frame actually touches:
-/// one admission check per attempt and one counter update per outcome. The full version
-/// is implemented in the shipping library; this stand-in ensures the fused loop incurs
-/// the same cost as the shipping version.
+///     A consecutive-failure breaker reduced to the state the executor frame actually touches:
+///     one admission check per attempt and one counter update per outcome. The full version
+///     is implemented in the shipping library; this stand-in ensures the fused loop incurs
+///     the same cost as the shipping version.
 /// </summary>
 public sealed class ProbeBreaker
 {
-    private readonly int _consecutiveFailures;
     private readonly long _breakDurationTicks;
+    private readonly int _consecutiveFailures;
     private int _failures;
     private long _openedAtTicks;
 
@@ -27,15 +27,12 @@ public sealed class ProbeBreaker
     public bool TryEnter(TimeProvider time)
     {
         var openedAt = Volatile.Read(ref _openedAtTicks);
+
         if (openedAt == 0)
-        {
             return true;
-        }
 
         if (time.GetUtcNow().UtcTicks - openedAt < _breakDurationTicks)
-        {
             return false;
-        }
 
         // Half-open: let one probe through.
         Interlocked.CompareExchange(ref _openedAtTicks, 0, openedAt);
@@ -49,9 +46,7 @@ public sealed class ProbeBreaker
     public void RecordFailure(TimeProvider time)
     {
         if (Interlocked.Increment(ref _failures) >= _consecutiveFailures)
-        {
             Volatile.Write(ref _openedAtTicks, time.GetUtcNow().UtcTicks);
-        }
     }
 
     public void Reset()
@@ -62,9 +57,9 @@ public sealed class ProbeBreaker
 }
 
 /// <summary>
-/// A client-side retry token bucket. It implements one <see cref="TrySpend"/> per retry 
-/// decision and one <see cref="Refund"/> per success, which is the total state the 
-/// executor frame accesses.
+///     A client-side retry token bucket. It implements one <see cref="TrySpend" /> per retry
+///     decision and one <see cref="Refund" /> per success, which is the total state the
+///     executor frame accesses.
 /// </summary>
 public sealed class ProbeBudget
 {
@@ -85,13 +80,13 @@ public sealed class ProbeBudget
     public bool TrySpend()
     {
         var current = Volatile.Read(ref _tokens);
+
         while (current > 0)
         {
             var observed = Interlocked.CompareExchange(ref _tokens, current - 1, current);
+
             if (observed == current)
-            {
                 return true;
-            }
 
             current = observed;
         }
@@ -103,10 +98,9 @@ public sealed class ProbeBudget
     public void Refund()
     {
         var current = Volatile.Read(ref _tokens);
+
         if (current >= _capacity)
-        {
             return;
-        }
 
         Interlocked.Add(ref _tokens, _refundPerSuccess);
     }
@@ -128,7 +122,9 @@ public sealed class ProbeExhaustedException : Exception
 {
     public ProbeExhaustedException(int attempts)
         : base($"All {attempts} attempt(s) failed.")
-        => Attempts = attempts;
+    {
+        Attempts = attempts;
+    }
 
     public int Attempts { get; }
 }

@@ -4,24 +4,20 @@ using System.Runtime.CompilerServices;
 namespace NResilience.Probes;
 
 /// <summary>
-/// Implements exponential backoff with full jitter, a hard cap, and separate base delays
-/// for transient and throttled verdicts. Jitter draws from a thread-static xoshiro128**
-/// to ensure the hot path takes no lock and touches no shared <see cref="Random"/>.
+///     Implements exponential backoff with full jitter, a hard cap, and separate base delays
+///     for transient and throttled verdicts. Jitter draws from a thread-static xoshiro128**
+///     to ensure the hot path takes no lock and touches no shared <see cref="Random" />.
 /// </summary>
 public static class ProbeBackoff
 {
-    [ThreadStatic]
-    private static uint t_s0, t_s1, t_s2, t_s3;
+    [ThreadStatic] private static uint t_s0, t_s1, t_s2, t_s3;
 
-    [ThreadStatic]
-    private static bool t_seeded;
+    [ThreadStatic] private static bool t_seeded;
 
     public static TimeSpan Compute(in FusedPolicy policy, in Verdict verdict, int attemptsSoFar)
     {
         if (!policy.UseBackoff)
-        {
             return TimeSpan.Zero;
-        }
 
         if (verdict.RetryAfter is { } pushback)
         {
@@ -37,9 +33,7 @@ public static class ProbeBackoff
         var capped = Math.Min(ticks, policy.BackoffMax.Ticks);
 
         if (!policy.Jitter)
-        {
             return TimeSpan.FromTicks((long)capped);
-        }
 
         // Full jitter: random(0, computed). A narrow band around a shared base still leaves a
         // synchronized pulse, which is the thing jitter exists to destroy.
@@ -52,9 +46,7 @@ public static class ProbeBackoff
     private static uint NextUInt32()
     {
         if (!t_seeded)
-        {
             Seed();
-        }
 
         var result = BitOperations.RotateLeft(t_s1 * 5, 7) * 9;
         var t = t_s1 << 9;
@@ -76,10 +68,9 @@ public static class ProbeBackoff
         t_s1 = SplitMix(ref x);
         t_s2 = SplitMix(ref x);
         t_s3 = SplitMix(ref x);
+
         if ((t_s0 | t_s1 | t_s2 | t_s3) == 0)
-        {
             t_s0 = 1;
-        }
 
         t_seeded = true;
 

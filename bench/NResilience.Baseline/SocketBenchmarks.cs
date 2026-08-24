@@ -6,16 +6,16 @@ using Polly;
 namespace NResilience.Baseline;
 
 /// <summary>
-/// Performs the same comparison over a real loopback TCP round trip. This benchmark is
-/// tagged <c>socket</c> for filtering; it serves as a cross-check for the <c>Task.Yield</c>
-/// arms rather than a trend line, because socket timings are noisier than yield arms.
+///     Performs the same comparison over a real loopback TCP round trip. This benchmark is
+///     tagged <c>socket</c> for filtering; it serves as a cross-check for the <c>Task.Yield</c>
+///     arms rather than a trend line, because socket timings are noisier than yield arms.
 /// </summary>
 [BenchmarkCategory("socket")]
 public class SocketBenchmarks
 {
+    private Func<CancellationToken, Task<int>> _callback = null!;
     private LoopbackEcho _echo = null!;
     private ResiliencePipeline _polly = null!;
-    private Func<CancellationToken, Task<int>> _callback = null!;
     private Func<CancellationToken, ValueTask<int>> _pollyCallback = null!;
 
     // Setup and teardown are synchronous because the harness binds them as void delegates.
