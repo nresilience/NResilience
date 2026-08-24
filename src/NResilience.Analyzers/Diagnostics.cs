@@ -3,8 +3,8 @@ using Microsoft.CodeAnalysis;
 namespace NResilience.Analyzers;
 
 /// <summary>
-/// Every diagnostic the analyzers raise, declared in one place so the ids, the categories and the
-/// help links cannot drift from the page that documents them.
+///     Every diagnostic the analyzers raise, declared in one place so the ids, the categories and the
+///     help links cannot drift from the page that documents them.
 /// </summary>
 internal static class Diagnostics
 {
@@ -111,7 +111,7 @@ internal static class Diagnostics
             messageFormat,
             category,
             severity,
-            isEnabledByDefault: true,
-            description: description,
-            helpLinkUri: Help + id.ToLowerInvariant());
+            true,
+            description,
+            Help + id.ToLowerInvariant());
 }

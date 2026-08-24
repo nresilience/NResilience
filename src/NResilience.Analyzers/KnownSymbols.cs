@@ -3,13 +3,13 @@ using Microsoft.CodeAnalysis;
 namespace NResilience.Analyzers;
 
 /// <summary>
-/// The symbols every analyzer needs, resolved once per compilation.
-/// <para>
-/// Resolution doubles as the opt-out: a compilation that does not reference NResilience has no
-/// <c>Resilience</c> type, <see cref="TryCreate"/> fails, and no per-node callback is ever
-/// registered. An analyzer that ships inside the library package runs in every consumer's build,
-/// so costing nothing in a project that does not use it is a requirement rather than a nicety.
-/// </para>
+///     The symbols every analyzer needs, resolved once per compilation.
+///     <para>
+///         Resolution doubles as the opt-out: a compilation that does not reference NResilience has no
+///         <c>Resilience</c> type, <see cref="TryCreate" /> fails, and no per-node callback is ever
+///         registered. An analyzer that ships inside the library package runs in every consumer's build,
+///         so costing nothing in a project that does not use it is a requirement rather than a nicety.
+///     </para>
 /// </summary>
 internal sealed class KnownSymbols
 {
@@ -54,9 +54,9 @@ internal sealed class KnownSymbols
     internal INamedTypeSymbol? Timeout { get; }
 
     /// <summary>
-    /// The compilation's entry point, if any: startup code is allowed to do once what a called
-    /// method must not do per call. Resolved on demand, because binding <c>Main</c> is work only one
-    /// rule needs and every consumer's build would otherwise pay for it.
+    ///     The compilation's entry point, if any: startup code is allowed to do once what a called
+    ///     method must not do per call. Resolved on demand, because binding <c>Main</c> is work only one
+    ///     rule needs and every consumer's build would otherwise pay for it.
     /// </summary>
     internal IMethodSymbol? EntryPoint => _entryPoint.Value;
 
@@ -89,8 +89,7 @@ internal sealed class KnownSymbols
         (method.Name == "RunAsync" || method.Name == "TryRunAsync")
         && SymbolEqualityComparer.Default.Equals(method.ContainingType, Resilience);
 
-    internal bool IsCancellationToken(ITypeSymbol? type) =>
-        type is not null && SymbolEqualityComparer.Default.Equals(type, CancellationToken);
+    internal bool IsCancellationToken(ITypeSymbol? type) => type is not null && SymbolEqualityComparer.Default.Equals(type, CancellationToken);
 
     internal bool IsPolicy(ITypeSymbol? type) => Is(type, Resilience);
 
@@ -103,6 +102,5 @@ internal sealed class KnownSymbols
     /// <summary>True when the method is the compilation's entry point.</summary>
     internal bool IsEntryPoint(IMethodSymbol method) => SymbolEqualityComparer.Default.Equals(method, EntryPoint);
 
-    private static bool Is(ITypeSymbol? type, INamedTypeSymbol? known) =>
-        known is not null && SymbolEqualityComparer.Default.Equals(type, known);
+    private static bool Is(ITypeSymbol? type, INamedTypeSymbol? known) => known is not null && SymbolEqualityComparer.Default.Equals(type, known);
 }

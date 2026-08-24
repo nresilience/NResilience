@@ -7,10 +7,10 @@ using Microsoft.CodeAnalysis.Operations;
 namespace NResilience.Analyzers;
 
 /// <summary>
-/// NRES005 and NRES006: the guards are mutable state whose whole purpose is to outlive the call.
-/// A breaker that is rebuilt per call has never seen a failure, a budget that is rebuilt per call
-/// has never seen a deposit, and a client that is rebuilt per call has no per-host anything. All
-/// three read as configured resilience and provide none.
+///     NRES005 and NRES006: the guards are mutable state whose whole purpose is to outlive the call.
+///     A breaker that is rebuilt per call has never seen a failure, a budget that is rebuilt per call
+///     has never seen a deposit, and a client that is rebuilt per call has no per-host anything. All
+///     three read as configured resilience and provide none.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
@@ -23,9 +23,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         if (context is null)
-        {
             throw new ArgumentNullException(nameof(context));
-        }
 
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -33,9 +31,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(static start =>
         {
             if (!KnownSymbols.TryCreate(start.Compilation, out var known))
-            {
                 return;
-            }
 
             start.RegisterOperationAction(operation => AnalyzeCreation(operation, known), OperationKind.ObjectCreation);
             start.RegisterOperationAction(operation => AnalyzeInvocation(operation, known), OperationKind.Invocation);
@@ -47,9 +43,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         var creation = (IObjectCreationOperation)context.Operation;
 
         if (known.IsBreaker(creation.Type))
-        {
             ReportGuardIfPerCall(context, creation, known, "breaker", "open");
-        }
     }
 
     private static void AnalyzeInvocation(OperationAnalysisContext context, KnownSymbols known)
@@ -66,15 +60,13 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         }
 
         if (method.Name == "CreateClient" && known.IsResilienceHttp(method.ContainingType))
-        {
             ReportClientIfPerCall(context, invocation, known);
-        }
     }
 
     /// <summary>
-    /// Reported only for a guard written directly into a policy's initializer. A guard that is a
-    /// local first may well be handed to something that keeps it, and a diagnostic on a shape that
-    /// is often correct is a diagnostic people turn off.
+    ///     Reported only for a guard written directly into a policy's initializer. A guard that is a
+    ///     local first may well be handed to something that keeps it, and a diagnostic on a shape that
+    ///     is often correct is a diagnostic people turn off.
     /// </summary>
     private static void ReportGuardIfPerCall(
         OperationAnalysisContext context,
@@ -84,9 +76,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         string cannotEver)
     {
         if (!IsPolicySetting(guard, known) || !InsideSomethingCalledRepeatedly(context, known, out var container))
-        {
             return;
-        }
 
         context.ReportDiagnostic(Diagnostic.Create(
             Diagnostics.PerCallGuardState,
@@ -101,9 +91,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         // The `using` form is the one that is provably per call: the client is disposed where it was
         // made. A plain local may be returned to something that holds it for the process's life.
         if (!IsDisposedWhereItIsMade(client.Syntax) || !InsideSomethingCalledRepeatedly(context, known, out var container))
-        {
             return;
-        }
 
         context.ReportDiagnostic(Diagnostic.Create(
             Diagnostics.PerCallClient,
@@ -122,13 +110,13 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         }
 
         return parent is ISimpleAssignmentOperation { Target: IPropertyReferenceOperation property }
-            && (property.Property.Name == "Breaker" || property.Property.Name == "Budget")
-            && known.IsPolicy(property.Property.ContainingType);
+               && (property.Property.Name == "Breaker" || property.Property.Name == "Budget")
+               && known.IsPolicy(property.Property.ContainingType);
     }
 
     /// <summary>
-    /// The enclosing member, unless it is the entry point or a static initializer - startup code is
-    /// allowed to do exactly once what a called method must not do per call.
+    ///     The enclosing member, unless it is the entry point or a static initializer - startup code is
+    ///     allowed to do exactly once what a called method must not do per call.
     /// </summary>
     private static bool InsideSomethingCalledRepeatedly(OperationAnalysisContext context, KnownSymbols known, out string container)
     {
@@ -137,9 +125,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         if (context.ContainingSymbol is not IMethodSymbol method
             || method.MethodKind == MethodKind.StaticConstructor
             || known.IsEntryPoint(method))
-        {
             return false;
-        }
 
         container = method.MethodKind switch
         {
@@ -151,8 +137,8 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    /// True when the expression is the initializer of a <c>using</c> declaration, or of a
-    /// <c>using</c> statement's own declaration - not merely something written inside a using block.
+    ///     True when the expression is the initializer of a <c>using</c> declaration, or of a
+    ///     <c>using</c> statement's own declaration - not merely something written inside a using block.
     /// </summary>
     private static bool IsDisposedWhereItIsMade(SyntaxNode node)
     {

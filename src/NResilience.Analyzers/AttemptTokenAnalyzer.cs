@@ -7,13 +7,13 @@ using Microsoft.CodeAnalysis.Operations;
 namespace NResilience.Analyzers;
 
 /// <summary>
-/// NRES001 and NRES002: the callback's token has to reach the work.
-/// <para>
-/// This is the failure the two-token shape makes easy to write and impossible to see. The token the
-/// callback receives is the one the attempt timeout cancels; the token the caller passed in is not.
-/// Handing the wrong one to an HTTP call, or none at all, compiles, reads as correct in review, and
-/// silently turns <c>AttemptTimeout</c> off for the only call that mattered.
-/// </para>
+///     NRES001 and NRES002: the callback's token has to reach the work.
+///     <para>
+///         This is the failure the two-token shape makes easy to write and impossible to see. The token the
+///         callback receives is the one the attempt timeout cancels; the token the caller passed in is not.
+///         Handing the wrong one to an HTTP call, or none at all, compiles, reads as correct in review, and
+///         silently turns <c>AttemptTimeout</c> off for the only call that mattered.
+///     </para>
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
@@ -35,9 +35,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         if (context is null)
-        {
             throw new ArgumentNullException(nameof(context));
-        }
 
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -45,9 +43,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(static start =>
         {
             if (!KnownSymbols.TryCreate(start.Compilation, out var known))
-            {
                 return;
-            }
 
             start.RegisterOperationAction(operation => Analyze(operation, known), OperationKind.Invocation);
         });
@@ -60,9 +56,7 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
         if (!Callback.TryGet(invocation, known, out var callback)
             || callback.Function.Body is null
             || callback.UsesAttemptToken())
-        {
             return;
-        }
 
         foreach (var argument in TokenArguments(callback.Function.Body, known))
         {
@@ -71,14 +65,16 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    /// Every cancellation token argument in the body: the ones the compiler filled in from a default,
-    /// and the ones that were passed explicitly. Since the attempt's token is known to be unused,
-    /// each of these is a call the attempt timeout cannot reach.
+    ///     Every cancellation token argument in the body: the ones the compiler filled in from a default,
+    ///     and the ones that were passed explicitly. Since the attempt's token is known to be unused,
+    ///     each of these is a call the attempt timeout cannot reach.
     /// </summary>
-    private static IEnumerable<IArgumentOperation> TokenArguments(IOperation body, KnownSymbols known) =>
-        body.Descendants()
+    private static IEnumerable<IArgumentOperation> TokenArguments(IOperation body, KnownSymbols known)
+    {
+        return body.Descendants()
             .OfType<IArgumentOperation>()
             .Where(argument => known.IsCancellationToken(argument.Parameter?.Type));
+    }
 
     private static Diagnostic Diagnose(IArgumentOperation argument, IParameterSymbol attemptToken)
     {
@@ -110,16 +106,14 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    /// A token can be appended without a name only when it is the last parameter and every parameter
-    /// before it was written out. Anything else - a skipped optional in the middle, an argument out
-    /// of order - has to be named to compile.
+    ///     A token can be appended without a name only when it is the last parameter and every parameter
+    ///     before it was written out. Anything else - a skipped optional in the middle, an argument out
+    ///     of order - has to be named to compile.
     /// </summary>
     private static bool CanAppendPositionally(IOperation call, IArgumentOperation token)
     {
         if (token.Parameter is null)
-        {
             return false;
-        }
 
         var arguments = call switch
         {
@@ -129,11 +123,10 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
         };
 
         if (arguments.IsEmpty)
-        {
             return false;
-        }
 
         var isLastParameter = token.Parameter.Ordinal == arguments.Length - 1;
+
         var everythingElseWritten = arguments.All(argument =>
             ReferenceEquals(argument, token)
             || (argument.ArgumentKind == ArgumentKind.Explicit && argument.Syntax is ArgumentSyntax { NameColon: null }));
@@ -141,10 +134,13 @@ public sealed class AttemptTokenAnalyzer : DiagnosticAnalyzer
         return isLastParameter && everythingElseWritten;
     }
 
-    private static string Describe(IOperation call) => call switch
+    private static string Describe(IOperation call)
     {
-        IInvocationOperation invocation => invocation.TargetMethod.Name,
-        IObjectCreationOperation creation => creation.Constructor?.ContainingType.Name ?? "the constructor",
-        _ => call.Syntax.ToString(),
-    };
+        return call switch
+        {
+            IInvocationOperation invocation => invocation.TargetMethod.Name,
+            IObjectCreationOperation creation => creation.Constructor?.ContainingType.Name ?? "the constructor",
+            _ => call.Syntax.ToString(),
+        };
+    }
 }

@@ -7,9 +7,9 @@ using Microsoft.CodeAnalysis.Operations;
 namespace NResilience.Analyzers;
 
 /// <summary>
-/// NRES003 and NRES004: what <c>Validate()</c> says on first execution, said at build time instead
-/// wherever the values are literals - plus the one combination that is legal, validates, and still
-/// cannot do what it looks like it does.
+///     NRES003 and NRES004: what <c>Validate()</c> says on first execution, said at build time instead
+///     wherever the values are literals - plus the one combination that is legal, validates, and still
+///     cannot do what it looks like it does.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
@@ -22,9 +22,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
     public override void Initialize(AnalysisContext context)
     {
         if (context is null)
-        {
             throw new ArgumentNullException(nameof(context));
-        }
 
         context.EnableConcurrentExecution();
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
@@ -32,9 +30,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
         context.RegisterCompilationStartAction(static start =>
         {
             if (!KnownSymbols.TryCreate(start.Compilation, out var known))
-            {
                 return;
-            }
 
             start.RegisterOperationAction(operation => Analyze(operation, known), OperationKind.ObjectCreation, OperationKind.With);
         });
@@ -50,9 +46,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
         };
 
         if (initializer is null)
-        {
             return;
-        }
 
         var settings = Settings(initializer);
 
@@ -69,9 +63,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
         foreach (var assignment in initializer.Initializers)
         {
             if (assignment is ISimpleAssignmentOperation { Target: IPropertyReferenceOperation property } simple)
-            {
                 settings[property.Property.Name] = simple.Value;
-            }
         }
 
         return settings;
@@ -83,9 +75,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
             || !attempts.ConstantValue.HasValue
             || attempts.ConstantValue.Value is not int count
             || count >= 1)
-        {
             return;
-        }
 
         Report(
             context,
@@ -104,9 +94,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
             || !TimeSpanValue.TryEvaluate(setting, known, out var value)
             || value.IsUnbounded()
             || value > TimeSpan.Zero)
-        {
             return;
-        }
 
         Report(
             context,
@@ -120,10 +108,10 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    /// The deadline covers the whole call and caps every attempt inside it, so an attempt timeout
-    /// above the deadline is unreachable. Only reported when both are written in the same
-    /// initializer: resolving a base policy's deadline would mean guessing which preset it came
-    /// from, and a diagnostic that guesses is worse than none.
+    ///     The deadline covers the whole call and caps every attempt inside it, so an attempt timeout
+    ///     above the deadline is unreachable. Only reported when both are written in the same
+    ///     initializer: resolving a base policy's deadline would mean guessing which preset it came
+    ///     from, and a diagnostic that guesses is worse than none.
     /// </summary>
     private static void CheckTheTwoBounds(
         OperationAnalysisContext context,
@@ -137,9 +125,7 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
             || attempt.IsUnbounded()
             || whole.IsUnbounded()
             || attempt <= whole)
-        {
             return;
-        }
 
         context.ReportDiagnostic(Diagnostic.Create(
             Diagnostics.AttemptTimeoutExceedsDeadline,
@@ -152,6 +138,8 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
         OperationAnalysisContext context,
         DiagnosticDescriptor descriptor,
         IOperation setting,
-        string message) =>
+        string message)
+    {
         context.ReportDiagnostic(Diagnostic.Create(descriptor, setting.Syntax.GetLocation(), message));
+    }
 }

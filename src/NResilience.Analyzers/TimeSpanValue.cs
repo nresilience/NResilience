@@ -5,9 +5,9 @@ using Microsoft.CodeAnalysis.Operations;
 namespace NResilience.Analyzers;
 
 /// <summary>
-/// Constant folding for the handful of ways a <see cref="TimeSpan"/> is written at a call site.
-/// Anything it does not recognize is reported as unknown, and the analyzer stays quiet - a
-/// configuration diagnostic that guesses is worse than none.
+///     Constant folding for the handful of ways a <see cref="TimeSpan" /> is written at a call site.
+///     Anything it does not recognize is reported as unknown, and the analyzer stays quiet - a
+///     configuration diagnostic that guesses is worse than none.
 /// </summary>
 internal static class TimeSpanValue
 {
@@ -16,35 +16,25 @@ internal static class TimeSpanValue
         value = default;
 
         if (operation is IConversionOperation conversion)
-        {
             return TryEvaluate(conversion.Operand, known, out value);
-        }
 
         if (operation is IUnaryOperation { OperatorKind: UnaryOperatorKind.Minus } negation)
         {
             if (!TryEvaluate(negation.Operand, known, out var operand))
-            {
                 return false;
-            }
 
             value = operand.Negate();
             return true;
         }
 
         if (operation is IFieldReferenceOperation field)
-        {
             return TryWellKnownField(field, known, out value);
-        }
 
         if (operation is IInvocationOperation invocation)
-        {
             return TryFactory(invocation, known, out value);
-        }
 
         if (operation is IObjectCreationOperation creation)
-        {
             return TryConstructor(creation, known, out value);
-        }
 
         return false;
     }
@@ -61,9 +51,7 @@ internal static class TimeSpanValue
         }
 
         if (!SymbolEqualityComparer.Default.Equals(owner, known.TimeSpan))
-        {
             return false;
-        }
 
         switch (field.Field.Name)
         {
@@ -88,9 +76,7 @@ internal static class TimeSpanValue
         if (!SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, known.TimeSpan)
             || invocation.Arguments.Length != 1
             || !TryConstant(invocation.Arguments[0].Value, out var amount))
-        {
             return false;
-        }
 
         try
         {
@@ -131,18 +117,14 @@ internal static class TimeSpanValue
         value = default;
 
         if (!SymbolEqualityComparer.Default.Equals(creation.Type, known.TimeSpan))
-        {
             return false;
-        }
 
         var parts = new double[creation.Arguments.Length];
 
         for (var i = 0; i < creation.Arguments.Length; i++)
         {
             if (!TryConstant(creation.Arguments[i].Value, out parts[i]))
-            {
                 return false;
-            }
         }
 
         try
@@ -177,9 +159,7 @@ internal static class TimeSpanValue
         var unwrapped = operation is IConversionOperation conversion ? conversion.Operand : operation;
 
         if (!unwrapped.ConstantValue.HasValue || unwrapped.ConstantValue.Value is null)
-        {
             return false;
-        }
 
         try
         {
