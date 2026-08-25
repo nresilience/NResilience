@@ -13,7 +13,7 @@ The `RetryBudget` is a `sealed class` that bounds the number of retries based on
 | `RetryBudget.Of(fraction = 0.1, minimumPerSecond = 3, time = null)` | Creates a budget private to the instance that holds it. |
 | `RetryBudget.Shared(name, fraction = 0.1, minimumPerSecond = 3)` | Creates or retrieves a process-wide budget looked up by name. Policies that share the same name share the same budget. The parameters provided by the first caller are used. |
 | `RetryBudget.None` | Disables the budget. Every retry allowed by other policy bounds is funded. |
-| `RetryBudget.Automatic` | A marker the presets carry. It resolves to a budget with default settings, private to each policy instance holding it. |
+| `RetryBudget.Automatic` | A marker used by presets that resolves to a private budget with default settings. |
 | `Name` | The name used to look up a shared budget, if applicable. |
 | `IsAutomatic` | True for `RetryBudget.Automatic`. |
 | `Utilization` | A value from 0 to 1 indicating how much of the current budget has been spent. Reads 0 on `RetryBudget.Automatic` itself, which holds no tokens. |
@@ -36,7 +36,7 @@ When the budget is exhausted, the handler stops the call with `StopReason.Budget
 
 ## Configuration
 
-`Resilience.Default` and `Resilience.Http` set `Budget` to `RetryBudget.Automatic`. Each policy instance carrying that marker resolves it to its own budget with default settings on its first execution, so two policies derived from a preset never share one bucket. Set `Budget` to `null` or to `RetryBudget.None` to turn the budget off.
+`Resilience.Default` and `Resilience.Http` use `RetryBudget.Automatic`. Each policy instance resolves this marker to its own private budget on first execution. Set `Budget` to `null` or `RetryBudget.None` to disable the budget.
 
 When using dependency injection, the budget is pinned to the registration name. This ensures that a configuration reload does not discard the traffic history.
 

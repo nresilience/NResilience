@@ -11,11 +11,10 @@ namespace NResilience;
 ///         budget expressed as a fraction bounds the aggregate - with every client independently holding to
 ///         10%, total amplification is 1.1×.
 ///     </para>
-///     <para>
-///         It is <b>on by default</b>. The presets carry <see cref="Automatic" />, a marker that resolves to
-///         a budget private to the policy instance holding it, so users get storm protection without learning
-///         the word; only people who want to tune, share or turn it off ever meet this API.
-///     </para>
+    /// <para>
+    ///         The retry budget is enabled by default. Presets use <see cref="Automatic" />, which
+    ///         resolves to a budget private to each policy instance.
+    ///     </para>
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -75,19 +74,16 @@ public sealed class RetryBudget
     public static RetryBudget None { get; } = new();
 
     /// <summary>
-    ///     Storm protection with the shipped defaults, private to each policy instance that carries it.
-    ///     A marker rather than a bucket: the bucket is created on that policy's first execution and lives
-    ///     as long as the policy does, so two policies holding this do not share one.
+    ///     A marker that resolves to a private budget with default settings on the policy's first
+    ///     execution.
     ///     <para>
-    ///         A marker is what the per-instance guarantee requires. A real <see cref="Of" /> bucket on the
-    ///         static <see cref="Resilience.Default" /> would give every policy in the process derived from
-    ///         it one shared bucket, so a storm against one dependency would throttle retries to all the
-    ///         others - the blast-radius inversion this library exists to prevent.
+    ///         This marker prevents "blast-radius inversion" by ensuring policies derived from the
+    ///         same preset do not share a single bucket.
     ///     </para>
     ///     <para>
-    ///         <see cref="Utilization" /> reads 0 on the marker itself. The number that means something is
-    ///         on the resolved bucket, which <c>ResilienceHandler.BudgetsByHost()</c> exposes for the HTTP
-    ///         path.
+    ///         <see cref="Utilization" /> returns 0 for the marker. The actual utilization is reported
+    ///         by the resolved bucket, accessible via <c>ResilienceHandler.BudgetsByHost()</c> for
+    ///         HTTP calls.
     ///     </para>
     /// </summary>
     public static RetryBudget Automatic { get; } = new(isAutomatic: true);

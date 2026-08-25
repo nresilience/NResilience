@@ -147,6 +147,93 @@ public sealed class BackoffTests
         Assert.Contains(problems, p => p.Contains("factor") && p.Contains("NaN"));
     }
 
+    [Fact]
+    public void The_default_value_reports_the_shipped_defaults_rather_than_zeros()
+    {
+        // default(Backoff) is reachable through `policy with { Backoff = default }`, and the
+        // readable properties have to agree with what Compute will actually do.
+        var backoff = default(Backoff);
+
+        Assert.Equal(BackoffKind.Exponential, backoff.Kind);
+        Assert.Equal(TimeSpan.FromMilliseconds(100), backoff.TransientBase);
+        Assert.Equal(TimeSpan.FromSeconds(1), backoff.ThrottledBase);
+        Assert.Equal(2.0, backoff.Factor);
+        Assert.Equal(TimeSpan.FromSeconds(30), backoff.Max);
+    }
+
+    [Fact]
+    public void The_default_preset_reports_the_same_properties_as_the_default_value()
+    {
+        var shipped = Backoff.Default;
+
+        Assert.Equal(default(Backoff).Kind, shipped.Kind);
+        Assert.Equal(default(Backoff).TransientBase, shipped.TransientBase);
+        Assert.Equal(default(Backoff).ThrottledBase, shipped.ThrottledBase);
+        Assert.Equal(default(Backoff).Factor, shipped.Factor);
+        Assert.Equal(default(Backoff).Max, shipped.Max);
+    }
+
+    [Fact]
+    public void None_reports_a_constant_curve_with_zero_delays()
+    {
+        var backoff = Backoff.None;
+
+        Assert.Equal(BackoffKind.Constant, backoff.Kind);
+        Assert.Equal(TimeSpan.Zero, backoff.TransientBase);
+        Assert.Equal(TimeSpan.Zero, backoff.ThrottledBase);
+        Assert.Equal(TimeSpan.Zero, backoff.Max);
+    }
+
+    [Fact]
+    public void Constant_reports_its_delay_on_every_readable_property()
+    {
+        var backoff = Backoff.Constant(TimeSpan.FromMilliseconds(250));
+
+        Assert.Equal(BackoffKind.Constant, backoff.Kind);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), backoff.TransientBase);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), backoff.ThrottledBase);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), backoff.Max);
+    }
+
+    [Fact]
+    public void Custom_reports_zero_base_delays_and_no_cap()
+    {
+        var backoff = Backoff.Custom(_ => TimeSpan.FromSeconds(7));
+
+        Assert.Equal(BackoffKind.Custom, backoff.Kind);
+        Assert.Equal(TimeSpan.Zero, backoff.TransientBase);
+        Assert.Equal(TimeSpan.Zero, backoff.ThrottledBase);
+        Assert.Equal(Timeout.InfiniteTimeSpan, backoff.Max);
+    }
+
+    [Theory]
+    [InlineData(100, 1000, 2.0)]
+    [InlineData(500, 5000, 1.5)]
+    public void A_round_trip_through_the_readable_properties_preserves_the_curve(int transientMs, int throttledMs, double factor)
+    {
+        var original = Backoff.Exponential(
+            TimeSpan.FromMilliseconds(transientMs),
+            TimeSpan.FromMilliseconds(throttledMs),
+            factor,
+            TimeSpan.FromSeconds(45)) with { Jitter = Jitter.None };
+
+        var rebuilt = Backoff.Exponential(original.TransientBase, original.ThrottledBase, original.Factor, original.Max)
+            with { Jitter = original.Jitter };
+
+        Assert.Equal(original, rebuilt);
+        Assert.Equal(Delay(original, Verdict.Transient, 4), Delay(rebuilt, Verdict.Transient, 4));
+        Assert.Equal(Delay(original, Verdict.Throttled(), 4), Delay(rebuilt, Verdict.Throttled(), 4));
+    }
+
+    [Fact]
+    public void The_readable_base_delays_agree_with_what_compute_produces()
+    {
+        var backoff = Backoff.Exponential(TimeSpan.FromMilliseconds(300), TimeSpan.FromSeconds(3)) with { Jitter = Jitter.None };
+
+        Assert.Equal(backoff.TransientBase, Delay(backoff, Verdict.Transient, 2));
+        Assert.Equal(backoff.ThrottledBase, Delay(backoff, Verdict.Throttled(), 2));
+    }
+
     private static TimeSpan Delay(Backoff backoff, Verdict previous, int attemptNumber) =>
         backoff.Compute(new NextAttempt(attemptNumber, previous, null, Timeout.InfiniteTimeSpan, default));
 }

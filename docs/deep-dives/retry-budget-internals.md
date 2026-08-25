@@ -41,10 +41,10 @@ Sharing is opt-in to prevent "blast-radius inversion." A single process-wide bud
 ## Implementation details
 
 ### Policy equality and lifetime
-`RetryBudget.Automatic` is a marker rather than a bucket, and the bucket it resolves to cannot be stored as a field within the `Resilience` record. Since records use synthesized equality to compare instance fields, a lazily created budget would cause two identically configured policies to be unequal simply because one had been executed. Instead, the budget is stored in a `ConditionalWeakTable` keyed by policy identity.
+`RetryBudget.Automatic` is a marker. The bucket it resolves to is stored in a `ConditionalWeakTable` keyed by policy identity to ensure that lazy initialization does not affect record equality.
 
 ### DI registration and persistence
-When using dependency injection, the marker is materialized into a real budget pinned to the registration name rather than left to resolve per policy instance. This ensures that when a configuration reload produces a new policy instance, the accumulated traffic history is not discarded.
+In dependency injection, the marker resolves to a budget pinned to the registration name. This preserves traffic history when a configuration reload creates a new policy instance.
 
 ## Monitoring the budget
 

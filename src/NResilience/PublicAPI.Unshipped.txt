@@ -24,9 +24,17 @@ NResilience.Backoff
 NResilience.Backoff.Backoff() -> void
 NResilience.Backoff.Compute(in NResilience.NextAttempt next) -> System.TimeSpan
 NResilience.Backoff.Equals(NResilience.Backoff other) -> bool
+NResilience.Backoff.Factor.get -> double
 NResilience.Backoff.Jitter.get -> NResilience.Jitter
 NResilience.Backoff.Jitter.init -> void
+NResilience.Backoff.Kind.get -> NResilience.BackoffKind
 NResilience.Backoff.Max.get -> System.TimeSpan
+NResilience.Backoff.ThrottledBase.get -> System.TimeSpan
+NResilience.Backoff.TransientBase.get -> System.TimeSpan
+NResilience.BackoffKind
+NResilience.BackoffKind.Constant = 1 -> NResilience.BackoffKind
+NResilience.BackoffKind.Custom = 2 -> NResilience.BackoffKind
+NResilience.BackoffKind.Exponential = 0 -> NResilience.BackoffKind
 NResilience.Breaker
 NResilience.Breaker.Breaker(NResilience.BreakerSettings? settings = null) -> void
 NResilience.Breaker.Isolate() -> void
@@ -206,6 +214,7 @@ NResilience.Resilience.TryRunAsync<T>(System.Func<System.Threading.CancellationT
 NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
 NResilience.Resilience.TryRunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
 NResilience.Resilience.Validate() -> void
+NResilience.Resilience.Validated() -> NResilience.Resilience!
 NResilience.ResilienceConfigurationException
 NResilience.ResilienceConfigurationException.Problems.get -> System.Collections.Generic.IReadOnlyList<string!>!
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException() -> void

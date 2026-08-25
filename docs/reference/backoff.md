@@ -17,7 +17,40 @@ order: 4
 | `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Allows you to compute the delay yourself. This mode ignores the `Max` property and jitter. |
 | `Jitter` | Determines the amount of randomness applied to the delay. |
 | `Max` | The maximum allowable delay for any single attempt. Defaults to 30 s. Use `Timeout.InfiniteTimeSpan` for no cap. |
+| `TransientBase` | The base delay for a `Transient` verdict. Zero for a `Custom` curve. |
+| `ThrottledBase` | The base delay for a `Throttled` verdict. Zero for a `Custom` curve. |
+| `Factor` | The growth per attempt. |
+| `Kind` | Which curve this is: `Exponential`, `Constant`, or `Custom`. |
 | `Compute(in NextAttempt)` | Calculates the delay before the specified attempt. This value is never negative. |
+
+### Reading a backoff back
+
+The five readable properties report the values `Compute` will actually use, so an unconstructed
+`default(Backoff)` reports the shipped defaults rather than zeros:
+
+```csharp
+var backoff = default(Backoff);
+
+backoff.Kind;           // BackoffKind.Exponential
+backoff.TransientBase;  // 00:00:00.1000000
+backoff.ThrottledBase;  // 00:00:01
+backoff.Factor;         // 2
+backoff.Max;            // 00:00:30
+```
+
+That makes a curve round-trippable - read the properties off one `Backoff`, change one, and rebuild:
+
+```csharp
+var slower = Backoff.Exponential(
+    existing.TransientBase,
+    existing.ThrottledBase,
+    existing.Factor,
+    TimeSpan.FromMinutes(2)) with { Jitter = existing.Jitter };
+```
+
+The factories remain the only way to *construct* a `Backoff`; the properties are read-only. A
+`Backoff` built with a positive `Factor` is what `Normalized()` recognizes as constructed, so
+there is no partial-object shape to get wrong.
 
 ### Exponential backoff calculation
 For exponential backoff, the delay for attempt *n* is calculated as:

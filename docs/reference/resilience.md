@@ -28,7 +28,7 @@ NResilience provides several presets for common scenarios:
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
 | `Classify` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
-| `Budget` | `RetryBudget?` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` resolves to a budget private to this policy instance. `null` and `RetryBudget.None` both mean no budget. |
+| `Budget` | `RetryBudget?` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` creates a budget private to the policy instance. `null` and `RetryBudget.None` disable the budget. |
 | `BeforeAttempt` | `Func<NextAttempt, Task>?` | `null` | A function that runs before every attempt, including the first. |
 | `OnEvent` | `Action<CallEvent>?` | `null` | The telemetry listener. If `null`, no events are raised and no performance cost is incurred. |
 | `Name` | `string?` | `null` | A name used in diagnostics and telemetry tags. |
@@ -49,6 +49,7 @@ The `Resilience` record provides methods to execute calls with the defined resil
 | `TryRunAsync<TState, T>(…)` | `ValueTask<CallResult<T>>` |
 | `TryRunAsync<TState>(…)` | `ValueTask<CallResult>` |
 | `Validate()` | `void` |
+| `Validated()` | `Resilience` |
 
 ### Execution behavior
 
@@ -66,6 +67,18 @@ The `TState` overloads allow you to use `static` callbacks, which avoids closure
 
 #### Validation
 The `Validate` method checks the policy configuration for errors and throws a `ResilienceConfigurationException` if any are found. Validation does not occur at construction; it happens when you call `Validate` explicitly, during eager DI registration, or lazily on the first execution of a policy instance.
+
+`Validated()` runs the same check and returns the policy, so a bad configuration throws where the policy is written rather than on the first call. This is the shape for a `static readonly` field, where a lazily-thrown configuration error would otherwise surface as a `TypeInitializationException` much later:
+
+```csharp
+public static class Policies
+{
+    public static readonly Resilience Api = (Resilience.Http with { Deadline = Config.ApiDeadline }).Validated();
+}
+```
+
+> [!NOTE]
+> The parentheses are required. C# does not allow member access directly on a `with` expression.
 
 ## `NextAttempt`
 

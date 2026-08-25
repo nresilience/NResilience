@@ -125,9 +125,9 @@ public sealed class Guards
 #pragma warning disable NRES005
 
         // <snippet:budget-off>
-        // The presets carry RetryBudget.Automatic: a budget private to this policy instance, so
-        // storm protection needs no configuration. None is the opt-out, and the only correct
-        // use is a dependency you know is not shared. Null means the same thing, quietly.
+        // Presets use `RetryBudget.Automatic` to provide a private budget by default.
+        // `RetryBudget.None` disables the budget, which is appropriate for dependencies
+        // that are not shared. `null` also disables the budget.
         var unbudgeted = Resilience.Default with { Budget = RetryBudget.None };
 
         // Or tune it, privately to whoever holds the instance.

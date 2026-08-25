@@ -168,8 +168,8 @@ public sealed class ResilienceOptionsTests
     }
 
     /// <summary>
-    ///     Backoff is rebuilt rather than patched, because the shipped shape is a factory rather than a
-    ///     bag of knobs - so a section that mentions only the cap keeps every other backoff default.
+    ///     A section that mentions only some of the backoff knobs patches the base policy's curve, so
+    ///     anything it did not mention keeps the value the base policy carried.
     /// </summary>
     [Fact]
     public void Backoff_settings_project_onto_an_exponential_backoff()
@@ -188,6 +188,49 @@ public sealed class ResilienceOptionsTests
         // 50ms, then ×3, with jitter off so the arithmetic is the assertion.
         Assert.Equal(TimeSpan.FromMilliseconds(50), Delay(policy, 2));
         Assert.Equal(TimeSpan.FromMilliseconds(150), Delay(policy, 3));
+    }
+
+    /// <summary>
+    ///     A section setting one knob on top of a base policy with a non-default exponential curve
+    ///     keeps the base policy's other delays, rather than silently substituting factory defaults.
+    /// </summary>
+    [Fact]
+    public void A_single_backoff_knob_patches_the_base_policy_rather_than_replacing_it()
+    {
+        var baseline = Resilience.Default with
+        {
+            Backoff = Backoff.Exponential(
+                TimeSpan.FromMilliseconds(500),
+                TimeSpan.FromSeconds(4),
+                3.0,
+                TimeSpan.FromSeconds(60)) with { Jitter = Jitter.None },
+        };
+
+        var policy = new ResilienceOptions { MaxDelay = TimeSpan.FromSeconds(5) }.ToPolicy(baseline);
+
+        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
+        Assert.Equal(TimeSpan.FromMilliseconds(500), policy.Backoff.TransientBase);
+        Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.ThrottledBase);
+        Assert.Equal(3.0, policy.Backoff.Factor);
+        Assert.Equal(Jitter.None, policy.Backoff.Jitter);
+    }
+
+    /// <summary>
+    ///     Patching only makes sense against an exponential curve, so a Constant or Custom base policy
+    ///     whose section sets a knob gets a fresh exponential built on the shipped defaults.
+    /// </summary>
+    [Fact]
+    public void A_backoff_knob_over_a_non_exponential_base_policy_starts_from_the_defaults()
+    {
+        var baseline = Resilience.Default with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(2)) };
+
+        var policy = new ResilienceOptions { MaxDelay = TimeSpan.FromSeconds(5), Jitter = Jitter.None }.ToPolicy(baseline);
+
+        Assert.Equal(BackoffKind.Exponential, policy.Backoff.Kind);
+        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
+        Assert.Equal(Backoff.Default.TransientBase, policy.Backoff.TransientBase);
+        Assert.Equal(Backoff.Default.ThrottledBase, policy.Backoff.ThrottledBase);
+        Assert.Equal(Backoff.Default.Factor, policy.Backoff.Factor);
     }
 
     /// <summary>Jitter on its own is a modifier, not a reason to rebuild the curve.</summary>

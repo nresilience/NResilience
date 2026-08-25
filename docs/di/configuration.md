@@ -75,6 +75,20 @@ NResilience uses `ResilienceOptions` as a flat, mutable Data Transfer Object (DT
 
 The middle case is the dangerous one, because the half that worked is the evidence people use to conclude the other half did too. Using a DTO ensures that the final policy exactly matches the configuration provided in the section. All three failures are gated by a test.
 
+### Backoff settings patch the base policy's curve
+
+A section that sets some of the backoff knobs patches the curve the base policy already carries: any
+knob the section does not mention keeps the base policy's value rather than falling back to a factory
+default. So a base policy built with `Backoff.Exponential(transientBase: TimeSpan.FromMilliseconds(500))`
+plus a section setting only `"MaxDelay": "00:00:05"` keeps the 500 ms transient base and gets the 5 s cap.
+
+Patching only makes sense against an exponential curve. If the base policy carries a
+`Backoff.Constant(...)` or a `Backoff.Custom(...)`, any backoff knob in the section replaces it with a
+fresh exponential built on the shipped defaults - a `Custom` delegate cannot be patched, and a
+`Constant` curve has no factor to preserve. To keep a constant or custom curve, leave the backoff
+knobs out of the section and set it in the configuration callback instead. `Jitter` on its own is a
+modifier rather than a backoff knob, so it does not trigger this and leaves the curve alone.
+
 ## Use the configuration callback for complex logic
 
 JSON cannot store lambdas or live objects. To configure classifiers, `BeforeAttempt` hooks, `OnEvent` listeners, or shared circuit breakers, use the configuration callback.

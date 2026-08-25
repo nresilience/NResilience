@@ -86,6 +86,26 @@ public sealed class PolicyTests
         Resilience.Http.Validate();
     }
 
+    /// <summary>
+    ///     Validated() moves the throw from the first execution to where the policy is written, which
+    ///     is what a static readonly field needs - the parentheses around the `with` are required.
+    /// </summary>
+    [Fact]
+    public void Validated_returns_the_policy_it_checked()
+    {
+        var policy = (Resilience.Http with { Deadline = TimeSpan.FromSeconds(3) }).Validated();
+
+        Assert.Equal(TimeSpan.FromSeconds(3), policy.Deadline);
+    }
+
+    [Fact]
+    public void Validated_throws_where_the_policy_is_written()
+    {
+        var error = Assert.Throws<ResilienceConfigurationException>(() => (Resilience.Default with { Attempts = 0 }).Validated());
+
+        Assert.Contains(error.Problems, p => p.Contains("Attempts", StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task An_invalid_policy_fails_on_first_execution()
     {

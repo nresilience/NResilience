@@ -19,6 +19,19 @@ public enum Jitter
     None,
 }
 
+/// <summary>Which curve a <see cref="Backoff" /> follows.</summary>
+public enum BackoffKind
+{
+    /// <summary>The delay grows by <see cref="Backoff.Factor" /> on each attempt. See <see cref="Backoff.Exponential" />.</summary>
+    Exponential,
+
+    /// <summary>The same delay every time. See <see cref="Backoff.Constant" /> and <see cref="Backoff.None" />.</summary>
+    Constant,
+
+    /// <summary>A caller-supplied delegate computes the delay. See <see cref="Backoff.Custom" />.</summary>
+    Custom,
+}
+
 /// <summary>The delay between one attempt and the next.</summary>
 public readonly record struct Backoff
 {
@@ -56,6 +69,24 @@ public readonly record struct Backoff
 
     /// <summary>How much randomness to apply. <see cref="Jitter.Full" /> by default.</summary>
     public Jitter Jitter { get; init; }
+
+    /// <summary>
+    ///     Base delay for a <see cref="VerdictKind.Transient" /> failure. Returns zero for
+    ///     <see cref="BackoffKind.Custom" /> curves because they compute their own delays.
+    /// </summary>
+    public TimeSpan TransientBase => Normalized()._transientBase;
+ 
+    /// <summary>
+    ///     Base delay for a <see cref="VerdictKind.Throttled" /> failure. Returns zero for a
+    ///     <see cref="BackoffKind.Custom" /> curve because it computes its own delays.
+    /// </summary>
+    public TimeSpan ThrottledBase => Normalized()._throttledBase;
+ 
+    /// <summary>Growth per attempt. A value of 2 doubles the delay each time; 1 makes it constant.</summary>
+    public double Factor => Normalized()._factor;
+ 
+    /// <summary>The backoff curve. <c>default(Backoff)</c> is <see cref="BackoffKind.Exponential" />.</summary>
+    public BackoffKind Kind => _kind;
 
     /// <summary>The hard cap on any single delay, or <see cref="Timeout.InfiniteTimeSpan" /> for none.</summary>
     public TimeSpan Max => _kind == BackoffKind.Custom ? _max : Normalized()._max;
@@ -183,11 +214,4 @@ public readonly record struct Backoff
         _kind == BackoffKind.Exponential && _factor == 0
             ? new Backoff(BackoffKind.Exponential, DefaultTransientBase, DefaultThrottledBase, DefaultFactor, DefaultMax, null) { Jitter = Jitter }
             : this;
-
-    private enum BackoffKind
-    {
-        Exponential,
-        Constant,
-        Custom,
-    }
 }

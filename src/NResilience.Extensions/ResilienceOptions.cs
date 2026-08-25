@@ -155,17 +155,19 @@ public sealed class ResilienceOptions
 
         if (HasBackoff)
         {
-            // Rebuilt rather than patched: Backoff's base delays are not readable off the struct,
-            // because the shipped shape is a factory rather than a bag of knobs. Anything the
-            // section did not mention falls back to the factory's own default, which is the same
-            // value Backoff.Default carries.
+            // Patched rather than rebuilt: anything the section did not mention keeps the value the
+            // base policy carried. Patching only makes sense against an exponential curve, so a
+            // Constant or Custom base policy whose section sets a knob gets a fresh exponential,
+            // and that is the documented behavior.
+            var existing = policy.Backoff.Kind == BackoffKind.Exponential ? policy.Backoff : Backoff.Default;
+
             policy = policy with
             {
                 Backoff = Backoff.Exponential(
-                        TransientBaseDelay,
-                        ThrottledBaseDelay,
-                        BackoffFactor ?? 2.0,
-                        MaxDelay) with
+                        TransientBaseDelay ?? existing.TransientBase,
+                        ThrottledBaseDelay ?? existing.ThrottledBase,
+                        BackoffFactor ?? existing.Factor,
+                        MaxDelay ?? existing.Max) with
                     {
                         Jitter = Jitter ?? policy.Backoff.Jitter,
                     },

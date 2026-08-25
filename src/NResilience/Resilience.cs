@@ -92,21 +92,19 @@ public sealed partial record Resilience
     public Breaker? Breaker { get; init; }
 
     /// <summary>
-    ///     Null means no retry budget, and so does <see cref="RetryBudget.None" />, which says so out loud.
-    ///     <see cref="RetryBudget.Automatic" /> - which the presets carry - is a budget private to this policy
-    ///     instance; <see cref="RetryBudget.Shared(string, double, int)" /> or one shared instance opts into
-    ///     sharing.
+    ///     A <c>null</c> value or <see cref="RetryBudget.None" /> disables the retry budget.
+    ///     <see cref="RetryBudget.Automatic" />, used by presets, creates a budget private to this policy
+    ///     instance. Use <see cref="RetryBudget.Shared(string, double, int)" /> or a shared instance to
+    ///     share a budget across policies.
     ///     <para>
-    ///         Deliberately <b>not</b> a process-wide singleton by default. A single global budget would let
-    ///         a storm against payments throttle retries to search, which is the blast-radius inversion a
-    ///         resilience library exists to prevent.
+    ///         Retry budgets are not process-wide singletons by default. This prevents a failure
+    ///         storm against one dependency from throttling retries for another.
     ///     </para>
     /// </summary>
     /// <remarks>
-    ///     The bucket <see cref="RetryBudget.Automatic" /> resolves to cannot live in a field on this record:
-    ///     the synthesized equality compares every instance field, so a lazily-created budget would make two
-    ///     identically-configured policies stop being equal as a side effect of one of them having executed.
-    ///     It lives in the same <c>ConditionalWeakTable</c> as the validated flag, keyed by reference identity.
+    ///     The budget resolved from <see cref="RetryBudget.Automatic" /> is stored in a
+    ///     <c>ConditionalWeakTable</c> keyed by reference identity. This ensures that lazily
+    ///     created budgets do not affect record equality.
     /// </remarks>
     public RetryBudget? Budget { get; init; }
 
@@ -168,13 +166,11 @@ public sealed partial record Resilience
         && OnEvent is null
         && Breaker is null
 
-        // A budget on a policy that cannot retry still needs its deposits, because a *shared* budget
-        // is funded by the successful traffic of every policy holding it - including single-attempt
-        // ones. Only the absence of a budget, RetryBudget.None, or the Automatic marker is free.
+        // Shared budgets are funded by all policies, including those with a single attempt. Only
+        // <c>null</c>, <see cref="RetryBudget.None" />, or <see cref="RetryBudget.Automatic" /> are free
+        // of cost for single-attempt policies.
         //
-        // Automatic is free here precisely because Attempts <= 1 above: ExecutionState materializes
-        // its bucket only when Attempts > 1, so there is nothing to deposit into. Without that
-        // clause this alternative would be wrong.
+        // The automatic marker is free because budgets are only materialized when <c>Attempts > 1</c>.
         && Budget is null or { IsNone: true } or { IsAutomatic: true };
 
     /// <summary>
@@ -209,6 +205,24 @@ public sealed partial record Resilience
 
         if (problems.Count > 0)
             throw new ResilienceConfigurationException(problems);
+    }
+
+    /// <summary>
+    ///     Runs <see cref="Validate" /> and returns this policy, so a bad configuration throws where it
+    ///     is written rather than on the first call. The shape for a <c>static readonly</c> field, where
+    ///     a lazily-thrown configuration error surfaces as a <see cref="TypeInitializationException" />
+    ///     much later.
+    ///     <para>
+    ///         A <c>with</c> expression needs parentheses before the call:
+    ///         <c>(Resilience.Http with { Deadline = ... }).Validated()</c>.
+    ///     </para>
+    /// </summary>
+    /// <returns>This policy.</returns>
+    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
+    public Resilience Validated()
+    {
+        Validate();
+        return this;
     }
 
     /// <summary>
