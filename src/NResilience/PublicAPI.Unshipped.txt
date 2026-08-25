@@ -213,6 +213,7 @@ NResilience.ResilienceConfigurationException.ResilienceConfigurationException(Sy
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException(string! message) -> void
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException(string! message, System.Exception! innerException) -> void
 NResilience.RetryBudget
+NResilience.RetryBudget.IsAutomatic.get -> bool
 NResilience.RetryBudget.Name.get -> string?
 NResilience.RetryBudget.Utilization.get -> double
 NResilience.StopReason
@@ -270,6 +271,7 @@ static NResilience.Resilience.Http.get -> NResilience.Resilience!
 static NResilience.Resilience.None.get -> NResilience.Resilience!
 static NResilience.Resilience.operator !=(NResilience.Resilience? left, NResilience.Resilience? right) -> bool
 static NResilience.Resilience.operator ==(NResilience.Resilience? left, NResilience.Resilience? right) -> bool
+static NResilience.RetryBudget.Automatic.get -> NResilience.RetryBudget!
 static NResilience.RetryBudget.None.get -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Of(double fraction = 0.1, int minimumPerSecond = 3, System.TimeProvider? time = null) -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Shared(string! name, double fraction = 0.1, int minimumPerSecond = 3) -> NResilience.RetryBudget!

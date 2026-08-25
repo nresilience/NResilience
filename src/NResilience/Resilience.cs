@@ -46,7 +46,10 @@ public sealed partial record Resilience
     ///     backoff with full jitter, and <see cref="Classifier.Default" /> - which does not retry
     ///     exceptions it does not recognize.
     /// </summary>
-    public static Resilience Default { get; } = new();
+    public static Resilience Default { get; } = new()
+    {
+        Budget = RetryBudget.Automatic,
+    };
 
     /// <summary>
     ///     <see cref="Default" /> with <see cref="Classifier.Http" />, which knows that a 429 is
@@ -89,9 +92,10 @@ public sealed partial record Resilience
     public Breaker? Breaker { get; init; }
 
     /// <summary>
-    ///     Null means an automatic retry budget private to this policy instance.
-    ///     <see cref="RetryBudget.None" /> disables it; <see cref="RetryBudget.Shared(string, double, int)" />
-    ///     or one shared instance opts into sharing.
+    ///     Null means no retry budget, and so does <see cref="RetryBudget.None" />, which says so out loud.
+    ///     <see cref="RetryBudget.Automatic" /> - which the presets carry - is a budget private to this policy
+    ///     instance; <see cref="RetryBudget.Shared(string, double, int)" /> or one shared instance opts into
+    ///     sharing.
     ///     <para>
     ///         Deliberately <b>not</b> a process-wide singleton by default. A single global budget would let
     ///         a storm against payments throttle retries to search, which is the blast-radius inversion a
@@ -99,10 +103,10 @@ public sealed partial record Resilience
     ///     </para>
     /// </summary>
     /// <remarks>
-    ///     The automatic budget cannot live in a field on this record: the synthesized equality compares
-    ///     every instance field, so a lazily-created budget would make two identically-configured
-    ///     policies stop being equal as a side effect of one of them having executed. It lives in the
-    ///     same <c>ConditionalWeakTable</c> as the validated flag, keyed by reference identity.
+    ///     The bucket <see cref="RetryBudget.Automatic" /> resolves to cannot live in a field on this record:
+    ///     the synthesized equality compares every instance field, so a lazily-created budget would make two
+    ///     identically-configured policies stop being equal as a side effect of one of them having executed.
+    ///     It lives in the same <c>ConditionalWeakTable</c> as the validated flag, keyed by reference identity.
     /// </remarks>
     public RetryBudget? Budget { get; init; }
 
@@ -166,8 +170,12 @@ public sealed partial record Resilience
 
         // A budget on a policy that cannot retry still needs its deposits, because a *shared* budget
         // is funded by the successful traffic of every policy holding it - including single-attempt
-        // ones. Only the absence of a budget, or RetryBudget.None, is free.
-        && Budget is null or { IsNone: true };
+        // ones. Only the absence of a budget, RetryBudget.None, or the Automatic marker is free.
+        //
+        // Automatic is free here precisely because Attempts <= 1 above: ExecutionState materializes
+        // its bucket only when Attempts > 1, so there is nothing to deposit into. Without that
+        // clause this alternative would be wrong.
+        && Budget is null or { IsNone: true } or { IsAutomatic: true };
 
     /// <summary>
     ///     Checks the policy and throws <see cref="ResilienceConfigurationException" /> listing every

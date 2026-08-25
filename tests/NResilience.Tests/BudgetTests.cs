@@ -226,6 +226,26 @@ public sealed class BudgetTests
         Assert.Null(ExecutionState.BudgetFor(Resilience.Default with { Attempts = 1 }));
     }
 
+    /// <summary>
+    ///     Null is off and <see cref="RetryBudget.None" /> is off and says so; the storm protection users
+    ///     get without asking for it is the marker the presets carry.
+    /// </summary>
+    [Fact]
+    public void A_null_budget_is_no_budget_and_the_presets_carry_the_marker()
+    {
+        Assert.Null(ExecutionState.BudgetFor(Resilience.Default with { Budget = null }));
+
+        Assert.Same(RetryBudget.Automatic, Resilience.Default.Budget);
+        Assert.Same(RetryBudget.Automatic, Resilience.Http.Budget);
+
+        Assert.True(RetryBudget.Automatic.IsAutomatic);
+        Assert.False(RetryBudget.Automatic.IsNone);
+        Assert.False(RetryBudget.None.IsAutomatic);
+
+        // A number that means nothing, documented rather than thrown: the marker holds no tokens.
+        Assert.Equal(0, RetryBudget.Automatic.Utilization);
+    }
+
     [Fact]
     public void None_turns_the_budget_off_and_an_instance_opts_into_sharing()
     {

@@ -27,6 +27,18 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     public void Passthrough_allocates_nothing_on_the_suspending_path()
         => AssertSuspendingOverhead(Baseline.LibNone, Budgets.NoneSuspendingOverhead);
 
+    /// <summary>
+    ///     The documented derivation - every bound turned off from a preset - is as free as naming
+    ///     <c>Resilience.None</c>, even though the preset carries <c>RetryBudget.Automatic</c>.
+    /// </summary>
+    [Fact]
+    public void A_passthrough_derived_from_a_preset_allocates_nothing_on_the_synchronous_path()
+        => AssertSyncOverhead(Baseline.LibDerivedPassthroughSync, Budgets.NoneSyncOverhead);
+
+    [Fact]
+    public void A_passthrough_derived_from_a_preset_allocates_nothing_on_the_suspending_path()
+        => AssertSuspendingOverhead(Baseline.LibDerivedPassthrough, Budgets.NoneSuspendingOverhead);
+
     [Fact]
     public void Full_policy_without_attempt_timeout_is_free_on_the_synchronous_path_with_static_lambda_and_state()
         => AssertSyncOverhead(Baseline.LibTrivialSyncState, Budgets.FullPolicyNoTimeoutSyncOverhead);

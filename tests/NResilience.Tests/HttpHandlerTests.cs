@@ -233,7 +233,14 @@ public sealed class HttpHandlerTests
         var breakers = handler.BreakersByHost();
         Assert.Equal(2, breakers.Count);
         Assert.NotSame(breakers["one.test"], breakers["two.test"]);
-        Assert.Equal(2, handler.BudgetsByHost().Count);
+
+        // The preset carries RetryBudget.Automatic, which per-host scoping is allowed to override.
+        // Counting the entries is not enough: one shared bucket behind two keys would let a storm
+        // against one host throttle retries to the other, with BudgetPerHost still reporting true.
+        var budgets = handler.BudgetsByHost();
+        Assert.Equal(2, budgets.Count);
+        Assert.NotSame(budgets["one.test"], budgets["two.test"]);
+        Assert.False(budgets["one.test"].IsAutomatic);
     }
 
     [Fact]

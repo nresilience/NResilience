@@ -34,7 +34,7 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `OwnTransportTimeout` | `true` | Whether the client's `Timeout` is set to `Timeout.InfiniteTimeSpan`. Honored by whoever builds the client. |
 | `BreakerPerHost` | `true` | Enables per-host circuit breakers. If the policy already carries an explicit `Breaker`, that breaker is used instead. |
 | `BreakerSettings` | `null` | The settings used to create per-host breakers. |
-| `BudgetPerHost` | `true` | Enables per-host retry budgets. An explicit `Budget` on the policy (including `RetryBudget.None`) takes precedence. |
+| `BudgetPerHost` | `true` | Enables per-host retry budgets. An explicit `Budget` on the policy (including `RetryBudget.None`) takes precedence. `RetryBudget.Automatic`, which the presets carry, does not: it states no scope preference, so per-host scoping applies. |
 | `DetectNestedRetries` | `true` | Determines whether the nested-retry header is added to requests and whether nesting is reported. |
 
 ## `ResilienceHttp`

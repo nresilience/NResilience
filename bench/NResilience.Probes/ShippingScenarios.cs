@@ -41,6 +41,25 @@ public static class ShippingScenarios
     };
 
     /// <summary>
+    ///     Passthrough reached by derivation rather than by naming <see cref="Lib.Resilience.None" />:
+    ///     every bound turned off from <see cref="Lib.Resilience.Default" />, which carries
+    ///     <see cref="Lib.RetryBudget.Automatic" />.
+    ///     <para>
+    ///         The marker is only free here because the shape cannot retry, and
+    ///         <c>Resilience.IsPassthrough</c> admits it on exactly that ground. This arm is what keeps
+    ///         the two facts from drifting apart: turn the attempt count back up in
+    ///         <c>IsPassthrough</c> without turning the marker back off and this allocates an executor
+    ///         frame where it handed back the callback's own task.
+    ///     </para>
+    /// </summary>
+    public static readonly Resilience DerivedPassthrough = Resilience.Default with
+    {
+        Attempts = 1,
+        Deadline = Timeout.InfiniteTimeSpan,
+        AttemptTimeout = Timeout.InfiniteTimeSpan,
+    };
+
+    /// <summary>
     ///     <see cref="Lib.Resilience.Default" /> with an attached listener, representing the cost
     ///     of telemetry when a listener is active.
     ///     <para>
@@ -74,6 +93,8 @@ public static class ShippingScenarios
 
     public static ValueTask<int> NoneSuspending() => Resilience.None.RunAsync(SuspendCallback);
 
+    public static ValueTask<int> DerivedPassthroughSuspending() => DerivedPassthrough.RunAsync(SuspendCallback);
+
     public static ValueTask<int> TrivialSuspending() => Trivial.RunAsync(SuspendCallback);
 
     public static ValueTask<int> DefaultSuspending() => Resilience.Default.RunAsync(SuspendCallback);
@@ -99,6 +120,8 @@ public static class ShippingScenarios
     // ---- Synchronous fast path: where the 0-byte budgets live. ----
 
     public static ValueTask<int> NoneSync() => Resilience.None.RunAsync(CompleteCallback);
+
+    public static ValueTask<int> DerivedPassthroughSync() => DerivedPassthrough.RunAsync(CompleteCallback);
 
     /// <summary>Static lambda plus state: no closure, no capture, and the state is a value type.</summary>
     public static ValueTask<int> TrivialSyncState() =>

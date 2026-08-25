@@ -293,13 +293,17 @@ public sealed class DependencyInjectionTests
         Assert.Same(budget, policies["api"].Budget);
     }
 
-    /// <summary>A single-attempt policy has nothing to spend and gets no budget, exactly as the core decides.</summary>
+    /// <summary>
+    ///     A single-attempt policy has nothing to spend, so the marker is left alone rather than pinned to
+    ///     a bucket by name - and the core resolves it to no budget at all, exactly as it decides.
+    /// </summary>
     [Fact]
     public void A_single_attempt_policy_gets_no_budget()
     {
         var policies = Build(s => s.AddResilience("once", Resilience.Default with { Attempts = 1 }));
 
-        Assert.Null(policies["once"].Budget);
+        Assert.Same(RetryBudget.Automatic, policies["once"].Budget);
+        Assert.Null(NResilience.Internal.ExecutionState.BudgetFor(policies["once"]));
     }
 
     /// <summary>

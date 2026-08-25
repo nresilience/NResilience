@@ -225,18 +225,18 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
                 policy = policy with { Breaker = live.Breaker };
             }
 
-            if (policy.Budget is { } budget)
+            if (policy.Budget is { IsAutomatic: false } budget)
             {
                 live.Budget ??= budget;
                 policy = policy with { Budget = live.Budget };
             }
-            else if (policy.Attempts > 1)
+            else if (policy.Budget is { IsAutomatic: true } && policy.Attempts > 1)
             {
-                // A null budget means the core creates an automatic one keyed by policy *instance*,
-                // and reload produces a new instance - so the accumulated traffic history would be
-                // thrown away on every edit, silently, on the default configuration. Materializing
-                // it here pins it to the name instead. RetryBudget.Of's defaults are the automatic
-                // budget's defaults, so nothing about the policy's behavior changes.
+                // RetryBudget.Automatic resolves to a bucket keyed by policy *instance*, and reload
+                // produces a new instance - so the accumulated traffic history would be thrown away
+                // on every edit, silently, on the default configuration. Materializing it here pins
+                // it to the name instead. RetryBudget.Of's defaults are Automatic's defaults, so
+                // nothing about the policy's behavior changes.
                 live.Budget ??= RetryBudget.Of(time: policy.Time);
                 policy = policy with { Budget = live.Budget };
             }

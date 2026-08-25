@@ -28,7 +28,7 @@ NResilience provides several presets for common scenarios:
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
 | `Classify` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
-| `Budget` | `RetryBudget?` | `null` | The retry budget. A `null` value creates an automatic budget private to this policy instance. |
+| `Budget` | `RetryBudget?` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` resolves to a budget private to this policy instance. `null` and `RetryBudget.None` both mean no budget. |
 | `BeforeAttempt` | `Func<NextAttempt, Task>?` | `null` | A function that runs before every attempt, including the first. |
 | `OnEvent` | `Action<CallEvent>?` | `null` | The telemetry listener. If `null`, no events are raised and no performance cost is incurred. |
 | `Name` | `string?` | `null` | A name used in diagnostics and telemetry tags. |

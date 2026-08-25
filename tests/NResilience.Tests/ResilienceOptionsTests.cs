@@ -227,11 +227,11 @@ public sealed class ResilienceOptionsTests
         Assert.NotSame(first.Budget, other.Budget);
     }
 
-    /// <summary>An unmentioned budget stays null, which is the core's automatic per-policy budget.</summary>
+    /// <summary>An unmentioned budget leaves the base policy's marker in place.</summary>
     [Fact]
     public void An_unmentioned_budget_stays_automatic()
     {
-        Assert.Null(new ResilienceOptions { Attempts = 3 }.ToPolicy().Budget);
+        Assert.Same(RetryBudget.Automatic, new ResilienceOptions { Attempts = 3 }.ToPolicy().Budget);
     }
 
     /// <summary>A breaker in configuration is settings; the live object is built from them.</summary>

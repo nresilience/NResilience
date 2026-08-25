@@ -65,6 +65,7 @@ public static class Arms
 
             // The shipping executor: what every gate below asserts against.
             Arm.Of("lib: None (passthrough)", ShippingScenarios.NoneSuspending, AllocationCounter.ProcessWide),
+            Arm.Of("lib: derived passthrough", ShippingScenarios.DerivedPassthroughSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: trivial (no bounds)", ShippingScenarios.TrivialSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: Default", ShippingScenarios.DefaultSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: Default, cancellable token", ShippingScenarios.DefaultSuspendingCancellable, AllocationCounter.ProcessWide),
@@ -97,6 +98,7 @@ public static class Arms
         Arm.Of("raw callback (baseline)", Scenarios.RawSync, AllocationCounter.ThreadLocal),
 
         Arm.Of("lib: None (passthrough)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal),
+        Arm.Of("lib: derived passthrough", ShippingScenarios.DerivedPassthroughSync, AllocationCounter.ThreadLocal),
         Arm.Of("lib: trivial, static+state", ShippingScenarios.TrivialSyncState, AllocationCounter.ThreadLocal),
         Arm.Of("lib: trivial, callback", ShippingScenarios.TrivialSyncCallback, AllocationCounter.ThreadLocal),
         Arm.Of("lib: Default, static+state", ShippingScenarios.DefaultSyncState, AllocationCounter.ThreadLocal),

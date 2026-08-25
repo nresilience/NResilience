@@ -40,6 +40,8 @@ These methods return a snapshot of the hosts currently tracked. The dictionaries
 
 If you provide an explicit [`Breaker`](../features/circuit-breaker.md) or `Budget` on your policy, the handler respects that decision and does not apply per-host scoping to those guards.
 
+`RetryBudget.Automatic` is not such a decision. It is what the presets carry, and it says "give me storm protection" rather than naming a scope, so `BudgetPerHost` scopes it to the host like a `null` budget. To share one budget across every host, name an instance: `Resilience.Http with { Budget = RetryBudget.Of() }`.
+
 Depending on your requirements, you can achieve the following scopes:
 
 | Desired Scope | Configuration |
@@ -47,6 +49,9 @@ Depending on your requirements, you can achieve the following scopes:
 | One breaker per host (default) | No change required. |
 | One breaker for the entire client (across all hosts) | Set the `Breaker` property on the policy. |
 | No circuit breaking | Leave `Breaker` as `null` and set `BreakerPerHost = false`. |
+| One budget per host (default) | No change required. |
+| One budget for the entire client (across all hosts) | Set `Budget` to a `RetryBudget.Of(...)` or `RetryBudget.Shared(...)` instance. |
+| No retry budget | Set `Budget` to `RetryBudget.None` (or `null`) and set `BudgetPerHost = false`. |
 
 ## Implementation details
 

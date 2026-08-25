@@ -12,9 +12,9 @@ namespace NResilience;
 ///         10%, total amplification is 1.1×.
 ///     </para>
 ///     <para>
-///         It is <b>on by default</b>. A policy with <c>Budget = null</c> and more than one attempt gets an
-///         automatic budget private to that policy instance, so users get storm protection without learning
-///         the word; only people who want to tune or share it ever meet this API.
+///         It is <b>on by default</b>. The presets carry <see cref="Automatic" />, a marker that resolves to
+///         a budget private to the policy instance holding it, so users get storm protection without learning
+///         the word; only people who want to tune, share or turn it off ever meet this API.
 ///     </para>
 /// </summary>
 /// <remarks>
@@ -47,13 +47,12 @@ public sealed class RetryBudget
     private readonly object _gate = new();
     private readonly double _refillPerSecond;
     private readonly TimeProvider? _time;
+    private readonly bool _isAutomatic;
     private long _refilledAt;
 
     private double _tokens;
 
-    private RetryBudget()
-    {
-    }
+    private RetryBudget(bool isAutomatic = false) => _isAutomatic = isAutomatic;
 
     private RetryBudget(string? name, double fraction, int minimumPerSecond, TimeProvider time)
     {
@@ -74,6 +73,24 @@ public sealed class RetryBudget
     ///     is a call whose dependency is known not to be shared.
     /// </summary>
     public static RetryBudget None { get; } = new();
+
+    /// <summary>
+    ///     Storm protection with the shipped defaults, private to each policy instance that carries it.
+    ///     A marker rather than a bucket: the bucket is created on that policy's first execution and lives
+    ///     as long as the policy does, so two policies holding this do not share one.
+    ///     <para>
+    ///         A marker is what the per-instance guarantee requires. A real <see cref="Of" /> bucket on the
+    ///         static <see cref="Resilience.Default" /> would give every policy in the process derived from
+    ///         it one shared bucket, so a storm against one dependency would throttle retries to all the
+    ///         others - the blast-radius inversion this library exists to prevent.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="Utilization" /> reads 0 on the marker itself. The number that means something is
+    ///         on the resolved bucket, which <c>ResilienceHandler.BudgetsByHost()</c> exposes for the HTTP
+    ///         path.
+    ///     </para>
+    /// </summary>
+    public static RetryBudget Automatic { get; } = new(isAutomatic: true);
 
     /// <summary>The name a <see cref="Shared(string, double, int)" /> budget was looked up by, if any.</summary>
     public string? Name { get; }
@@ -99,8 +116,13 @@ public sealed class RetryBudget
         }
     }
 
+    /// <summary>
+    ///     True for <see cref="Automatic" />, which the executor resolves to a bucket per policy instance.
+    /// </summary>
+    public bool IsAutomatic => _isAutomatic;
+
     /// <summary>True for <see cref="None" />, which the executor skips entirely.</summary>
-    internal bool IsNone => _time is null;
+    internal bool IsNone => _time is null && !_isAutomatic;
 
     /// <summary>A budget private to whoever holds this instance.</summary>
     /// <param name="fraction">
@@ -137,8 +159,8 @@ public sealed class RetryBudget
             (Fraction: fraction, MinimumPerSecond: minimumPerSecond));
     }
 
-    /// <summary>The automatic per-policy budget. Same defaults as <see cref="Of" />.</summary>
-    internal static RetryBudget Automatic(TimeProvider time) => new(null, 0.1, 3, time);
+    /// <summary>The bucket <see cref="Automatic" /> resolves to. Same defaults as <see cref="Of" />.</summary>
+    internal static RetryBudget CreateAutomatic(TimeProvider time) => new(null, 0.1, 3, time);
 
     /// <summary>Charges one retry. False means the retry is refused.</summary>
     internal bool TrySpend()

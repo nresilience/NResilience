@@ -29,7 +29,9 @@ internal sealed class HostScope
         else
             Breaker = policy.Breaker;
 
-        if (options.BudgetPerHost && policy.Budget is null)
+        // A null budget and the Automatic marker both mean "no deliberate scope decision was made",
+        // which is what per-host scoping is allowed to override. An explicit instance is not.
+        if (options.BudgetPerHost && policy.Budget is null or { IsAutomatic: true })
         {
             Budget = RetryBudget.Of();
             scoped = scoped with { Budget = Budget };

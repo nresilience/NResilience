@@ -44,16 +44,16 @@ internal sealed class ExecutionState
         // A policy that cannot retry has nothing to spend and nobody to fund, so it gets no budget
         // at all rather than one that is never consulted. An *explicit* budget on such a policy is
         // still honored, because a shared one is funded by its successful traffic.
-        _automaticBudget = policy.Attempts > 1 ? RetryBudget.Automatic(policy.Time) : null;
+        _automaticBudget = policy.Attempts > 1 ? RetryBudget.CreateAutomatic(policy.Time) : null;
     }
 
     /// <summary>Validates the policy on its first execution, and caches the result per thread.</summary>
     public static void EnsureValidated(Resilience policy) => _ = StateFor(policy);
 
     /// <summary>
-    ///     The budget this call should charge: the policy's own, or the automatic one private to this
-    ///     policy instance. Null when there is no budget to consult, which is the only case the executor
-    ///     pays nothing for.
+    ///     The budget this call should charge: the policy's own, or - for <see cref="RetryBudget.Automatic" />
+    ///     - the bucket private to this policy instance. Null when there is no budget to consult, which is
+    ///     the only case the executor pays nothing for.
     /// </summary>
     /// <remarks>
     ///     Read once per execution into a local rather than at each of the two points that need it. The
@@ -63,8 +63,12 @@ internal sealed class ExecutionState
     /// </remarks>
     public static RetryBudget? BudgetFor(Resilience policy)
     {
-        if (policy.Budget is { } configured)
-            return configured.IsNone ? null : configured;
+        // A null budget is genuinely "no budget", and so is RetryBudget.None.
+        if (policy.Budget is not { } configured || configured.IsNone)
+            return null;
+
+        if (!configured.IsAutomatic)
+            return configured;
 
         // EnsureValidated ran first, from the entry point, so the warm path here is the reference
         // comparison it just primed.

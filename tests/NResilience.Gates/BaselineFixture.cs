@@ -44,6 +44,10 @@ public static class Baseline
 
     // The shipping executor. Every gate asserts against these.
     public const string LibNone = "lib: None (passthrough)";
+
+    /// <summary>Passthrough derived from <c>Resilience.Default</c>, so it carries the Automatic marker.</summary>
+    public const string LibDerivedPassthrough = "lib: derived passthrough";
+
     public const string LibTrivial = "lib: trivial (no bounds)";
     public const string LibDefault = "lib: Default";
     public const string LibDefaultCancellable = "lib: Default, cancellable token";
@@ -75,6 +79,7 @@ public static class Baseline
     public const string RawSync = "raw callback (baseline)";
 
     public const string LibNoneSync = "lib: None (passthrough)";
+    public const string LibDerivedPassthroughSync = "lib: derived passthrough";
     public const string LibTrivialSyncState = "lib: trivial, static+state";
     public const string LibTrivialSyncCallback = "lib: trivial, callback";
     public const string LibDefaultSyncState = "lib: Default, static+state";
