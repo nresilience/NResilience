@@ -62,6 +62,7 @@ using var client = ResilienceHttp.CreateClient(
         OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
         BreakerPerHost = true, // a dead host does not trip calls to the healthy ones
         BudgetPerHost = true,
+        MaxHosts = 1024, // the per-host registry is bounded; null is unbounded
         DetectNestedRetries = true,
     });
 ```
@@ -73,6 +74,7 @@ using var client = ResilienceHttp.CreateClient(
 | `OwnTransportTimeout` | `true` | Sets `HttpClient.Timeout` to infinite to avoid conflicting with the deadline. | below |
 | `BreakerPerHost` | `true` | Scopes the circuit breaker to the target host. | [Per-host scope](per-host-scope.md) |
 | `BudgetPerHost` | `true` | Scopes the retry budget to the target host. | [Per-host scope](per-host-scope.md) |
+| `MaxHosts` | `1024` | Bounds the per-host registry. `null` is unbounded. | [Per-host scope](per-host-scope.md) |
 | `DetectNestedRetries` | `true` | Enables detection of nested retry loops. | [Nested retries](nested-retries.md) |
 
 ## Manage the transport timeout

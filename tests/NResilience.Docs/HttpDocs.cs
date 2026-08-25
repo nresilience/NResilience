@@ -53,6 +53,7 @@ public sealed class HttpDocs
                 OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
                 BreakerPerHost = true, // a dead host does not trip calls to the healthy ones
                 BudgetPerHost = true,
+                MaxHosts = 1024, // the per-host registry is bounded; null is unbounded
                 DetectNestedRetries = true,
             });
 
@@ -90,6 +91,19 @@ public sealed class HttpDocs
 
         Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
         Assert.Equal(expected: 2, actual: transport.Requests.Count);
+    }
+
+    [Fact]
+    public void The_per_host_registry_is_bounded()
+    {
+        // <snippet:http-max-hosts>
+        var handler = new ResilienceHandler(options: new HttpResilienceOptions { MaxHosts = 64 });
+
+        // </snippet:http-max-hosts>
+
+        Assert.Equal(expected: 64, actual: handler.Options.MaxHosts);
+
+        handler.Dispose();
     }
 
     [Fact]

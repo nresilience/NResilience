@@ -35,6 +35,7 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `BreakerPerHost` | `true` | Enables per-host circuit breakers. If the policy already carries an explicit `Breaker`, that breaker is used instead. |
 | `BreakerSettings` | `null` | The settings used to create per-host breakers. |
 | `BudgetPerHost` | `true` | Enables per-host retry budgets. An explicit `Budget` (including `RetryBudget.None`) takes precedence. `RetryBudget.Automatic` does not specify a scope, so per-host scoping applies. |
+| `MaxHosts` | `1024` | The number of hosts the per-host registry keeps. `null` is unbounded; the least-recently-seen hosts are dropped past the cap. |
 | `DetectNestedRetries` | `true` | Determines whether the nested-retry header is added to requests and whether nesting is reported. |
 
 ## `ResilienceHttp`

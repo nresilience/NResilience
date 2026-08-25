@@ -68,25 +68,91 @@ internal sealed class HostScope
 
     /// <summary>This host's budget, whether created here or inherited from the policy.</summary>
     internal RetryBudget? Budget { get; }
+
+    /// <summary>
+    ///     Set on use and cleared by an eviction sweep, so a host seen since the last sweep survives
+    ///     the next one. A plain field rather than an interlocked counter: this is an approximation,
+    ///     and a lost race under-counts a host's recency by one sweep, which is not a correctness
+    ///     property.
+    /// </summary>
+    internal int Used;
 }
 
 /// <summary>
-///     Host scopes, created on first sight of a host and kept for the handler's lifetime.
+///     Host scopes, created on first sight of a host and kept until an eviction sweep drops them.
 /// </summary>
 /// <remarks>
-///     Unbounded, and deliberately so: the set of hosts one <see cref="HttpClient" /> talks to is a
-///     property of the application rather than of its traffic, and an eviction policy on a dictionary
-///     of a dozen entries would be a cache with a bug in it. A client that talks to an unbounded set of
-///     hosts wants <see cref="HttpResilienceOptions.BreakerPerHost" /> off, and the docs say so.
+///     Bounded by <see cref="HttpResilienceOptions.MaxHosts" />. The read path stays a lock-free
+///     dictionary lookup plus a predicated store, and eviction is second chance rather than true LRU:
+///     maintaining access order would put linked-list surgery under a lock on every HTTP send, which
+///     is a worse trade than approximating recency.
 /// </remarks>
 internal sealed class HostRegistry(Resilience policy, HttpResilienceOptions options)
 {
     private readonly ConcurrentDictionary<string, HostScope> _scopes = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The cap, or zero for an unbounded registry.</summary>
+    private readonly int _max = options.MaxHosts is > 0 ? options.MaxHosts.Value : 0;
+
+    private int _sweeping;
+
     internal IEnumerable<HostScope> Scopes => _scopes.Values;
 
-    internal HostScope For(string host) =>
-        _scopes.TryGetValue(host, out var scope)
-            ? scope
-            : _scopes.GetOrAdd(host, static (key, state) => new HostScope(state.Policy, key, state.Options), (Policy: policy, Options: options));
+    internal HostScope For(string host)
+    {
+        if (_scopes.TryGetValue(host, out var scope))
+        {
+            // Guarded so a steady-state request does not dirty a shared cache line on every send.
+            if (scope.Used == 0)
+                scope.Used = 1;
+
+            return scope;
+        }
+
+        var created = _scopes.GetOrAdd(host, static (key, state) => new HostScope(state.Policy, key, state.Options), (Policy: policy, Options: options));
+
+        created.Used = 1;
+
+        if (_max > 0 && _scopes.Count > _max)
+            Sweep();
+
+        return created;
+    }
+
+    /// <summary>
+    ///     Drops the hosts that have not been seen since the last sweep, plus enough headroom that a
+    ///     sweep runs once per batch of new hosts rather than once per host past the cap.
+    /// </summary>
+    private void Sweep()
+    {
+        // One sweeper at a time. Everyone else keeps serving requests against a registry that is
+        // briefly over its cap, which is the correct trade: the cap bounds growth, it is not a hard
+        // invariant worth blocking a request for.
+        if (Interlocked.Exchange(ref _sweeping, 1) == 1)
+            return;
+
+        try
+        {
+            var target = _scopes.Count - _max + (_max / 8);
+
+            foreach (var (host, scope) in _scopes)
+            {
+                if (target <= 0)
+                    return;
+
+                if (scope.Used != 0)
+                {
+                    scope.Used = 0; // Second chance: seen since the last sweep, so it survives this one.
+                    continue;
+                }
+
+                if (_scopes.TryRemove(host, out _))
+                    target--;
+            }
+        }
+        finally
+        {
+            Volatile.Write(ref _sweeping, 0);
+        }
+    }
 }

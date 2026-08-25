@@ -148,6 +148,8 @@ NResilience.Http.HttpResilienceOptions.BudgetPerHost.set -> void
 NResilience.Http.HttpResilienceOptions.DetectNestedRetries.get -> bool
 NResilience.Http.HttpResilienceOptions.DetectNestedRetries.set -> void
 NResilience.Http.HttpResilienceOptions.HttpResilienceOptions() -> void
+NResilience.Http.HttpResilienceOptions.MaxHosts.get -> int?
+NResilience.Http.HttpResilienceOptions.MaxHosts.set -> void
 NResilience.Http.HttpResilienceOptions.OwnTransportTimeout.get -> bool
 NResilience.Http.HttpResilienceOptions.OwnTransportTimeout.set -> void
 NResilience.Http.HttpResilienceOptions.RetryUnsafeMethods.get -> bool

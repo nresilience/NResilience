@@ -14,8 +14,22 @@ The NResilience handler prevents this by maintaining a separate circuit breaker 
 
 `BreakerPerHost` and `BudgetPerHost` are enabled by default. The handler automatically creates a breaker and a retry budget for each authority it sees upon the first request to that host.
 
-> [!WARNING]
-> The host registry is unbounded. This is intended for applications where the set of hosts is stable. If you are building a proxy, a web crawler, or a webhook dispatcher that talks to an **unbounded** set of hosts, you must set `BreakerPerHost` and `BudgetPerHost` to `false`. In these cases, you should define the scope of the guards directly on the policy.
+## Bound the host registry
+ 
+The registry keeps 1024 hosts by default. Use `MaxHosts` to change the cap, or set it to `null` to remove it:
+ 
+<!-- snippet: http-max-hosts -->
+```csharp
+var handler = new ResilienceHandler(options: new HttpResilienceOptions { MaxHosts = 64 });
+```
+<!-- endsnippet -->
+ 
+The set of hosts a client communicates with is typically a property of the application rather than its traffic, so the cap is usually invisible. For a proxy, a crawler, or a webhook dispatcher that reaches the cap, the least-recently-seen hosts are dropped.
+ 
+Eviction is approximate: a host seen since the last sweep survives the next one, and the registry can briefly exceed its cap while a sweep catches up. The cap bounds growth, and no request ever waits on a sweep.
+ 
+> [!IMPORTANT]
+> Eviction discards state. A dropped host forgets if its breaker was open. If this loss of protection is unacceptable, set `BreakerPerHost` and `BudgetPerHost` to `false` and define the guard scope directly on the policy instead.
 
 ## Monitor host state
 
@@ -34,7 +48,7 @@ foreach (var (host, breaker) in breakers)
 ```
 <!-- endsnippet -->
 
-These methods return a snapshot of the hosts currently tracked. The dictionaries are empty until the first request is made to a host, and remain empty if the per-host switches are disabled and the policy does not provide its own breaker or budget.
+These methods return a snapshot of the hosts currently tracked. The dictionaries are empty until the first request is made to a host, and remain empty if the per-host switches are disabled and the policy does not provide its own breaker or budget. Hosts evicted by `MaxHosts` are removed from the snapshot.
 
 ## Configure a different scope
 
@@ -62,6 +76,7 @@ To allow dashboards to separate hosts, the handler renames the policy for the sp
 When a request is marked as non-repeatable, the handler still runs the resilience policy but limits it to a single attempt. This ensures that the circuit breaker still observes the outcome and the retry budget still receives its deposit, but the request is never sent twice.
 
 ### State lifetime
-The lifetime of the host state is tied to the lifetime of the handler:
+The lifetime of the host state is tied to the handler's lifetime or to eviction, whichever comes first:
 - **`IHttpClientFactory`**: Rotates handler chains every two minutes by default. Per-host state is reset when the handler is rotated.
-- **`ResilienceHttp.CreateClient`**: If you maintain the client for the lifetime of the process, the per-host state persists for the lifetime of the process.
+- **`ResilienceHttp.CreateClient`**: Per-host state persists for the lifetime of the process if the client is maintained.
+- **Eviction**: A host dropped by a `MaxHosts` sweep resets to a closed breaker and a full budget the next time it is seen.

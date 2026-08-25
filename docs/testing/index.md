@@ -83,10 +83,11 @@ The policy's `Time` also drives the breakers and retry budgets the library const
  
 <!-- snippet: testing-library-clock -->
 ```csharp
-// The per-host breaker is built by the handler and uses the policy's clock.
-// This allows tests to advance the break duration without real-time sleeps.
+// The per-host breaker is built by the handler, so it runs on the policy's clock rather
+// than on wall time - which is the only reason a break duration can be waited out in a
+// test without actually waiting.
 var time = new FakeTimeProvider();
- 
+
 using var handler = new ResilienceHandler(
     innerHandler: transport,
     policy: Resilience.Http with
@@ -101,19 +102,19 @@ using var handler = new ResilienceHandler(
     {
         BreakerSettings = new BreakerSettings { ConsecutiveFailures = 2, BreakDuration = TimeSpan.FromSeconds(value: 15) },
     });
- 
+
 using var client = new HttpClient(handler: handler);
- 
+
 for (var i = 0; i < 2; i++)
 {
     (await client.GetAsync(requestUri: "https://api.example.com/orders")).Dispose();
 }
- 
+
 Assert.Equal(expected: BreakerState.Open, actual: handler.BreakersByHost()[key: "api.example.com"].State);
- 
+
 down = false;
 time.Advance(delta: TimeSpan.FromSeconds(value: 16)); // the break expires on the fake clock
- 
+
 using var response = await client.GetAsync(requestUri: "https://api.example.com/orders");
 Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
 ```

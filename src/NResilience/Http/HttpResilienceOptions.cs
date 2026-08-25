@@ -77,6 +77,23 @@ public sealed class HttpResilienceOptions
     public bool BudgetPerHost { get; set; } = true;
 
     /// <summary>
+    ///     The number of hosts the handler keeps a breaker and a budget for. 1024 by default; null is
+    ///     unbounded.
+    ///     <para>
+    ///         The set of hosts one client talks to is normally a property of the application, and the
+    ///         cap is invisible to it. A proxy, a crawler or a webhook dispatcher reaches the cap, and
+    ///         the least-recently-seen hosts are dropped - a host that returns after being dropped
+    ///         starts again with a closed breaker and a full budget, which is the right reading for a
+    ///         host nobody has spoken to in a while.
+    ///     </para>
+    ///     <para>
+    ///         Eviction is approximate, so the registry can sit a little over the cap while a sweep
+    ///         catches up. A value of zero or less is read as unbounded.
+    ///     </para>
+    /// </summary>
+    public int? MaxHosts { get; set; } = 1024;
+
+    /// <summary>
     ///     Whether the handler stamps <see cref="ResilienceHttp.NestedRetryHeader" /> on outbound
     ///     requests and reports nesting it detects. On by default; it costs one header on a request
     ///     that can be retried.
