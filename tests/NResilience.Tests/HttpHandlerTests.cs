@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.Time.Testing;
 using NResilience.Http;
 using NResilience.Testing;
 
@@ -277,6 +278,87 @@ public sealed class HttpHandlerTests
 
         using var healthy = await client.GetAsync(new Uri("https://healthy.test/a"));
         Assert.Equal(HttpStatusCode.OK, healthy.StatusCode);
+    }
+
+    /// <summary>
+    ///     A per-host breaker is built by the library, so it runs on the policy's clock. Without that
+    ///     there is no way to write a deterministic test for per-host breaker behavior at all: the
+    ///     break would have to be waited out in real time.
+    /// </summary>
+    [Fact]
+    public async Task A_fake_clock_on_the_policy_drives_a_per_host_breaker()
+    {
+        var down = true;
+        var transport = new ScriptedTransport(_ =>
+            down
+                ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
+                : new HttpResponseMessage(HttpStatusCode.OK));
+
+        var time = new FakeTimeProvider();
+
+        using var handler = new ResilienceHandler(
+            transport,
+            Instant with { Attempts = 1, Breaker = null, Time = time },
+            new HttpResilienceOptions
+            {
+                BreakerSettings = new BreakerSettings
+                {
+                    ConsecutiveFailures = 2,
+                    BreakDuration = TimeSpan.FromSeconds(15),
+                },
+            });
+
+        using var client = new HttpClient(handler);
+
+        for (var i = 0; i < 2; i++)
+        {
+            (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+        }
+
+        var breaker = handler.BreakersByHost()["api.test"];
+        Assert.Equal(BreakerState.Open, breaker.State);
+        Assert.Same(time, breaker.Settings.Time);
+
+        down = false;
+
+        // On TimeProvider.System the break has another 15 s to run, so a call getting through here is
+        // the fake clock and nothing else.
+        time.Advance(TimeSpan.FromSeconds(16));
+
+        using var response = await client.GetAsync(new Uri("https://api.test/thing"));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    /// <summary>
+    ///     Same for the per-host budget: its token bucket refills on the policy's clock, so advancing a
+    ///     fake clock returns the spent capacity.
+    /// </summary>
+    [Fact]
+    public async Task A_fake_clock_on_the_policy_drives_a_per_host_budget()
+    {
+        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var time = new FakeTimeProvider();
+
+        // No per-host breaker: five failing calls would open one, and a refused call pauses on the
+        // policy's clock, which is the clock this test is holding still.
+        using var handler = new ResilienceHandler(
+            transport,
+            Instant with { Breaker = null, Time = time },
+            new HttpResilienceOptions { BreakerPerHost = false });
+        using var client = new HttpClient(handler);
+
+        for (var i = 0; i < 5; i++)
+        {
+            (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+        }
+
+        var budget = handler.BudgetsByHost()["api.test"];
+        Assert.True(budget.Utilization > 0);
+
+        // The bucket refills at its floor rate, so a clock the test controls empties and refills it.
+        time.Advance(TimeSpan.FromSeconds(30));
+
+        Assert.Equal(0, budget.Utilization);
     }
 
     [Fact]

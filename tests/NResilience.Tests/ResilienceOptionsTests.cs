@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Time.Testing;
 using NResilience.Extensions;
 
 namespace NResilience.Tests;
@@ -296,6 +297,49 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(2, breaker.Settings.ConsecutiveFailures);
         Assert.Equal(TimeSpan.FromSeconds(15), breaker.Settings.BreakDuration);
         Assert.Equal(BreakerState.Closed, breaker.State);
+    }
+
+    /// <summary>
+    ///     A section cannot name a clock, so a configured breaker and budget take the policy's. Without
+    ///     it, a policy under a fake clock would still have a breaker running on wall time.
+    /// </summary>
+    [Fact]
+    public void A_configured_breaker_and_budget_take_the_policys_clock()
+    {
+        var time = new FakeTimeProvider();
+
+        var policy = new ResilienceOptions
+        {
+            BudgetFraction = 0.5,
+            Breaker = new BreakerOptions { ConsecutiveFailures = 2 },
+        }.ToPolicy(Resilience.Default with { Time = time });
+
+        Assert.Same(time, policy.Breaker!.Settings.Time);
+
+        // The budget's clock is not readable, so it is asserted through the refill it drives: on
+        // TimeProvider.System no measurable time passes here and the bucket stays empty.
+        var budget = policy.Budget!;
+
+        while (budget.Utilization < 1)
+        {
+            Assert.True(budget.TrySpend());
+        }
+
+        time.Advance(TimeSpan.FromSeconds(30));
+
+        Assert.Equal(0, budget.Utilization);
+    }
+
+    /// <summary>An explicitly named breaker clock is not overwritten by the policy's.</summary>
+    [Fact]
+    public void A_hand_built_breaker_keeps_its_own_clock()
+    {
+        var breakerTime = new FakeTimeProvider();
+        var settings = new BreakerSettings { Time = breakerTime };
+
+        Assert.Same(breakerTime, settings.ConfiguredTime);
+        Assert.Null(new BreakerSettings().ConfiguredTime);
+        Assert.Same(TimeProvider.System, new BreakerSettings().Time);
     }
 
     /// <summary>

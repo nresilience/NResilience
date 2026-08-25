@@ -59,6 +59,8 @@ internal enum BreakerTransition : byte
 /// </remarks>
 public sealed record BreakerSettings
 {
+    private readonly TimeProvider? _time;
+
     /// <summary>Consecutive failures before opening. The reading most people have of "circuit breaker".</summary>
     public int ConsecutiveFailures { get; init; } = 5;
 
@@ -122,8 +124,28 @@ public sealed record BreakerSettings
     ///         two policies with different clocks would otherwise have no single answer to "how long have
     ///         you been open?".
     ///     </para>
+    ///     <para>
+    ///         Where the library builds the breaker for you - the per-host breakers, and the ones a
+    ///         configuration section describes - it hands over the policy's clock unless this was set, so
+    ///         one <see cref="Resilience.Time" /> drives all of them from one place.
+    ///     </para>
     /// </summary>
-    public TimeProvider Time { get; init; } = TimeProvider.System;
+    public TimeProvider Time
+    {
+        get => _time ?? TimeProvider.System;
+        init => _time = value;
+    }
+
+    /// <summary>
+    ///     Null when the caller never named a clock, so the library may supply the executing policy's.
+    /// </summary>
+    /// <remarks>
+    ///     A nullable backing field rather than a separate "was set" flag: a record's synthesized
+    ///     equality compares every field, and a flag would make <c>new BreakerSettings()</c> and
+    ///     <c>new BreakerSettings { Time = TimeProvider.System }</c> unequal for no reason a caller
+    ///     could see.
+    /// </remarks>
+    internal TimeProvider? ConfiguredTime => _time;
 
     /// <summary>Checks the settings and throws listing every problem at once.</summary>
     /// <exception cref="ResilienceConfigurationException">The settings cannot be used.</exception>

@@ -23,7 +23,15 @@ internal sealed class HostScope
         // default rather than an override.
         if (options.BreakerPerHost && policy.Breaker is null)
         {
-            Breaker = new Breaker(options.BreakerSettings) { Name = host };
+            // The breaker is built here rather than handed in, so it takes the policy's clock unless
+            // the settings named one. Without that, a fake clock on the policy could not drive the
+            // per-host breakers it created.
+            var settings = options.BreakerSettings ?? new BreakerSettings();
+
+            if (settings.ConfiguredTime is null)
+                settings = settings with { Time = policy.Time };
+
+            Breaker = new Breaker(settings) { Name = host };
             scoped = scoped with { Breaker = Breaker };
         }
         else
@@ -33,7 +41,7 @@ internal sealed class HostScope
         // which is what per-host scoping is allowed to override. An explicit instance is not.
         if (options.BudgetPerHost && policy.Budget is null or { IsAutomatic: true })
         {
-            Budget = RetryBudget.Of();
+            Budget = RetryBudget.Of(time: policy.Time);
             scoped = scoped with { Budget = Budget };
         }
         else

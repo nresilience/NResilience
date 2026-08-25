@@ -47,7 +47,7 @@ The `BreakerState` enum defines the possible states of the circuit breaker:
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set this equal to `BreakDuration` to disable growth. |
 | `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while in the `HalfOpen` state. |
 | `ProbeSuccesses` | 2 | The number of successful probes required to return the breaker to the `Closed` state. |
-| `Time` | `TimeProvider.System` | The clock used for timing. The breaker maintains its own clock so its state can be read by health endpoints that do not have access to a policy. |
+| `Time` | `TimeProvider.System` | The clock used for timing. The breaker maintains its own clock so its state can be read by health endpoints without a policy. When the library builds the breaker (per-host or from configuration), it uses the policy's `Time` if no other clock is specified. See [the breaker's clock](../features/circuit-breaker.md#the-breakers-clock). |
 | `Validate()` | N/A | Validates the settings and throws a `ResilienceConfigurationException` listing all found problems. |
 
 ### Implementation details

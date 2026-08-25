@@ -22,7 +22,7 @@ NResilience.Extensions.BreakerOptions.SlowCallRatio.get -> double?
 NResilience.Extensions.BreakerOptions.SlowCallRatio.set -> void
 NResilience.Extensions.BreakerOptions.SlowCallThreshold.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.SlowCallThreshold.set -> void
-NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null) -> NResilience.Breaker!
+NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null, System.TimeProvider? time = null) -> NResilience.Breaker!
 NResilience.Extensions.BreakerOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.Window.set -> void
 NResilience.Extensions.IResiliencePolicies

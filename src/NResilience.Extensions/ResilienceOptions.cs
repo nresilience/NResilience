@@ -176,16 +176,21 @@ public sealed class ResilienceOptions
         else if (Jitter is { } jitter)
             policy = policy with { Backoff = policy.Backoff with { Jitter = jitter } };
 
-        if (BuildBudget() is { } budget)
+        if (BuildBudget(policy.Time) is { } budget)
             policy = policy with { Budget = budget };
 
         if (Breaker is { } breaker)
-            policy = policy with { Breaker = breaker.ToBreaker(Name ?? policy.Name) };
+            policy = policy with { Breaker = breaker.ToBreaker(Name ?? policy.Name, policy.Time) };
 
         return policy;
     }
 
-    private RetryBudget? BuildBudget()
+    /// <param name="time">
+    ///     The policy's clock, which a private budget adopts. A shared budget does not: it is
+    ///     process-wide and the first caller's parameters win, so a clock from one section would
+    ///     silently apply to every policy naming the same string.
+    /// </param>
+    private RetryBudget? BuildBudget(TimeProvider time)
     {
         if (SharedBudget is { } shared)
             return RetryBudget.Shared(shared, BudgetFraction ?? 0.1, BudgetMinimumPerSecond ?? 3);
@@ -199,7 +204,7 @@ public sealed class ResilienceOptions
         if (BudgetFraction is 0)
             return RetryBudget.None;
 
-        return RetryBudget.Of(BudgetFraction ?? 0.1, BudgetMinimumPerSecond ?? 3);
+        return RetryBudget.Of(BudgetFraction ?? 0.1, BudgetMinimumPerSecond ?? 3, time);
     }
 
     private Resilience? ResolvePreset()
@@ -267,10 +272,15 @@ public sealed class BreakerOptions
 
     /// <summary>Builds the live breaker.</summary>
     /// <param name="name">The name it reports itself under. Usually the policy's.</param>
+    /// <param name="time">
+    ///     The clock, usually the policy's. Null means <see cref="TimeProvider.System" />. A section
+    ///     cannot name a clock, so the breaker a section describes runs on whatever clock the policy
+    ///     it is attached to runs on, and one <see cref="Resilience.Time" /> drives both.
+    /// </param>
     /// <returns>A new breaker, closed.</returns>
-    public Breaker ToBreaker(string? name = null)
+    public Breaker ToBreaker(string? name = null, TimeProvider? time = null)
     {
-        var settings = new BreakerSettings();
+        var settings = time is null ? new BreakerSettings() : new BreakerSettings { Time = time };
 
         if (ConsecutiveFailures is { } consecutive)
             settings = settings with { ConsecutiveFailures = consecutive };

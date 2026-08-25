@@ -102,6 +102,14 @@ The breaker uses `StopReason.DependencyUnavailable` for refusals. The [retry bud
 
 For more information, see [Guarded rejection](../deep-dives/guarded-rejection.md).
 
+## The breaker's clock
+ 
+A breaker measures its break duration and sliding window using `BreakerSettings.Time` rather than the clock of the executing policy. This allows `State` and `OpenedAt` to be read from health endpoints that do not have a policy instance. If a single breaker is shared by two policies with different clocks, it maintains its own independent time source.
+ 
+When the library creates the breaker for you - such as [per-host breakers](../http/per-host-scope.md) or those described in a [configuration section](../di/configuration.md) - it uses the policy's `Time` unless the settings specify a different clock. This ensures a single `FakeTimeProvider` on the policy drives these breakers during tests. See [Testing](../testing/index.md).
+ 
+A breaker you construct yourself uses the clock specified in its settings. If you need it to align with a policy, provide the same `TimeProvider` instance to both.
+
 ## Manage the breaker
 
 You can monitor the state of the breaker or manually control its behavior.

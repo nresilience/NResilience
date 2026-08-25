@@ -57,6 +57,53 @@ public sealed class TestingDocs
     }
 
     [Fact]
+    public async Task One_clock_drives_the_guards_the_library_builds()
+    {
+        var down = true;
+
+        var transport = new Doubles.ScriptedTransport(() =>
+            new HttpResponseMessage(statusCode: down ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
+
+        // <snippet:testing-library-clock>
+        // The per-host breaker is built by the handler, so it runs on the policy's clock rather
+        // than on wall time - which is the only reason a break duration can be waited out in a
+        // test without actually waiting.
+        var time = new FakeTimeProvider();
+
+        using var handler = new ResilienceHandler(
+            innerHandler: transport,
+            policy: Resilience.Http with
+            {
+                Time = time,
+                Attempts = 1,
+                Backoff = Backoff.None,
+                AttemptTimeout = Timeout.InfiniteTimeSpan,
+                Deadline = Timeout.InfiniteTimeSpan,
+            },
+            options: new HttpResilienceOptions
+            {
+                BreakerSettings = new BreakerSettings { ConsecutiveFailures = 2, BreakDuration = TimeSpan.FromSeconds(value: 15) },
+            });
+
+        using var client = new HttpClient(handler: handler);
+
+        for (var i = 0; i < 2; i++)
+        {
+            (await client.GetAsync(requestUri: "https://api.example.com/orders")).Dispose();
+        }
+
+        Assert.Equal(expected: BreakerState.Open, actual: handler.BreakersByHost()[key: "api.example.com"].State);
+
+        down = false;
+        time.Advance(delta: TimeSpan.FromSeconds(value: 16)); // the break expires on the fake clock
+
+        using var response = await client.GetAsync(requestUri: "https://api.example.com/orders");
+        Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
+
+        // </snippet:testing-library-clock>
+    }
+
+    [Fact]
     public async Task Assert_on_the_whole_event_sequence()
     {
         // <snippet:testing-event-recorder>

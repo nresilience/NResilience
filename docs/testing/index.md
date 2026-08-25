@@ -77,6 +77,53 @@ Assert.IsType<AttemptTimeoutException>(@object: result.Exception);
 > [!IMPORTANT]
 > You must pass the same `TimeProvider` instance to both the policy and the sequence. If the sequence uses the system clock while the policy uses a fake clock, the scripted delay becomes a real sleep, making your tests slow and flaky.
 
+### Guards the library builds for you
+ 
+The policy's `Time` also drives the breakers and retry budgets the library constructs, including [per-host](../http/per-host-scope.md) guards and those defined in a [configuration section](../di/configuration.md). A single `FakeTimeProvider` on the policy manages a per-host breaker's break duration and a configured budget's refill.
+ 
+<!-- snippet: testing-library-clock -->
+```csharp
+// The per-host breaker is built by the handler and uses the policy's clock.
+// This allows tests to advance the break duration without real-time sleeps.
+var time = new FakeTimeProvider();
+ 
+using var handler = new ResilienceHandler(
+    innerHandler: transport,
+    policy: Resilience.Http with
+    {
+        Time = time,
+        Attempts = 1,
+        Backoff = Backoff.None,
+        AttemptTimeout = Timeout.InfiniteTimeSpan,
+        Deadline = Timeout.InfiniteTimeSpan,
+    },
+    options: new HttpResilienceOptions
+    {
+        BreakerSettings = new BreakerSettings { ConsecutiveFailures = 2, BreakDuration = TimeSpan.FromSeconds(value: 15) },
+    });
+ 
+using var client = new HttpClient(handler: handler);
+ 
+for (var i = 0; i < 2; i++)
+{
+    (await client.GetAsync(requestUri: "https://api.example.com/orders")).Dispose();
+}
+ 
+Assert.Equal(expected: BreakerState.Open, actual: handler.BreakersByHost()[key: "api.example.com"].State);
+ 
+down = false;
+time.Advance(delta: TimeSpan.FromSeconds(value: 16)); // the break expires on the fake clock
+ 
+using var response = await client.GetAsync(requestUri: "https://api.example.com/orders");
+Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
+```
+<!-- endsnippet -->
+ 
+A `Breaker` you construct yourself is the exception; it uses the clock specified in its settings. To align it with a policy, provide the same `TimeProvider` instance. See [the breaker's clock](../features/circuit-breaker.md#the-breakers-clock).
+ 
+> [!CAUTION]
+> A guard that refuses a call pauses briefly on the policy's clock. Under a fake clock, this pause never ends unless the test advances time. Tests expecting a rejection must advance the clock or disable the guard (e.g., set `BreakerPerHost = false`).
+
 ## Verify policy behavior
 
 You can verify that a policy is emitting the correct events in the correct order by using an `EventRecorder`. This is more reliable than asserting on elapsed time.
