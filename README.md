@@ -4,6 +4,7 @@
 [![NuGet Version](https://img.shields.io/nuget/v/NResilience.svg)](https://www.nuget.org/packages/NResilience)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/NResilience.svg)](https://www.nuget.org/packages/NResilience)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-blue.svg)](https://dotnet.microsoft.com/)
+[![AOT](https://img.shields.io/badge/Native%20AOT-compatible-success.svg)](https://learn.microsoft.com/dotnet/core/whats-new/dotnet-8/native-aot)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docs](https://img.shields.io/badge/docs-docs.nresilience.net-blue.svg)](https://docs.nresilience.net)
 
