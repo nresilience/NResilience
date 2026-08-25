@@ -47,7 +47,7 @@ If a specific status code is transient for your API, add a custom rule. For an e
 **Solution**: Mark the request as repeatable.
 
 ```csharp
-request.Options.Set(ResilienceHttp.Repeatable, true);
+request.MarkRepeatable(idempotencyKey);
 ```
 
 **Why this happens**: `POST` and `PATCH` requests are not retried by default to prevent duplicate orders, messages, or charges.
@@ -55,7 +55,7 @@ request.Options.Set(ResilienceHttp.Repeatable, true);
 <!-- snippet: troubleshoot-post-not-retried -->
 ```csharp
 using var request = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders");
-request.Options.Set(key: ResilienceHttp.Repeatable, value: true); // this one carries an idempotency key
+request.MarkRepeatable(idempotencyKey: Guid.NewGuid().ToString()); // the option this client retries on, plus the key the service deduplicates on
 ```
 <!-- endsnippet -->
 

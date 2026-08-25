@@ -28,27 +28,34 @@ A retried `POST` is a duplicate order, a duplicate message, or a duplicate charg
 
 If you know a specific `POST` or `PATCH` request is safe to repeat - for example, because it includes an idempotency key - you can mark it as repeatable on a per-request basis. This is the most precise way to control retry behavior.
 
+`MarkRepeatable` writes both halves of that decision in one call, and both halves matter because they serve different consumers. The `ResilienceHttp.Repeatable` option tells *this client* the request may be sent again; the idempotency key header tells *the service* to discard the second copy. A retryable `POST` needs both - the option without a key duplicates the order, and the key without the option is never used.
+
 <!-- snippet: http-repeatable -->
 ```csharp
 // POST is not retried by default, because a retried POST is a duplicate order. Per request,
 // this is the finer instrument, and it beats the per-client switch in both directions.
+// MarkRepeatable writes both halves: the option this client retries on, and the key the
+// service deduplicates on.
 using var request = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders") { Content = body };
-request.Headers.Add(name: "Idempotency-Key", value: key);
-request.Options.Set(key: ResilienceHttp.Repeatable, value: true);
+request.MarkRepeatable(idempotencyKey: key);
 
 using var response = await client.SendAsync(request: request, cancellationToken: cancellationToken);
 ```
 <!-- endsnippet -->
 
+`Idempotency-Key` is an IETF draft rather than a standard, so the header name is a parameter: `request.MarkRepeatable(key, headerName: "X-Request-Id")`. Passing no key at all leaves the headers alone, for a service that does not deduplicate. An existing key on the request is never replaced, because two idempotency keys on one request is a request most services reject outright.
+
 The `ResilienceHttp.Repeatable` option overrides the client-level `RetryUnsafeMethods` setting in both directions:
-- Setting it to `true` allows a `POST` or `PATCH` request to be retried.
-- Setting it to `false` prevents a `GET` or `PUT` request from being retried.
+- Setting it to `true` - what `MarkRepeatable` does - allows a `POST` or `PATCH` request to be retried.
+- Setting it to `false` - what `MarkSingleShot()` does - prevents a `GET` or `PUT` request from being retried, whatever its method says.
+
+Both helpers return the same request, so they compose in an initializer.
 
 ## Enable retries for a client
 
 You can enable retries for `POST` and `PATCH` across an entire client by setting `HttpResilienceOptions.RetryUnsafeMethods = true`. 
 
-Use this setting only if the entire API served by that client is genuinely idempotent. For most scenarios, the per-request `ResilienceHttp.Repeatable` option is safer and more precise.
+Use this setting only if the entire API served by that client is genuinely idempotent. For most scenarios, the per-request `MarkRepeatable` / `MarkSingleShot` pair is safer and more precise.
 
 ## Request and response handling
 

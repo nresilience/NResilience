@@ -118,7 +118,7 @@ public sealed class LoggingTests
         foreach (var kind in Enum.GetValues<CallEventKind>())
         {
             logger.Collector.Clear();
-            listener.Record(Event(kind));
+            listener.Record(CallEvent.Create(kind, "api"));
 
             Assert.Single(logger.Collector.GetSnapshot());
             Assert.Contains(logger.Collector.LatestRecord.Id.Id, Vocabulary.Select(row => row.Id));
@@ -137,7 +137,7 @@ public sealed class LoggingTests
 
         for (var i = 0; i < 100; i++)
         {
-            listener.Record(Event(CallEventKind.RejectedByBreaker));
+            listener.Record(CallEvent.Create(CallEventKind.RejectedByBreaker, "api"));
         }
 
         Assert.Single(logger.Collector.GetSnapshot(), r => r.Id.Id == 1010);
@@ -154,11 +154,11 @@ public sealed class LoggingTests
 
         for (var i = 0; i < 100; i++)
         {
-            listener.Record(Event(CallEventKind.RejectedByBreaker));
+            listener.Record(CallEvent.Create(CallEventKind.RejectedByBreaker, "api"));
         }
 
         time.Advance(TimeSpan.FromSeconds(31));
-        listener.Record(Event(CallEventKind.RejectedByBreaker));
+        listener.Record(CallEvent.Create(CallEventKind.RejectedByBreaker, "api"));
 
         FakeLogRecord[] warnings = [.. logger.Collector.GetSnapshot().Where(r => r.Id.Id == 1010)];
 
@@ -179,7 +179,7 @@ public sealed class LoggingTests
 
         for (var i = 0; i < 5; i++)
         {
-            listener.Record(Event(CallEventKind.RejectedByBreaker));
+            listener.Record(CallEvent.Create(CallEventKind.RejectedByBreaker, "api"));
         }
 
         Assert.Equal(5, logger.Collector.GetSnapshot().Count(r => r.Id.Id == 1010));
@@ -191,8 +191,8 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions(), new FakeTimeProvider());
 
-        listener.Record(Event(CallEventKind.RejectedByBreaker));
-        listener.Record(Event(CallEventKind.RejectedByBudget));
+        listener.Record(CallEvent.Create(CallEventKind.RejectedByBreaker, "api"));
+        listener.Record(CallEvent.Create(CallEventKind.RejectedByBudget, "api"));
 
         Assert.Equal([1010, 1011], Ids(logger));
     }
@@ -203,8 +203,8 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
 
-        listener.Record(Event(CallEventKind.NotRetried, error: new InvalidOperationException()));
-        listener.Record(Event(CallEventKind.NotRetried, error: new InvalidOperationException()));
+        listener.Record(CallEvent.Create(CallEventKind.NotRetried, "api", exception: new InvalidOperationException()));
+        listener.Record(CallEvent.Create(CallEventKind.NotRetried, "api", exception: new InvalidOperationException()));
 
         Assert.Equal([1007, 1006], Ids(logger));
         Assert.Equal(LogLevel.Warning, logger.Collector.GetSnapshot()[0].Level);
@@ -217,8 +217,8 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
 
-        listener.Record(Event(CallEventKind.NotRetried, error: new InvalidOperationException()));
-        listener.Record(Event(CallEventKind.NotRetried, error: new FormatException()));
+        listener.Record(CallEvent.Create(CallEventKind.NotRetried, "api", exception: new InvalidOperationException()));
+        listener.Record(CallEvent.Create(CallEventKind.NotRetried, "api", exception: new FormatException()));
 
         Assert.Equal([1007, 1007], Ids(logger));
     }
@@ -231,7 +231,7 @@ public sealed class LoggingTests
 
         // The HTTP path classifies a 404 from a response, so the event arrives with no exception at
         // all. The warning is for genuine unrecognized exception types.
-        listener.Record(Event(CallEventKind.NotRetried, verdict: Verdict.Permanent));
+        listener.Record(CallEvent.Create(CallEventKind.NotRetried, "api", verdict: Verdict.Permanent));
 
         Assert.Equal([1006], Ids(logger));
         Assert.Equal(LogLevel.Debug, logger.Collector.LatestRecord.Level);
@@ -245,7 +245,7 @@ public sealed class LoggingTests
 
         for (var i = 0; i < 200; i++)
         {
-            listener.Record(Event(CallEventKind.NotRetried, error: new InvalidOperationException($"#{i}"), policy: $"p{i}"));
+            listener.Record(CallEvent.Create(CallEventKind.NotRetried, $"p{i}", exception: new InvalidOperationException($"#{i}")));
         }
 
         Assert.Equal(64, logger.Collector.GetSnapshot().Count(r => r.Id.Id == 1007));
@@ -258,9 +258,9 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
 
-        listener.Record(Event(CallEventKind.NestedRetry));
-        listener.Record(Event(CallEventKind.NestedRetry));
-        listener.Record(Event(CallEventKind.NestedRetry, "other"));
+        listener.Record(CallEvent.Create(CallEventKind.NestedRetry, "api"));
+        listener.Record(CallEvent.Create(CallEventKind.NestedRetry, "api"));
+        listener.Record(CallEvent.Create(CallEventKind.NestedRetry, "other"));
 
         Assert.Equal([1018, 1019, 1018], Ids(logger));
     }
@@ -271,7 +271,7 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
 
-        listener.Record(Event(CallEventKind.OrphanedWork));
+        listener.Record(CallEvent.Create(CallEventKind.OrphanedWork, "api"));
 
         Assert.Equal(1016, logger.Collector.LatestRecord.Id.Id);
         Assert.Contains("CancellationToken", logger.Collector.LatestRecord.Message, StringComparison.Ordinal);
@@ -290,7 +290,7 @@ public sealed class LoggingTests
         // is the one a per-host policy raises events to.
         var scoped = api with { Name = "payments:api.example.com" };
 
-        scoped.OnEvent!(Event(CallEventKind.RejectedByBreaker, "payments:api.example.com"));
+        scoped.OnEvent!(CallEvent.Create(CallEventKind.RejectedByBreaker, "payments:api.example.com"));
 
         Assert.Equal("NResilience.payments", factory.Collector.LatestRecord.Category);
     }
@@ -302,7 +302,7 @@ public sealed class LoggingTests
         var api = (Resilience.Http with { Name = "payments" }).WithLogging(Factory(factory));
 
         (api with { Name = "payments:api.example.com" }).OnEvent!(
-            Event(CallEventKind.RejectedByBreaker, "payments:api.example.com"));
+            CallEvent.Create(CallEventKind.RejectedByBreaker, "payments:api.example.com"));
 
         Assert.Equal("payments:api.example.com", Field(factory.Collector.LatestRecord, "Policy"));
     }
@@ -323,7 +323,7 @@ public sealed class LoggingTests
 
         var api = (Resilience.Default with { Name = "api", OnEvent = e => seen.Add(e.Kind) }).WithLogging(logger);
 
-        api.OnEvent!(Event(CallEventKind.NestedRetry));
+        api.OnEvent!(CallEvent.Create(CallEventKind.NestedRetry, "api"));
 
         Assert.Equal([CallEventKind.NestedRetry], seen);
         Assert.NotEmpty(logger.Collector.GetSnapshot());
@@ -335,7 +335,7 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var api = (Resilience.Default with { Name = "api" }).WithLogging(logger).WithLogging(logger);
 
-        api.OnEvent!(Event(CallEventKind.NestedRetry));
+        api.OnEvent!(CallEvent.Create(CallEventKind.NestedRetry, "api"));
 
         Assert.Single(logger.Collector.GetSnapshot());
     }
@@ -357,8 +357,8 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions { Profile = ResilienceLogProfile.Verbose });
 
-        listener.Record(Event(CallEventKind.Attempt, error: new IOException(), verdict: Verdict.Transient));
-        listener.Record(Event(CallEventKind.Succeeded, attempt: 1, verdict: Verdict.Ok, reason: StopReason.Succeeded));
+        listener.Record(CallEvent.Create(CallEventKind.Attempt, "api", verdict: Verdict.Transient, exception: new IOException()));
+        listener.Record(CallEvent.Create(CallEventKind.Succeeded, "api", verdict: Verdict.Ok, reason: StopReason.Succeeded));
 
         Assert.All(logger.Collector.GetSnapshot(), record => Assert.Equal(LogLevel.Information, record.Level));
     }
@@ -375,7 +375,7 @@ public sealed class LoggingTests
                 Level = (id, _) => id.Id == 1004 ? LogLevel.Error : null,
             });
 
-        listener.Record(Event(CallEventKind.Succeeded, attempt: 1, verdict: Verdict.Ok, reason: StopReason.Succeeded));
+        listener.Record(CallEvent.Create(CallEventKind.Succeeded, "api", verdict: Verdict.Ok, reason: StopReason.Succeeded));
 
         Assert.Equal(LogLevel.Error, logger.Collector.LatestRecord.Level);
     }
@@ -391,7 +391,7 @@ public sealed class LoggingTests
 
         foreach (var kind in Enum.GetValues<CallEventKind>())
         {
-            listener.Record(Event(kind));
+            listener.Record(CallEvent.Create(kind, "api"));
         }
 
         Assert.Empty(logger.Collector.GetSnapshot());
@@ -404,8 +404,8 @@ public sealed class LoggingTests
         var listener = new LogListener(logger, new ResilienceLoggingOptions());
         var error = new IOException();
 
-        listener.Record(Event(CallEventKind.Attempt, error: error, verdict: Verdict.Transient));
-        listener.Record(Event(CallEventKind.Exhausted, error: error, verdict: Verdict.Transient, reason: StopReason.AttemptsExhausted));
+        listener.Record(CallEvent.Create(CallEventKind.Attempt, "api", verdict: Verdict.Transient, exception: error));
+        listener.Record(CallEvent.Create(CallEventKind.Exhausted, "api", verdict: Verdict.Transient, exception: error, reason: StopReason.AttemptsExhausted));
 
         Assert.Null(logger.Collector.GetSnapshot()[0].Exception);
         Assert.Same(error, logger.Collector.GetSnapshot()[1].Exception);
@@ -418,7 +418,7 @@ public sealed class LoggingTests
         var listener = new LogListener(logger, new ResilienceLoggingOptions { IncludeStackTracesOnRetry = true });
         var error = new IOException();
 
-        listener.Record(Event(CallEventKind.Attempt, error: error, verdict: Verdict.Transient));
+        listener.Record(CallEvent.Create(CallEventKind.Attempt, "api", verdict: Verdict.Transient, exception: error));
 
         Assert.Same(error, logger.Collector.LatestRecord.Exception);
     }
@@ -479,7 +479,7 @@ public sealed class LoggingTests
 
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
-        api.OnEvent!(Event(CallEventKind.RejectedByBreaker));
+        api.OnEvent!(CallEvent.Create(CallEventKind.RejectedByBreaker, "api"));
 
         Assert.Contains(1010, provider.Collector.GetSnapshot().Select(r => r.Id.Id));
         Assert.Equal("NResilience.api", provider.Collector.GetSnapshot().First(r => r.Id.Id == 1010).Category);
@@ -508,7 +508,7 @@ public sealed class LoggingTests
         services.AddResilience("api", Resilience.Http, p => p.WithLogging(mine));
 
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
-        api.OnEvent!(Event(CallEventKind.NestedRetry));
+        api.OnEvent!(CallEvent.Create(CallEventKind.NestedRetry, "api"));
 
         Assert.Single(mine.Collector.GetSnapshot(), r => r.Id.Id == 1018);
         Assert.DoesNotContain(1018, theirs.Collector.GetSnapshot().Select(r => r.Id.Id));
@@ -555,7 +555,7 @@ public sealed class LoggingTests
         services.AddResilience("api", Resilience.Http);
 
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
-        api.OnEvent!(Event(CallEventKind.Succeeded, "api", 1, Verdict.Ok, reason: StopReason.Succeeded));
+        api.OnEvent!(CallEvent.Create(CallEventKind.Succeeded, "api", 1, Verdict.Ok, reason: StopReason.Succeeded));
 
         Assert.Equal(
             LogLevel.Information,
@@ -669,53 +669,4 @@ public sealed class LoggingTests
 
     private static string? Field(FakeLogRecord record, string name) =>
         record.StructuredState?.FirstOrDefault(pair => pair.Key == name).Value;
-
-    /// <summary>
-    ///     A <see cref="CallEvent" /> of a given kind, shaped enough for the listener to route it. The
-    ///     executor's own constructor is internal, so the recorder is how a test gets one.
-    /// </summary>
-    private static CallEvent Event(
-        CallEventKind kind,
-        string? policy = "api",
-        int attempt = 1,
-        Verdict? verdict = null,
-        Exception? error = null,
-        StopReason? reason = null)
-    {
-        var effective = verdict ?? kind switch
-        {
-            CallEventKind.RejectedByBreaker => Verdict.Transient,
-            CallEventKind.RejectedByBudget => Verdict.Transient,
-            CallEventKind.NotRetried => Verdict.Permanent,
-            CallEventKind.Exhausted => Verdict.Transient,
-            CallEventKind.DeadlineExceeded => Verdict.Transient,
-            _ => Verdict.Ok,
-        };
-
-        var effectiveReason = reason ?? kind switch
-        {
-            CallEventKind.RejectedByBreaker => StopReason.DependencyUnavailable,
-            CallEventKind.RejectedByBudget => StopReason.BudgetExhausted,
-            CallEventKind.NotRetried => StopReason.Permanent,
-            CallEventKind.Succeeded => StopReason.Succeeded,
-            CallEventKind.DeadlineExceeded => StopReason.DeadlineExceeded,
-            CallEventKind.Exhausted => StopReason.AttemptsExhausted,
-            _ => null,
-        };
-
-        // The constructor is internal, and NResilience grants this assembly access - so a test can
-        // hand the listener one event of each kind without driving the executor into every state.
-        return new CallEvent(
-            kind,
-            policy,
-            attempt,
-            effective,
-            TimeSpan.FromMilliseconds(12),
-            kind is CallEventKind.Retrying or CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget
-                ? TimeSpan.FromMilliseconds(5)
-                : null,
-            error,
-            null,
-            effectiveReason);
-    }
 }

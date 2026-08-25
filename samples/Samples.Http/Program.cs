@@ -38,8 +38,9 @@ transport.Reset();
 
 using (var post = new HttpRequestMessage(HttpMethod.Post, "https://orders.example") { Content = new StringContent("{}") })
 {
-    post.Headers.Add("Idempotency-Key", Guid.NewGuid().ToString());
-    post.Options.Set(ResilienceHttp.Repeatable, true);
+    // One call writes both halves: the option this client retries on, and the key the service
+    // deduplicates on.
+    post.MarkRepeatable(Guid.NewGuid().ToString());
 
     using var response = await client.SendAsync(post, CancellationToken.None);
     Console.WriteLine($"  -> {(int)response.StatusCode} after {transport.Sends} send(s)");

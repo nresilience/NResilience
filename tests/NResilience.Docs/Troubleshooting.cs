@@ -84,7 +84,7 @@ public sealed class Troubleshooting
 
         // <snippet:troubleshoot-post-not-retried>
         using var request = new HttpRequestMessage(method: HttpMethod.Post, requestUri: "https://api.example.com/orders");
-        request.Options.Set(key: ResilienceHttp.Repeatable, value: true); // this one carries an idempotency key
+        request.MarkRepeatable(idempotencyKey: Guid.NewGuid().ToString()); // the option this client retries on, plus the key the service deduplicates on
 
         // </snippet:troubleshoot-post-not-retried>
 

@@ -152,6 +152,41 @@ Assert.Equal(expected: 42, actual: events.Single(kind: CallEventKind.Succeeded).
 
 The `EventRecorder` captures every [`CallEvent`](../reference/events.md) in order. While you can use methods like `CountOf(kind)` or `Contains(kind)` for simple checks, asserting on the entire `Kinds` sequence is recommended to ensure that telemetry is reported in the correct order.
 
+## Test a custom listener
+ 
+An `EventRecorder` proves the policy raised the right events. To prove a listener behaves correctly, you can use `CallEvent.Create` to build events without the executor. Since most parameters are defaulted, you only need to specify the fields your listener asserts on.
+ 
+<!-- snippet: testing-call-event-create -->
+```csharp
+// The listener under test counts the two refusal kinds separately, as "the dependency
+// is down" and "we are retrying too hard" require opposite responses.
+var unavailable = 0;
+var overRetried = 0;
+
+void Listener(CallEvent e)
+{
+    if (e.Kind == CallEventKind.RejectedByBreaker)
+    {
+        unavailable++;
+    }
+    else if (e.Kind == CallEventKind.RejectedByBudget)
+    {
+        overRetried++;
+    }
+}
+
+// CallEvent.Create builds the event the executor would raise.
+Listener(CallEvent.Create(kind: CallEventKind.RejectedByBreaker, policyName: "orders", reason: StopReason.DependencyUnavailable));
+Listener(CallEvent.Create(kind: CallEventKind.RejectedByBudget, policyName: "orders", reason: StopReason.BudgetExhausted));
+Listener(CallEvent.Create(kind: CallEventKind.Succeeded, policyName: "orders", reason: StopReason.Succeeded));
+
+Assert.Equal(expected: 1, actual: unavailable);
+Assert.Equal(expected: 1, actual: overRetried);
+```
+<!-- endsnippet -->
+ 
+This allows you to cover kinds that are difficult to provoke in a test - such as `RejectedByBudget`, `OrphanedWork`, and `NestedRetry` - without constructing a complex scenario for each.
+
 ## Test an HTTP client
 
 You can test resilient `HttpClient` configurations by providing a scripted `HttpMessageHandler` as the inner handler.

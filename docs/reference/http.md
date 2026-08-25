@@ -48,6 +48,15 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `Repeatable` | An `HttpRequestOptionsKey<bool>` used to override the idempotency decision for a specific request. |
 | `NestedRetryHeader` | The constant value for the nested-retry header: `"X-NResilience-Retrying"`. |
 
+## `ResilienceHttpRequestExtensions`
+
+`ResilienceHttpRequestExtensions` is a `static class` of per-request helpers over `ResilienceHttp`'s option keys. Both return the same request, so they compose in an initializer. See [Idempotency](../http/idempotency.md#mark-a-request-as-repeatable).
+
+| Member | Description |
+| :--- | :--- |
+| `MarkRepeatable(idempotencyKey = null, headerName = "Idempotency-Key")` | Sets `ResilienceHttp.Repeatable` to `true` and stamps the idempotency key header when a key is supplied. An existing header of that name is left alone. |
+| `MarkSingleShot()` | Sets `ResilienceHttp.Repeatable` to `false`, so the request is sent at most once whatever its method and whatever `RetryUnsafeMethods` says. |
+
 ### Default retryable methods
 The handler retries the following methods by default: `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`, and `TRACE`. 
 

@@ -166,6 +166,7 @@ NResilience.Http.ResilienceHandler.ResilienceHandler(NResilience.Resilience? pol
 NResilience.Http.ResilienceHandler.ResilienceHandler(System.Net.Http.HttpMessageHandler! innerHandler, NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
 NResilience.Http.ResilienceHandler.WillRetry(System.Net.Http.HttpRequestMessage! request) -> bool
 NResilience.Http.ResilienceHttp
+NResilience.Http.ResilienceHttpRequestExtensions
 NResilience.Jitter
 NResilience.Jitter.Equal = 1 -> NResilience.Jitter
 NResilience.Jitter.Full = 0 -> NResilience.Jitter
@@ -278,8 +279,11 @@ static NResilience.BreakerSettings.operator ==(NResilience.BreakerSettings? left
 static NResilience.Classifier.Default.get -> NResilience.Classifier!
 static NResilience.Classifier.Http.get -> NResilience.Classifier!
 static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
+static NResilience.CallEvent.Create(NResilience.CallEventKind kind, string? policyName = null, int attemptNumber = 1, NResilience.Verdict verdict = default(NResilience.Verdict), System.TimeSpan duration = default(System.TimeSpan), System.TimeSpan? delay = null, System.Exception? exception = null, object? result = null, NResilience.StopReason? reason = null) -> NResilience.CallEvent
 static NResilience.Http.ResilienceHttp.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
 static NResilience.Http.ResilienceHttp.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
+static NResilience.Http.ResilienceHttpRequestExtensions.MarkRepeatable(this System.Net.Http.HttpRequestMessage! request, string? idempotencyKey = null, string! headerName = "Idempotency-Key") -> System.Net.Http.HttpRequestMessage!
+static NResilience.Http.ResilienceHttpRequestExtensions.MarkSingleShot(this System.Net.Http.HttpRequestMessage! request) -> System.Net.Http.HttpRequestMessage!
 static NResilience.Resilience.Default.get -> NResilience.Resilience!
 static NResilience.Resilience.Http.get -> NResilience.Resilience!
 static NResilience.Resilience.None.get -> NResilience.Resilience!

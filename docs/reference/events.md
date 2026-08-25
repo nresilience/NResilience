@@ -22,6 +22,7 @@ order: 7
 | `IsRejection` | `true` for `RejectedByBreaker` and `RejectedByBudget`, for a listener that treats the two refusals alike. |
 | `IsTerminal` | `true` for the kinds that end a call. Exactly one of these is raised per call. |
 | `ToString()` | Returns a formatted summary of the event, omitting absent segments. |
+| `Create(kind, ...)` | Static. Builds a `CallEvent` for [testing a listener](../testing/index.md#test-a-custom-listener) without the executor. Every parameter but `kind` is defaulted. |
 
 ## `CallEventKind`
 

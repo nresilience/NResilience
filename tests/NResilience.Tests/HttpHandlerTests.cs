@@ -156,7 +156,7 @@ public sealed class HttpHandlerTests
             Content = new StringContent("order"),
         };
 
-        request.Options.Set(ResilienceHttp.Repeatable, true);
+        request.MarkRepeatable();
 
         using var response = await client.SendAsync(request);
 
@@ -172,11 +172,93 @@ public sealed class HttpHandlerTests
         using var client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Options.Set(ResilienceHttp.Repeatable, false);
+        request.MarkSingleShot();
 
         using var response = await client.SendAsync(request);
 
         Assert.Single(transport.Requests);
+    }
+
+    /// <summary>
+    ///     The two calls the helper replaces serve different consumers: the option tells this client to
+    ///     retry, the header tells the service to discard the duplicate. A retryable POST needs both, so
+    ///     one call writes both.
+    /// </summary>
+    [Fact]
+    public void MarkRepeatable_sets_the_option_and_stamps_the_key()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("https://api.test/orders"));
+
+        Assert.Same(request, request.MarkRepeatable("key-1"));
+
+        Assert.True(request.Options.TryGetValue(ResilienceHttp.Repeatable, out var repeatable) && repeatable);
+        Assert.Equal(["key-1"], request.Headers.GetValues("Idempotency-Key"));
+    }
+
+    /// <summary>
+    ///     <c>Idempotency-Key</c> is an IETF draft rather than a standard, so the header name is a
+    ///     parameter - the services that name it something else are exactly the callers who need this.
+    /// </summary>
+    [Fact]
+    public void MarkRepeatable_stamps_the_key_under_the_named_header()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("https://api.test/orders"));
+
+        request.MarkRepeatable("key-1", "X-Request-Id");
+
+        Assert.Equal(["key-1"], request.Headers.GetValues("X-Request-Id"));
+        Assert.False(request.Headers.Contains("Idempotency-Key"));
+    }
+
+    /// <summary>
+    ///     No key leaves the headers alone: a service that does not deduplicate still wants the retry.
+    /// </summary>
+    [Fact]
+    public void MarkRepeatable_without_a_key_touches_no_header()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("https://api.test/orders"));
+
+        request.MarkRepeatable();
+
+        Assert.True(request.Options.TryGetValue(ResilienceHttp.Repeatable, out var repeatable) && repeatable);
+        Assert.False(request.Headers.Contains("Idempotency-Key"));
+    }
+
+    /// <summary>
+    ///     <c>TryAddWithoutValidation</c> appends rather than replaces, and two idempotency keys on one
+    ///     request is a request most services reject outright. The caller's own key wins.
+    /// </summary>
+    [Fact]
+    public void MarkRepeatable_does_not_add_a_second_key()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri("https://api.test/orders"));
+        request.Headers.TryAddWithoutValidation("Idempotency-Key", "mine");
+
+        request.MarkRepeatable("key-1");
+
+        Assert.Equal(["mine"], request.Headers.GetValues("Idempotency-Key"));
+    }
+
+    /// <summary>
+    ///     <see cref="ResilienceHttp.Repeatable" /> beats <c>RetryUnsafeMethods</c> in both directions,
+    ///     and the helper pair carries both of them.
+    /// </summary>
+    [Fact]
+    public void MarkSingleShot_clears_the_option()
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
+
+        Assert.Same(request, request.MarkSingleShot());
+
+        Assert.True(request.Options.TryGetValue(ResilienceHttp.Repeatable, out var repeatable));
+        Assert.False(repeatable);
+    }
+
+    [Fact]
+    public void The_request_helpers_reject_a_null_request()
+    {
+        Assert.Throws<ArgumentNullException>(() => ((HttpRequestMessage)null!).MarkRepeatable());
+        Assert.Throws<ArgumentNullException>(() => ((HttpRequestMessage)null!).MarkSingleShot());
     }
 
     [Theory]

@@ -128,6 +128,38 @@ public sealed class TestingDocs
     }
 
     [Fact]
+    public void A_listener_is_testable_without_the_executor()
+    {
+        // <snippet:testing-call-event-create>
+        // The listener under test counts the two refusal kinds separately, as "the dependency
+        // is down" and "we are retrying too hard" require opposite responses.
+        var unavailable = 0;
+        var overRetried = 0;
+ 
+        void Listener(CallEvent e)
+        {
+            if (e.Kind == CallEventKind.RejectedByBreaker)
+            {
+                unavailable++;
+            }
+            else if (e.Kind == CallEventKind.RejectedByBudget)
+            {
+                overRetried++;
+            }
+        }
+ 
+        // CallEvent.Create builds the event the executor would raise.
+        Listener(CallEvent.Create(kind: CallEventKind.RejectedByBreaker, policyName: "orders", reason: StopReason.DependencyUnavailable));
+        Listener(CallEvent.Create(kind: CallEventKind.RejectedByBudget, policyName: "orders", reason: StopReason.BudgetExhausted));
+        Listener(CallEvent.Create(kind: CallEventKind.Succeeded, policyName: "orders", reason: StopReason.Succeeded));
+ 
+        Assert.Equal(expected: 1, actual: unavailable);
+        Assert.Equal(expected: 1, actual: overRetried);
+ 
+        // </snippet:testing-call-event-create>
+    }
+
+    [Fact]
     public async Task The_handler_is_testable_without_a_container()
     {
         // <snippet:testing-http-handler>

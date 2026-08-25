@@ -39,14 +39,6 @@ public sealed class TelemetryTests
         return await call;
     }
 
-    /// <summary>
-    ///     A <see cref="CallEvent" /> of a given kind with nothing else set. The executor's constructor
-    ///     is internal and this assembly has access, so a test can exercise the kind predicates over
-    ///     every kind without driving the executor into each state.
-    /// </summary>
-    private static CallEvent Blank(CallEventKind kind) =>
-        new(kind, null, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null);
-
     // ---- Pay-for-play ----
 
     [Fact]
@@ -285,7 +277,7 @@ public sealed class TelemetryTests
     [InlineData(CallEventKind.NestedRetry, false)]
     [InlineData(CallEventKind.Exhausted, false)]
     public void IsRejection_covers_the_two_refusals(CallEventKind kind, bool expected) =>
-        Assert.Equal(expected, Blank(kind).IsRejection);
+        Assert.Equal(expected, CallEvent.Create(kind).IsRejection);
 
     /// <summary>
     ///     <see cref="CallEvent.IsTerminal" /> is exactly the kinds that end a call - the list the
@@ -306,7 +298,7 @@ public sealed class TelemetryTests
     [InlineData(CallEventKind.BreakerHalfOpened, false)]
     [InlineData(CallEventKind.NestedRetry, false)]
     public void IsTerminal_covers_the_kinds_that_end_a_call(CallEventKind kind, bool expected) =>
-        Assert.Equal(expected, Blank(kind).IsTerminal);
+        Assert.Equal(expected, CallEvent.Create(kind).IsTerminal);
 
     /// <summary>
     ///     The two theories above name every kind, and this is what keeps them exhaustive: adding a
@@ -315,6 +307,63 @@ public sealed class TelemetryTests
     [Fact]
     public void The_kind_predicates_are_asserted_over_every_kind() =>
         Assert.Equal(13, Enum.GetValues<CallEventKind>().Length);
+
+    /// <summary>
+    ///     <see cref="CallEvent.Create" /> exists so a listener can be tested without the executor, and
+    ///     it is only worth anything if what it builds is indistinguishable from what the executor
+    ///     raises. This pins that field for field.
+    /// </summary>
+    [Fact]
+    public async Task Create_builds_the_event_the_executor_raises()
+    {
+        var recorder = new Recorder();
+
+        await (Instant(recorder) with { Name = "api" }).TryRunAsync(static ct => Task.FromResult(7));
+
+        var raised = recorder.Single(CallEventKind.Succeeded);
+
+        var built = CallEvent.Create(
+            CallEventKind.Succeeded,
+            raised.PolicyName,
+            raised.AttemptNumber,
+            raised.Verdict,
+            raised.Duration,
+            raised.Delay,
+            raised.Exception,
+            raised.Result,
+            raised.Reason);
+
+        Assert.Equal(raised.Kind, built.Kind);
+        Assert.Equal("api", built.PolicyName);
+        Assert.Equal(raised.AttemptNumber, built.AttemptNumber);
+        Assert.Equal(raised.Verdict, built.Verdict);
+        Assert.Equal(raised.Duration, built.Duration);
+        Assert.Equal(raised.Delay, built.Delay);
+        Assert.Same(raised.Exception, built.Exception);
+        Assert.Equal(7, built.Result);
+        Assert.Equal(StopReason.Succeeded, built.Reason);
+        Assert.Equal(raised.ToString(), built.ToString());
+    }
+
+    /// <summary>
+    ///     Everything but the kind is defaulted, so a listener test names only the fields it asserts
+    ///     on. The defaults are the "nothing has happened yet" shape.
+    /// </summary>
+    [Fact]
+    public void Create_defaults_every_field_but_the_kind()
+    {
+        var built = CallEvent.Create(CallEventKind.NestedRetry);
+
+        Assert.Equal(CallEventKind.NestedRetry, built.Kind);
+        Assert.Null(built.PolicyName);
+        Assert.Equal(1, built.AttemptNumber);
+        Assert.Equal(Verdict.Ok, built.Verdict);
+        Assert.Equal(TimeSpan.Zero, built.Duration);
+        Assert.Null(built.Delay);
+        Assert.Null(built.Exception);
+        Assert.Null(built.Result);
+        Assert.Null(built.Reason);
+    }
 
     /// <summary>Non-terminal events do not carry a stop reason because the operation has not stopped.</summary>
     [Fact]

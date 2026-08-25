@@ -216,6 +216,37 @@ public readonly struct CallEvent
         Kind is CallEventKind.Succeeded or CallEventKind.NotRetried or CallEventKind.DeadlineExceeded
             or CallEventKind.Exhausted or CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget;
 
+    /// <summary>
+    ///     Creates a <see cref="CallEvent" /> for testing an <see cref="Resilience.OnEvent" /> listener
+    ///     in isolation. The parameters mirror what the executor raises.
+    /// </summary>
+    /// <param name="kind">What happened.</param>
+    /// <param name="policyName">The policy name the listener routes on.</param>
+    /// <param name="attemptNumber">The 1-based attempt this event is about.</param>
+    /// <param name="verdict">How the most recent attempt was classified.</param>
+    /// <param name="duration">The attempt's duration on <see cref="CallEventKind.Attempt" />, the call's on every other kind.</param>
+    /// <param name="delay">The pause about to be served, on the kinds that serve one.</param>
+    /// <param name="exception">What the most recent attempt threw.</param>
+    /// <param name="result">What the most recent attempt returned.</param>
+    /// <param name="reason">Why the call stopped, on the terminal kinds.</param>
+    /// <returns>The event.</returns>
+    /// <remarks>
+    ///     The executor uses the constructor directly, so nothing on the hot path routes through this.
+    ///     Every parameter but <paramref name="kind" /> is defaulted, so a test names only the fields it
+    ///     asserts on.
+    /// </remarks>
+    public static CallEvent Create(
+        CallEventKind kind,
+        string? policyName = null,
+        int attemptNumber = 1,
+        Verdict verdict = default,
+        TimeSpan duration = default,
+        TimeSpan? delay = null,
+        Exception? exception = null,
+        object? result = null,
+        StopReason? reason = null)
+        => new(kind, policyName, attemptNumber, verdict, duration, delay, exception, result, reason);
+
     /// <inheritdoc />
     public override string ToString()
     {
