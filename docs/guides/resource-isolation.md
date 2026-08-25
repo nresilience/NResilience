@@ -256,9 +256,9 @@ var policy = Resilience.Http with
 {
     OnEvent = e =>
     {
-        if (e.Kind == CallEventKind.Rejected)
+        if (e.IsRejection)
         {
-            logger.LogWarning("Rate limit rejected call to {Service}", e.PolicyName);
+            logger.LogWarning("A guard refused a call to {Service}: {Kind}", e.PolicyName, e.Kind);
         }
     }
 };

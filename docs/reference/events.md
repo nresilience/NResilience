@@ -15,10 +15,12 @@ order: 7
 | `AttemptNumber` | The 1-based index of the attempt. For `Attempt` events, it is the attempt that just finished. For `Retrying` and pre-attempt events, it is the attempt about to run. |
 | `Verdict` | The classification of the most recent attempt. Defaults to `Ok` before any attempt has run. |
 | `Duration` | For `Attempt` events, this is the duration of that attempt. For all other event kinds, this is the total time the call has been running. |
-| `Delay` | The duration of the pause about to be served. This is the backoff delay for `Retrying` events or the [rejection pause](../deep-dives/guarded-rejection.md) for `Rejected` events. This is `null` for all other event kinds. |
+| `Delay` | The duration of the pause about to be served. This is the backoff delay for `Retrying` events or the [rejection pause](../deep-dives/guarded-rejection.md) for the two rejection events. This is `null` for all other event kinds. |
 | `Exception` | The exception thrown by the most recent attempt, or `null` if none was thrown. |
 | `Result` | The value returned by the most recent attempt, as an `object`. This is `null` if the attempt threw an exception or returned nothing. |
 | `Reason` | The `StopReason` indicating why the call stopped. This is populated only for terminal event kinds. |
+| `IsRejection` | `true` for `RejectedByBreaker` and `RejectedByBudget`, for a listener that treats the two refusals alike. |
+| `IsTerminal` | `true` for the kinds that end a call. Exactly one of these is raised per call. |
 | `ToString()` | Returns a formatted summary of the event, omitting absent segments. |
 
 ## `CallEventKind`
@@ -32,7 +34,8 @@ The `CallEventKind` enum defines the types of events emitted during a call.
 | `Succeeded` | Yes | No | Yes (`Succeeded`) |
 | `NotRetried` | Yes | No | Yes (`Permanent`) |
 | `Exhausted` | Yes | No | Yes (`AttemptsExhausted`) |
-| `Rejected` | Yes | Yes (Rejection pause) | Yes (`DependencyUnavailable` or `BudgetExhausted`) |
+| `RejectedByBreaker` | Yes | Yes (Rejection pause) | Yes (`DependencyUnavailable`) |
+| `RejectedByBudget` | Yes | Yes (Rejection pause) | Yes (`BudgetExhausted`) |
 | `DeadlineExceeded` | Yes | No | Yes (`DeadlineExceeded`) |
 | `OrphanedWork` | No | No | No |
 | `BreakerOpened` | No | No | No |
@@ -42,7 +45,8 @@ The `CallEventKind` enum defines the types of events emitted during a call.
 
 ### Event invariants and behavior
 
-- **Terminal Events**: Every call ends with exactly one terminal event. This invariant ensures that logical operations can be counted reliably.
+- **Terminal Events**: Every call ends with exactly one terminal event. This invariant ensures that logical operations can be counted reliably. The `IsTerminal` property identifies these events.
+- **Rejections**: A refusal names the guard that made it: `RejectedByBreaker` indicates the dependency is unavailable, and `RejectedByBudget` indicates the client is retrying too hard. `IsRejection` covers both.
 - **Attempt Events**: Exactly one `Attempt` event fires per attempt.
 - **Retrying Events**: `Retrying` events fire **before** the backoff delay is served, allowing listeners to report the expected idle time.
 - **Orphaned Work**: `OrphanedWork` fires when an attempt exceeds its time ceiling by more than one second. This event is raised retrospectively the moment the work finally returns.

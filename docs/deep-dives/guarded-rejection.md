@@ -18,7 +18,7 @@ The rejection pause is subject to the following constraints:
 
 - **Deadline bound**: The pause is capped by the time remaining on the [deadline](../features/deadlines.md). A refusal will never cause a call to exceed the budget set by the caller. For example, if only 40 milliseconds remain on the deadline, the pause is 40 milliseconds.
 - **Cancellation**: The pause observes the caller's cancellation token. Cancelling the operation during a rejection pause causes it to abort immediately.
-- **Telemetry**: The pause is announced before it is served. The `Rejected` [event](../reference/events.md) includes the pause duration in the `Delay` field, allowing listeners to report the impending delay.
+- **Telemetry**: The pause is announced before it is served. The rejection event (`RejectedByBreaker` or `RejectedByBudget`, depending on the guard) includes the pause duration in the `Delay` field, allowing listeners to report the impending delay.
 
 ## Why the pause is not configurable
 

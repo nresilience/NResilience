@@ -255,7 +255,7 @@ public sealed partial record Resilience
                     var pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
 
                     if (OnEvent is not null)
-                        Notify(CallEventKind.Rejected, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
+                        Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
                             StopReason.DependencyUnavailable);
 
                     await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
@@ -494,7 +494,7 @@ public sealed partial record Resilience
                     var refused = GuardDelay(left);
 
                     if (OnEvent is not null)
-                        Notify(CallEventKind.Rejected, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue),
+                        Notify(CallEventKind.RejectedByBudget, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue),
                             StopReason.BudgetExhausted);
 
                     await Delay(Time, refused, cancellationToken).ConfigureAwait(false);

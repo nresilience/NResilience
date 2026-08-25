@@ -161,7 +161,8 @@ public static class ResilienceTelemetry
                 Annotate(e, "nresilience.retrying");
                 break;
 
-            case CallEventKind.Rejected:
+            case CallEventKind.RejectedByBreaker:
+            case CallEventKind.RejectedByBudget:
                 RejectionCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Reason(e));
                 Terminal(e, policy);
                 break;

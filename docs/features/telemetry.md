@@ -44,13 +44,14 @@ A lambda is still the right answer for anything that is not an `ILogger`. If it 
 | `Succeeded` | The call succeeded | Yes |
 | `NotRetried` | The outcome was `Permanent` | Yes |
 | `Exhausted` | The final attempt failed and no retries remain | Yes |
-| `Rejected` | A circuit breaker or the retry budget refused the call | Yes |
+| `RejectedByBreaker` | A circuit breaker refused the call: the dependency is unavailable | Yes |
+| `RejectedByBudget` | The retry budget refused to fund another attempt: this client is retrying too hard | Yes |
 | `DeadlineExceeded` | The total wall-clock budget expired | Yes |
 | `OrphanedWork` | A callback ran past the timeout that should have stopped it | No |
 | `BreakerOpened` / `BreakerClosed` / `BreakerHalfOpened` | A circuit breaker changed state | No |
 | `NestedRetry` | The request is already inside another retrying client | No |
-
-**Every call ends with exactly one terminal event.** This invariant ensures that counts of logical operations are accurate.
+ 
+**Every call ends with exactly one terminal event.** This invariant ensures that counts of logical operations are accurate. Use the `IsTerminal` property to identify these events. `IsRejection` is true for the two refusal kinds; use it when a listener treats both rejections alike.
 
 <!-- snippet: telemetry-recorder -->
 ```csharp
@@ -64,8 +65,8 @@ Console.WriteLine(value: string.Join(separator: ", ", values: events.Kinds));
 <!-- endsnippet -->
 
 - `Duration` represents the individual attempt's duration for `Attempt` events, and the total elapsed time for all other event types.
-- `Delay` represents the pause about to be served for `Retrying` and `Rejected` events; it is `null` for other events.
-- `Reason` distinguishes between the two types of refusals covered by a `Rejected` event.
+- `Delay` represents the pause about to be served for `Retrying` and the two rejection events; it is `null` for other events.
+- `Reason` agrees with the kind on a rejection: `DependencyUnavailable` for `RejectedByBreaker` and `BudgetExhausted` for `RejectedByBudget`. A listener switching on `Kind` does not need to read this field.
 
 <!-- snippet: telemetry-tostring -->
 ```csharp

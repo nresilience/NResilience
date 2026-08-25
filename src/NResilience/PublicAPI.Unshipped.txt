@@ -84,20 +84,23 @@ NResilience.CallEvent.Duration.get -> System.TimeSpan
 NResilience.CallEvent.Exception.get -> System.Exception?
 NResilience.CallEvent.Kind.get -> NResilience.CallEventKind
 NResilience.CallEvent.PolicyName.get -> string?
+NResilience.CallEvent.IsRejection.get -> bool
+NResilience.CallEvent.IsTerminal.get -> bool
 NResilience.CallEvent.Reason.get -> NResilience.StopReason?
 NResilience.CallEvent.Result.get -> object?
 NResilience.CallEvent.Verdict.get -> NResilience.Verdict
 NResilience.CallEventKind
 NResilience.CallEventKind.Attempt = 0 -> NResilience.CallEventKind
-NResilience.CallEventKind.BreakerClosed = 8 -> NResilience.CallEventKind
-NResilience.CallEventKind.BreakerHalfOpened = 9 -> NResilience.CallEventKind
-NResilience.CallEventKind.BreakerOpened = 7 -> NResilience.CallEventKind
-NResilience.CallEventKind.DeadlineExceeded = 5 -> NResilience.CallEventKind
-NResilience.CallEventKind.Exhausted = 11 -> NResilience.CallEventKind
-NResilience.CallEventKind.NestedRetry = 10 -> NResilience.CallEventKind
+NResilience.CallEventKind.BreakerClosed = 9 -> NResilience.CallEventKind
+NResilience.CallEventKind.BreakerHalfOpened = 10 -> NResilience.CallEventKind
+NResilience.CallEventKind.BreakerOpened = 8 -> NResilience.CallEventKind
+NResilience.CallEventKind.DeadlineExceeded = 6 -> NResilience.CallEventKind
+NResilience.CallEventKind.Exhausted = 12 -> NResilience.CallEventKind
+NResilience.CallEventKind.NestedRetry = 11 -> NResilience.CallEventKind
 NResilience.CallEventKind.NotRetried = 3 -> NResilience.CallEventKind
-NResilience.CallEventKind.OrphanedWork = 6 -> NResilience.CallEventKind
-NResilience.CallEventKind.Rejected = 4 -> NResilience.CallEventKind
+NResilience.CallEventKind.OrphanedWork = 7 -> NResilience.CallEventKind
+NResilience.CallEventKind.RejectedByBreaker = 4 -> NResilience.CallEventKind
+NResilience.CallEventKind.RejectedByBudget = 5 -> NResilience.CallEventKind
 NResilience.CallEventKind.Retrying = 1 -> NResilience.CallEventKind
 NResilience.CallEventKind.Succeeded = 2 -> NResilience.CallEventKind
 NResilience.CallRejectedException

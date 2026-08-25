@@ -137,7 +137,7 @@ public sealed class LoggingTests
 
         for (var i = 0; i < 100; i++)
         {
-            listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
+            listener.Record(Event(CallEventKind.RejectedByBreaker));
         }
 
         Assert.Single(logger.Collector.GetSnapshot(), r => r.Id.Id == 1010);
@@ -154,11 +154,11 @@ public sealed class LoggingTests
 
         for (var i = 0; i < 100; i++)
         {
-            listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
+            listener.Record(Event(CallEventKind.RejectedByBreaker));
         }
 
         time.Advance(TimeSpan.FromSeconds(31));
-        listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
+        listener.Record(Event(CallEventKind.RejectedByBreaker));
 
         FakeLogRecord[] warnings = [.. logger.Collector.GetSnapshot().Where(r => r.Id.Id == 1010)];
 
@@ -179,7 +179,7 @@ public sealed class LoggingTests
 
         for (var i = 0; i < 5; i++)
         {
-            listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
+            listener.Record(Event(CallEventKind.RejectedByBreaker));
         }
 
         Assert.Equal(5, logger.Collector.GetSnapshot().Count(r => r.Id.Id == 1010));
@@ -191,8 +191,8 @@ public sealed class LoggingTests
         var logger = new FakeLogger();
         var listener = new LogListener(logger, new ResilienceLoggingOptions(), new FakeTimeProvider());
 
-        listener.Record(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
-        listener.Record(Event(CallEventKind.Rejected, reason: StopReason.BudgetExhausted));
+        listener.Record(Event(CallEventKind.RejectedByBreaker));
+        listener.Record(Event(CallEventKind.RejectedByBudget));
 
         Assert.Equal([1010, 1011], Ids(logger));
     }
@@ -290,7 +290,7 @@ public sealed class LoggingTests
         // is the one a per-host policy raises events to.
         var scoped = api with { Name = "payments:api.example.com" };
 
-        scoped.OnEvent!(Event(CallEventKind.Rejected, "payments:api.example.com", reason: StopReason.DependencyUnavailable));
+        scoped.OnEvent!(Event(CallEventKind.RejectedByBreaker, "payments:api.example.com"));
 
         Assert.Equal("NResilience.payments", factory.Collector.LatestRecord.Category);
     }
@@ -302,7 +302,7 @@ public sealed class LoggingTests
         var api = (Resilience.Http with { Name = "payments" }).WithLogging(Factory(factory));
 
         (api with { Name = "payments:api.example.com" }).OnEvent!(
-            Event(CallEventKind.Rejected, "payments:api.example.com", reason: StopReason.DependencyUnavailable));
+            Event(CallEventKind.RejectedByBreaker, "payments:api.example.com"));
 
         Assert.Equal("payments:api.example.com", Field(factory.Collector.LatestRecord, "Policy"));
     }
@@ -479,7 +479,7 @@ public sealed class LoggingTests
 
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
-        api.OnEvent!(Event(CallEventKind.Rejected, reason: StopReason.DependencyUnavailable));
+        api.OnEvent!(Event(CallEventKind.RejectedByBreaker));
 
         Assert.Contains(1010, provider.Collector.GetSnapshot().Select(r => r.Id.Id));
         Assert.Equal("NResilience.api", provider.Collector.GetSnapshot().First(r => r.Id.Id == 1010).Category);
@@ -684,7 +684,8 @@ public sealed class LoggingTests
     {
         var effective = verdict ?? kind switch
         {
-            CallEventKind.Rejected => Verdict.Transient,
+            CallEventKind.RejectedByBreaker => Verdict.Transient,
+            CallEventKind.RejectedByBudget => Verdict.Transient,
             CallEventKind.NotRetried => Verdict.Permanent,
             CallEventKind.Exhausted => Verdict.Transient,
             CallEventKind.DeadlineExceeded => Verdict.Transient,
@@ -693,7 +694,8 @@ public sealed class LoggingTests
 
         var effectiveReason = reason ?? kind switch
         {
-            CallEventKind.Rejected => StopReason.DependencyUnavailable,
+            CallEventKind.RejectedByBreaker => StopReason.DependencyUnavailable,
+            CallEventKind.RejectedByBudget => StopReason.BudgetExhausted,
             CallEventKind.NotRetried => StopReason.Permanent,
             CallEventKind.Succeeded => StopReason.Succeeded,
             CallEventKind.DeadlineExceeded => StopReason.DeadlineExceeded,
@@ -709,7 +711,9 @@ public sealed class LoggingTests
             attempt,
             effective,
             TimeSpan.FromMilliseconds(12),
-            kind is CallEventKind.Retrying or CallEventKind.Rejected ? TimeSpan.FromMilliseconds(5) : null,
+            kind is CallEventKind.Retrying or CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget
+                ? TimeSpan.FromMilliseconds(5)
+                : null,
             error,
             null,
             effectiveReason);

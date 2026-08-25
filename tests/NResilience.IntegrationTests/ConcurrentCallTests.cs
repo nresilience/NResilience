@@ -30,7 +30,7 @@ public sealed class ConcurrentCallTests
     /// <summary>
     ///     A shared breaker opens after enough failures even under concurrent admission. 16 calls through
     ///     one policy with a shared breaker, each call failing. The contract: the breaker opens, and at
-    ///     least some of the later calls are <see cref="CallEventKind.Rejected" /> - the failure count is not
+    ///     least some of the later calls are <see cref="CallEventKind.RejectedByBreaker" /> - the failure count is not
     ///     lost to a race between concurrent admissions.
     /// </summary>
     [Fact]
@@ -60,7 +60,7 @@ public sealed class ConcurrentCallTests
         await Task.WhenAll(tasks);
 
         Assert.Equal(BreakerState.Open, breaker.State);
-        Assert.True(events.Contains(CallEventKind.Rejected), "No call was rejected - the breaker never opened under load.");
+        Assert.True(events.Contains(CallEventKind.RejectedByBreaker), "No call was rejected - the breaker never opened under load.");
     }
 
     /// <summary>
@@ -97,7 +97,7 @@ public sealed class ConcurrentCallTests
         // A budget that is working refuses some retries. The assertion is that at least one
         // retry was refused - the exact count depends on timing and refill, but the presence of
         // any throttling is the claim.
-        var rejections = events.CountOf(CallEventKind.Rejected);
+        var rejections = events.CountOf(CallEventKind.RejectedByBudget);
 
         Assert.True(rejections > 0,
             $"Expected the budget to refuse some retries, but {events.Count} events were recorded and none were rejections. Events: {events}.");

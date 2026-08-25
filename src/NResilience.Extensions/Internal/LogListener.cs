@@ -66,7 +66,8 @@ internal sealed class LogListener
                 NotRetried(e, policy);
                 break;
 
-            case CallEventKind.Rejected:
+            case CallEventKind.RejectedByBreaker:
+            case CallEventKind.RejectedByBudget:
                 Rejected(e, policy);
                 break;
 
@@ -174,7 +175,7 @@ internal sealed class LogListener
     /// </summary>
     private void Rejected(CallEvent e, string policy)
     {
-        var id = e.Reason == StopReason.BudgetExhausted
+        var id = e.Kind == CallEventKind.RejectedByBudget
             ? Log.Ids.RejectedBudgetExhausted
             : Log.Ids.RejectedDependencyUnavailable;
 

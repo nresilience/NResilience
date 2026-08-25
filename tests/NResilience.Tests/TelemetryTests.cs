@@ -39,6 +39,14 @@ public sealed class TelemetryTests
         return await call;
     }
 
+    /// <summary>
+    ///     A <see cref="CallEvent" /> of a given kind with nothing else set. The executor's constructor
+    ///     is internal and this assembly has access, so a test can exercise the kind predicates over
+    ///     every kind without driving the executor into each state.
+    /// </summary>
+    private static CallEvent Blank(CallEventKind kind) =>
+        new(kind, null, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null);
+
     // ---- Pay-for-play ----
 
     [Fact]
@@ -230,25 +238,17 @@ public sealed class TelemetryTests
 
         await (Instant(recorder) with { Attempts = 2 }).TryRunAsync(work);
 
-        CallEventKind[] terminals =
-        [
-            CallEventKind.Succeeded,
-            CallEventKind.NotRetried,
-            CallEventKind.Rejected,
-            CallEventKind.DeadlineExceeded,
-            CallEventKind.Exhausted,
-        ];
-
-        var terminal = Assert.Single(recorder.Events, e => terminals.Contains(e.Kind));
+        var terminal = Assert.Single(recorder.Events, e => e.IsTerminal);
         Assert.Equal(kind, terminal.Kind);
         Assert.Equal(reason, terminal.Reason);
         Assert.Equal(terminal, recorder.Events[^1]);
     }
 
     /// <summary>
-    ///     A <see cref="CallEventKind.Rejected" /> event can cover two types of refusals:
-    ///     "the dependency is down" or "we are retrying too hard". These require opposite
-    ///     responses, and the reason field distinguishes them.
+    ///     A refusal is one of two kinds: "the dependency is down"
+    ///     (<see cref="CallEventKind.RejectedByBreaker" />) or "we are retrying too hard"
+    ///     (<see cref="CallEventKind.RejectedByBudget" />). These require opposite responses, so the
+    ///     kind states which guard refused and <see cref="CallEvent.Reason" /> agrees with it.
     /// </summary>
     [Fact]
     public async Task A_rejection_says_which_guard_refused_the_call()
@@ -260,8 +260,61 @@ public sealed class TelemetryTests
         await (Instant(recorder) with { Breaker = breaker })
             .TryRunAsync(static ct => Task.FromResult(1));
 
-        Assert.Equal(StopReason.DependencyUnavailable, recorder.Single(CallEventKind.Rejected).Reason);
+        var rejection = recorder.Single(CallEventKind.RejectedByBreaker);
+        Assert.Equal(StopReason.DependencyUnavailable, rejection.Reason);
+        Assert.True(rejection.IsRejection);
+        Assert.True(rejection.IsTerminal);
     }
+
+    /// <summary>
+    ///     <see cref="CallEvent.IsRejection" /> is exactly the two refusal kinds, so a listener that
+    ///     treats them alike does not pay for the split.
+    /// </summary>
+    [Theory]
+    [InlineData(CallEventKind.RejectedByBreaker, true)]
+    [InlineData(CallEventKind.RejectedByBudget, true)]
+    [InlineData(CallEventKind.Attempt, false)]
+    [InlineData(CallEventKind.Retrying, false)]
+    [InlineData(CallEventKind.Succeeded, false)]
+    [InlineData(CallEventKind.NotRetried, false)]
+    [InlineData(CallEventKind.DeadlineExceeded, false)]
+    [InlineData(CallEventKind.OrphanedWork, false)]
+    [InlineData(CallEventKind.BreakerOpened, false)]
+    [InlineData(CallEventKind.BreakerClosed, false)]
+    [InlineData(CallEventKind.BreakerHalfOpened, false)]
+    [InlineData(CallEventKind.NestedRetry, false)]
+    [InlineData(CallEventKind.Exhausted, false)]
+    public void IsRejection_covers_the_two_refusals(CallEventKind kind, bool expected) =>
+        Assert.Equal(expected, Blank(kind).IsRejection);
+
+    /// <summary>
+    ///     <see cref="CallEvent.IsTerminal" /> is exactly the kinds that end a call - the list the
+    ///     "exactly one terminal event per call" rule is stated against.
+    /// </summary>
+    [Theory]
+    [InlineData(CallEventKind.Succeeded, true)]
+    [InlineData(CallEventKind.NotRetried, true)]
+    [InlineData(CallEventKind.RejectedByBreaker, true)]
+    [InlineData(CallEventKind.RejectedByBudget, true)]
+    [InlineData(CallEventKind.DeadlineExceeded, true)]
+    [InlineData(CallEventKind.Exhausted, true)]
+    [InlineData(CallEventKind.Attempt, false)]
+    [InlineData(CallEventKind.Retrying, false)]
+    [InlineData(CallEventKind.OrphanedWork, false)]
+    [InlineData(CallEventKind.BreakerOpened, false)]
+    [InlineData(CallEventKind.BreakerClosed, false)]
+    [InlineData(CallEventKind.BreakerHalfOpened, false)]
+    [InlineData(CallEventKind.NestedRetry, false)]
+    public void IsTerminal_covers_the_kinds_that_end_a_call(CallEventKind kind, bool expected) =>
+        Assert.Equal(expected, Blank(kind).IsTerminal);
+
+    /// <summary>
+    ///     The two theories above name every kind, and this is what keeps them exhaustive: adding a
+    ///     kind without deciding whether it is a rejection or terminal fails here.
+    /// </summary>
+    [Fact]
+    public void The_kind_predicates_are_asserted_over_every_kind() =>
+        Assert.Equal(13, Enum.GetValues<CallEventKind>().Length);
 
     /// <summary>Non-terminal events do not carry a stop reason because the operation has not stopped.</summary>
     [Fact]
@@ -331,7 +384,7 @@ public sealed class TelemetryTests
     // ---- Rejection ----
 
     [Fact]
-    public async Task An_open_breaker_raises_BreakerOpened_and_then_Rejected()
+    public async Task An_open_breaker_raises_BreakerOpened_and_then_RejectedByBreaker()
     {
         var recorder = new Recorder();
         var time = new FakeTimeProvider();
@@ -360,7 +413,7 @@ public sealed class TelemetryTests
 
         Assert.Equal(StopReason.DependencyUnavailable, second.StopReason);
 
-        var rejected = recorder.Single(CallEventKind.Rejected);
+        var rejected = recorder.Single(CallEventKind.RejectedByBreaker);
         Assert.Equal(1, rejected.AttemptNumber);
         Assert.Equal(TimeSpan.FromMilliseconds(100), rejected.Delay);
     }
@@ -466,11 +519,11 @@ public sealed class TelemetryTests
         var result = await RunAsync(policy, static ct => Task.FromResult(1), time);
 
         Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
-        Assert.Equal([CallEventKind.Rejected], recorder.Kinds);
+        Assert.Equal([CallEventKind.RejectedByBreaker], recorder.Kinds);
     }
 
     [Fact]
-    public async Task An_exhausted_budget_raises_Rejected()
+    public async Task An_exhausted_budget_raises_RejectedByBudget()
     {
         var recorder = new Recorder();
         var time = new FakeTimeProvider();
@@ -495,7 +548,7 @@ public sealed class TelemetryTests
 
         Assert.Equal(StopReason.BudgetExhausted, last);
 
-        var rejected = recorder.Events.Last(e => e.Kind == CallEventKind.Rejected);
+        var rejected = recorder.Events.Last(e => e.Kind == CallEventKind.RejectedByBudget);
         Assert.Equal(1, rejected.AttemptNumber);
         Assert.Equal(TimeSpan.FromMilliseconds(100), rejected.Delay);
         Assert.IsType<IOException>(rejected.Exception);

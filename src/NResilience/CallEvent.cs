@@ -35,11 +35,18 @@ public enum CallEventKind
     NotRetried,
 
     /// <summary>
-    ///     A guard refused to make the call: a breaker is open, or the retry budget would not fund the
-    ///     retry. <see cref="CallEvent.Delay" /> carries the pause the refusal serves before it is
-    ///     reported. Terminal.
+    ///     A circuit breaker refused the call: the dependency is unavailable.
+    ///     <see cref="CallEvent.Delay" /> carries the pause the refusal serves before it is reported.
+    ///     Terminal.
     /// </summary>
-    Rejected,
+    RejectedByBreaker,
+
+    /// <summary>
+    ///     The retry budget refused to fund another attempt: this client is retrying too hard.
+    ///     <see cref="CallEvent.Delay" /> carries the pause the refusal serves before it is reported.
+    ///     Terminal.
+    /// </summary>
+    RejectedByBudget,
 
     /// <summary>The wall-clock budget for the whole operation ran out. Terminal.</summary>
     DeadlineExceeded,
@@ -75,7 +82,8 @@ public enum CallEventKind
     ///     <para>
     ///         This is the ordinary way a retried call gives up, and it exists so that <i>every</i> call
     ///         ends with exactly one terminal event - <see cref="Succeeded" />, <see cref="NotRetried" />,
-    ///         <see cref="Rejected" />, <see cref="DeadlineExceeded" /> or this. A listener counting logical
+    ///         <see cref="RejectedByBreaker" />, <see cref="RejectedByBudget" />,
+    ///         <see cref="DeadlineExceeded" /> or this. A listener counting logical
     ///         operations can only be trusted if the count includes the failures, and those are the calls
     ///         worth counting.
     ///     </para>
@@ -159,7 +167,7 @@ public readonly struct CallEvent
 
     /// <summary>
     ///     The pause about to be served: the backoff on <see cref="CallEventKind.Retrying" />, the
-    ///     guarded-rejection pause on <see cref="CallEventKind.Rejected" />. Null on every other kind.
+    ///     guarded-rejection pause on the two rejection kinds. Null on every other kind.
     /// </summary>
     public TimeSpan? Delay { get; }
 
@@ -178,19 +186,35 @@ public readonly struct CallEvent
     public object? Result { get; }
 
     /// <summary>
-    ///     Why the call stopped, on the four terminal kinds - <see cref="CallEventKind.Succeeded" />,
-    ///     <see cref="CallEventKind.NotRetried" />, <see cref="CallEventKind.Rejected" /> and
+    ///     Why the call stopped, on the terminal kinds - <see cref="CallEventKind.Succeeded" />,
+    ///     <see cref="CallEventKind.NotRetried" />, <see cref="CallEventKind.RejectedByBreaker" />,
+    ///     <see cref="CallEventKind.RejectedByBudget" /> and
     ///     <see cref="CallEventKind.DeadlineExceeded" />. Null on every other kind, because nothing has
     ///     stopped yet.
     ///     <para>
-    ///         <see cref="CallEventKind.Rejected" /> covers two different refusals - an open breaker
-    ///         (<see cref="StopReason.DependencyUnavailable" />) and an exhausted retry budget
-    ///         (<see cref="StopReason.BudgetExhausted" />) - and telling them apart is the difference
-    ///         between "the dependency is down" and "we are retrying too hard". A stateless listener
-    ///         cannot infer it from the other fields, so the executor states it.
+    ///         The two refusals carry the reason the kind already names -
+    ///         <see cref="StopReason.DependencyUnavailable" /> on
+    ///         <see cref="CallEventKind.RejectedByBreaker" /> and
+    ///         <see cref="StopReason.BudgetExhausted" /> on
+    ///         <see cref="CallEventKind.RejectedByBudget" /> - so a listener that switches on
+    ///         <see cref="Kind" /> never has to read this field to tell "the dependency is down" from
+    ///         "we are retrying too hard".
     ///     </para>
     /// </summary>
     public StopReason? Reason { get; }
+
+    /// <summary>
+    ///     True for the two refusals - <see cref="CallEventKind.RejectedByBreaker" /> and
+    ///     <see cref="CallEventKind.RejectedByBudget" /> - for a listener that treats them alike.
+    /// </summary>
+    public bool IsRejection => Kind is CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget;
+
+    /// <summary>
+    ///     True for the kinds that end a call. Exactly one of these is raised per call.
+    /// </summary>
+    public bool IsTerminal =>
+        Kind is CallEventKind.Succeeded or CallEventKind.NotRetried or CallEventKind.DeadlineExceeded
+            or CallEventKind.Exhausted or CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget;
 
     /// <inheritdoc />
     public override string ToString()
