@@ -187,6 +187,8 @@ NResilience.RateLimitedException.RateLimitedException(string? limiter = null, Sy
 NResilience.RateLimitedException.RetryAfter.get -> System.TimeSpan?
 NResilience.Resilience
 NResilience.Resilience.<Clone>$() -> NResilience.Resilience!
+NResilience.Resilience.Admit.get -> System.Func<NResilience.NextAttempt, System.Threading.Tasks.Task<NResilience.Verdict>!>?
+NResilience.Resilience.Admit.init -> void
 NResilience.Resilience.AttemptTimeout.get -> System.TimeSpan
 NResilience.Resilience.AttemptTimeout.init -> void
 NResilience.Resilience.Attempts.get -> int

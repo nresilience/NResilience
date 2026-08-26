@@ -89,6 +89,28 @@ public static class ShippingScenarios
     public static readonly Resilience DefaultWithLogging =
         DefaultWithListener.WithLogging(SilentLogger.Instance);
 
+    /// <summary>
+    ///     The completed task <see cref="AdmitHook" /> hands back on every attempt. Cached rather than
+    ///     built with <c>Task.FromResult</c> per call, so this arm measures only what the executor's
+    ///     second, <see cref="Lib.Resilience.Admit" />-configured loop costs - not the cost of a hook
+    ///     that allocates its own return value.
+    /// </summary>
+    private static readonly Task<Lib.Verdict> AdmitOk = Task.FromResult(Lib.Verdict.Ok);
+
+    private static readonly Func<NextAttempt, Task<Lib.Verdict>> AdmitHook = static _ => AdmitOk;
+
+    /// <summary>
+    ///     <see cref="Lib.Resilience.Default" /> with <see cref="Lib.Resilience.Admit" /> configured to
+    ///     always admit. This selects the second execution path - see
+    ///     <c>Resilience.ExecuteWithAdmitAsync</c> - and measures the one hoisted awaiter field that
+    ///     path adds, isolated from every other cost by comparing against <see cref="DefaultSuspending" />
+    ///     in the same sweep.
+    /// </summary>
+    public static readonly Resilience DefaultWithAdmit = Resilience.Default with
+    {
+        Admit = AdmitHook,
+    };
+
     // ---- Suspending path: the path every real I/O call takes. ----
 
     public static ValueTask<int> NoneSuspending() => Resilience.None.RunAsync(SuspendCallback);
@@ -114,6 +136,8 @@ public static class ShippingScenarios
     public static ValueTask<CallResult<int>> TryRunDefaultSuspending() => Resilience.Default.TryRunAsync(SuspendCallback);
 
     public static ValueTask<int> DefaultListenerSuspending() => DefaultWithListener.RunAsync(SuspendCallback);
+
+    public static ValueTask<int> DefaultAdmitSuspending() => DefaultWithAdmit.RunAsync(SuspendCallback);
 
     public static ValueTask<int> DefaultLoggingSuspending() => DefaultWithLogging.RunAsync(SuspendCallback);
 

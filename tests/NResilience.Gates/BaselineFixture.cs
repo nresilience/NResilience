@@ -54,6 +54,8 @@ public static class Baseline
     public const string LibTryRunDefault = "lib: TryRunAsync, Default";
     public const string LibDefaultListener = "lib: Default + listener";
 
+    public const string LibDefaultAdmit = "lib: Default + Admit hook";
+
     /// <summary>The same arm with the shipping log listener chained on, at a logger that carries nothing.</summary>
     public const string LibDefaultLogging = "lib: Default + listener + logging";
 

@@ -130,6 +130,33 @@ public sealed partial record Resilience
     public Func<NextAttempt, Task>? BeforeAttempt { get; init; }
 
     /// <summary>
+    ///     First-class local admission control, checked once per attempt, inside the same classified
+    ///     region the attempt itself runs in. Return <see cref="Verdict.Ok" /> to admit the attempt;
+    ///     return anything else - typically <see cref="Verdict.Refused" /> or
+    ///     <see cref="Verdict.Limited" /> - to refuse it, and the attempt is skipped and treated exactly
+    ///     as if that verdict had come back from the callback: the same log entry, the same telemetry,
+    ///     the same retry-budget exemption for <see cref="Verdict.SelfImposed" />, and the same breaker
+    ///     treatment.
+    ///     <para>
+    ///         Unlike <see cref="BeforeAttempt" />, this is bounded by the attempt's own token and runs
+    ///         where a thrown exception is classified - an exception this hook throws is classified like
+    ///         any other. Prefer this when a guard's outcome should participate in retry, backoff, the
+    ///         breaker and the attempt log; use <see cref="BeforeAttempt" /> for setup that always has to
+    ///         run and has no outcome to classify. The classified-exception recipe in the admission
+    ///         control deep dive still works without configuring this at all - this hook exists for
+    ///         callers who would rather express the guard as a value than as a thrown exception.
+    ///     </para>
+    ///     <para>
+    ///         Configuring this selects a second, separate execution path with one extra hoisted awaiter
+    ///         field, because an <c>await</c> written once in the executor's source costs every caller
+    ///         that field whether or not the hook is set - see "One bit, zero bytes" in the admission
+    ///         control deep dive. Callers who never set this pay nothing for it: the shipping baseline is
+    ///         unchanged, gated in <c>NResilience.Gates</c>.
+    ///     </para>
+    /// </summary>
+    public Func<NextAttempt, Task<Verdict>>? Admit { get; init; }
+
+    /// <summary>
     ///     Told about everything that happens during a call. Null - the default - means the executor
     ///     raises nothing and pays nothing, which is what "pay-for-play telemetry" has to mean if it
     ///     is to mean anything.
@@ -166,6 +193,7 @@ public sealed partial record Resilience
         && Deadline == Timeout.InfiniteTimeSpan
         && AttemptTimeout == Timeout.InfiniteTimeSpan
         && BeforeAttempt is null
+        && Admit is null
 
         // A listener takes a policy out of passthrough even though it imposes no bound. Handing
         // back the callback's own task would be cheaper and would silently raise nothing, and a

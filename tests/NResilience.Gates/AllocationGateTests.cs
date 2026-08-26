@@ -176,6 +176,46 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
+    ///     The claim Tier 2 of the flat-executor extensibility review exists to test: a policy that
+    ///     never configures <see cref="Resilience.Admit" /> must not pay one byte for the second,
+    ///     <c>ExecuteWithAdmitAsync</c> execution path existing in the assembly.
+    ///     <see cref="The_default_policy_stays_within_budget_on_the_suspending_path" /> already gates the
+    ///     absolute figure; this asserts the comparison directly, in the same sweep, so a regression
+    ///     reads as "Admit moved the baseline" rather than requiring two test runs to notice.
+    /// </summary>
+    [Fact]
+    public void A_policy_with_no_Admit_hook_pays_nothing_for_the_second_execution_path()
+    {
+        var withoutAdmit = baseline.SuspendingBytes(Baseline.LibDefault);
+        var withAdmit = baseline.SuspendingBytes(Baseline.LibDefaultAdmit);
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"no Admit {withoutAdmit:0.0} B/op vs Admit configured {withAdmit:0.0} B/op, delta {withAdmit - withoutAdmit:0.0} B"));
+
+        Assert.True(
+            withoutAdmit < withAdmit - Budgets.SuspendingNoiseFloor,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"""
+                 A policy without Admit configured measured {withoutAdmit:0.0} B/op against {withAdmit:0.0} B/op
+                 with one configured. The two are indistinguishable, which means either
+                 ExecuteWithAdmitAsync is not actually a separate code path or the no-Admit entry points
+                 are selecting it anyway.
+                 """));
+    }
+
+    /// <summary>
+    ///     What configuring <see cref="Resilience.Admit" /> costs: the second execution path's one extra
+    ///     hoisted <c>Task&lt;Verdict&gt;</c> awaiter field, and nothing else. Gated loosely, in keeping
+    ///     with every other number in this file being measured rather than reasoned - see the sequencing
+    ///     note in <c>plans/flat-executor-debate-review.md</c>.
+    /// </summary>
+    [Fact]
+    public void The_Admit_hook_stays_within_budget_on_the_suspending_path()
+        => AssertSuspendingOverhead(Baseline.LibDefaultAdmit, Budgets.AdmitConfiguredOverhead);
+
+    /// <summary>
     ///     The falsification test for the shipping executor. The stand-in measured a hand-written fused loop to establish
     ///     what was achievable before any library existed; the shipping executor has to match it while
     ///     doing strictly more - capturing a per-attempt exception, classifying results, and awaiting a

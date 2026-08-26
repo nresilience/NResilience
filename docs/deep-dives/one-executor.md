@@ -48,13 +48,17 @@ Instead, the library provides targeted extension points:
 | Run code before each attempt (refresh a token, build a fresh request) | `BeforeAttempt` |
 | Monitor every stage of the process | `OnEvent` |
 | Add a custom admission-control guard (a distributed lock, a hand-rolled limiter, anything that should refuse a call before it reaches the dependency) | The callback, plus a classifier rule - see [Building a custom guard](admission-control.md#building-a-custom-guard) |
+| Refuse an attempt as a value, without throwing | `Admit`, an opt-in second execution path - see [The Admit hook](admission-control.md#the-admit-hook) |
 | Compose arbitrary logic around an HTTP call | Chain another `DelegatingHandler` alongside `ResilienceHandler` |
 
-The last two are easy to miss because neither reads as "the pipeline": a custom guard is an ordinary
-exception classified to a verdict, not a strategy object, and HTTP composition happens through
-`DelegatingHandler`, not through the policy. Both get the same treatment as the built-in ones -
-correct backoff curve, breaker exemption, retry-budget exemption, telemetry - without adding a layer
-to the executor.
+The two admission rows and the HTTP row are easy to miss because none reads as "the pipeline": a
+custom guard is an ordinary exception (or, via `Admit`, an ordinary return value) classified to a
+verdict rather than a strategy object, and HTTP composition happens through `DelegatingHandler`, not
+through the policy. All three get the same treatment as the built-in ones - correct backoff curve,
+breaker exemption, retry-budget exemption, telemetry - without adding a layer to the executor.
+`Admit` is the one exception to "without adding a layer": configuring it selects a second execution
+path with one extra hoisted field, paid only by callers who configure it. See
+[The Admit hook](admission-control.md#the-admit-hook).
 
 > [!CAUTION]
 > `BeforeAttempt` is awaited outside the executor's classification logic. An exception it throws is

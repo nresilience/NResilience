@@ -64,15 +64,16 @@ services.AddHttpClient("api")
 The callback-based approach respects NResilience's design philosophy: explicit insertion point, zero cost when unused, and integration with the verdict system. A hand-rolled `SemaphoreSlim` requires manual handling of the deadline, exception flow on timeout, and outcome classification. The limiter handles these for you.
 
 ### Can I add my own policy layer?
-You cannot add layers through composition because the engine is [one flat method](./deep-dives/one-executor.md). Extension points include the [classifier](./features/classification.md), `Backoff.Custom`, `BeforeAttempt`, and `OnEvent`. This restricted surface ensures long-term API stability.
+You cannot add layers through composition because the engine is [one flat method](./deep-dives/one-executor.md). Extension points include the [classifier](./features/classification.md), `Backoff.Custom`, `BeforeAttempt`, `Admit`, and `OnEvent`. This restricted surface ensures long-term API stability.
 
 A custom admission-control guard - a distributed lock, a hand-rolled limiter, anything that should
-refuse a call before it reaches the dependency - is not a fifth item on that list. It composes
-through the callback and the classifier, and gets the same treatment as the built-in rate limiter:
-correct backoff curve, no charge to the retry budget, no evidence against the breaker. See
-[Building a custom guard](./deep-dives/admission-control.md#building-a-custom-guard). Do not build
-this with `BeforeAttempt`: it runs outside the classified region, so an exception it throws is never
-turned into a verdict.
+refuse a call before it reaches the dependency - is not a sixth item on that list. It composes
+through the callback and the classifier, or through `Admit` directly, and gets the same treatment as
+the built-in rate limiter: correct backoff curve, no charge to the retry budget, no evidence against
+the breaker. See [Building a custom guard](./deep-dives/admission-control.md#building-a-custom-guard)
+for the classifier-based recipe and [The Admit hook](./deep-dives/admission-control.md#the-admit-hook)
+for the value-returning one. Do not build this with `BeforeAttempt`: it runs outside the classified
+region, so an exception it throws is never turned into a verdict.
 
 ### Is a `Breaker` thread-safe? Can I share one across policies?
 Yes. Sharing a breaker allows you to treat multiple different calls as the same dependency. The breaker is guarded by an uncontended lock. Using `with` copies the reference to the breaker, not its internal state.

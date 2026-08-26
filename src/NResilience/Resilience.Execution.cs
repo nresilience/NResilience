@@ -56,6 +56,10 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask<T>(work(cancellationToken));
 
+        if (Admit is not null)
+            return ExecuteWithAdmitAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
+                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
+
         return ExecuteAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
             new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
     }
@@ -71,6 +75,10 @@ public sealed partial record Resilience
 
         if (IsPassthrough)
             return new ValueTask(work(cancellationToken));
+
+        if (Admit is not null)
+            return Discard(ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
+                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken));
 
         return Discard(ExecuteAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
             new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken));
@@ -95,6 +103,10 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask<T>(work(state, cancellationToken));
 
+        if (Admit is not null)
+            return ExecuteWithAdmitAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
+                new StatefulInvoker<TState, T>(work), state, cancellationToken);
+
         return ExecuteAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
             new StatefulInvoker<TState, T>(work), state, cancellationToken);
     }
@@ -112,6 +124,10 @@ public sealed partial record Resilience
 
         if (IsPassthrough)
             return new ValueTask(work(state, cancellationToken));
+
+        if (Admit is not null)
+            return Discard(ExecuteWithAdmitAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
+                new VoidStatefulInvoker<TState>(work), state, cancellationToken));
 
         return Discard(ExecuteAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
             new VoidStatefulInvoker<TState>(work), state, cancellationToken));
@@ -135,6 +151,10 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
+        if (Admit is not null)
+            return ExecuteWithAdmitAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
+                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
+
         return ExecuteAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
             new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
     }
@@ -147,6 +167,10 @@ public sealed partial record Resilience
     {
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
+
+        if (Admit is not null)
+            return ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
+                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken);
 
         return ExecuteAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
             new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken);
@@ -165,6 +189,10 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
+        if (Admit is not null)
+            return ExecuteWithAdmitAsync<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
+                new StatefulInvoker<TState, T>(work), state, cancellationToken);
+
         return ExecuteAsync<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
             new StatefulInvoker<TState, T>(work), state, cancellationToken);
     }
@@ -179,6 +207,10 @@ public sealed partial record Resilience
     {
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
+
+        if (Admit is not null)
+            return ExecuteWithAdmitAsync<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
+                new VoidStatefulInvoker<TState>(work), state, cancellationToken);
 
         return ExecuteAsync<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
             new VoidStatefulInvoker<TState>(work), state, cancellationToken);
@@ -537,6 +569,305 @@ public sealed partial record Resilience
         // Read after the guarded delay rather than before it, which is both more accurate - the
         // hint is that much shorter by the time the caller sees it - and keeps a TimeSpan? out of
         // the state-machine box.
+        var retryAfter = reason switch
+        {
+            StopReason.DependencyUnavailable => Breaker?.RetryAfterHint(),
+            StopReason.BudgetExhausted => budget?.RetryAfterHint(),
+            _ => null,
+        };
+
+        return shaper.Failure(value, hasValue, error, reason, Deadline, attempts, retryAfter);
+    }
+
+    /// <summary>
+    ///     The same loop as <see cref="ExecuteAsync{TState,T,TInvoker,TOut,TShaper}" />, selected only
+    ///     when <see cref="Admit" /> is configured.
+    ///     <para>
+    ///         A second, separate <c>async</c> method rather than one shared loop with a conditional
+    ///         await, because a hoisted awaiter field is a property of the generated state-machine
+    ///         <b>type</b>: an <c>await Admit(...)</c> written once in <see cref="ExecuteAsync{TState,T,TInvoker,TOut,TShaper}" />
+    ///         would cost every caller that field, whether or not the hook is set. Splitting the loop
+    ///         charges the field only to the callers who actually select this method - see "One bit, zero
+    ///         bytes" in the admission control deep dive for the general form of this argument.
+    ///     </para>
+    ///     <para>
+    ///         Everything except the admission check is identical to <see cref="ExecuteAsync{TState,T,TInvoker,TOut,TShaper}" />
+    ///         on purpose: the two are meant to drift only in the one place this comment marks, and every
+    ///         change to the shared shell has to be made in both. <see cref="Admit" /> is awaited inside
+    ///         the same inner <c>try</c> the attempt itself runs in, using the same <c>attemptToken</c>,
+    ///         so it gets the three properties the callback-based recipe already has: per attempt,
+    ///         bounded, and classified. A verdict other than <see cref="VerdictKind.Ok" /> skips the
+    ///         attempt entirely and is processed exactly as if the callback had produced that verdict -
+    ///         the same log entry, telemetry, breaker and budget treatment. An exception <see cref="Admit" />
+    ///         throws falls into the same <c>catch</c> clauses the attempt's own exceptions do, so it is
+    ///         classified rather than special-cased.
+    ///     </para>
+    /// </summary>
+    private async ValueTask<TOut> ExecuteWithAdmitAsync<TState, T, TInvoker, TOut, TShaper>(
+        TInvoker invoker,
+        TState state,
+        CancellationToken cancellationToken)
+        where TInvoker : struct, IInvoker<TState, T>
+        where TShaper : struct, IOutcomeShaper<T, TOut>
+    {
+        var admit = Admit!;
+
+        var bounded = Deadline != Timeout.InfiniteTimeSpan;
+        TShaper shaper = default;
+        var budget = ExecutionState.BudgetFor(this);
+        var start = Time.GetTimestamp();
+        AttemptSink log = default;
+
+        var verdict = Verdict.Ok;
+        Exception? error = null;
+        T value = default!;
+        var hasValue = false;
+        StopReason reason;
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        while (true)
+        {
+            if (Breaker is { } breaker)
+            {
+                var admitted = breaker.TryEnter(out var admission);
+
+                if (admission != BreakerTransition.None && OnEvent is not null)
+                    NotifyBreaker(admission, log.Count + 1, Time.GetElapsedTime(start));
+
+                if (!admitted)
+                {
+                    reason = StopReason.DependencyUnavailable;
+                    var pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
+
+                    if (OnEvent is not null)
+                        Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
+                            StopReason.DependencyUnavailable);
+
+                    await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+            }
+
+            var recorded = false;
+
+            try
+            {
+                var remaining = Remaining(Time, start, Deadline, bounded);
+
+                if (remaining == TimeSpan.Zero)
+                {
+                    reason = StopReason.DeadlineExceeded;
+                    NotifyDeadline(log.Count + 1, verdict, Time.GetElapsedTime(start), error);
+                    break;
+                }
+
+                if (BeforeAttempt is { } beforeAttempt)
+                {
+                    await beforeAttempt(new NextAttempt(log.Count + 1, verdict, error, remaining, cancellationToken)).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    remaining = Remaining(Time, start, Deadline, bounded);
+
+                    if (remaining == TimeSpan.Zero)
+                    {
+                        reason = StopReason.DeadlineExceeded;
+                        NotifyDeadline(log.Count + 1, verdict, Time.GetElapsedTime(start), error);
+                        break;
+                    }
+                }
+
+                var effective = Effective(AttemptTimeout, remaining);
+
+                CancellationTokenSource? timer = null;
+                CancellationTokenSource? attemptSource = null;
+                var attemptToken = cancellationToken;
+
+                if (effective != Timeout.InfiniteTimeSpan)
+                {
+                    timer = CtsPool.Rent(Time);
+                    timer.CancelAfter(effective);
+
+                    attemptSource = cancellationToken.CanBeCanceled
+                        ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
+                        : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
+
+                    attemptToken = attemptSource.Token;
+                }
+
+                var attemptStart = Time.GetTimestamp();
+                error = null;
+                hasValue = false;
+
+                try
+                {
+                    // The one place this loop differs from ExecuteAsync: a verdict other than Ok skips
+                    // the attempt and is processed exactly as if the callback had produced it.
+                    var decision = await admit(new NextAttempt(log.Count + 1, verdict, error, remaining, attemptToken)).ConfigureAwait(false);
+
+                    if (decision.Kind == VerdictKind.Ok)
+                    {
+                        var attempt = invoker.Invoke(state, attemptToken);
+                        await attempt.ConfigureAwait(false);
+                        value = invoker.Result(attempt);
+                        hasValue = true;
+                        verdict = Classify.ClassifyResult(value);
+                    }
+                    else
+                    {
+                        verdict = decision;
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (OperationCanceledException canceled) when (attemptSource is not null && attemptSource.IsCancellationRequested)
+                {
+                    verdict = Verdict.Transient;
+                    error = new AttemptTimeoutException(effective, canceled);
+                }
+                catch (RateLimitedException limited)
+                {
+                    verdict = Verdict.Limited(limited.RetryAfter);
+                    error = limited;
+                }
+                catch (Exception exception)
+                {
+                    verdict = Classify.ClassifyException(exception);
+
+                    if (verdict.Kind == VerdictKind.Ok)
+                        verdict = Verdict.Permanent;
+
+                    error = exception;
+                }
+                finally
+                {
+                    attemptSource?.Dispose();
+
+                    if (timer is not null)
+                        CtsPool.Return(timer, Time);
+                }
+
+                var duration = Time.GetElapsedTime(attemptStart);
+
+                log.Record(
+                    Time.GetElapsedTime(start, attemptStart).Ticks,
+                    duration.Ticks,
+                    verdict.Kind,
+                    verdict.SelfImposed,
+                    error);
+
+                if (OnEvent is not null)
+                {
+                    var observed = ResultOf(value, hasValue);
+                    Notify(CallEventKind.Attempt, log.Count, verdict, duration, null, error, observed);
+
+                    if (attemptSource is not null && duration >= effective + OrphanGrace)
+                        Notify(CallEventKind.OrphanedWork, log.Count, verdict, duration, null, error, observed);
+                }
+
+                if (Breaker is { } sampled)
+                {
+                    var outcome = sampled.Record(verdict.Kind, duration);
+                    recorded = true;
+
+                    if (outcome != BreakerTransition.None && OnEvent is not null)
+                        NotifyBreaker(outcome, log.Count, Time.GetElapsedTime(start));
+                }
+
+                if (verdict.Kind == VerdictKind.Ok)
+                {
+                    budget?.Deposit();
+
+                    if (OnEvent is not null)
+                        Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue),
+                            StopReason.Succeeded);
+
+                    var succeeded = shaper.WantsLogOnSuccess
+                        ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
+                        : AttemptLog.Empty;
+
+                    return shaper.Success(value, succeeded);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (verdict.Kind == VerdictKind.Permanent)
+                {
+                    reason = StopReason.Permanent;
+
+                    if (OnEvent is not null)
+                    {
+                        Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                            StopReason.Permanent);
+                    }
+
+                    break;
+                }
+
+                if (log.Count >= Attempts)
+                {
+                    reason = StopReason.AttemptsExhausted;
+
+                    if (OnEvent is not null)
+                        Notify(CallEventKind.Exhausted, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                            StopReason.AttemptsExhausted);
+
+                    break;
+                }
+
+                var left = Remaining(Time, start, Deadline, bounded);
+
+                if (left == TimeSpan.Zero)
+                {
+                    reason = StopReason.DeadlineExceeded;
+                    NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
+                    break;
+                }
+
+                if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
+                {
+                    reason = StopReason.BudgetExhausted;
+                    var refused = GuardDelay(left);
+
+                    if (OnEvent is not null)
+                        Notify(CallEventKind.RejectedByBudget, log.Count, verdict, Time.GetElapsedTime(start), refused, error, ResultOf(value, hasValue),
+                            StopReason.BudgetExhausted);
+
+                    await Delay(Time, refused, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+
+                var delay = Backoff.Compute(new NextAttempt(log.Count + 1, verdict, error, left, cancellationToken));
+
+                if (bounded && delay >= left)
+                {
+                    reason = StopReason.DeadlineExceeded;
+                    NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
+                    break;
+                }
+
+                if (OnEvent is not null)
+                {
+                    Notify(CallEventKind.Retrying, log.Count + 1, verdict, Time.GetElapsedTime(start), delay, error, ResultOf(value, hasValue));
+                }
+
+                if (delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay, Time, cancellationToken).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+            }
+            finally
+            {
+                if (Breaker is { } b && !recorded)
+                    b.ReleaseProbe();
+            }
+        }
+
+        var attempts = log.Materialize(Time.GetElapsedTime(start), Deadline, bounded);
+
         var retryAfter = reason switch
         {
             StopReason.DependencyUnavailable => Breaker?.RetryAfterHint(),

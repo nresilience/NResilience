@@ -104,6 +104,20 @@ public static class Budgets
     public const double DefaultWithListenerOverhead = 512;
 
     /// <summary>
+    ///     <c>Resilience.Default</c> with <see cref="Resilience.Admit" /> configured to always admit,
+    ///     against <c>ShippingScenarios.AdmitHook</c>, a cached delegate returning a cached completed
+    ///     <c>Task&lt;Verdict&gt;</c> - so this prices only what the executor's second,
+    ///     <c>ExecuteWithAdmitAsync</c> loop costs, not the hook's own allocation.
+    ///     Measured: 424.0 B on .NET 10, 423.8 B on .NET 8 - 31.2 B and 32.5 B over
+    ///     <see cref="DefaultOverhead" />'s measured figure, the one extra hoisted
+    ///     <c>TaskAwaiter&lt;Verdict&gt;</c> field <see cref="Admit" /> costs a caller who configures it.
+    ///     This is the Tier 2 spike from <c>plans/flat-executor-debate-review.md</c>: the number that
+    ///     matters more than this one is <see cref="DefaultOverhead" /> itself holding still, which
+    ///     <c>A_policy_with_no_Admit_hook_pays_nothing_for_the_second_execution_path</c> asserts directly.
+    /// </summary>
+    public const double AdmitConfiguredOverhead = 488;
+
+    /// <summary>
     ///     The pay-for-play gate, expressed as the thing it actually claims: what a listener adds must
     ///     be accounted for by the boxes it asked for, and nothing else.
     ///     Two events on a successful call carry a result - <c>Attempt</c> and <c>Succeeded</c> - and a

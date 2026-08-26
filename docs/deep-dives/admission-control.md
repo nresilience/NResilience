@@ -65,7 +65,11 @@ public bool SelfImposed => (_packed & SelfImposedFlag) != 0;
 
 Back to 24 bytes, gated by `The_verdict_carries_its_origin_for_free`. `AttemptRecord` already used the same trick to carry the verdict kind in the top eight bits of a 64-bit field, and it has the same spare capacity - so the flag survives into the attempt log for nothing as well, and a reader of `CallResult<T>.Attempts` can tell a limiter this process runs from a 429 the dependency sent.
 
-The same accounting is why there is no `Admit` hook on the policy. A hook returning a new awaitable type adds a hoisted awaiter field to the state-machine box of every suspending call, configured or not - the same 16 bytes per call that `BeforeAttempt` returns `Task` specifically to avoid.
+The same accounting is why [the `Admit` hook](#the-admit-hook) does not live in the shared loop. A
+hook returning a new awaitable type would add a hoisted awaiter field to the state-machine box of
+every suspending call, configured or not - the same 16 bytes per call that `BeforeAttempt` returns
+`Task` to avoid. `Admit` avoids this by living in a second, separate `async` method, selected only
+when it is configured, so the field is charged to the callers who select it and to no one else.
 
 ## Building a custom guard
 
@@ -111,6 +115,47 @@ per attempt, bounded by the attempt's own token, and running where a thrown exce
 apply here exactly as they do to a rate limiter. `BeforeAttempt` does not have this property: it runs
 outside the classified region, so an exception thrown there is never turned into a verdict at all.
 That is why a guard belongs in the callback, not as a matter of taste.
+
+## The Admit hook
+
+`Resilience.Admit` is `Func<NextAttempt, Task<Verdict>>?`, checked once per attempt, in the same
+classified region the attempt itself runs in. Return `Verdict.Ok` to admit the attempt; return
+anything else - typically `Verdict.Refused` or `Verdict.Limited` - to refuse it. The attempt is
+skipped and processed exactly as if the callback had produced that verdict: the same log entry, the
+same telemetry, the same retry-budget exemption for `SelfImposed`, and the same breaker treatment.
+
+```csharp
+var policy = Resilience.Default with
+{
+    Admit = async next =>
+        await consensusStore.TryAcquireAsync(next.CancellationToken)
+            ? Verdict.Ok
+            : Verdict.Refused(TimeSpan.FromMilliseconds(200)),
+};
+
+var result = await policy.RunAsync(ct => CallDependencyAsync(ct), cancellationToken);
+```
+
+This is the same guard as [Building a custom guard](#building-a-custom-guard), expressed as a value
+instead of a thrown exception. Prefer `Admit` when the guard's outcome is naturally a decision rather
+than a failure - there is no exception to throw, so there is nothing to invent one for. Prefer the
+classified-exception recipe when the guard already fails by throwing, because a domain type you
+already have composes with the classifier for free. Both reach the identical code path: `Admit`
+returning a non-`Ok` verdict is processed exactly where a classified `RateLimitedException` is.
+
+An exception `Admit` throws is not special-cased. It falls into the same exception handling the
+attempt's own exceptions do, and is classified like any other.
+
+**The cost is opt-in, and only the callers who opt in pay it.** Configuring `Admit` selects a second,
+separate execution path - a second `async` method with the loop's shell repeated and one extra
+`await Admit(...)` added - rather than adding the await to the one shared loop. This is the only
+technique that works for the reason [a refusal is not a kind of outcome](#a-refusal-is-not-a-kind-of-outcome):
+a hoisted awaiter field is a property of the generated state-machine type, not of any particular
+call, so an `await` written once in the executor's source would cost every caller that field whether
+or not the hook is set. A policy that never configures `Admit` selects the original loop, and its
+state-machine box is unchanged; `NResilience.Gates` gates this directly, in the same sweep as every
+other budget in the library. Configuring `Admit` costs one hoisted `TaskAwaiter<Verdict>` field -
+measured at roughly 30 B per suspending call on top of the same policy without it.
 
 ## The callback is the seam
 
