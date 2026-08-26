@@ -4,9 +4,9 @@
 [![NuGet Version](https://img.shields.io/nuget/v/NResilience.svg)](https://www.nuget.org/packages/NResilience)
 [![NuGet Downloads](https://img.shields.io/nuget/dt/NResilience.svg)](https://www.nuget.org/packages/NResilience)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-blue.svg)](https://dotnet.microsoft.com/)
-[![AOT](https://img.shields.io/badge/Native%20AOT-compatible-success.svg)](https://learn.microsoft.com/dotnet/core/aot/)
+[![AOT](https://img.shields.io/badge/Native%20AOT-✓-success.svg)](ttps://learn.microsoft.com/en-us/dotnet/core/deploying/native-aot/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Docs](https://img.shields.io/badge/docs-docs.nresilience.net-blue.svg)](https://docs.nresilience.net)
+[![Docs](https://img.shields.io/badge/Docs-website-blue.svg)](https://docs.nresilience.net)
 
 Prevent cascading failures in your .NET applications.
 
@@ -20,6 +20,7 @@ NResilience replaces complex fluent builders, confusing strategy ordering, and m
 - **No fluent builders.** Configure policies using `with` expressions to change one setting while keeping the rest.
 - **Sensible defaults.** Get a working, retried HTTP call with one line of code.
 - **One method for everything.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
+- **Retry budget.** A cap on retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
 - **Native AOT compatible.** Zero external dependencies and no reflection.
 
@@ -77,7 +78,7 @@ User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGoo
 
 NResilience is built for high-performance .NET applications:
 
-- **Low overhead.** A flat execution path ensures that cost doesn't grow as you add more policy settings.
+- **Low overhead.** A flat execution path ensures that cost doesn't grow as you add more policy settings. Overhead is one allocation per call, and that ceiling is gated in CI.
 - **Built-in analyzers.** Seven diagnostics ship with the package to prevent silent failures.
 - **Native AOT.** Fully compatible with `net8.0` and `net10.0` trimming and AOT publishing.
 
