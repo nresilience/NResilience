@@ -125,24 +125,43 @@ internal sealed class HostRegistry(Resilience policy, HttpResilienceOptions opti
     /// </summary>
     private void Sweep()
     {
+        var count = _scopes.Count;
+
+        // Past twice the cap the registry has stopped approximating its bound and is simply
+        // growing, and the two concessions below are both withdrawn until it is back under.
+        var crowded = count > _max * 2;
+
         // One sweeper at a time. Everyone else keeps serving requests against a registry that is
         // briefly over its cap, which is the correct trade: the cap bounds growth, it is not a hard
         // invariant worth blocking a request for.
-        if (Interlocked.Exchange(ref _sweeping, 1) == 1)
+        //
+        // Deferring unconditionally is a different matter. The sweeper is an ordinary request thread
+        // holding no lock, so a loaded scheduler can leave it descheduled part-way through its
+        // iteration while every other thread adds a host and declines to sweep - and then nothing
+        // bounds anything. Eight threads looking up 400 hosts against a cap of 32 were observed
+        // keeping all 400. So a thread that arrives while the registry is crowded sweeps alongside
+        // whoever is already sweeping. Concurrent sweeps need no coordination: TryRemove settles
+        // which one evicts an entry, and Used is an approximation by construction.
+        if (Interlocked.Exchange(ref _sweeping, 1) == 1 && !crowded)
             return;
 
         try
         {
-            var target = _scopes.Count - _max + (_max / 8);
+            var target = count - _max + (_max / 8);
 
             foreach (var (host, scope) in _scopes)
             {
                 if (target <= 0)
                     return;
 
-                if (scope.Used != 0)
+                // Second chance: seen since the last sweep, so it survives this one. Withheld while
+                // crowded, because a caller whose every lookup is a host it has not seen before
+                // leaves every entry warm, and a sweep that can only clear flags reclaims nothing.
+                // Evicting a warm host costs it a rebuilt breaker and budget; not evicting it costs
+                // the bound the cap exists to provide.
+                if (scope.Used != 0 && !crowded)
                 {
-                    scope.Used = 0; // Second chance: seen since the last sweep, so it survives this one.
+                    scope.Used = 0;
                     continue;
                 }
 
