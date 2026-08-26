@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using NResilience.Testing;
 
 namespace NResilience.Docs;
 
@@ -13,7 +14,12 @@ public sealed class Tour
     public async Task The_whole_api()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var client = Doubles.Client(() => Doubles.Json(value: new User(Name: "ada")));
+
+        using var client = new HttpClient(handler: new ScriptedHttpHandler().Respond(() => Doubles.Json(value: new User(Name: "ada"))))
+        {
+            BaseAddress = new Uri(uriString: "https://api.example.com"),
+        };
+
         var url = new Uri(uriString: "https://api.example.com/users/1");
         var queue = new Doubles.Queue();
         var cache = new Doubles.Cache<User>(lastKnownGood: new User(Name: "last known good"));

@@ -4,6 +4,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NResilience.Extensions;
 using NResilience.Http;
+using NResilience.Testing;
 
 namespace NResilience.Docs;
 
@@ -13,9 +14,9 @@ public sealed class Guides
     [Fact]
     public async Task Retry_an_http_call_end_to_end()
     {
-        var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Json(value: new Order(Id: "A-1", Status: "shipped")));
+        var transport = new ScriptedHttpHandler()
+            .Respond(() => Doubles.Status(status: HttpStatusCode.ServiceUnavailable))
+            .Respond(() => Doubles.Json(value: new Order(Id: "A-1", Status: "shipped")));
 
         var order = await ReadOrderAsync(
             client: ResilienceHttp.CreateClient(policy: Resilience.Http with { Backoff = Backoff.None }, innerHandler: transport),

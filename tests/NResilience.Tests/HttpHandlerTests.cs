@@ -13,74 +13,70 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class HttpHandlerTests
 {
-    /// <summary>A policy that retries without sleeping and imposes no clock-dependent bound.</summary>
-    private static Resilience Instant => Resilience.Http with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-    };
-
     [Fact]
     public async Task A_transient_status_is_retried_to_success()
     {
-        var transport = new ScriptedTransport(
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(2, transport.Requests.Count);
+        Assert.Equal(2, transport.CallCount);
     }
 
     [Fact]
     public async Task A_404_is_an_answer_rather_than_a_failure()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.NotFound));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.NotFound);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/missing"));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        Assert.Single(transport.Requests);
+        Assert.Equal(1, transport.CallCount);
     }
 
     [Fact]
     public async Task The_last_response_is_returned_when_the_attempts_run_out()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Equal(3, transport.Requests.Count);
+        Assert.Equal(3, transport.CallCount);
     }
 
     [Fact]
     public async Task Each_attempt_gets_its_own_request()
     {
-        var transport = new ScriptedTransport(
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
-        // Re-sending one HttpRequestMessage throws "The request message was already sent"; the
-        // point of cloning is that these are two distinct objects.
-        Assert.NotSame(transport.Requests[0], transport.Requests[1]);
+        // Re-sending one HttpRequestMessage throws "The request message was already sent", so the
+        // second attempt reaching the transport at all is proof the handler cloned rather than
+        // resent it.
+        Assert.Equal(2, transport.CallCount);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
     public async Task A_clone_carries_the_headers_the_body_and_the_uri()
     {
-        var transport = new ScriptedTransport(
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler
+        {
+            CaptureBodies = true,
+        }
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = Client(transport);
 
@@ -97,57 +93,59 @@ public sealed class HttpHandlerTests
         Assert.Equal(HttpMethod.Put, second.Method);
         Assert.Equal(new Uri("https://api.test/thing?q=1"), second.RequestUri);
         Assert.Equal("abc", second.Headers.GetValues("X-Trace").Single());
-        Assert.Equal("application/json", second.Content!.Headers.ContentType!.MediaType);
-        Assert.Equal("{\"a\":1}", transport.Bodies[1]);
-        Assert.Equal(transport.Bodies[0], transport.Bodies[1]);
+        Assert.Equal("{\"a\":1}", transport.Requests[1].Body);
+        Assert.Equal(transport.Requests[0].Body, transport.Requests[1].Body);
     }
 
     [Fact]
     public async Task A_POST_is_not_retried()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
 
         using var client = Client(transport);
         using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
-        Assert.Single(transport.Requests);
+        Assert.Equal(1, transport.CallCount);
     }
 
     [Fact]
     public async Task A_non_retryable_POST_body_reaches_the_wire()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler { CaptureBodies = true }.Respond(HttpStatusCode.OK);
 
         using var client = Client(transport);
         using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Single(transport.Requests);
-        Assert.Equal("order", transport.Bodies[0]);
+        Assert.Equal(1, transport.CallCount);
+        Assert.Equal("order", transport.Requests[0].Body);
     }
 
     [Fact]
     public async Task A_POST_is_retried_when_the_client_opts_in()
     {
-        var transport = new ScriptedTransport(
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler
+        {
+            CaptureBodies = true,
+        }
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
         using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(2, transport.Requests.Count);
-        Assert.Equal("order", transport.Bodies[1]);
+        Assert.Equal(2, transport.CallCount);
+        Assert.Equal("order", transport.Requests[1].Body);
     }
 
     [Fact]
     public async Task A_POST_is_retried_when_the_request_declares_itself_repeatable()
     {
-        var transport = new ScriptedTransport(
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = Client(transport);
 
@@ -161,13 +159,13 @@ public sealed class HttpHandlerTests
         using var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(2, transport.Requests.Count);
+        Assert.Equal(2, transport.CallCount);
     }
 
     [Fact]
     public async Task A_request_declared_not_repeatable_is_not_retried_even_when_its_method_is_safe()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
 
         using var client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
 
@@ -176,7 +174,7 @@ public sealed class HttpHandlerTests
 
         using var response = await client.SendAsync(request);
 
-        Assert.Single(transport.Requests);
+        Assert.Equal(1, transport.CallCount);
     }
 
     /// <summary>
@@ -273,7 +271,7 @@ public sealed class HttpHandlerTests
     [InlineData("MADEUP", false)]
     public void The_idempotent_methods_are_the_retryable_ones(string method, bool retried)
     {
-        using var handler = new ResilienceHandler(new ScriptedTransport(), Instant);
+        using var handler = new ResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp);
         using var request = new HttpRequestMessage(new HttpMethod(method), new Uri("https://api.test/thing"));
 
         Assert.Equal(retried, handler.WillRetry(request));
@@ -282,7 +280,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public void A_single_attempt_policy_retries_nothing_whatever_the_method_says()
     {
-        using var handler = new ResilienceHandler(new ScriptedTransport(), Instant with { Attempts = 1 });
+        using var handler = new ResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp with { Attempts = 1 });
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
 
         Assert.False(handler.WillRetry(request));
@@ -293,7 +291,7 @@ public sealed class HttpHandlerTests
     {
         var first = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = new TrackedContent() };
         var second = new HttpResponseMessage(HttpStatusCode.OK) { Content = new TrackedContent() };
-        var transport = new ScriptedTransport(() => first, () => second);
+        var transport = new ScriptedHttpHandler().Respond(() => first).Respond(() => second);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -305,8 +303,8 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task Every_host_gets_its_own_breaker_and_budget()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
-        using var handler = new ResilienceHandler(transport, Instant);
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp);
         using var client = new HttpClient(handler);
 
         (await client.GetAsync(new Uri("https://one.test/a"))).Dispose();
@@ -329,12 +327,12 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_dead_host_does_not_break_a_healthy_one()
     {
-        var transport = new ScriptedTransport(request =>
+        var transport = new ConditionalTransport((request, _) => Task.FromResult(
             request.RequestUri!.Host == "dead.test"
                 ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
-                : new HttpResponseMessage(HttpStatusCode.OK));
+                : new HttpResponseMessage(HttpStatusCode.OK)));
 
-        var policy = Instant with
+        var policy = TestPolicy.InstantHttp with
         {
             Attempts = 1,
             Breaker = null,
@@ -371,16 +369,17 @@ public sealed class HttpHandlerTests
     public async Task A_fake_clock_on_the_policy_drives_a_per_host_breaker()
     {
         var down = true;
-        var transport = new ScriptedTransport(_ =>
+
+        var transport = new ConditionalTransport((_, _) => Task.FromResult(
             down
                 ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
-                : new HttpResponseMessage(HttpStatusCode.OK));
+                : new HttpResponseMessage(HttpStatusCode.OK)));
 
         var time = new FakeTimeProvider();
 
         using var handler = new ResilienceHandler(
             transport,
-            Instant with { Attempts = 1, Breaker = null, Time = time },
+            TestPolicy.InstantHttp with { Attempts = 1, Breaker = null, Time = time },
             new HttpResilienceOptions
             {
                 BreakerSettings = new BreakerSettings
@@ -418,14 +417,14 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_fake_clock_on_the_policy_drives_a_per_host_budget()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
         var time = new FakeTimeProvider();
 
         // No per-host breaker: five failing calls would open one, and a refused call pauses on the
         // policy's clock, which is the clock this test is holding still.
         using var handler = new ResilienceHandler(
             transport,
-            Instant with { Breaker = null, Time = time },
+            TestPolicy.InstantHttp with { Breaker = null, Time = time },
             new HttpResilienceOptions { BreakerPerHost = false });
         using var client = new HttpClient(handler);
 
@@ -447,9 +446,9 @@ public sealed class HttpHandlerTests
     public async Task An_explicit_breaker_survives_per_host_scoping()
     {
         var shared = new Breaker { Name = "shared" };
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
-        using var handler = new ResilienceHandler(transport, Instant with { Breaker = shared });
+        using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp with { Breaker = shared });
         using var client = new HttpClient(handler);
 
         (await client.GetAsync(new Uri("https://one.test/a"))).Dispose();
@@ -463,7 +462,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_retrying_client_stamps_the_nested_retry_header()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
         using var client = Client(transport);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
@@ -474,9 +473,9 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_client_that_cannot_retry_stamps_nothing()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
-        using var client = Client(transport, policy: Instant with { Attempts = 1 });
+        using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1 });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.False(transport.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
@@ -486,9 +485,9 @@ public sealed class HttpHandlerTests
     public async Task An_inbound_stamp_makes_the_retry_a_reported_nested_one()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
-        using var client = Client(transport, policy: Instant with { OnEvent = recorder.Record });
+        using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
         request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
@@ -501,7 +500,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task An_inbound_stamp_is_not_duplicated_on_the_outbound_request()
     {
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
         using var client = Client(transport);
 
@@ -518,12 +517,12 @@ public sealed class HttpHandlerTests
     {
         var recorder = new EventRecorder();
 
-        var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
-        using var innerClient = Client(inner, policy: Instant with { OnEvent = recorder.Record });
+        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        using var innerClient = Client(inner, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         // The outer client's transport is the inner client: exactly the shape a service that calls
         // another service has, and the one whose amplification nothing in .NET reports.
-        var outerTransport = new ScriptedTransport(async (request, ct) =>
+        var outerTransport = new ConditionalTransport(async (request, ct) =>
             await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
 
         using var outerClient = Client(outerTransport);
@@ -535,12 +534,12 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task An_in_process_nested_retry_stamps_the_header_on_the_inner_request()
     {
-        var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
         using var innerClient = Client(inner);
 
         // The inner transport receives a different request than the outer one, so the header
         // must be stamped on it independently of the outer request's header.
-        var outerTransport = new ScriptedTransport(async (request, ct) =>
+        var outerTransport = new ConditionalTransport(async (request, ct) =>
             await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
 
         using var outerClient = Client(outerTransport);
@@ -553,12 +552,12 @@ public sealed class HttpHandlerTests
     public async Task Nesting_detection_can_be_turned_off()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
         using var client = Client(
             transport,
             new HttpResilienceOptions { DetectNestedRetries = false },
-            Instant with { OnEvent = recorder.Record });
+            TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
         request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
@@ -575,10 +574,10 @@ public sealed class HttpHandlerTests
         // to its previous value in the finally block, so a second call through the same handler
         // is still detected as nested when it runs inside an outer retrying client.
         var recorder = new EventRecorder();
-        var inner = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
-        using var innerClient = Client(inner, policy: Instant with { OnEvent = recorder.Record });
+        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        using var innerClient = Client(inner, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
-        var outerTransport = new ScriptedTransport(async (request, ct) =>
+        var outerTransport = new ConditionalTransport(async (request, ct) =>
             await innerClient.GetAsync(new Uri("https://downstream.test/a"), ct).ConfigureAwait(false));
 
         using var outerClient = Client(outerTransport);
@@ -602,13 +601,13 @@ public sealed class HttpHandlerTests
     [Fact]
     public void CreateClient_takes_ownership_of_the_transport_timeout()
     {
-        using var owned = ResilienceHttp.CreateClient(Instant, innerHandler: new ScriptedTransport());
+        using var owned = ResilienceHttp.CreateClient(TestPolicy.InstantHttp, innerHandler: new ScriptedHttpHandler());
         Assert.Equal(Timeout.InfiniteTimeSpan, owned.Timeout);
 
         using var borrowed = ResilienceHttp.CreateClient(
-            Instant,
+            TestPolicy.InstantHttp,
             new HttpResilienceOptions { OwnTransportTimeout = false },
-            new ScriptedTransport());
+            new ScriptedHttpHandler());
 
         Assert.NotEqual(Timeout.InfiniteTimeSpan, borrowed.Timeout);
     }
@@ -619,9 +618,9 @@ public sealed class HttpHandlerTests
         var throttled = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
         throttled.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromMilliseconds(1));
 
-        var transport = new ScriptedTransport(() => throttled, () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(() => throttled).Respond(HttpStatusCode.OK);
 
-        using var client = Client(transport, policy: Instant with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
+        using var client = Client(transport, policy: TestPolicy.InstantHttp with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         // A five-minute backoff would have made this test time out; the server's own hint is the
@@ -633,9 +632,9 @@ public sealed class HttpHandlerTests
     public async Task Events_carry_the_host_scoped_policy_name()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedTransport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
-        using var client = Client(transport, policy: Instant with { OnEvent = recorder.Record });
+        using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.Equal("http:api.test", recorder[0].PolicyName);
@@ -647,15 +646,13 @@ public sealed class HttpHandlerTests
         var tracked = new TrackedContent();
         using var cancellation = new CancellationTokenSource();
 
-        var transport = new ScriptedTransport(
-        [
-            (_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = tracked }),
-            Task<HttpResponseMessage> (_, _) =>
+        var transport = new ScriptedHttpHandler()
+            .Respond(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = tracked })
+            .Throw(() =>
             {
                 cancellation.Cancel();
-                throw new OperationCanceledException(cancellation.Token);
-            },
-        ]);
+                return new OperationCanceledException(cancellation.Token);
+            });
 
         using var client = Client(transport);
 
@@ -668,7 +665,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public void The_synchronous_send_is_refused()
     {
-        using var handler = new ResilienceHandler(new ScriptedTransport(), Instant);
+        using var handler = new ResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp);
         using var client = new HttpClient(handler);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
 
@@ -676,57 +673,20 @@ public sealed class HttpHandlerTests
     }
 
     private static HttpClient Client(
-        ScriptedTransport transport,
+        HttpMessageHandler transport,
         HttpResilienceOptions? options = null,
         Resilience? policy = null) =>
-        new(new ResilienceHandler(transport, policy ?? Instant, options));
+        new(new ResilienceHandler(transport, policy ?? TestPolicy.InstantHttp, options));
 
-    /// <summary>An inner handler that serves a script, and keeps every request it was sent.</summary>
-    private sealed class ScriptedTransport : HttpMessageHandler
+    /// <summary>
+    ///     A transport that routes by request, observes a mutable flag toggled from outside it, or
+    ///     forwards to another <see cref="HttpClient" /> - the shapes <see cref="ScriptedHttpHandler" />
+    ///     cannot express.
+    /// </summary>
+    private sealed class ConditionalTransport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : HttpMessageHandler
     {
-        private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] _steps;
-        private int _index = -1;
-
-        internal ScriptedTransport(params Func<HttpResponseMessage>[] steps)
-            : this(steps.Select(step => new Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>((_, _) => Task.FromResult(step())))
-                .ToArray())
-        {
-        }
-
-        internal ScriptedTransport(Func<HttpRequestMessage, HttpResponseMessage> constant)
-            : this([(request, _) => Task.FromResult(constant(request))])
-        {
-        }
-
-        internal ScriptedTransport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> constant)
-            : this([constant])
-        {
-        }
-
-        internal ScriptedTransport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] steps)
-        {
-            _steps = steps;
-        }
-
-        /// <summary>Every request that reached the wire, in order.</summary>
-        internal List<HttpRequestMessage> Requests { get; } = [];
-
-        /// <summary>Each request's body, read before the response is produced.</summary>
-        internal List<string?> Bodies { get; } = [];
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Requests.Add(request);
-            Bodies.Add(request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false));
-
-            if (_steps.Length == 0)
-                throw new InvalidOperationException("The transport was given no script.");
-
-            // The last step repeats, so "always 503" is one step rather than as many as the policy
-            // happens to allow.
-            var next = Math.Min(Interlocked.Increment(ref _index), _steps.Length - 1);
-            return await _steps[next](request, cancellationToken).ConfigureAwait(false);
-        }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            respond(request, cancellationToken);
     }
 
     /// <summary>Content that remembers being disposed, which is the whole assertion.</summary>

@@ -9,20 +9,13 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class EventRecorderTests
 {
-    private static Resilience Instant => Resilience.Default with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-    };
-
     [Fact]
     public async Task It_records_the_whole_sequence_in_order()
     {
         var events = new EventRecorder();
         var calls = Sequence.For<int>().Throws(new TimeoutException()).Returns(1);
 
-        await (Instant with { OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
+        await (TestPolicy.Instant with { OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
 
         Assert.Equal(
             [CallEventKind.Attempt, CallEventKind.Retrying, CallEventKind.Attempt, CallEventKind.Succeeded],
@@ -35,7 +28,7 @@ public sealed class EventRecorderTests
         var events = new EventRecorder();
         var calls = Sequence.For<int>().Throws(new TimeoutException()).Returns(42);
 
-        await (Instant with { Name = "api", OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
+        await (TestPolicy.Instant with { Name = "api", OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
 
         var succeeded = events.Single(CallEventKind.Succeeded);
 
@@ -50,7 +43,7 @@ public sealed class EventRecorderTests
         var events = new EventRecorder();
         var calls = Sequence.For<int>().Throws(new TimeoutException()).Returns(1);
 
-        await (Instant with { OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
+        await (TestPolicy.Instant with { OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
 
         var error = Assert.Throws<InvalidOperationException>(() => events.Single(CallEventKind.Attempt));
 
@@ -66,7 +59,7 @@ public sealed class EventRecorderTests
         var events = new EventRecorder();
         var calls = Sequence.For<int>().Throws(new TimeoutException(), 2).Returns(1);
 
-        await (Instant with { OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
+        await (TestPolicy.Instant with { OnEvent = events.Record }).RunAsync(ct => calls.NextAsync(ct));
 
         Assert.Equal(6, events.Count);
         Assert.Equal(3, events.CountOf(CallEventKind.Attempt));
@@ -81,7 +74,7 @@ public sealed class EventRecorderTests
     public async Task Clear_lets_one_recorder_span_several_calls()
     {
         var events = new EventRecorder();
-        var policy = Instant with { OnEvent = events.Record };
+        var policy = TestPolicy.Instant with { OnEvent = events.Record };
 
         await policy.RunAsync(_ => Task.FromResult(1));
         Assert.Equal(2, events.Count);
@@ -97,7 +90,7 @@ public sealed class EventRecorderTests
     public async Task Events_is_a_snapshot_rather_than_a_live_view()
     {
         var events = new EventRecorder();
-        var policy = Instant with { OnEvent = events.Record };
+        var policy = TestPolicy.Instant with { OnEvent = events.Record };
 
         await policy.RunAsync(_ => Task.FromResult(1));
         var snapshot = events.Events;
@@ -117,7 +110,7 @@ public sealed class EventRecorderTests
         var both = events.Record;
         both += also.Record;
 
-        await (Instant with { OnEvent = both }).RunAsync(_ => Task.FromResult(1));
+        await (TestPolicy.Instant with { OnEvent = both }).RunAsync(_ => Task.FromResult(1));
 
         Assert.Equal(events.Kinds, also.Kinds);
     }
@@ -153,7 +146,7 @@ public sealed class EventRecorderTests
     public async Task Concurrent_calls_sharing_one_recorder_lose_nothing()
     {
         var events = new EventRecorder();
-        var policy = Instant with { OnEvent = events.Record };
+        var policy = TestPolicy.Instant with { OnEvent = events.Record };
 
         await Task.WhenAll(Enumerable.Range(0, 32)
             .Select(_ => Task.Run(async () => await policy.RunAsync(_ => Task.FromResult(1)))));

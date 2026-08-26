@@ -1,5 +1,6 @@
 using System.Net;
 using NResilience.Http;
+using NResilience.Testing;
 
 namespace NResilience.Docs;
 
@@ -11,9 +12,9 @@ public sealed class HttpDocs
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Status(status: HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = ResilienceHttp.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },
@@ -67,9 +68,9 @@ public sealed class HttpDocs
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Status(status: HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = ResilienceHttp.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },
@@ -110,7 +111,7 @@ public sealed class HttpDocs
     [Fact]
     public void Per_host_state_is_readable_for_a_health_endpoint()
     {
-        var handler = new ResilienceHandler(innerHandler: new Doubles.ScriptedTransport(() => Doubles.Status(status: HttpStatusCode.OK)));
+        var handler = new ResilienceHandler(innerHandler: new ScriptedHttpHandler().Respond(HttpStatusCode.OK));
 
         // <snippet:http-per-host>
         // A breaker whose scope is a variable with a name is one an operator can be told about.
@@ -131,7 +132,7 @@ public sealed class HttpDocs
     [Fact]
     public void Whether_a_request_will_be_retried_is_a_question_you_can_ask()
     {
-        var handler = new ResilienceHandler(innerHandler: new Doubles.ScriptedTransport(() => Doubles.Status(status: HttpStatusCode.OK)));
+        var handler = new ResilienceHandler(innerHandler: new ScriptedHttpHandler().Respond(HttpStatusCode.OK));
 
         // <snippet:http-will-retry>
         using var get = new HttpRequestMessage(method: HttpMethod.Get, requestUri: "https://api.example.com/orders/1");

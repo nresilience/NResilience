@@ -74,9 +74,9 @@ public sealed class Troubleshooting
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        var transport = new Doubles.ScriptedTransport(
-            () => Doubles.Status(status: HttpStatusCode.ServiceUnavailable),
-            () => Doubles.Status(status: HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = ResilienceHttp.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },

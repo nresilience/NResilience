@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using NResilience.Testing;
 
 namespace NResilience.Tests;
 
@@ -8,21 +9,13 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class RetryTests
 {
-    /// <summary>A policy that retries without sleeping to avoid clock coordination in tests.</summary>
-    private static Resilience Instant => Resilience.Default with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-    };
-
     [Fact]
     public async Task Attempts_is_the_total_including_the_first()
     {
         var calls = 0;
 
         await Assert.ThrowsAsync<TimeoutException>(async () =>
-            await (Instant with { Attempts = 3 }).RunAsync(ct =>
+            await (TestPolicy.Instant with { Attempts = 3 }).RunAsync(ct =>
             {
                 calls++;
                 throw new TimeoutException();
@@ -37,7 +30,7 @@ public sealed class RetryTests
         var calls = 0;
 
         await Assert.ThrowsAsync<TimeoutException>(async () =>
-            await (Instant with { Attempts = 1 }).RunAsync(ct =>
+            await (TestPolicy.Instant with { Attempts = 1 }).RunAsync(ct =>
             {
                 calls++;
                 throw new TimeoutException();
@@ -51,7 +44,7 @@ public sealed class RetryTests
     {
         var calls = 0;
 
-        var value = await Instant.RunAsync(ct =>
+        var value = await TestPolicy.Instant.RunAsync(ct =>
         {
             if (++calls < 3)
                 throw new IOException();
@@ -70,7 +63,7 @@ public sealed class RetryTests
 
         // Classifier.Default does not recognize InvalidOperationException, so it is Permanent.
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await Instant.RunAsync(ct =>
+            await TestPolicy.Instant.RunAsync(ct =>
             {
                 calls++;
                 throw new InvalidOperationException();
@@ -84,7 +77,7 @@ public sealed class RetryTests
     {
         var tasks = new List<Task<int>>();
 
-        var value = await Instant.RunAsync(ct =>
+        var value = await TestPolicy.Instant.RunAsync(ct =>
         {
             var task = tasks.Count < 2
                 ? Task.FromException<int>(new IOException())
@@ -105,7 +98,7 @@ public sealed class RetryTests
         var thrown = new IOException("the far end hung up");
 
         var caught = await Assert.ThrowsAsync<IOException>(async () =>
-            await Instant.RunAsync(ct => throw thrown));
+            await TestPolicy.Instant.RunAsync(ct => throw thrown));
 
         Assert.Same(thrown, caught);
         Assert.Equal("the far end hung up", caught.Message);
@@ -115,7 +108,7 @@ public sealed class RetryTests
     public async Task The_attempt_history_is_attached_to_the_rethrown_exception()
     {
         var caught = await Assert.ThrowsAsync<IOException>(async () =>
-            await (Instant with { Attempts = 2 }).RunAsync(ct => throw new IOException()));
+            await (TestPolicy.Instant with { Attempts = 2 }).RunAsync(ct => throw new IOException()));
 
         var log = AttemptLog.Of(caught);
         Assert.NotNull(log);
@@ -128,7 +121,7 @@ public sealed class RetryTests
     {
         var calls = 0;
 
-        var policy = Instant with
+        var policy = TestPolicy.Instant with
         {
             Classify = Classifier.Default.OnResult<int>(static code => code == 503 ? Verdict.Transient : Verdict.Ok),
         };
@@ -149,7 +142,7 @@ public sealed class RetryTests
     public async Task A_classifier_cannot_turn_an_exception_into_a_success()
     {
         var calls = 0;
-        var policy = Instant with { Classify = Classifier.Default.On<IOException>(Verdict.Ok) };
+        var policy = TestPolicy.Instant with { Classify = Classifier.Default.On<IOException>(Verdict.Ok) };
 
         await Assert.ThrowsAsync<IOException>(async () =>
             await policy.RunAsync(ct =>
@@ -194,7 +187,7 @@ public sealed class RetryTests
     {
         var calls = 0;
 
-        await Instant.RunAsync(ct =>
+        await TestPolicy.Instant.RunAsync(ct =>
         {
             if (++calls < 2)
                 throw new IOException();
@@ -208,7 +201,7 @@ public sealed class RetryTests
     [Fact]
     public async Task The_state_overload_threads_state_without_a_closure()
     {
-        var value = await Instant.RunAsync(
+        var value = await TestPolicy.Instant.RunAsync(
             static (state, ct) => Task.FromResult(state * 2),
             21);
 
@@ -220,7 +213,7 @@ public sealed class RetryTests
     {
         var seen = new List<int>();
 
-        var policy = Instant with
+        var policy = TestPolicy.Instant with
         {
             Attempts = 3,
             BeforeAttempt = next =>

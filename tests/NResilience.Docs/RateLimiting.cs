@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using NResilience.Extensions;
+using NResilience.Testing;
 
 namespace NResilience.Docs;
 
@@ -100,7 +101,7 @@ public sealed class RateLimiting
         // </snippet:limit-http>
 
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
-            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new Ok()));
+            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Respond(HttpStatusCode.OK)));
 
         using var provider = services.BuildServiceProvider();
         using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "api");
@@ -141,10 +142,4 @@ public sealed class RateLimiting
     }
 
     private static Task<int> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(result: 42);
-
-    private sealed class Ok : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(result: new HttpResponseMessage(statusCode: HttpStatusCode.OK));
-    }
 }

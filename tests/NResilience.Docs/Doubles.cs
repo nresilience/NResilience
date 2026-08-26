@@ -10,9 +10,6 @@ namespace NResilience.Docs;
 /// </summary>
 internal static class Doubles
 {
-    internal static HttpClient Client(params Func<HttpResponseMessage>[] responses) =>
-        new(handler: new ScriptedTransport(responses: responses)) { BaseAddress = new Uri(uriString: "https://api.example.com") };
-
     internal static HttpResponseMessage Status(HttpStatusCode status) => new(statusCode: status);
 
     internal static HttpResponseMessage Json<T>(T value) =>
@@ -45,21 +42,6 @@ internal static class Doubles
         {
             Flushes++;
             return Task.CompletedTask;
-        }
-    }
-
-    /// <summary>A transport that serves a script of responses, then repeats the last one.</summary>
-    internal sealed class ScriptedTransport(params Func<HttpResponseMessage>[] responses) : HttpMessageHandler
-    {
-        private int _served;
-
-        internal List<HttpRequestMessage> Requests { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Requests.Add(item: request);
-            var index = Math.Min(val1: _served++, val2: responses.Length - 1);
-            return Task.FromResult(result: responses[index]());
         }
     }
 }

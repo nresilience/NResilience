@@ -5,6 +5,7 @@ using Microsoft.Extensions.Http;
 using NResilience.Extensions;
 using NResilience.Extensions.Internal;
 using NResilience.Http;
+using NResilience.Testing;
 
 namespace NResilience.Tests;
 
@@ -17,13 +18,6 @@ public sealed class HttpRateLimitTests
     private static readonly Uri Thing = new("https://api.test/thing");
     private static readonly Uri Other = new("https://other.test/thing");
 
-    private static Resilience Instant => Resilience.Http with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-    };
-
     // ---- One permit per attempt ----
 
     [Fact]
@@ -31,21 +25,20 @@ public sealed class HttpRateLimitTests
     {
         var limiter = new ScriptedLimiter();
 
-        var transport = new Transport(
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable, times: 2)
+            .Respond(HttpStatusCode.OK);
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                .AddResilience(Instant, telemetry: false)
+                .AddResilience(TestPolicy.InstantHttp, telemetry: false)
                 .AddRateLimit(limiter, "api"),
             transport);
 
         using var response = await Client(provider).GetAsync(Thing);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(3, transport.Requests.Count);
+        Assert.Equal(3, transport.CallCount);
 
         // Three attempts, three permits. A limiter outside the resilience handler would have been
         // asked exactly once, and the two retries would have bypassed the quota entirely.
@@ -58,13 +51,13 @@ public sealed class HttpRateLimitTests
     {
         var limiter = new ScriptedLimiter([true, false, true], TimeSpan.Zero);
 
-        var transport = new Transport(
-            () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                .AddResilience(Instant, telemetry: false)
+                .AddResilience(TestPolicy.InstantHttp, telemetry: false)
                 .AddRateLimit(limiter, "api"),
             transport);
 
@@ -74,7 +67,7 @@ public sealed class HttpRateLimitTests
 
         // The refused attempt never reached the wire, so the transport saw two of the three.
         Assert.Equal(3, limiter.Acquisitions);
-        Assert.Equal(2, transport.Requests.Count);
+        Assert.Equal(2, transport.CallCount);
         limiter.Dispose();
     }
 
@@ -82,9 +75,9 @@ public sealed class HttpRateLimitTests
     public async Task A_refusal_is_not_charged_to_the_per_host_retry_budget()
     {
         var limiter = new ScriptedLimiter([false, false, false], TimeSpan.Zero);
-        var transport = new Transport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
-        var handler = new ResilienceHandler(Instant, new HttpResilienceOptions());
+        var handler = new ResilienceHandler(TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic }, new HttpResilienceOptions());
         var limitHandler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };
         handler.InnerHandler = limitHandler;
 
@@ -109,7 +102,7 @@ public sealed class HttpRateLimitTests
         using var limiter = Limit.Concurrency(1);
         var calls = 0;
 
-        var transport = new Transport(async (_, ct) =>
+        var transport = new ConditionalTransport(async (_, ct) =>
         {
             if (calls++ == 0)
                 await Task.Delay(Timeout.Infinite, ct);
@@ -139,15 +132,14 @@ public sealed class HttpRateLimitTests
     public async Task A_permit_is_released_when_the_transport_throws()
     {
         using var limiter = Limit.Concurrency(1);
-        var calls = 0;
 
-        var transport = new Transport((_, _) => calls++ == 0
-            ? Task.FromException<HttpResponseMessage>(new HttpRequestException("reset"))
-            : Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)));
+        var transport = new ScriptedHttpHandler()
+            .Throw(() => new HttpRequestException("reset"))
+            .Respond(HttpStatusCode.OK);
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                .AddResilience(Instant, telemetry: false)
+                .AddResilience(TestPolicy.InstantHttp, telemetry: false)
                 .AddRateLimit(limiter, "api"),
             transport);
 
@@ -163,7 +155,7 @@ public sealed class HttpRateLimitTests
     {
         var gate = new TaskCompletionSource();
 
-        var transport = new Transport(async (request, _) =>
+        var transport = new ConditionalTransport(async (request, _) =>
         {
             if (request.RequestUri == Thing)
                 await gate.Task;
@@ -173,7 +165,7 @@ public sealed class HttpRateLimitTests
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
+                .AddResilience(TestPolicy.InstantHttp with { Attempts = 1 }, telemetry: false)
                 .AddRateLimit(o =>
                 {
                     o.Concurrency = 1;
@@ -201,7 +193,7 @@ public sealed class HttpRateLimitTests
     {
         var gate = new TaskCompletionSource();
 
-        var transport = new Transport(async (request, _) =>
+        var transport = new ConditionalTransport(async (request, _) =>
         {
             if (request.RequestUri == Thing)
                 await gate.Task;
@@ -211,7 +203,7 @@ public sealed class HttpRateLimitTests
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
-                .AddResilience(Instant with { Attempts = 1 }, telemetry: false)
+                .AddResilience(TestPolicy.InstantHttp with { Attempts = 1 }, telemetry: false)
                 .AddRateLimit(o =>
                 {
                     o.Concurrency = 1;
@@ -241,7 +233,7 @@ public sealed class HttpRateLimitTests
 
         var error = Assert.Throws<ResilienceConfigurationException>(() => services.AddHttpClient("api")
             .AddRateLimit(o => o.PermitsPerSecond = 10)
-            .AddResilience(Instant, telemetry: false));
+            .AddResilience(TestPolicy.InstantHttp, telemetry: false));
 
         Assert.Contains("AddRateLimit() before AddResilience()", error.Message, StringComparison.Ordinal);
     }
@@ -252,7 +244,7 @@ public sealed class HttpRateLimitTests
         var services = new ServiceCollection();
 
         services.AddHttpClient("api")
-            .AddResilience(Instant, telemetry: false)
+            .AddResilience(TestPolicy.InstantHttp, telemetry: false)
             .AddRateLimit(o => o.PermitsPerSecond = 10);
     }
 
@@ -270,7 +262,7 @@ public sealed class HttpRateLimitTests
         var services = new ServiceCollection();
 
         services.AddHttpClient("limited").AddRateLimit(o => o.Concurrency = 2);
-        services.AddHttpClient("resilient").AddResilience(Instant, telemetry: false);
+        services.AddHttpClient("resilient").AddResilience(TestPolicy.InstantHttp, telemetry: false);
     }
 
     [Fact]
@@ -279,7 +271,7 @@ public sealed class HttpRateLimitTests
         var services = new ServiceCollection();
 
         Assert.Throws<ResilienceConfigurationException>(() =>
-            services.AddHttpClient("api").AddResilience(Instant, telemetry: false).AddRateLimit(_ => { }));
+            services.AddHttpClient("api").AddResilience(TestPolicy.InstantHttp, telemetry: false).AddRateLimit(_ => { }));
     }
 
     // ---- Ownership ----
@@ -288,7 +280,7 @@ public sealed class HttpRateLimitTests
     public async Task A_limiter_the_caller_passed_in_outlives_the_handler()
     {
         using var limiter = Limit.Concurrency(1);
-        var transport = new Transport(() => new HttpResponseMessage(HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
         var handler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };
         handler.Dispose();
@@ -301,7 +293,7 @@ public sealed class HttpRateLimitTests
 
     // ---- Harness ----
 
-    private static ServiceProvider Provider(Action<IServiceCollection> register, Transport transport)
+    private static ServiceProvider Provider(Action<IServiceCollection> register, HttpMessageHandler transport)
     {
         var services = new ServiceCollection();
         register(services);
@@ -359,38 +351,13 @@ public sealed class HttpRateLimitTests
         }
     }
 
-    /// <summary>A transport that answers from a script and records what reached it.</summary>
-    private sealed class Transport : HttpMessageHandler
+    /// <summary>
+    ///     A transport that routes by request or observes cancellation - the two things
+    ///     <see cref="ScriptedHttpHandler" /> cannot express.
+    /// </summary>
+    private sealed class ConditionalTransport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : HttpMessageHandler
     {
-        private readonly Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>[] _steps;
-        private int _index = -1;
-
-        internal Transport(params Func<HttpResponseMessage>[] steps)
-        {
-            _steps = [.. steps.Select(step => new Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>>((_, _) => Task.FromResult(step())))];
-        }
-
-        internal Transport(Func<HttpRequestMessage, HttpResponseMessage> byRequest)
-        {
-            _steps = [(request, _) => Task.FromResult(byRequest(request))];
-        }
-
-        internal Transport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> constant)
-        {
-            _steps = [constant];
-        }
-
-        internal List<HttpRequestMessage> Requests { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            lock (Requests)
-            {
-                Requests.Add(request);
-            }
-
-            var index = Math.Min(Interlocked.Increment(ref _index), _steps.Length - 1);
-            return _steps[index](request, cancellationToken);
-        }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            respond(request, cancellationToken);
     }
 }

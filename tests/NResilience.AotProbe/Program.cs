@@ -179,7 +179,10 @@ internal static class Program
         var failures = 0;
 
         var events = new EventRecorder();
-        var transport = new SequencedTransport(HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK);
+
+        var transport = new ScriptedHttpHandler { CaptureBodies = true }
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         var policy = Resilience.Http with
         {
@@ -200,11 +203,14 @@ internal static class Program
 
         using var response = await client.SendAsync(request).ConfigureAwait(false);
 
+        var lastRequest = transport.Requests[^1];
+        var lastTrace = lastRequest.Headers.TryGetValues("X-Trace", out var trace) ? trace.FirstOrDefault() : null;
+
         failures += Check("http: a 503 is retried to a 200", response.StatusCode == HttpStatusCode.OK);
-        failures += Check("http: each attempt got its own request", transport.Sent == 2);
-        failures += Check("http: the clone carried the headers and the body", transport.LastTrace == "abc" && transport.LastBody == "body");
+        failures += Check("http: each attempt got its own request", transport.CallCount == 2);
+        failures += Check("http: the clone carried the headers and the body", lastTrace == "abc" && lastRequest.Body == "body");
         failures += Check("http: the breaker was scoped to the host", handler.BreakersByHost().ContainsKey("api.invalid"));
-        failures += Check("http: the nested-retry header was stamped", transport.LastStamped);
+        failures += Check("http: the nested-retry header was stamped", lastRequest.Headers.Contains(ResilienceHttp.NestedRetryHeader));
 
         failures += Check(
             "http: the events came back in order",
@@ -440,7 +446,10 @@ internal static class Program
 
         failures += Check("the meter records under AOT", calls == 1);
 
-        var transport = new SequencedTransport(HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
+
         var clientServices = new ServiceCollection();
         clientServices.AddResilience("client", Resilience.Http with { Backoff = Backoff.None });
         clientServices.AddHttpClient("probe").AddResilience("client");
@@ -457,7 +466,7 @@ internal static class Program
             .GetAsync(new Uri("https://api.test/thing"))
             .ConfigureAwait(false);
 
-        failures += Check("a registered client retries under AOT", response.StatusCode == HttpStatusCode.OK && transport.Sent == 2);
+        failures += Check("a registered client retries under AOT", response.StatusCode == HttpStatusCode.OK && transport.CallCount == 2);
 
         failures += await RateLimitAsync().ConfigureAwait(false);
 
@@ -622,7 +631,6 @@ internal static class Program
 
     private static void Log(string message) => Console.WriteLine(message);
 
-    /// <summary>An inner handler serving one status per attempt, recording what reached it.</summary>
     /// <summary>
     ///     Collects event IDs and categories. A real provider rather than a fake logger, because what is
     ///     being checked is that the generated record travels the whole way to one under AOT.
@@ -691,23 +699,4 @@ internal static class Program
         }
     }
 
-    private sealed class SequencedTransport(params HttpStatusCode[] statuses) : HttpMessageHandler
-    {
-        internal int Sent { get; private set; }
-
-        internal string? LastTrace { get; private set; }
-
-        internal string? LastBody { get; private set; }
-
-        internal bool LastStamped { get; private set; }
-
-        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            LastTrace = request.Headers.TryGetValues("X-Trace", out var trace) ? trace.FirstOrDefault() : null;
-            LastStamped = request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
-            LastBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-
-            return new HttpResponseMessage(statuses[Math.Min(Sent++, statuses.Length - 1)]);
-        }
-    }
 }

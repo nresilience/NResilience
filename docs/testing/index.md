@@ -125,6 +125,25 @@ A `Breaker` you construct yourself is the exception; it uses the clock specified
 > [!CAUTION]
 > A guard that refuses a call pauses briefly on the policy's clock. Under a fake clock, this pause never ends unless the test advances time. Tests expecting a rejection must advance the clock or disable the guard (e.g., set `BreakerPerHost = false`).
 
+## Reach for a ready-made policy
+
+`TestPolicy.Instant` is a `Resilience` value shaped for tests: three attempts, no backoff, and both the deadline and the attempt timeout set to infinite, so a test pays for neither a sleep nor a wall-clock bound it does not care about. It retries on whatever the policy's classifier decides, and its breaker and retry budget are both off.
+
+```csharp
+using NResilience.Testing;
+
+var api = TestPolicy.Instant;
+```
+
+`TestPolicy.InstantHttp` is the same shape with `Classify = Classifier.Http`, for a test that scripts HTTP status codes rather than a custom classifier.
+
+To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.On(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker and its budget all advance together - the same pairing the [Control the clock](#control-the-clock) section makes by hand with `Time = time`:
+
+```csharp
+var time = new FakeTimeProvider();
+var api = TestPolicy.On(time);
+```
+
 ## Verify policy behavior
 
 You can verify that a policy is emitting the correct events in the correct order by using an `EventRecorder`. This is more reliable than asserting on elapsed time.
@@ -193,9 +212,9 @@ You can test resilient `HttpClient` configurations by providing a scripted `Http
 
 <!-- snippet: testing-http-handler -->
 ```csharp
-var transport = new ScriptedTransport(
-    () => new HttpResponseMessage(statusCode: HttpStatusCode.ServiceUnavailable),
-    () => new HttpResponseMessage(statusCode: HttpStatusCode.OK));
+var transport = new ScriptedHttpHandler()
+    .Respond(HttpStatusCode.ServiceUnavailable)
+    .Respond(HttpStatusCode.OK);
 
 using var client = ResilienceHttp.CreateClient(
     policy: Resilience.Http with { Backoff = Backoff.None },
@@ -204,9 +223,17 @@ using var client = ResilienceHttp.CreateClient(
 using var response = await client.GetAsync(requestUri: new Uri(uriString: "https://api.example.com/orders/1"));
 
 Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
-Assert.Equal(expected: 2, actual: transport.Requests.Count);
+Assert.Equal(expected: 2, actual: transport.CallCount);
 ```
 <!-- endsnippet -->
+
+`ScriptedHttpHandler` serves the script you give it, then repeats the last step for every attempt after that, so it does not need to know in advance how many attempts the policy will make. `Respond` and `Throw` both return the handler, so a multi-step script reads as one chain:
+
+- `Respond(status)` and `Respond(status, times)` serve a fixed status code, once or for a run of attempts.
+- `Respond(response)` and `Respond(response, times)` build a fresh `HttpResponseMessage` from the given function on every attempt that consumes the step - use this over the status overload when a response carries content that a test reads.
+- `Throw(exception)` and `Throw(exception, times)` throw instead, for the transport failures a classifier has to see.
+
+`CallCount` is how many attempts reached the handler. `Requests` is a snapshot of what each attempt sent, in order: the method, the URI, the headers, and - only when `CaptureBodies` is `true` - the body. `CaptureBodies` defaults to `false` because reading a body buffers it; turn it on only when a test asserts on what was sent.
 
 ## Testing best practices
 

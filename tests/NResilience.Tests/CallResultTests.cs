@@ -1,21 +1,15 @@
 using Microsoft.Extensions.Time.Testing;
+using NResilience.Testing;
 
 namespace NResilience.Tests;
 
 /// <summary>The non-throwing entry point, and the attempt history it always carries.</summary>
 public sealed class CallResultTests
 {
-    private static Resilience Instant => Resilience.Default with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-    };
-
     [Fact]
     public async Task A_success_carries_the_value_and_the_history()
     {
-        var result = await Instant.TryRunAsync(ct => Task.FromResult(42));
+        var result = await TestPolicy.Instant.TryRunAsync(ct => Task.FromResult(42));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(42, result.Value);
@@ -31,7 +25,7 @@ public sealed class CallResultTests
     {
         var calls = 0;
 
-        var result = await Instant.TryRunAsync(ct =>
+        var result = await TestPolicy.Instant.TryRunAsync(ct =>
         {
             return ++calls < 3
                 ? Task.FromException<int>(new IOException("nope"))
@@ -50,7 +44,7 @@ public sealed class CallResultTests
     [Fact]
     public async Task A_failure_reports_the_reason_and_does_not_throw()
     {
-        var result = await (Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException<int>(new IOException()));
+        var result = await (TestPolicy.Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException<int>(new IOException()));
 
         Assert.False(result.IsSuccess);
         Assert.False(result.HasValue);
@@ -63,7 +57,7 @@ public sealed class CallResultTests
     [Fact]
     public async Task A_permanent_failure_says_so()
     {
-        var result = await Instant.TryRunAsync(ct => Task.FromException<int>(new InvalidOperationException()));
+        var result = await TestPolicy.Instant.TryRunAsync(ct => Task.FromException<int>(new InvalidOperationException()));
 
         Assert.Equal(StopReason.Permanent, result.StopReason);
         Assert.Single(result.Attempts);
@@ -72,7 +66,7 @@ public sealed class CallResultTests
     [Fact]
     public async Task A_failing_result_is_still_reported_as_a_value()
     {
-        var policy = Instant with
+        var policy = TestPolicy.Instant with
         {
             Attempts = 2,
             Classify = Classifier.Default.OnResult<int>(static v => v == 503 ? Verdict.Transient : Verdict.Ok),
@@ -91,7 +85,7 @@ public sealed class CallResultTests
     public async Task ValueOrThrow_rethrows_the_original()
     {
         var thrown = new IOException();
-        var result = await (Instant with { Attempts = 1 }).TryRunAsync(ct => Task.FromException<int>(thrown));
+        var result = await (TestPolicy.Instant with { Attempts = 1 }).TryRunAsync(ct => Task.FromException<int>(thrown));
 
         var caught = Assert.Throws<IOException>(() => result.ValueOrThrow());
         Assert.Same(thrown, caught);
@@ -100,7 +94,7 @@ public sealed class CallResultTests
     [Fact]
     public async Task The_void_form_reports_the_same_things()
     {
-        var result = await (Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException(new IOException()));
+        var result = await (TestPolicy.Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException(new IOException()));
 
         Assert.False(result.IsSuccess);
         Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
@@ -111,10 +105,10 @@ public sealed class CallResultTests
     [Fact]
     public async Task The_stateful_forms_report_the_same_things()
     {
-        var typed = await Instant.TryRunAsync(static (state, ct) => Task.FromResult(state + 1), 41);
+        var typed = await TestPolicy.Instant.TryRunAsync(static (state, ct) => Task.FromResult(state + 1), 41);
         Assert.Equal(42, typed.Value);
 
-        var untyped = await Instant.TryRunAsync(static (state, ct) => Task.CompletedTask, "state");
+        var untyped = await TestPolicy.Instant.TryRunAsync(static (state, ct) => Task.CompletedTask, "state");
         Assert.True(untyped.IsSuccess);
     }
 
@@ -154,7 +148,7 @@ public sealed class CallResultTests
     [Fact]
     public async Task The_log_prints_something_a_human_can_read()
     {
-        var result = await (Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException<int>(new IOException()));
+        var result = await (TestPolicy.Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException<int>(new IOException()));
 
         var text = result.Attempts.ToString();
 
@@ -165,7 +159,7 @@ public sealed class CallResultTests
     [Fact]
     public async Task The_log_spills_past_the_inline_buffer_rather_than_truncating()
     {
-        var result = await (Instant with { Attempts = 9 }).TryRunAsync(ct => Task.FromException<int>(new IOException()));
+        var result = await (TestPolicy.Instant with { Attempts = 9 }).TryRunAsync(ct => Task.FromException<int>(new IOException()));
 
         Assert.Equal(9, result.Attempts.Count);
         Assert.Equal(Enumerable.Range(1, 9), result.Attempts.Select(a => a.Number));

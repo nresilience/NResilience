@@ -19,14 +19,6 @@ namespace NResilience.IntegrationTests;
 /// </summary>
 public sealed class ConcurrentCallTests
 {
-    private static Resilience Instant(FakeTimeProvider time) => Resilience.Default with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-        Time = time,
-    };
-
     /// <summary>
     ///     A shared breaker opens after enough failures even under concurrent admission. 16 calls through
     ///     one policy with a shared breaker, each call failing. The contract: the breaker opens, and at
@@ -40,7 +32,7 @@ public sealed class ConcurrentCallTests
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 5, Time = time });
         var events = new EventRecorder();
 
-        var policy = Instant(time) with
+        var policy = TestPolicy.On(time) with
         {
             Breaker = breaker,
             Attempts = 1,
@@ -75,7 +67,7 @@ public sealed class ConcurrentCallTests
         var budget = RetryBudget.Shared("test-throttle", 0.10, 1);
         var events = new EventRecorder();
 
-        var policy = Instant(time) with
+        var policy = TestPolicy.On(time) with
         {
             Budget = budget,
             Attempts = 5,
@@ -171,7 +163,7 @@ public sealed class ConcurrentCallTests
         var time = new FakeTimeProvider();
         var events = new EventRecorder();
 
-        var policy = (Instant(time) with
+        var policy = (TestPolicy.On(time) with
         {
             Attempts = 3,
             OnEvent = events.Record,

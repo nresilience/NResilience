@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Internal;
+using NResilience.Testing;
 
 namespace NResilience.Tests;
 
@@ -9,14 +10,6 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class BudgetTests
 {
-    private static Resilience Instant(FakeTimeProvider time) => Resilience.Default with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-        Time = time,
-    };
-
     /// <summary>
     ///     Runs a call that may serve a guarded rejection and moves the fake clock until it lands.
     ///     Because a rejection is not instant, a test that simply awaited it would hang.
@@ -285,7 +278,7 @@ public sealed class BudgetTests
     {
         var time = new FakeTimeProvider();
 
-        var policy = Instant(time) with
+        var policy = TestPolicy.On(time) with
         {
             Attempts = 3,
             Budget = RetryBudget.Of(0.25, 0, time),
@@ -317,7 +310,7 @@ public sealed class BudgetTests
     {
         var time = new FakeTimeProvider();
 
-        var policy = Instant(time) with
+        var policy = TestPolicy.On(time) with
         {
             Attempts = 3,
             Budget = RetryBudget.Of(0.25, 2, time),
@@ -343,7 +336,7 @@ public sealed class BudgetTests
     {
         var time = new FakeTimeProvider();
 
-        var policy = Instant(time) with
+        var policy = TestPolicy.On(time) with
         {
             Attempts = 4,
             Budget = RetryBudget.Of(0.25, 0, time),
@@ -373,7 +366,7 @@ public sealed class BudgetTests
     {
         var time = new FakeTimeProvider();
 
-        var policy = Instant(time) with
+        var policy = TestPolicy.On(time) with
         {
             Attempts = 2,
             Budget = RetryBudget.Of(0.25, 0, time),
@@ -420,8 +413,8 @@ public sealed class BudgetTests
         var time = new FakeTimeProvider();
         var shared = RetryBudget.Of(0.25, 0, time);
 
-        var payments = Instant(time) with { Attempts = 2, Budget = shared };
-        var search = Instant(time) with { Attempts = 2, Budget = shared };
+        var payments = TestPolicy.On(time) with { Attempts = 2, Budget = shared };
+        var search = TestPolicy.On(time) with { Attempts = 2, Budget = shared };
 
         var paymentAttempts = 0;
         var searchAttempts = 0;
@@ -449,7 +442,7 @@ public sealed class BudgetTests
     {
         var time = new FakeTimeProvider();
         var budget = RetryBudget.Of(0.25, 0, time);
-        var policy = Instant(time) with { Attempts = 3, Budget = budget };
+        var policy = TestPolicy.On(time) with { Attempts = 3, Budget = budget };
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await policy.RunAsync(_ => Task.FromException<int>(new InvalidOperationException("bad request"))));
@@ -463,7 +456,7 @@ public sealed class BudgetTests
     {
         var time = new FakeTimeProvider();
         var budget = RetryBudget.Of(0.25, 0, time);
-        var policy = Instant(time) with { Attempts = 3, Budget = budget };
+        var policy = TestPolicy.On(time) with { Attempts = 3, Budget = budget };
 
         using var caller = new CancellationTokenSource();
 

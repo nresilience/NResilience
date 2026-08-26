@@ -11,6 +11,31 @@ NResilience.Testing.EventRecorder.OfKind(NResilience.CallEventKind kind) -> Syst
 NResilience.Testing.EventRecorder.Record(NResilience.CallEvent callEvent) -> void
 NResilience.Testing.EventRecorder.Single(NResilience.CallEventKind kind) -> NResilience.CallEvent
 NResilience.Testing.EventRecorder.this[int index].get -> NResilience.CallEvent
+NResilience.Testing.ScriptedHttpHandler
+NResilience.Testing.ScriptedHttpHandler.CallCount.get -> int
+NResilience.Testing.ScriptedHttpHandler.CaptureBodies.get -> bool
+NResilience.Testing.ScriptedHttpHandler.CaptureBodies.init -> void
+NResilience.Testing.ScriptedHttpHandler.Requests.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.SentRequest!>!
+NResilience.Testing.ScriptedHttpHandler.Respond(System.Func<System.Net.Http.HttpResponseMessage!>! response) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Respond(System.Func<System.Net.Http.HttpResponseMessage!>! response, int times) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Respond(System.Net.HttpStatusCode status) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Respond(System.Net.HttpStatusCode status, int times) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.ScriptedHttpHandler() -> void
+NResilience.Testing.ScriptedHttpHandler.Throw(System.Func<System.Exception!>! exception) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Throw(System.Func<System.Exception!>! exception, int times) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.SentRequest
+NResilience.Testing.SentRequest.<Clone>$() -> NResilience.Testing.SentRequest!
+NResilience.Testing.SentRequest.Body.get -> string?
+NResilience.Testing.SentRequest.Body.init -> void
+NResilience.Testing.SentRequest.Deconstruct(out System.Net.Http.HttpMethod! Method, out System.Uri? RequestUri, out System.Net.Http.Headers.HttpRequestHeaders! Headers, out string? Body) -> void
+NResilience.Testing.SentRequest.Equals(NResilience.Testing.SentRequest? other) -> bool
+NResilience.Testing.SentRequest.Headers.get -> System.Net.Http.Headers.HttpRequestHeaders!
+NResilience.Testing.SentRequest.Headers.init -> void
+NResilience.Testing.SentRequest.Method.get -> System.Net.Http.HttpMethod!
+NResilience.Testing.SentRequest.Method.init -> void
+NResilience.Testing.SentRequest.RequestUri.get -> System.Uri?
+NResilience.Testing.SentRequest.RequestUri.init -> void
+NResilience.Testing.SentRequest.SentRequest(System.Net.Http.HttpMethod! Method, System.Uri? RequestUri, System.Net.Http.Headers.HttpRequestHeaders! Headers, string? Body) -> void
 NResilience.Testing.Sequence
 NResilience.Testing.Sequence<T>
 NResilience.Testing.Sequence<T>.CallCount.get -> int
@@ -22,8 +47,18 @@ NResilience.Testing.Sequence<T>.Returns(T result) -> NResilience.Testing.Sequenc
 NResilience.Testing.Sequence<T>.Returns(T result, int count) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.Throws(System.Exception! exception) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.Throws(System.Exception! exception, int count) -> NResilience.Testing.Sequence<T>!
+NResilience.Testing.TestPolicy
 NResilience.Testing.Void
 NResilience.Testing.Void.Void() -> void
 override NResilience.Testing.EventRecorder.ToString() -> string!
+override NResilience.Testing.SentRequest.Equals(object? obj) -> bool
+override NResilience.Testing.SentRequest.GetHashCode() -> int
+override NResilience.Testing.SentRequest.ToString() -> string!
+static NResilience.Testing.SentRequest.operator !=(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
+static NResilience.Testing.SentRequest.operator ==(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.Sequence.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<T>!
 static NResilience.Testing.Sequence.ForVoid(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<NResilience.Testing.Void>!
+static NResilience.Testing.TestPolicy.Instant.get -> NResilience.Resilience!
+static NResilience.Testing.TestPolicy.InstantHttp.get -> NResilience.Resilience!
+static NResilience.Testing.TestPolicy.On(System.TimeProvider! time) -> NResilience.Resilience!
+static NResilience.Testing.TestPolicy.UseClock(this NResilience.Resilience! policy, System.TimeProvider! time) -> NResilience.Resilience!

@@ -61,8 +61,8 @@ public sealed class TestingDocs
     {
         var down = true;
 
-        var transport = new Doubles.ScriptedTransport(() =>
-            new HttpResponseMessage(statusCode: down ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(() => new HttpResponseMessage(statusCode: down ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
 
         // <snippet:testing-library-clock>
         // The per-host breaker is built by the handler, so it runs on the policy's clock rather
@@ -163,9 +163,9 @@ public sealed class TestingDocs
     public async Task The_handler_is_testable_without_a_container()
     {
         // <snippet:testing-http-handler>
-        var transport = new ScriptedTransport(
-            () => new HttpResponseMessage(statusCode: HttpStatusCode.ServiceUnavailable),
-            () => new HttpResponseMessage(statusCode: HttpStatusCode.OK));
+        var transport = new ScriptedHttpHandler()
+            .Respond(HttpStatusCode.ServiceUnavailable)
+            .Respond(HttpStatusCode.OK);
 
         using var client = ResilienceHttp.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },
@@ -174,22 +174,8 @@ public sealed class TestingDocs
         using var response = await client.GetAsync(requestUri: new Uri(uriString: "https://api.example.com/orders/1"));
 
         Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
-        Assert.Equal(expected: 2, actual: transport.Requests.Count);
+        Assert.Equal(expected: 2, actual: transport.CallCount);
 
         // </snippet:testing-http-handler>
-    }
-
-    /// <summary>The transport double the handler test above stands on.</summary>
-    private sealed class ScriptedTransport(params Func<HttpResponseMessage>[] responses) : HttpMessageHandler
-    {
-        private int _served;
-
-        internal List<HttpRequestMessage> Requests { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Requests.Add(item: request);
-            return Task.FromResult(result: responses[Math.Min(val1: _served++, val2: responses.Length - 1)]());
-        }
     }
 }

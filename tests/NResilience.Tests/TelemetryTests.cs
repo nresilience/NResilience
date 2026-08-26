@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using Microsoft.Extensions.Time.Testing;
+using NResilience.Testing;
 
 namespace NResilience.Tests;
 
@@ -14,14 +14,6 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class TelemetryTests
 {
-    private static Resilience Instant(Recorder recorder) => Resilience.Default with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-        OnEvent = recorder.Listener,
-    };
-
     /// <summary>
     ///     Runs a call that may serve a guarded rejection, moving the fake clock until it lands. A
     ///     rejection is deliberately not instant, so a test that simply awaited it would hang.
@@ -58,8 +50,8 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_listener_on_the_passthrough_preset_still_hears_about_the_call()
     {
-        var recorder = new Recorder();
-        var policy = Resilience.None with { OnEvent = recorder.Listener };
+        var recorder = new EventRecorder();
+        var policy = Resilience.None with { OnEvent = recorder.Record };
 
         Assert.Equal(1, await policy.RunAsync(static ct => Task.FromResult(1)));
         Assert.Equal([CallEventKind.Attempt, CallEventKind.Succeeded], recorder.Kinds);
@@ -80,9 +72,9 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_call_that_succeeds_first_time_raises_the_attempt_and_the_success()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        await (Resilience.Default with { Name = "api", OnEvent = recorder.Listener })
+        await (Resilience.Default with { Name = "api", OnEvent = recorder.Record })
             .RunAsync(static ct => Task.FromResult(7));
 
         Assert.Equal([CallEventKind.Attempt, CallEventKind.Succeeded], recorder.Kinds);
@@ -103,17 +95,18 @@ public sealed class TelemetryTests
     [Fact]
     public async Task The_result_that_was_classified_a_failure_is_on_the_event()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        var policy = Instant(recorder) with
+        var policy = TestPolicy.Instant with
         {
+            OnEvent = recorder.Record,
             Attempts = 2,
             Classify = Classifier.Default.OnResult<int>(static status => status == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         await policy.TryRunAsync(static ct => Task.FromResult(503));
 
-        Assert.Equal(2, recorder.Count(CallEventKind.Attempt));
+        Assert.Equal(2, recorder.CountOf(CallEventKind.Attempt));
         Assert.All(recorder.Events.Where(e => e.Kind == CallEventKind.Attempt), e => Assert.Equal(503, e.Result));
         Assert.Equal(503, recorder.Single(CallEventKind.Retrying).Result);
     }
@@ -125,9 +118,9 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_void_call_reports_no_result_rather_than_a_placeholder()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        await (Resilience.Default with { OnEvent = recorder.Listener }).RunAsync(static ct => Task.CompletedTask);
+        await (Resilience.Default with { OnEvent = recorder.Record }).RunAsync(static ct => Task.CompletedTask);
 
         Assert.All(recorder.Events, e => Assert.Null(e.Result));
     }
@@ -137,10 +130,10 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_retried_call_raises_one_attempt_and_one_retrying_per_retry()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var calls = 0;
 
-        var value = await (Instant(recorder) with { Attempts = 3 }).RunAsync(ct =>
+        var value = await (TestPolicy.Instant with { OnEvent = recorder.Record, Attempts = 3 }).RunAsync(ct =>
             ++calls < 3 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(9));
 
         Assert.Equal(9, value);
@@ -162,7 +155,7 @@ public sealed class TelemetryTests
     [Fact]
     public async Task Retrying_carries_the_backoff_and_the_number_of_the_attempt_it_precedes()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var time = new FakeTimeProvider();
 
         var policy = Resilience.Default with
@@ -172,7 +165,7 @@ public sealed class TelemetryTests
             Deadline = Timeout.InfiniteTimeSpan,
             Backoff = Backoff.Constant(TimeSpan.FromSeconds(1)) with { Jitter = Jitter.None },
             Time = time,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         var result = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time);
@@ -194,9 +187,9 @@ public sealed class TelemetryTests
     [Fact]
     public async Task Exhausting_the_attempts_is_a_terminal_event()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        await (Instant(recorder) with { Attempts = 2 })
+        await (TestPolicy.Instant with { OnEvent = recorder.Record, Attempts = 2 })
             .TryRunAsync(static ct => Task.FromException<int>(new IOException("flaky")));
 
         Assert.Equal(
@@ -219,7 +212,7 @@ public sealed class TelemetryTests
     [InlineData(2, CallEventKind.Exhausted, StopReason.AttemptsExhausted)]
     public async Task Every_call_ends_with_exactly_one_terminal_event(int shape, CallEventKind kind, StopReason reason)
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
         Func<CancellationToken, Task<int>> work = shape switch
         {
@@ -228,7 +221,7 @@ public sealed class TelemetryTests
             _ => static ct => Task.FromException<int>(new IOException("flaky")),
         };
 
-        await (Instant(recorder) with { Attempts = 2 }).TryRunAsync(work);
+        await (TestPolicy.Instant with { OnEvent = recorder.Record, Attempts = 2 }).TryRunAsync(work);
 
         var terminal = Assert.Single(recorder.Events, e => e.IsTerminal);
         Assert.Equal(kind, terminal.Kind);
@@ -245,11 +238,11 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_rejection_says_which_guard_refused_the_call()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var breaker = new Breaker();
         breaker.Isolate();
 
-        await (Instant(recorder) with { Breaker = breaker })
+        await (TestPolicy.Instant with { OnEvent = recorder.Record, Breaker = breaker })
             .TryRunAsync(static ct => Task.FromResult(1));
 
         var rejection = recorder.Single(CallEventKind.RejectedByBreaker);
@@ -316,9 +309,9 @@ public sealed class TelemetryTests
     [Fact]
     public async Task Create_builds_the_event_the_executor_raises()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        await (Instant(recorder) with { Name = "api" }).TryRunAsync(static ct => Task.FromResult(7));
+        await (TestPolicy.Instant with { OnEvent = recorder.Record, Name = "api" }).TryRunAsync(static ct => Task.FromResult(7));
 
         var raised = recorder.Single(CallEventKind.Succeeded);
 
@@ -369,9 +362,9 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_non_terminal_event_carries_no_reason()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        await (Instant(recorder) with { Attempts = 2 })
+        await (TestPolicy.Instant with { OnEvent = recorder.Record, Attempts = 2 })
             .TryRunAsync(static ct => Task.FromException<int>(new IOException("flaky")));
 
         Assert.All(
@@ -388,10 +381,10 @@ public sealed class TelemetryTests
     [Fact]
     public async Task An_unrecognized_exception_type_raises_NotRetried_naming_the_type()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
-            await (Instant(recorder) with { Attempts = 3 })
+            await (TestPolicy.Instant with { OnEvent = recorder.Record, Attempts = 3 })
                 .RunAsync(static ct => Task.FromException<int>(new InvalidOperationException("a bug"))));
 
         Assert.Equal([CallEventKind.Attempt, CallEventKind.NotRetried], recorder.Kinds);
@@ -407,7 +400,7 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_deadline_that_stops_the_call_raises_DeadlineExceeded()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var time = new FakeTimeProvider();
 
         var policy = Resilience.Default with
@@ -417,17 +410,17 @@ public sealed class TelemetryTests
             AttemptTimeout = Timeout.InfiniteTimeSpan,
             Backoff = Backoff.Constant(TimeSpan.FromSeconds(10)) with { Jitter = Jitter.None },
             Time = time,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         var result = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time);
 
         Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
-        Assert.Equal(1, recorder.Count(CallEventKind.DeadlineExceeded));
+        Assert.Equal(1, recorder.CountOf(CallEventKind.DeadlineExceeded));
 
         // The backoff would outlast the deadline, so the call stops rather than sleeping through
         // it - and must not announce a retry it is not going to make.
-        Assert.Equal(0, recorder.Count(CallEventKind.Retrying));
+        Assert.Equal(0, recorder.CountOf(CallEventKind.Retrying));
     }
 
     // ---- Rejection ----
@@ -435,7 +428,7 @@ public sealed class TelemetryTests
     [Fact]
     public async Task An_open_breaker_raises_BreakerOpened_and_then_RejectedByBreaker()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var time = new FakeTimeProvider();
 
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2, Time = time });
@@ -449,13 +442,13 @@ public sealed class TelemetryTests
             Breaker = breaker,
             Budget = RetryBudget.None,
             Time = time,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         // Two failing attempts trip it; the operation still reports its own failure.
         var first = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("down")), time);
         Assert.Equal(StopReason.AttemptsExhausted, first.StopReason);
-        Assert.Equal(1, recorder.Count(CallEventKind.BreakerOpened));
+        Assert.Equal(1, recorder.CountOf(CallEventKind.BreakerOpened));
         Assert.Equal(BreakerState.Open, breaker.State);
 
         var second = await RunAsync(policy, static ct => Task.FromResult(1), time);
@@ -474,7 +467,7 @@ public sealed class TelemetryTests
     [Fact]
     public async Task The_probe_that_reopens_a_breaker_raises_HalfOpened_then_Opened()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var time = new FakeTimeProvider();
 
         var breaker = new Breaker(new BreakerSettings
@@ -491,7 +484,7 @@ public sealed class TelemetryTests
             Deadline = Timeout.InfiniteTimeSpan,
             Breaker = breaker,
             Time = time,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         await RunAsync(policy, static ct => Task.FromException<int>(new IOException("down")), time);
@@ -513,7 +506,7 @@ public sealed class TelemetryTests
     [Fact]
     public async Task A_probe_that_recovers_raises_BreakerClosed()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var time = new FakeTimeProvider();
 
         var breaker = new Breaker(new BreakerSettings
@@ -531,7 +524,7 @@ public sealed class TelemetryTests
             Deadline = Timeout.InfiniteTimeSpan,
             Breaker = breaker,
             Time = time,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         await RunAsync(policy, static ct => Task.FromException<int>(new IOException("down")), time);
@@ -539,15 +532,15 @@ public sealed class TelemetryTests
         await RunAsync(policy, static ct => Task.FromResult(1), time);
 
         Assert.Equal(BreakerState.Closed, breaker.State);
-        Assert.Equal(1, recorder.Count(CallEventKind.BreakerHalfOpened));
-        Assert.Equal(1, recorder.Count(CallEventKind.BreakerClosed));
+        Assert.Equal(1, recorder.CountOf(CallEventKind.BreakerHalfOpened));
+        Assert.Equal(1, recorder.CountOf(CallEventKind.BreakerClosed));
     }
 
     /// <summary>Isolate and Reset are administrative: there is no call to attribute them to.</summary>
     [Fact]
     public async Task Isolating_a_breaker_raises_nothing_until_a_call_meets_it()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var time = new FakeTimeProvider();
 
         var breaker = new Breaker(new BreakerSettings { Time = time });
@@ -562,7 +555,7 @@ public sealed class TelemetryTests
             Deadline = Timeout.InfiniteTimeSpan,
             Breaker = breaker,
             Time = time,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         var result = await RunAsync(policy, static ct => Task.FromResult(1), time);
@@ -574,7 +567,7 @@ public sealed class TelemetryTests
     [Fact]
     public async Task An_exhausted_budget_raises_RejectedByBudget()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var time = new FakeTimeProvider();
 
         var policy = Resilience.Default with
@@ -585,7 +578,7 @@ public sealed class TelemetryTests
             Deadline = Timeout.InfiniteTimeSpan,
             Budget = RetryBudget.Of(0.1, 1, time),
             Time = time,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         var last = StopReason.Succeeded;
@@ -613,7 +606,7 @@ public sealed class TelemetryTests
     [Fact]
     public async Task Work_that_outlives_its_attempt_timeout_raises_OrphanedWork()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         var release = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var policy = Resilience.Default with
@@ -621,7 +614,7 @@ public sealed class TelemetryTests
             Attempts = 1,
             AttemptTimeout = TimeSpan.FromMilliseconds(20),
             Deadline = Timeout.InfiniteTimeSpan,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         // The callback never looks at its token, which is the whole point.
@@ -633,21 +626,21 @@ public sealed class TelemetryTests
         var result = await call;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(1, recorder.Count(CallEventKind.OrphanedWork));
+        Assert.Equal(1, recorder.CountOf(CallEventKind.OrphanedWork));
         Assert.Equal(1, recorder.Single(CallEventKind.OrphanedWork).AttemptNumber);
     }
 
     [Fact]
     public async Task An_attempt_that_honors_its_timeout_is_not_reported_as_orphaned()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
         var policy = Resilience.Default with
         {
             Attempts = 1,
             AttemptTimeout = TimeSpan.FromMilliseconds(20),
             Deadline = Timeout.InfiniteTimeSpan,
-            OnEvent = recorder.Listener,
+            OnEvent = recorder.Record,
         };
 
         var result = await policy.TryRunAsync(async ct =>
@@ -657,7 +650,7 @@ public sealed class TelemetryTests
         });
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(0, recorder.Count(CallEventKind.OrphanedWork));
+        Assert.Equal(0, recorder.CountOf(CallEventKind.OrphanedWork));
         Assert.IsType<AttemptTimeoutException>(recorder.Single(CallEventKind.Attempt).Exception);
     }
 
@@ -692,12 +685,12 @@ public sealed class TelemetryTests
     [Fact]
     public async Task Caller_cancellation_raises_no_terminal_event()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await (Resilience.Default with { OnEvent = recorder.Listener })
+            await (Resilience.Default with { OnEvent = recorder.Record })
                 .RunAsync(static ct => Task.FromResult(1), cts.Token));
 
         Assert.Empty(recorder.Events);
@@ -707,9 +700,9 @@ public sealed class TelemetryTests
     [Fact]
     public async Task Every_event_carries_the_policy_name()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        await (Instant(recorder) with { Name = "payments", Attempts = 2 })
+        await (TestPolicy.Instant with { OnEvent = recorder.Record, Name = "payments", Attempts = 2 })
             .TryRunAsync(static ct => Task.FromException<int>(new IOException("flaky")));
 
         Assert.NotEmpty(recorder.Events);
@@ -719,30 +712,14 @@ public sealed class TelemetryTests
     [Fact]
     public async Task An_events_text_form_says_what_happened()
     {
-        var recorder = new Recorder();
+        var recorder = new EventRecorder();
 
-        await (Instant(recorder) with { Name = "api" }).RunAsync(static ct => Task.FromResult(1));
+        await (TestPolicy.Instant with { OnEvent = recorder.Record, Name = "api" }).RunAsync(static ct => Task.FromResult(1));
 
         var text = recorder.Single(CallEventKind.Attempt).ToString();
 
         Assert.Contains("[api]", text, StringComparison.Ordinal);
         Assert.Contains("Attempt #1", text, StringComparison.Ordinal);
         Assert.Contains("Ok", text, StringComparison.Ordinal);
-    }
-
-    /// <summary>Collects call events in order. This recorder is thread-safe for listeners.</summary>
-    private sealed class Recorder
-    {
-        private readonly ConcurrentQueue<CallEvent> _events = new();
-
-        public Action<CallEvent> Listener => _events.Enqueue;
-
-        public IReadOnlyList<CallEvent> Events => [.. _events];
-
-        public IReadOnlyList<CallEventKind> Kinds => [.. _events.Select(e => e.Kind)];
-
-        public CallEvent Single(CallEventKind kind) => _events.Single(e => e.Kind == kind);
-
-        public int Count(CallEventKind kind) => _events.Count(e => e.Kind == kind);
     }
 }

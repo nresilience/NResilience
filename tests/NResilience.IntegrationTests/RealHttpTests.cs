@@ -18,17 +18,6 @@ namespace NResilience.IntegrationTests;
 public sealed class RealHttpTests
 {
     /// <summary>
-    ///     A policy that retries without sleeping and imposes no clock-dependent bound, so the tests are
-    ///     instant. Everything else stays at the <see cref="Resilience.Http" /> preset defaults.
-    /// </summary>
-    private static Resilience Instant => Resilience.Http with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-    };
-
-    /// <summary>
     ///     The smoke test: one GET, one 200. If this fails, the loopback server's framing is broken
     ///     against <c>SocketsHttpHandler</c>, and every test below is meaningless until it is fixed.
     /// </summary>
@@ -38,7 +27,7 @@ public sealed class RealHttpTests
         await using var server = await LoopbackHttp.StartAsync(
             new LoopbackResponse(HttpStatusCode.OK, "ok"u8.ToArray()));
 
-        using var client = ResilienceHttp.CreateClient(Instant, innerHandler: null);
+        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp, innerHandler: null);
         using var response = await client.GetAsync(server.BaseUri);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -54,7 +43,7 @@ public sealed class RealHttpTests
             new LoopbackResponse(HttpStatusCode.OK, "ok"u8.ToArray()));
 
         var events = new EventRecorder();
-        using var client = ResilienceHttp.CreateClient(Instant with { OnEvent = events.Record });
+        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp with { OnEvent = events.Record });
 
         using var response = await client.GetAsync(server.BaseUri);
 
@@ -72,7 +61,7 @@ public sealed class RealHttpTests
         await using var server = await LoopbackHttp.StartAsync(
             new LoopbackResponse(HttpStatusCode.ServiceUnavailable));
 
-        using var client = ResilienceHttp.CreateClient(Instant);
+        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp);
         using var response = await client.GetAsync(server.BaseUri);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -86,7 +75,7 @@ public sealed class RealHttpTests
             new LoopbackResponse(HttpStatusCode.NotFound));
 
         var events = new EventRecorder();
-        using var client = ResilienceHttp.CreateClient(Instant with { OnEvent = events.Record });
+        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp with { OnEvent = events.Record });
         using var response = await client.GetAsync(server.BaseUri);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -108,7 +97,7 @@ public sealed class RealHttpTests
             new LoopbackResponse(HttpStatusCode.OK));
 
         using var client = ResilienceHttp.CreateClient(
-            Instant with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
+            TestPolicy.InstantHttp with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
 
         using var response = await client.GetAsync(server.BaseUri);
 
@@ -133,7 +122,7 @@ public sealed class RealHttpTests
             return Task.FromResult(new LoopbackResponse(HttpStatusCode.ServiceUnavailable));
         });
 
-        using var client = ResilienceHttp.CreateClient(Instant);
+        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp);
         using var response = await client.PostAsync(server.BaseUri, new StringContent("{}"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -149,7 +138,7 @@ public sealed class RealHttpTests
             new LoopbackResponse(HttpStatusCode.OK));
 
         using var client = ResilienceHttp.CreateClient(
-            Instant,
+            TestPolicy.InstantHttp,
             new HttpResilienceOptions { RetryUnsafeMethods = true });
 
         using var response = await client.PostAsync(server.BaseUri, new StringContent("{}"));

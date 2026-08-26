@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Globalization;
 using NResilience.Extensions;
+using NResilience.Testing;
 
 namespace NResilience.Tests;
 
@@ -16,13 +17,7 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class MetricsTests
 {
-    private static Resilience Instant(string name) => (Resilience.Default with
-    {
-        Name = name,
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-    }).WithTelemetry();
+    private static Resilience Named(string name) => (TestPolicy.Instant with { Name = name }).WithTelemetry();
 
     // ---- The retry fraction ----
 
@@ -31,7 +26,7 @@ public sealed class MetricsTests
     {
         using var recording = new Recording();
 
-        await Instant("t-success").RunAsync(static ct => Task.FromResult(1));
+        await Named("t-success").RunAsync(static ct => Task.FromResult(1));
 
         Assert.Equal(1, Calls(recording, "t-success"));
         Assert.Equal(1, Attempts(recording, "t-success"));
@@ -48,7 +43,7 @@ public sealed class MetricsTests
         using var recording = new Recording();
         var calls = 0;
 
-        await (Instant("t-retry") with { Attempts = 3 }).RunAsync(ct =>
+        await (Named("t-retry") with { Attempts = 3 }).RunAsync(ct =>
             ++calls < 3 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(1));
 
         Assert.Equal(1, Calls(recording, "t-retry"));
@@ -65,7 +60,7 @@ public sealed class MetricsTests
     {
         using var recording = new Recording();
 
-        await (Instant("t-exhausted") with { Attempts = 2 })
+        await (Named("t-exhausted") with { Attempts = 2 })
             .TryRunAsync(static ct => Task.FromException<int>(new IOException("down")));
 
         Assert.Equal(1, Calls(recording, "t-exhausted"));
@@ -78,7 +73,7 @@ public sealed class MetricsTests
     {
         using var recording = new Recording();
 
-        await Instant("t-permanent")
+        await Named("t-permanent")
             .TryRunAsync(static ct => Task.FromException<int>(new InvalidOperationException("no")));
 
         Assert.Equal(1, Calls(recording, "t-permanent"));
@@ -98,7 +93,7 @@ public sealed class MetricsTests
         var breaker = new Breaker();
         breaker.Isolate();
 
-        await (Instant("t-breaker") with { Breaker = breaker })
+        await (Named("t-breaker") with { Breaker = breaker })
             .TryRunAsync(static ct => Task.FromResult(1));
 
         // Filtered by policy: a MeterListener sees the whole process, and the suite runs in
@@ -120,7 +115,7 @@ public sealed class MetricsTests
     {
         using var recording = new Recording();
 
-        await Instant("t-duration").RunAsync(static ct => Task.FromResult(1));
+        await Named("t-duration").RunAsync(static ct => Task.FromResult(1));
 
         Assert.Single(recording.TagsFor("nresilience.call.duration"), t => Equals(t["nresilience.policy"], "t-duration"));
         Assert.Single(recording.TagsFor("nresilience.attempt.duration"), t => Equals(t["nresilience.policy"], "t-duration"));
@@ -140,8 +135,8 @@ public sealed class MetricsTests
     {
         using var recording = new Recording();
 
-        await Instant("t-tagged").RunAsync(static ct => Task.FromResult(1));
-        await Instant("t-other").RunAsync(static ct => Task.FromResult(1));
+        await Named("t-tagged").RunAsync(static ct => Task.FromResult(1));
+        await Named("t-other").RunAsync(static ct => Task.FromResult(1));
 
         Assert.Equal(1, Calls(recording, "t-tagged"));
         Assert.Equal(1, Calls(recording, "t-other"));
@@ -155,7 +150,7 @@ public sealed class MetricsTests
     {
         using var recording = new Recording();
 
-        await Instant("t-idempotent").WithTelemetry().WithTelemetry()
+        await Named("t-idempotent").WithTelemetry().WithTelemetry()
             .RunAsync(static ct => Task.FromResult(1));
 
         Assert.Equal(1, Calls(recording, "t-idempotent"));
@@ -206,7 +201,7 @@ public sealed class MetricsTests
 
         var calls = 0;
 
-        await (Instant("t-trace") with { Attempts = 3 }).RunAsync(ct =>
+        await (Named("t-trace") with { Attempts = 3 }).RunAsync(ct =>
             ++calls < 2 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(1));
 
         Assert.Equal("succeeded", activity.GetTagItem("nresilience.outcome"));

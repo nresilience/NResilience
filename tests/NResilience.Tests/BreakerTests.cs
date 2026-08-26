@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Time.Testing;
+using NResilience.Testing;
 
 namespace NResilience.Tests;
 
@@ -14,15 +15,6 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class BreakerTests
 {
-    /// <summary>A policy that neither sleeps nor bounds time, so a fake clock only moves when a test moves it.</summary>
-    private static Resilience Instant(FakeTimeProvider time) => Resilience.Default with
-    {
-        Backoff = Backoff.None,
-        AttemptTimeout = Timeout.InfiniteTimeSpan,
-        Deadline = Timeout.InfiniteTimeSpan,
-        Time = time,
-    };
-
     private static Breaker Build(FakeTimeProvider time, BreakerSettings? settings = null) =>
         new((settings ?? new BreakerSettings()) with { Time = time });
 
@@ -385,7 +377,7 @@ public sealed class BreakerTests
         var time = new FakeTimeProvider();
         var breaker = Build(time);
 
-        var payments = Instant(time) with { Breaker = breaker };
+        var payments = TestPolicy.On(time) with { Breaker = breaker };
         var derived = payments with { Attempts = 9 };
 
         Assert.Same(breaker, payments.Breaker);
@@ -408,7 +400,7 @@ public sealed class BreakerTests
 
         var ran = false;
 
-        var call = (Instant(time) with { Breaker = breaker })
+        var call = (TestPolicy.On(time) with { Breaker = breaker })
             .TryRunAsync(_ =>
             {
                 ran = true;
@@ -433,7 +425,7 @@ public sealed class BreakerTests
         var breaker = Build(time);
         breaker.Isolate();
 
-        var call = (Instant(time) with { Breaker = breaker })
+        var call = (TestPolicy.On(time) with { Breaker = breaker })
             .TryRunAsync(_ => Task.FromResult(1))
             .AsTask();
 
@@ -455,7 +447,7 @@ public sealed class BreakerTests
         var breaker = Build(time);
         breaker.Isolate();
 
-        var policy = Instant(time) with { Breaker = breaker, Deadline = TimeSpan.FromMilliseconds(40) };
+        var policy = TestPolicy.On(time) with { Breaker = breaker, Deadline = TimeSpan.FromMilliseconds(40) };
         var call = policy.TryRunAsync(_ => Task.FromResult(1)).AsTask();
 
         // A refusal must never make a call overrun the budget its caller set.
@@ -471,7 +463,7 @@ public sealed class BreakerTests
         var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
         Sample(breaker, VerdictKind.Transient, 5);
 
-        var call = (Instant(time) with { Breaker = breaker })
+        var call = (TestPolicy.On(time) with { Breaker = breaker })
             .TryRunAsync(_ => Task.FromResult(1))
             .AsTask();
 
@@ -491,7 +483,7 @@ public sealed class BreakerTests
         var time = new FakeTimeProvider();
         var breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 1 });
 
-        var policy = Instant(time) with { Breaker = breaker, Attempts = 3 };
+        var policy = TestPolicy.On(time) with { Breaker = breaker, Attempts = 3 };
 
         var call = policy
             .TryRunAsync(_ => Task.FromException<int>(new IOException("down")))
@@ -515,7 +507,7 @@ public sealed class BreakerTests
         var time = new FakeTimeProvider();
         var breaker = Build(time, new BreakerSettings { ConsecutiveFailures = 3 });
 
-        var policy = Instant(time) with
+        var policy = TestPolicy.On(time) with
         {
             Breaker = breaker,
             Attempts = 3,
@@ -541,7 +533,7 @@ public sealed class BreakerTests
         await caller.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await (Instant(time) with { Breaker = breaker }).RunAsync(
+            await (TestPolicy.On(time) with { Breaker = breaker }).RunAsync(
                 _ => Task.FromResult(1),
                 caller.Token));
 
@@ -554,7 +546,7 @@ public sealed class BreakerTests
         var time = new FakeTimeProvider();
         var breaker = Build(time);
 
-        var value = await (Instant(time) with { Breaker = breaker }).RunAsync(_ => Task.FromResult(42));
+        var value = await (TestPolicy.On(time) with { Breaker = breaker }).RunAsync(_ => Task.FromResult(42));
 
         Assert.Equal(42, value);
         Assert.Equal(BreakerState.Closed, breaker.State);
@@ -594,7 +586,7 @@ public sealed class BreakerTests
             Time = time,
         });
 
-        var single = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var single = TestPolicy.On(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
@@ -637,7 +629,7 @@ public sealed class BreakerTests
             Time = time,
         });
 
-        var single = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var single = TestPolicy.On(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
@@ -646,7 +638,7 @@ public sealed class BreakerTests
 
         // The next call is admitted as a probe. The BeforeAttempt hook advances time past the
         // deadline, so the recheck after the hook breaks the loop without recording - the leak path.
-        var withDeadline = Instant(time) with
+        var withDeadline = TestPolicy.On(time) with
         {
             Attempts = 1,
             Breaker = breaker,
@@ -666,7 +658,7 @@ public sealed class BreakerTests
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
 
         // The slot was released, so the next call through a policy with a live deadline can probe.
-        var live = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var live = TestPolicy.On(time) with { Attempts = 1, Breaker = breaker };
         var probe = await RunAsync(live, _ => Task.FromResult(1), time);
         Assert.True(probe.IsSuccess);
         Assert.Equal(BreakerState.Closed, breaker.State);
@@ -686,7 +678,7 @@ public sealed class BreakerTests
             Time = time,
         });
 
-        var single = Instant(time) with { Attempts = 1, Breaker = breaker };
+        var single = TestPolicy.On(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
