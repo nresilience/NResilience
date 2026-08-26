@@ -71,6 +71,16 @@ The [executor](index.md) also ensures that a delay does not consume the remainin
 
 **Note**: `default(Backoff)` is equivalent to `Backoff.Default`.
 
+## `BackoffKind`
+
+`BackoffKind` identifies which curve a `Backoff` follows. Read it from the `Kind` property.
+
+| Value | Curve |
+| :--- | :--- |
+| `Exponential` | The delay grows by `Factor` on each attempt. Set by `Backoff.Exponential` and `Backoff.Default`. |
+| `Constant` | The same delay every time. Set by `Backoff.Constant` and `Backoff.None`. |
+| `Custom` | A caller-supplied delegate computes the delay. Set by `Backoff.Custom`. |
+
 ## `Jitter`
 
 Jitter adds randomness to the delay to prevent "thundering herd" problems where multiple clients retry simultaneously.

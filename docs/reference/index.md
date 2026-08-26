@@ -13,12 +13,12 @@ The **executor** is the internal loop that manages the execution of each attempt
 | [`Resilience`](resilience.md) | `Resilience`, execution methods, `NextAttempt` |
 | [`CallResult<T>`](call-result.md) | `CallResult<T>`, `CallResult`, `StopReason`, `AttemptLog`, `Attempt` |
 | [Classifier and verdicts](classifier.md) | `Classifier`, `Verdict`, `VerdictKind` |
-| [`Backoff`](backoff.md) | `Backoff`, `Jitter` |
+| [`Backoff`](backoff.md) | `Backoff`, `BackoffKind`, `Jitter` |
 | [`Breaker`](breaker.md) | `Breaker`, `BreakerSettings`, `BreakerState` |
 | [`RetryBudget`](retry-budget.md) | `RetryBudget` |
 | [`CallEvent`](events.md) | `CallEvent`, `CallEventKind` |
 | [Exceptions](exceptions.md) | `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, `ResilienceConfigurationException` |
 | [HTTP](http.md) | `ResilienceHandler`, `HttpResilienceOptions`, `ResilienceHttp` |
 | [Options and registration](options.md) | `ResilienceOptions`, `BreakerOptions`, `IResiliencePolicies`, `ResilienceTelemetry`, `AddResilience` |
-| [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder` |
+| [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder`, `TestPolicy`, `ScriptedHttpHandler`, `SentRequest` |
 | [Analyzers](analyzers.md) | Diagnostics `NRES001` through `NRES007` |

@@ -1,6 +1,6 @@
 ---
 title: Testing reference
-description: Reference for the Sequence and EventRecorder tools used for testing resilience policies.
+description: Reference for the Sequence, EventRecorder, TestPolicy, and ScriptedHttpHandler tools used for testing resilience policies.
 order: 11
 ---
 
@@ -58,3 +58,41 @@ To ensure that scripted delays are handled deterministically and do not introduc
 | `ToString()` | Returns a human-readable list of all events, with one event per line. |
 
 `EventRecorder` is thread-safe.
+
+## `TestPolicy`
+
+`TestPolicy` provides ready-made `Resilience` values shaped for tests, where sleeping and wall-clock bounds are noise. The policies are not safe to ship: they turn off storm protection so a test pays for neither a sleep nor a wall-clock bound it does not care about.
+
+| Member | Description |
+| :--- | :--- |
+| `TestPolicy.Instant` | Three attempts, no backoff, and both the deadline and the attempt timeout set to `Timeout.InfiniteTimeSpan`. Storm protection is off. |
+| `TestPolicy.InstantHttp` | `Instant` with `Classify = Classifier.Http` and `Name = "http"`. |
+| `TestPolicy.On(TimeProvider time)` | `Instant` on the given test clock, with any breaker the policy carries rebuilt on the same clock. |
+| `UseClock(this Resilience policy, TimeProvider time)` | Extension method. Rebases a policy on the given clock, rebuilding the breaker it carries on that clock too. The returned policy carries a new breaker with the same settings and no accumulated state. |
+
+## `ScriptedHttpHandler`
+
+`ScriptedHttpHandler` is an `HttpMessageHandler` that serves a scripted sequence of responses, so the HTTP layer can be tested without a transport. The last step repeats, so a script does not have to predict how many attempts the policy will make.
+
+| Member | Description |
+| :--- | :--- |
+| `Respond(HttpStatusCode status)` | Serves one response with the given status. Returns this handler. |
+| `Respond(HttpStatusCode status, int times)` | Serves the status for `times` attempts before the script advances. Returns this handler. |
+| `Respond(Func<HttpResponseMessage> response)` | Serves one response built afresh per attempt, so its content can be read each time. Returns this handler. |
+| `Respond(Func<HttpResponseMessage> response, int times)` | Builds a fresh response for `times` attempts before the script advances. Returns this handler. |
+| `Throw(Func<Exception> exception)` | Throws, for the transport failures a classifier has to see. The factory is called once per attempt, so a reused instance never accumulates a shared stack trace. Returns this handler. |
+| `Throw(Func<Exception> exception, int times)` | Throws for `times` attempts before the script advances. Returns this handler. |
+| `Requests` | A snapshot of what each attempt sent, in order. The live message is disposed by `HttpClient`, so the snapshot captures the method, URI, and headers before disposal. |
+| `CallCount` | How many attempts reached the handler. |
+| `CaptureBodies` | Whether `SentRequest.Body` is populated. Off by default; reading a body buffers it. |
+
+## `SentRequest`
+
+`SentRequest` is a `record` that captures what one attempt sent, before `HttpClient` disposed the message.
+
+| Member | Description |
+| :--- | :--- |
+| `Method` | The `HttpMethod` of the request. |
+| `RequestUri` | The `Uri` of the request. |
+| `Headers` | The request headers, copied before disposal. |
+| `Body` | The request body, or null when `CaptureBodies` is off. |
