@@ -67,6 +67,50 @@ Back to 24 bytes, gated by `The_verdict_carries_its_origin_for_free`. `AttemptRe
 
 The same accounting is why there is no `Admit` hook on the policy. A hook returning a new awaitable type adds a hoisted awaiter field to the state-machine box of every suspending call, configured or not - the same 16 bytes per call that `BeforeAttempt` returns `Task` specifically to avoid.
 
+## Building a custom guard
+
+Nothing about the mechanism is specific to the shipped rate limiter. Any local admission decision -
+a distributed lock, a hand-rolled token bucket, a load shedder driven by your own telemetry - gets
+the same treatment: the long backoff curve, the limiter's own hint honored verbatim, no evidence
+against the breaker, no charge against the retry budget. None of it requires a new type in the
+library.
+
+The recipe is the one [classification](../features/classification.md) already documents, aimed at
+`Verdict.Limited` instead of `Verdict.Throttled`:
+
+```csharp
+public sealed class ConsensusRefusedException(TimeSpan? retryAfter = null) : Exception
+{
+    public TimeSpan? RetryAfter { get; } = retryAfter;
+}
+
+var policy = Resilience.Default with
+{
+    Classify = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Limited(ex.RetryAfter)),
+};
+
+var result = await policy.RunAsync(async ct =>
+{
+    if (!await consensusStore.TryAcquireAsync(ct))
+        throw new ConsensusRefusedException(retryAfter: TimeSpan.FromMilliseconds(200));
+
+    return await CallDependencyAsync(ct);
+}, cancellationToken);
+```
+
+This works because `Verdict.Limited` is not specific to rate limiting - its own summary says it is
+for "a rate limiter, a concurrency limit, or anything else in this process that said no before the
+call left it" - and because the budget and the breaker key off `SelfImposed`, not the exception
+type. `RateLimitedException` gets special-cased in the executor only because the shipped limiters
+throw it directly; a classifier rule reaches the identical code path through the ordinary
+exception-classification `catch`, with the identical result.
+
+The three properties [the callback is the seam](#the-callback-is-the-seam) requires of any guard -
+per attempt, bounded by the attempt's own token, and running where a thrown exception is classified -
+apply here exactly as they do to a rate limiter. `BeforeAttempt` does not have this property: it runs
+outside the classified region, so an exception thrown there is never turned into a verdict at all.
+That is why a guard belongs in the callback, not as a matter of taste.
+
 ## The callback is the seam
 
 Which leaves the question of where a limiter runs, and the answer is that it needs no new place. Inside the executed callback, every property it needs is already true:

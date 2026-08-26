@@ -181,6 +181,13 @@ public sealed class AttemptTimeoutException : TimeoutException
 ///         the backoff curve, the breaker's evidence rule and the retry budget without the core taking a
 ///         dependency on any of them.
 ///     </para>
+///     <para>
+///         This type is not required to get that treatment. Any exception a classifier maps to
+///         <see cref="Verdict.Limited" /> reaches the executor's general exception-classification path
+///         and is handled identically - see "Building a custom guard" in the admission control deep
+///         dive. Throwing this type directly is simply the shortest path when a name like "rate
+///         limiter" already fits.
+///     </para>
 /// </summary>
 public sealed class RateLimitedException : Exception
 {

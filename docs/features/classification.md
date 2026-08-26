@@ -73,6 +73,28 @@ var api = Resilience.Http with { Classify = classify };
 ```
 <!-- endsnippet -->
 
+## Classify a self-imposed refusal
+
+`Verdict.Throttled` above is for pushback the dependency itself sent - a quota response, a 429. A
+different case is a refusal that never reached the dependency at all: your own admission-control
+check, a distributed lock, a hand-rolled limiter. Classify that to `Verdict.Limited` instead. The
+retry budget and the circuit breaker then treat it correctly - neither is evidence about the
+dependency, so neither charges the refusal against it:
+
+```csharp
+public sealed class ConsensusRefusedException(TimeSpan? retryAfter = null) : Exception
+{
+    public TimeSpan? RetryAfter { get; } = retryAfter;
+}
+
+var api = Resilience.Default with
+{
+    Classify = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Limited(ex.RetryAfter)),
+};
+```
+
+This is the general form of what the shipped rate limiter does. See [Building a custom guard](../deep-dives/admission-control.md#building-a-custom-guard) for the full recipe, including where to throw the exception from.
+
 ## Classify returned results
 
 Some dependencies report failures in a response envelope rather than by throwing exceptions. You can create rules to classify these results.

@@ -40,10 +40,29 @@ However, the fused design provides several architectural advantages:
 By choosing a flat executor, NResilience gives up extensibility through composition. You cannot write a custom strategy and insert it into a chain because there is no chain.
 
 Instead, the library provides targeted extension points:
-- **Outcome Classification**: Use the [`Classifier`](../reference/classifier.md) to determine how outcomes are treated.
-- **Custom Delays**: Use `Backoff.Custom` to compute your own backoff logic.
-- **Pre-attempt Logic**: Use `BeforeAttempt` to run code before each attempt.
-- **Observability**: Use `OnEvent` to monitor every stage of the process.
+
+| Need | Mechanism |
+| :--- | :--- |
+| Decide what counts as what | [`Classifier`](../features/classification.md) |
+| Compute your own delay between attempts | `Backoff.Custom` |
+| Run code before each attempt (refresh a token, build a fresh request) | `BeforeAttempt` |
+| Monitor every stage of the process | `OnEvent` |
+| Add a custom admission-control guard (a distributed lock, a hand-rolled limiter, anything that should refuse a call before it reaches the dependency) | The callback, plus a classifier rule - see [Building a custom guard](admission-control.md#building-a-custom-guard) |
+| Compose arbitrary logic around an HTTP call | Chain another `DelegatingHandler` alongside `ResilienceHandler` |
+
+The last two are easy to miss because neither reads as "the pipeline": a custom guard is an ordinary
+exception classified to a verdict, not a strategy object, and HTTP composition happens through
+`DelegatingHandler`, not through the policy. Both get the same treatment as the built-in ones -
+correct backoff curve, breaker exemption, retry-budget exemption, telemetry - without adding a layer
+to the executor.
+
+> [!CAUTION]
+> `BeforeAttempt` is awaited outside the executor's classification logic. An exception it throws is
+> not retried, not logged to the attempt log, and raises no `CallEvent` - it propagates out of the
+> call unchanged. Use it for setup that always has to run (refreshing a token, building a fresh
+> request), not for anything that should be able to refuse an attempt. A guard that needs retry,
+> backoff, or telemetry belongs in the callback instead - see
+> [Building a custom guard](admission-control.md#building-a-custom-guard).
 
 This restricted surface is a deliberate choice. A smaller public API is more likely to remain stable over time, reducing the need for breaking changes and making the library more reliable for long-term adoption.
 

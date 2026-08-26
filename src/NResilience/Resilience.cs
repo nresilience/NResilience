@@ -118,6 +118,14 @@ public sealed partial record Resilience
     ///         hook shares their hoisted awaiter field instead of adding one to every suspending call.
     ///         Measured: 16 B/call cheaper for every caller, whether or not the hook is set.
     ///     </para>
+    ///     <para>
+    ///         This runs outside the executor's classification region. An exception it throws is not
+    ///         retried, not logged to the attempt log, and raises no <see cref="CallEvent" /> - it
+    ///         propagates out of the call unchanged. Use this for setup that always has to run, not for
+    ///         a guard that should be able to refuse an attempt: a check that needs retry, backoff, or
+    ///         telemetry belongs inside the callback instead, classified like any other outcome. See
+    ///         "Building a custom guard" in the admission control deep dive.
+    ///     </para>
     /// </summary>
     public Func<NextAttempt, Task>? BeforeAttempt { get; init; }
 
