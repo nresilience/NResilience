@@ -21,9 +21,27 @@ public enum AllocationCounter
 }
 
 /// <summary>A single arm's measured allocation.</summary>
-public sealed record AllocationMeasurement(string Name, double BytesPerOperation, AllocationCounter Counter, int Iterations, int Repeats)
+/// <remarks>
+///     <paramref name="Samples" /> keeps every repeat, not just the winning one.
+///     <see cref="BytesPerOperation" /> is their minimum and is the figure every budget is asserted
+///     against, but the minimum alone cannot say whether it was drawn from nine tight readings or
+///     nine wild ones. On a quiet machine the spread is under a byte, so a wide spread is the
+///     instrument reporting that this host could not hold still - which is worth having in a CI
+///     failure, where the run cannot be repeated by hand.
+/// </remarks>
+public sealed record AllocationMeasurement(
+    string Name,
+    double BytesPerOperation,
+    AllocationCounter Counter,
+    int Iterations,
+    int Repeats,
+    IReadOnlyList<double> Samples)
 {
-    public override string ToString() => $"{Name,-34} {BytesPerOperation,9:0.0} B/op  ({Counter}, {Repeats}x{Iterations})";
+    /// <summary>The gap between the noisiest and the cleanest repeat.</summary>
+    public double Spread => Samples.Count == 0 ? 0 : Samples.Max() - Samples.Min();
+
+    public override string ToString() =>
+        $"{Name,-34} {BytesPerOperation,9:0.0} B/op  ({Counter}, {Repeats}x{Iterations}, spread {Spread:0.0} B)";
 }
 
 /// <summary>
@@ -78,6 +96,7 @@ public static class AllocationProbe
         await WarmAsync(body, warmup, betweenOperations).ConfigureAwait(false);
 
         var best = double.MaxValue;
+        var samples = new double[repeats];
 
         for (var r = 0; r < repeats; r++)
         {
@@ -94,12 +113,13 @@ public static class AllocationProbe
             var after = Read(counter);
 
             var perOp = (after - before) / (double)iterations;
+            samples[r] = perOp;
 
             if (perOp < best)
                 best = perOp;
         }
 
-        return new AllocationMeasurement(name, best, counter, iterations, repeats);
+        return new AllocationMeasurement(name, best, counter, iterations, repeats, samples);
     }
 
     /// <summary>

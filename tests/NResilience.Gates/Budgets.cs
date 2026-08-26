@@ -188,6 +188,11 @@ public static class Budgets
     ///     but because a synchronous callback erases a composed pipeline's per-attempt boxes while
     ///     the executor still pays for its linked source. The probe now asserts that no receive
     ///     completed synchronously before this ratio is allowed to mean anything.
+    ///     Enforced on Linux and macOS. Windows is excluded because Polly's arm does not measure
+    ///     repeatably there - on one runner it read below the fused executor it wraps - and the
+    ///     reason is in that arm, not in this library, whose own figure is within 15 B of its
+    ///     Linux and macOS value on the same runs. <c>SocketCrossCheckTests.OnWindows</c> carries
+    ///     the numbers. The yield gate and every budget above still run everywhere.
     /// </summary>
     public const double MinimumSocketRatioVersusPolly = 2.0;
 
