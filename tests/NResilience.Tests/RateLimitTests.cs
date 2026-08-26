@@ -47,6 +47,13 @@ public sealed class RateLimitTests
     }
 
     [Fact]
+    public void Refused_is_an_alias_of_Limited_for_a_non_rate_limiting_guard()
+    {
+        Assert.Equal(Verdict.Limited(), Verdict.Refused());
+        Assert.Equal(Verdict.Limited(TimeSpan.FromMilliseconds(200)), Verdict.Refused(TimeSpan.FromMilliseconds(200)));
+    }
+
+    [Fact]
     public void Server_throttling_and_self_throttling_are_not_the_same_verdict()
     {
         Assert.NotEqual(Verdict.Throttled(), Verdict.Limited());

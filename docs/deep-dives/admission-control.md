@@ -76,7 +76,7 @@ against the breaker, no charge against the retry budget. None of it requires a n
 library.
 
 The recipe is the one [classification](../features/classification.md) already documents, aimed at
-`Verdict.Limited` instead of `Verdict.Throttled`:
+`Verdict.Refused` instead of `Verdict.Throttled`:
 
 ```csharp
 public sealed class ConsensusRefusedException(TimeSpan? retryAfter = null) : Exception
@@ -86,7 +86,7 @@ public sealed class ConsensusRefusedException(TimeSpan? retryAfter = null) : Exc
 
 var policy = Resilience.Default with
 {
-    Classify = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Limited(ex.RetryAfter)),
+    Classify = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Refused(ex.RetryAfter)),
 };
 
 var result = await policy.RunAsync(async ct =>
@@ -98,11 +98,12 @@ var result = await policy.RunAsync(async ct =>
 }, cancellationToken);
 ```
 
-This works because `Verdict.Limited` is not specific to rate limiting - its own summary says it is
-for "a rate limiter, a concurrency limit, or anything else in this process that said no before the
-call left it" - and because the budget and the breaker key off `SelfImposed`, not the exception
-type. `RateLimitedException` gets special-cased in the executor only because the shipped limiters
-throw it directly; a classifier rule reaches the identical code path through the ordinary
+This works because `Verdict.Refused` (an alias of `Verdict.Limited`, named for a guard that is not a
+rate limiter) is not specific to rate limiting - its summary says it is for "a rate limiter, a
+concurrency limit, or anything else in this process that said no before the call left it" - and
+because the budget and the breaker key off `SelfImposed`, not the exception type.
+`RateLimitedException` gets special-cased in the executor only because the shipped limiters throw it
+directly; a classifier rule reaches the identical code path through the ordinary
 exception-classification `catch`, with the identical result.
 
 The three properties [the callback is the seam](#the-callback-is-the-seam) requires of any guard -

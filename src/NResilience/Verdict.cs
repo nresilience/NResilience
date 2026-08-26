@@ -49,6 +49,13 @@ public readonly struct Verdict : IEquatable<Verdict>
     ///         capacity <c>AttemptRecord</c> exploits to carry the flag in the inline attempt log for
     ///         nothing.
     ///     </para>
+    ///     <para>
+    ///         This is the pattern to reach for before spending a byte on the next single-bit fact about a
+    ///         verdict: <see cref="VerdictKind" />'s four members only occupy bits 0-1, and this flag takes
+    ///         bit 7, so bits 2-6 are unclaimed and free for a future flag of the same shape - packed into
+    ///         <c>_packed</c> here, and into the matching bits of <c>AttemptRecord</c>'s inline field, at
+    ///         zero marginal cost to the state-machine box.
+    ///     </para>
     /// </summary>
     internal const byte SelfImposedFlag = 0x80;
 
@@ -113,6 +120,16 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// <param name="retryAfter">When the limiter said a permit would be available, if it said.</param>
     /// <returns>A self-imposed throttled verdict.</returns>
     public static Verdict Limited(TimeSpan? retryAfter = null) => new(VerdictKind.Throttled, retryAfter, true);
+
+    /// <summary>
+    ///     An alias for <see cref="Limited" />, for a classifier rule that is not a rate limiter. Both
+    ///     produce the identical verdict; this name is for a hand-rolled admission-control guard - a
+    ///     distributed lock, a consensus check, a load shedder - where "limited" would misdescribe what
+    ///     refused the attempt. See the admission control deep dive for the full pattern.
+    /// </summary>
+    /// <param name="retryAfter">When the guard said it would allow another attempt, if it said.</param>
+    /// <returns>A self-imposed throttled verdict.</returns>
+    public static Verdict Refused(TimeSpan? retryAfter = null) => Limited(retryAfter);
 
     /// <inheritdoc />
     public bool Equals(Verdict other) => _packed == other._packed && RetryAfter == other.RetryAfter;

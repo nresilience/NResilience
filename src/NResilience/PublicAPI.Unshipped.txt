@@ -296,6 +296,7 @@ static NResilience.RetryBudget.Shared(string! name, double fraction = 0.1, int m
 static NResilience.Verdict.Limited(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Ok.get -> NResilience.Verdict
 static NResilience.Verdict.Permanent.get -> NResilience.Verdict
+static NResilience.Verdict.Refused(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Throttled(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Transient.get -> NResilience.Verdict
 static NResilience.Verdict.operator !=(NResilience.Verdict left, NResilience.Verdict right) -> bool
