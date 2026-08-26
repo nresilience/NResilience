@@ -21,7 +21,7 @@ The following data compares the memory overhead of a fused loop against a compar
 | Full policy (Retry + Timeout) | 448 B | ~1,291 B (harness range 1,100-1,600) | **>= 2.5x** (Measured 3.2x) |
 | Trivial policy (Empty) | 368 B | ~304 B (harness range 250-400) | **<= 1.25x** (Measured 1.05x) |
 
-When measured over a real loopback socket - which more accurately reflects real-world I/O and cancellation token registration - the fused design is **2.38x** cheaper. The build process enforces a minimum ratio of 2.0x to ensure this performance advantage is maintained. The socket figure is the more honest headline of the two, because real I/O registers on the cancellable attempt token and `Task.Yield` does not.
+When measured over a real loopback socket - which more accurately reflects real-world I/O and cancellation token registration - the fused design is **2.41x** cheaper. The build process enforces a minimum ratio of 2.0x to ensure this performance advantage is maintained. The socket figure is the more honest headline of the two, because real I/O registers on the cancellable attempt token and `Task.Yield` does not.
 
 **Key takeaway**: Composition overhead scales with the number of layers. A flat loop's overhead does not. The fused design's advantage grows in proportion to the complexity of the configured policy. At the trivial end, there is effectively nothing to win, which is why the trivial policy ratio is near 1.0x.
 

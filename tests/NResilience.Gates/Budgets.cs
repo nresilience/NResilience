@@ -173,13 +173,21 @@ public static class Budgets
 
     /// <summary>
     ///     The same claim measured over a real loopback TCP round trip rather than over
-    ///     <c>Task.Yield</c>. Measured: 2.38x, against 3.22x on the yield gate.
+    ///     <c>Task.Yield</c>. Measured: 2.41x on both TFMs, against 3.22x on the yield gate.
     ///     The two disagree for a reason worth knowing: <c>Task.Yield</c> ignores the token it is
     ///     handed, so the yield gate cannot see what it costs to give a callback a <i>cancellable</i>
     ///     token. Real I/O registers on that token, and the executor's per-attempt linked source
     ///     makes every attempt token cancellable even when the caller's was not. The socket figure
     ///     is therefore the more honest headline, and the yield gate is the deterministic proxy that
     ///     CI can actually enforce.
+    ///     The 2.38x recorded earlier was taken before the probe's round trip was made to suspend
+    ///     deterministically, and this floor is the reason the change was needed: with the receive
+    ///     issued after the send, the fraction of round trips completing synchronously tracked the
+    ///     platform's loopback timing, and that fraction moves the ratio. A Windows runner measuring
+    ///     roughly half its receives synchronously reported 1.72x - not because anything regressed,
+    ///     but because a synchronous callback erases a composed pipeline's per-attempt boxes while
+    ///     the executor still pays for its linked source. The probe now asserts that no receive
+    ///     completed synchronously before this ratio is allowed to mean anything.
     /// </summary>
     public const double MinimumSocketRatioVersusPolly = 2.0;
 

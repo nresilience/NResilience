@@ -18,6 +18,8 @@ namespace NResilience.Gates;
 ///     The yield gate structurally cannot see one thing - that giving the callback a <i>cancellable</i>
 ///     token costs 208 B over real I/O against 65 B over <c>Task.Yield</c> - and that finding is the
 ///     reason this test exists rather than being a formality.
+///     The comparison is only valid while the round trip actually suspends, so the sweep asserts
+///     that before it asserts the ratio. See <see cref="LoopbackEcho.RoundTripAsync" />.
 /// </summary>
 [Collection(BaselineCollection.Name)]
 public sealed class SocketCrossCheckTests(ITestOutputHelper output)
@@ -26,6 +28,7 @@ public sealed class SocketCrossCheckTests(ITestOutputHelper output)
     public async Task Real_socket_io_agrees_with_the_yield_gate()
     {
         await using var echo = await LoopbackEcho.StartAsync();
+        echo.ResetCounters();
 
         var callback = echo.RoundTripAsync;
         Func<CancellationToken, ValueTask<int>> pollyCallback = ct => new ValueTask<int>(echo.RoundTripAsync(ct));
@@ -81,7 +84,23 @@ public sealed class SocketCrossCheckTests(ITestOutputHelper output)
 
         report.Append(CultureInfo.InvariantCulture, $"  {polly}  (+{pollyOverhead:0.0} B)").AppendLine();
         report.Append(CultureInfo.InvariantCulture, $"  ratio: {ratio:0.00}x").AppendLine();
+
+        report.Append(CultureInfo.InvariantCulture,
+            $"  round trips: {echo.RoundTrips:N0}, of which suspended: {echo.RoundTrips - echo.SynchronousReceives:N0}").AppendLine();
+
         output.WriteLine(report.ToString());
+
+        // Asserted before the ratio, because it decides whether the ratio means anything. A round
+        // trip whose receive completed synchronously never allocated a state machine, and the arms
+        // stop being comparable: the executor pays for its per-attempt linked source either way,
+        // while a composed pipeline's per-attempt boxes simply vanish. A sweep with synchronous
+        // receives in it measures the platform's completion timing, not the design, so it must
+        // report that rather than a ratio verdict.
+        Assert.True(
+            echo.SynchronousReceives == 0,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"{echo.SynchronousReceives:N0} of {echo.RoundTrips:N0} round trips completed their receive synchronously, so this sweep did not measure the suspending path and its {ratio:0.00}x is not comparable to the yield gate. The probe, not the executor, is what regressed."));
 
         Assert.True(fusedOverhead > 0, "The fused executor should cost something over a raw socket round trip.");
 
