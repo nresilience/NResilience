@@ -18,6 +18,7 @@ By using a single classifier, NResilience ensures that retry logic, backoff curv
 | :--- | :--- | :--- |
 | `Classifier.Default` | `TimeoutException`, `IOException`, `SocketException` | `Permanent` |
 | `Classifier.Http` | The above, plus `HttpRequestException` and specific HTTP status codes | `Permanent` |
+| `Classifier.Data` | The above, plus any `DbException` the provider calls transient | `Permanent` |
 | `Classifier.RetryEverything` | Every exception | `Transient` |
 
 `Classifier.Http` classifies HTTP status codes according to standard semantics:
@@ -40,6 +41,44 @@ var answer = http.ClassifyResult(value: new HttpResponseMessage(statusCode: Http
 | 404 and other 4xx | `Ok` (treated as a valid answer, not a failure) |
 
 A 404 is considered an answer and is not retried. If a specific status is transient for your API, you can add a custom rule for it. For more information, see [migrating a predicate](../migrating-from-polly.md#configure-predicates).
+
+## Classify database failures
+
+`Classifier.Data` adds one rule to `Classifier.Default`: a `DbException` is `Transient` when the provider says it is, and `Permanent` when it does not.
+
+<!-- snippet: classifier-data -->
+```csharp
+// Classifier.Data reads DbException.IsTransient, which maintained ADO.NET providers
+// implement. This avoids using a driver package or a manual table of error numbers.
+// Providers that do not implement this property report false, making Classifier.Data
+// equivalent to Classifier.Default.
+var db = Resilience.Default with
+{
+    Classify = Classifier.Data,
+    Backoff = Backoff.Constant(delay: TimeSpan.FromMilliseconds(value: 50)),
+};
+```
+<!-- endsnippet -->
+
+The judgment comes from `DbException.IsTransient`, which is part of the base class library rather than any particular driver. Microsoft.Data.SqlClient, Npgsql, and MySqlConnector all implement it, so this classifier needs no package reference and carries no list of error numbers to go stale.
+
+A provider that never overrode `IsTransient` reports `false` for everything, which makes `Classifier.Data` behave exactly like `Classifier.Default`. That is the property worth knowing before you reach for it: it is never worse than the default, so you do not have to audit your driver first.
+
+What the provider cannot tell you is that a failure was the dependency *defending itself* rather than breaking. A resource-limit error is reported as transient like any other, so it takes the short backoff curve and counts as evidence against the dependency. If your provider distinguishes them, one rule of your own does too:
+
+<!-- snippet: classifier-data-throttled -->
+```csharp
+// Providers cannot distinguish between a dependency failing and one defending itself.
+// For example, Azure SQL reports resource limits as 10928 and 10929. Both are
+// throttling: they use a long backoff curve and do not count as evidence against the
+// dependency's health.
+var classify = Classifier.Data.On<SqlLikeException>(e => e.Number is 10928 or 10929
+    ? Verdict.Throttled()
+    : Classifier.Data.ClassifyException(exception: e));
+
+var db = Resilience.Default with { Classify = classify };
+```
+<!-- endsnippet -->
 
 ## Add custom exception rules
 

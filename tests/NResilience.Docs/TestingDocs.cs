@@ -1,4 +1,5 @@
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Http;
 using NResilience.Testing;
@@ -177,5 +178,91 @@ public sealed class TestingDocs
         Assert.Equal(expected: 2, actual: transport.CallCount);
 
         // </snippet:testing-http-handler>
+    }
+
+    [Fact]
+    public async Task Chaos_injects_faults_the_policy_then_handles()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var orders = new OrderService();
+
+        var policy = Resilience.Default with { Attempts = 3, Backoff = Backoff.None, Budget = null };
+
+        // <snippet:chaos-callback>
+        // One call in ten fails and one in five is slow. Chaos wraps the callback rather than the
+        // policy, so an injected fault is classified, retried, counted against the breaker and
+        // written to the attempt log exactly like a real one.
+        var chaos = new Chaos
+        {
+            Enabled = true,
+            FaultRate = 0.1,
+            LatencyRate = 0.2,
+            Latency = TimeSpan.FromSeconds(value: 2),
+        };
+
+        var result = await policy.TryRunAsync(
+            work: chaos.Inject(work: attempt => orders.FetchAsync(cancellationToken: attempt)),
+            cancellationToken: cancellationToken);
+
+        // </snippet:chaos-callback>
+
+        Assert.True(condition: result.IsSuccess || result.Attempts.Count > 0);
+    }
+
+    [Fact]
+    public async Task Chaos_can_be_pinned_to_a_seed_and_a_gate()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var orders = new OrderService();
+        var tenant = "acme";
+
+        var policy = Resilience.Default with { Attempts = 3, Backoff = Backoff.None, Budget = null };
+
+        // <snippet:chaos-deterministic>
+        // Seed fixes the random stream, so a test that asserts how many calls were injected is
+        // repeatable. Gate narrows the blast radius past anything a rate can express - one tenant,
+        // one region, one shard - and is asked before the dice are rolled.
+        var chaos = new Chaos
+        {
+            Enabled = true,
+            FaultRate = 1.0,
+            Seed = 1234,
+            Gate = () => tenant == "acme",
+        };
+
+        var failed = await policy.TryRunAsync(
+            work: chaos.Inject(work: attempt => orders.FetchAsync(cancellationToken: attempt)),
+            cancellationToken: cancellationToken);
+
+        Assert.False(condition: failed.IsSuccess);
+        Assert.IsType<IOException>(@object: failed.Exception);
+
+        // </snippet:chaos-deterministic>
+    }
+
+    [Fact]
+    public void Chaos_injects_into_an_http_pipeline()
+    {
+        var services = new ServiceCollection();
+
+        // <snippet:chaos-http>
+        // Add this after AddResilience() to make it inner to the resilience handler. Adding it
+        // before would inject faults outside the policy, so the policy would not retry them.
+        services.AddHttpClient(name: "orders")
+            .AddResilience()
+            .AddHttpMessageHandler(() => new ChaosHandler(
+                chaos: new Chaos { Enabled = true, FaultRate = 0.05 },
+                response: () => new HttpResponseMessage(statusCode: HttpStatusCode.ServiceUnavailable)));
+
+        // </snippet:chaos-http>
+
+        using var provider = services.BuildServiceProvider();
+        Assert.NotNull(@object: provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "orders"));
+    }
+
+    /// <summary>A dependency that always answers, so only the injected failures are visible.</summary>
+    private sealed class OrderService
+    {
+        internal Task<int> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(result: 1);
     }
 }

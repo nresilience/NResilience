@@ -97,5 +97,5 @@ For more information, see these resources:
 | Package                  | Use case                                                                  |
 |--------------------------|---------------------------------------------------------------------------|
 | `NResilience`            | The core library, HTTP handler, and analyzers.                            |
-| `NResilience.Extensions` | Dependency injection, configuration binding, and metrics for hosted apps. |
-| `NResilience.Testing`    | Helpers for testing your policies.                                        |
+| `NResilience.Extensions` | Dependency injection, configuration binding, metrics, and health checks. |
+| `NResilience.Testing`    | Helpers for testing your policies, and fault injection.                  |

@@ -82,10 +82,10 @@ NResilience.CallEvent.CallEvent() -> void
 NResilience.CallEvent.Delay.get -> System.TimeSpan?
 NResilience.CallEvent.Duration.get -> System.TimeSpan
 NResilience.CallEvent.Exception.get -> System.Exception?
-NResilience.CallEvent.Kind.get -> NResilience.CallEventKind
-NResilience.CallEvent.PolicyName.get -> string?
 NResilience.CallEvent.IsRejection.get -> bool
 NResilience.CallEvent.IsTerminal.get -> bool
+NResilience.CallEvent.Kind.get -> NResilience.CallEventKind
+NResilience.CallEvent.PolicyName.get -> string?
 NResilience.CallEvent.Reason.get -> NResilience.StopReason?
 NResilience.CallEvent.Result.get -> object?
 NResilience.CallEvent.Verdict.get -> NResilience.Verdict
@@ -232,6 +232,7 @@ NResilience.ResilienceConfigurationException.ResilienceConfigurationException(st
 NResilience.ResilienceValueTask
 NResilience.RetryBudget
 NResilience.RetryBudget.IsAutomatic.get -> bool
+NResilience.RetryBudget.IsNone.get -> bool
 NResilience.RetryBudget.Name.get -> string?
 NResilience.RetryBudget.Utilization.get -> double
 NResilience.StopReason
@@ -279,10 +280,11 @@ static NResilience.Backoff.operator !=(NResilience.Backoff left, NResilience.Bac
 static NResilience.Backoff.operator ==(NResilience.Backoff left, NResilience.Backoff right) -> bool
 static NResilience.BreakerSettings.operator !=(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
 static NResilience.BreakerSettings.operator ==(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
+static NResilience.CallEvent.Create(NResilience.CallEventKind kind, string? policyName = null, int attemptNumber = 1, NResilience.Verdict verdict = default(NResilience.Verdict), System.TimeSpan duration = default(System.TimeSpan), System.TimeSpan? delay = null, System.Exception? exception = null, object? result = null, NResilience.StopReason? reason = null) -> NResilience.CallEvent
+static NResilience.Classifier.Data.get -> NResilience.Classifier!
 static NResilience.Classifier.Default.get -> NResilience.Classifier!
 static NResilience.Classifier.Http.get -> NResilience.Classifier!
 static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
-static NResilience.CallEvent.Create(NResilience.CallEventKind kind, string? policyName = null, int attemptNumber = 1, NResilience.Verdict verdict = default(NResilience.Verdict), System.TimeSpan duration = default(System.TimeSpan), System.TimeSpan? delay = null, System.Exception? exception = null, object? result = null, NResilience.StopReason? reason = null) -> NResilience.CallEvent
 static NResilience.Http.ResilienceHttp.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
 static NResilience.Http.ResilienceHttp.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
 static NResilience.Http.ResilienceHttpRequestExtensions.MarkRepeatable(this System.Net.Http.HttpRequestMessage! request, string? idempotencyKey = null, string! headerName = "Idempotency-Key") -> System.Net.Http.HttpRequestMessage!

@@ -30,6 +30,7 @@ The Polly snippets below are illustrative. All NResilience snippets are compiled
 | `AddStandardResilienceHandler()` | `.AddResilience()` |
 | `OnRetry`, `OnTimeout`, `OnOpened`, etc. | One [`OnEvent`](features/telemetry.md) listener |
 | `resilience.polly.*` metrics | `nresilience.*` metrics |
+| Simmy chaos strategies (`AddChaosFault`, `AddChaosLatency`, `AddChaosOutcome`) | [`Chaos`](testing/fault-injection.md) in `NResilience.Testing`, which wraps the callback rather than adding a strategy |
 
 ## Implement a retry, timeout, and breaker
 

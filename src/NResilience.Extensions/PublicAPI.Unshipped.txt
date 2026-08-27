@@ -1,5 +1,6 @@
 #nullable enable
 Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions
+Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExtensions
 Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions
 Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions
 NResilience.Extensions.BreakerOptions
@@ -49,6 +50,19 @@ NResilience.Extensions.RateLimitOptions.Validate() -> void
 NResilience.Extensions.RateLimitOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.RateLimitOptions.Window.set -> void
 NResilience.Extensions.RateLimiterExtensions
+NResilience.Extensions.ResilienceHealthOptions
+NResilience.Extensions.ResilienceHealthOptions.BreakerOpenStatus.get -> Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus
+NResilience.Extensions.ResilienceHealthOptions.BreakerOpenStatus.set -> void
+NResilience.Extensions.ResilienceHealthOptions.BudgetExhaustedStatus.get -> Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus
+NResilience.Extensions.ResilienceHealthOptions.BudgetExhaustedStatus.set -> void
+NResilience.Extensions.ResilienceHealthOptions.BudgetThreshold.get -> double
+NResilience.Extensions.ResilienceHealthOptions.BudgetThreshold.set -> void
+NResilience.Extensions.ResilienceHealthOptions.IncludeHttpClients.get -> bool
+NResilience.Extensions.ResilienceHealthOptions.IncludeHttpClients.set -> void
+NResilience.Extensions.ResilienceHealthOptions.ResilienceHealthOptions() -> void
+NResilience.Extensions.ResilienceHealthOptions.Validate() -> void
+NResilience.Extensions.ResilienceHealthOptions.Watch(string! name, NResilience.Breaker! breaker) -> NResilience.Extensions.ResilienceHealthOptions!
+NResilience.Extensions.ResilienceHealthOptions.Watch(string! name, NResilience.RetryBudget! budget) -> NResilience.Extensions.ResilienceHealthOptions!
 NResilience.Extensions.ResilienceLogProfile
 NResilience.Extensions.ResilienceLogProfile.Default = 1 -> NResilience.Extensions.ResilienceLogProfile
 NResilience.Extensions.ResilienceLogProfile.Off = 0 -> NResilience.Extensions.ResilienceLogProfile
@@ -100,12 +114,14 @@ NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseli
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.set -> void
 NResilience.Extensions.ResilienceTelemetry
+const Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExtensions.DefaultName = "resilience" -> string!
 const NResilience.Extensions.ResilienceLogging.CategoryPrefix = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.ActivitySourceName = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.MeterName = "NResilience" -> string!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! section) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Action<NResilience.Extensions.RateLimitOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Threading.RateLimiting.RateLimiter! limiter, string? name = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
+static Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder! builder, string! name = "resilience", System.Action<NResilience.Extensions.ResilienceHealthOptions!>? configure = null, System.Collections.Generic.IEnumerable<string!>? tags = null) -> Microsoft.Extensions.DependencyInjection.IHealthChecksBuilder!
 static Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, NResilience.Resilience? policy = null, System.Action<NResilience.Http.HttpResilienceOptions!>? configureOptions = null, bool telemetry = true, NResilience.Extensions.ResilienceLogProfile? logging = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, string! policyName, System.Action<NResilience.Http.HttpResilienceOptions!>? configureOptions = null, bool telemetry = true, NResilience.Extensions.ResilienceLogProfile? logging = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

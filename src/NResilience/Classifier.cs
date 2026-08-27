@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net.Sockets;
 using System.Text;
 
@@ -64,6 +65,37 @@ public sealed class Classifier
     ///     </para>
     /// </summary>
     public static Classifier Http => HttpHolder.Instance;
+
+    /// <summary>
+    ///     <see cref="Default" /> plus ADO.NET transience: a <see cref="DbException" /> is
+    ///     <see cref="VerdictKind.Transient" /> when the provider says it is, and
+    ///     <see cref="VerdictKind.Permanent" /> otherwise.
+    ///     <para>
+    ///         The judgement is the provider's, read from <see cref="DbException.IsTransient" />, so this
+    ///         needs no reference to a database driver and carries no table of error numbers to go stale.
+    ///         Microsoft.Data.SqlClient, Npgsql and MySqlConnector all implement it; a provider that does
+    ///         not override it reports false for everything, which makes this classifier exactly
+    ///         <see cref="Default" /> rather than something worse.
+    ///     </para>
+    ///     <para>
+    ///         What it cannot tell you is that a failure was <i>throttling</i>. A resource-limit error is
+    ///         reported as transient like any other, so it takes the short backoff curve and counts as
+    ///         evidence against the dependency. Distinguishing the two means matching the provider's own
+    ///         error numbers, which is one rule of your own:
+    ///         <c>Classifier.Data.On&lt;SqlException&gt;(e => e.Number is 10928 or 10929 ? Verdict.Throttled() : Classifier.Data.ClassifyException(e))</c>.
+    ///     </para>
+    ///     <para>
+    ///         Held behind a nested holder so an application that never touches a database does not root
+    ///         <see cref="DbException" /> and <c>System.Data.Common</c> just by reading
+    ///         <see cref="Default" />.
+    ///     </para>
+    /// </summary>
+    /// <example>
+    ///     <code>
+    /// var db = Resilience.Default with { Classify = Classifier.Data };
+    /// </code>
+    /// </example>
+    public static Classifier Data => DataHolder.Instance;
 
     /// <summary>
     ///     No rules at all: every exception is <see cref="VerdictKind.Transient" />. Opt-in, and named
@@ -256,6 +288,16 @@ public sealed class Classifier
 
             public Func<T, Verdict>? Judge { get; } = judge;
         }
+    }
+
+    /// <summary>
+    ///     <see cref="Data" />'s ruleset. A predicate rule rather than a fixed one, because the verdict
+    ///     depends on the exception rather than on its type.
+    /// </summary>
+    private static class DataHolder
+    {
+        internal static readonly Classifier Instance =
+            Default.On<DbException>(static e => e.IsTransient ? Verdict.Transient : Verdict.Permanent);
     }
 
     private static class HttpHolder

@@ -62,6 +62,11 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
 
     <!--
+      Health checks. See the note in Directory.Packages.props for why this and not .Abstractions.
+    -->
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks"/>
+
+    <!--
       The limiters themselves. Referenced here rather than in the core package because it is an
       out-of-band NuGet package; see the note in Directory.Packages.props.
     -->

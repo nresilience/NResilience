@@ -178,7 +178,18 @@ public static class ResilienceHttpClientBuilderExtensions
             builder.AddHttpMessageHandler(() => new ResilienceTelemetryHandler(name));
         }
 
-        builder.AddHttpMessageHandler(services => new ResilienceHandler(policy(services), options));
+        // Tracked so the health check can read the per-host breakers and budgets this handler holds.
+        // The registry is written to here, at registration time, and the handler is recorded as the
+        // factory builds each generation of the chain.
+        var handlers = ResilienceHandlerRegistry.For(builder.Services);
+        var client = builder.Name;
+
+        builder.AddHttpMessageHandler(services =>
+        {
+            var handler = new ResilienceHandler(policy(services), options);
+            handlers.Track(client, handler);
+            return handler;
+        });
 
         return builder;
     }

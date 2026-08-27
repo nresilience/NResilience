@@ -1,4 +1,32 @@
 #nullable enable
+NResilience.Testing.Chaos
+NResilience.Testing.Chaos.<Clone>$() -> NResilience.Testing.Chaos!
+NResilience.Testing.Chaos.Chaos() -> void
+NResilience.Testing.Chaos.Enabled.get -> bool
+NResilience.Testing.Chaos.Enabled.init -> void
+NResilience.Testing.Chaos.Equals(NResilience.Testing.Chaos? other) -> bool
+NResilience.Testing.Chaos.Fault.get -> System.Func<System.Exception!>?
+NResilience.Testing.Chaos.Fault.init -> void
+NResilience.Testing.Chaos.FaultRate.get -> double
+NResilience.Testing.Chaos.FaultRate.init -> void
+NResilience.Testing.Chaos.Gate.get -> System.Func<bool>?
+NResilience.Testing.Chaos.Gate.init -> void
+NResilience.Testing.Chaos.Latency.get -> System.TimeSpan
+NResilience.Testing.Chaos.Latency.init -> void
+NResilience.Testing.Chaos.LatencyRate.get -> double
+NResilience.Testing.Chaos.LatencyRate.init -> void
+NResilience.Testing.Chaos.Seed.get -> int?
+NResilience.Testing.Chaos.Seed.init -> void
+NResilience.Testing.Chaos.Time.get -> System.TimeProvider!
+NResilience.Testing.Chaos.Time.init -> void
+NResilience.Testing.Chaos.Validate() -> void
+NResilience.Testing.Chaos.Validated() -> NResilience.Testing.Chaos!
+NResilience.Testing.ChaosExtensions
+NResilience.Testing.ChaosHandler
+NResilience.Testing.ChaosHandler.Chaos.get -> NResilience.Testing.Chaos!
+NResilience.Testing.ChaosHandler.ChaosHandler(NResilience.Testing.Chaos! chaos, System.Func<System.Net.Http.HttpResponseMessage!>? response = null) -> void
+NResilience.Testing.ChaosHandler.Injected.get -> int
+NResilience.Testing.ChaosHandler.Slowed.get -> int
 NResilience.Testing.EventRecorder
 NResilience.Testing.EventRecorder.Clear() -> void
 NResilience.Testing.EventRecorder.Contains(NResilience.CallEventKind kind) -> bool
@@ -50,10 +78,22 @@ NResilience.Testing.Sequence<T>.Throws(System.Exception! exception, int count) -
 NResilience.Testing.TestPolicy
 NResilience.Testing.Void
 NResilience.Testing.Void.Void() -> void
+override NResilience.Testing.Chaos.Equals(object? obj) -> bool
+override NResilience.Testing.Chaos.GetHashCode() -> int
+override NResilience.Testing.Chaos.ToString() -> string!
 override NResilience.Testing.EventRecorder.ToString() -> string!
 override NResilience.Testing.SentRequest.Equals(object? obj) -> bool
 override NResilience.Testing.SentRequest.GetHashCode() -> int
 override NResilience.Testing.SentRequest.ToString() -> string!
+static NResilience.Testing.Chaos.None.get -> NResilience.Testing.Chaos!
+static NResilience.Testing.Chaos.operator !=(NResilience.Testing.Chaos? left, NResilience.Testing.Chaos? right) -> bool
+static NResilience.Testing.Chaos.operator ==(NResilience.Testing.Chaos? left, NResilience.Testing.Chaos? right) -> bool
+static NResilience.Testing.ChaosExtensions.Inject(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>!
+static NResilience.Testing.ChaosExtensions.Inject(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! work) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>!
+static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>!
+static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Func<T>! outcome) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>!
+static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>!
+static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work, System.Func<T>! outcome) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>!
 static NResilience.Testing.SentRequest.operator !=(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.SentRequest.operator ==(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.Sequence.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<T>!

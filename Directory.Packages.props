@@ -43,6 +43,16 @@
     -->
     <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.11" />
 
+    <!--
+      Health checks. IHealthChecksBuilder and HealthCheckRegistration live here rather than in the
+      .Abstractions package beside them, and extending the builder is the idiomatic way to register a
+      check - so this is the package, not the abstractions. Its own dependencies are
+      DependencyInjection.Abstractions, Options and Logging.Abstractions, all of which
+      NResilience.Extensions already references. Same Microsoft.Extensions family and version as the
+      rest, decided once, and already in the transitive graph of any app that calls AddHealthChecks().
+    -->
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks" Version="10.0.11" />
+
     <!-- The log listener's own dependency, and the one the docs snippets log through. -->
     <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />

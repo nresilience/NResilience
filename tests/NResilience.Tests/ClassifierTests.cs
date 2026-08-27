@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
@@ -133,6 +134,50 @@ public sealed class ClassifierTests
     }
 
     [Fact]
+    public void Data_asks_the_provider_whether_a_database_failure_is_transient()
+    {
+        Assert.Equal(VerdictKind.Transient, Classifier.Data.ClassifyException(new FakeDbException(transient: true)).Kind);
+        Assert.Equal(VerdictKind.Permanent, Classifier.Data.ClassifyException(new FakeDbException(transient: false)).Kind);
+    }
+
+    /// <summary>
+    ///     The property that makes the classifier safe to reach for without auditing your provider:
+    ///     <see cref="DbException.IsTransient" /> defaults to false, so a provider that does not
+    ///     implement it leaves every outcome exactly where <see cref="Classifier.Default" /> left it.
+    /// </summary>
+    [Fact]
+    public void Data_is_never_worse_than_Default_for_a_provider_that_does_not_implement_IsTransient()
+    {
+        var silent = new SilentDbException();
+
+        Assert.Equal(Classifier.Default.ClassifyException(silent).Kind, Classifier.Data.ClassifyException(silent).Kind);
+        Assert.Equal(VerdictKind.Permanent, Classifier.Data.ClassifyException(silent).Kind);
+    }
+
+    [Fact]
+    public void Data_keeps_everything_Default_already_knew()
+    {
+        Assert.Equal(VerdictKind.Transient, Classifier.Data.ClassifyException(new IOException()).Kind);
+        Assert.Equal(VerdictKind.Transient, Classifier.Data.ClassifyException(new TimeoutException()).Kind);
+        Assert.Equal(VerdictKind.Permanent, Classifier.Data.ClassifyException(new InvalidOperationException()).Kind);
+    }
+
+    /// <summary>
+    ///     The documented escape hatch for the one thing the provider cannot tell you: that a failure
+    ///     was the dependency defending itself rather than breaking.
+    /// </summary>
+    [Fact]
+    public void A_rule_of_your_own_can_call_a_resource_limit_throttling()
+    {
+        var classifier = Classifier.Data.On<FakeDbException>(static e =>
+            e.Number is 10928 or 10929 ? Verdict.Throttled() : Classifier.Data.ClassifyException(e));
+
+        Assert.Equal(VerdictKind.Throttled, classifier.ClassifyException(new FakeDbException(transient: true) { Number = 10928 }).Kind);
+        Assert.Equal(VerdictKind.Transient, classifier.ClassifyException(new FakeDbException(transient: true)).Kind);
+        Assert.Equal(VerdictKind.Permanent, classifier.ClassifyException(new FakeDbException(transient: false)).Kind);
+    }
+
+    [Fact]
     public void The_active_ruleset_is_printable()
     {
         var dump = Classifier.Http.ToString();
@@ -141,4 +186,19 @@ public sealed class ClassifierTests
         Assert.Contains("HttpResponseMessage", dump, StringComparison.Ordinal);
         Assert.Contains("any other exception -> Permanent", dump, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    ///     Stands in for a provider that implements <see cref="DbException.IsTransient" /> - which
+    ///     Microsoft.Data.SqlClient, Npgsql and MySqlConnector all do. Referencing one of them to test
+    ///     a one-line rule would be a driver dependency in the test project for nothing.
+    /// </summary>
+    private sealed class FakeDbException(bool transient) : DbException("injected")
+    {
+        public override bool IsTransient { get; } = transient;
+
+        public int Number { get; init; }
+    }
+
+    /// <summary>Stands in for a provider that never overrode it, so the base's false is what is read.</summary>
+    private sealed class SilentDbException() : DbException("injected");
 }

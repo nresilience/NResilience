@@ -12,6 +12,7 @@ The `Classifier` is a `sealed class` used to categorize the outcome of an attemp
 | :--- | :--- |
 | `Classifier.Default` | Classifies `TimeoutException`, `IOException`, and `SocketException` as `Transient`. All other exceptions are `Permanent`. |
 | `Classifier.Http` | Extends `Default` by adding `HttpRequestException` as `Transient` and including a status-code rule for `HttpResponseMessage`. |
+| `Classifier.Data` | Extends `Default` by classifying a `DbException` as `Transient` when `DbException.IsTransient` is `true`, and `Permanent` when it is not. Adds no package dependency and no error-number table. |
 | `Classifier.RetryEverything` | Contains no specific rules; every exception is classified as `Transient`. |
 | `On<TException>(Verdict)` | Assigns a fixed verdict to a specific exception type and its subclasses. |
 | `On<TException>(Func<TException, Verdict>)` | Assigns a verdict based on a predicate that can inspect the exception. |
@@ -33,6 +34,9 @@ Rules are evaluated in reverse order of addition; the most recently added rule t
 | All other statuses | `Ok` |
 
 The `Retry-After` value is supported as both a delta-seconds value and an HTTP date. Both are converted to a `TimeSpan` and floored at zero.
+
+### Database rules
+`Classifier.Data` reads `DbException.IsTransient`, which is implemented by the provider. Providers that do not override this property report `false`, making `Classifier.Data` equivalent to `Classifier.Default`. Resource limits are reported as transient; see [Classify database failures](../features/classification.md#classify-database-failures) for the rule that classifies them as throttling.
 
 ## `Verdict`
 

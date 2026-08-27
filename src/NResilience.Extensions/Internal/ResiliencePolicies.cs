@@ -38,6 +38,12 @@ internal sealed class LiveState
     public RetryBudget? Budget { get; set; }
 }
 
+/// <summary>One registered policy's live guards, as the health check reads them.</summary>
+/// <param name="Name">The registration name.</param>
+/// <param name="Breaker">Its breaker, or null when it has none.</param>
+/// <param name="Budget">Its retry budget, or null when it has none.</param>
+internal sealed record RegisteredGuards(string Name, Breaker? Breaker, RetryBudget? Budget);
+
 /// <inheritdoc cref="IResiliencePolicies" />
 internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
 {
@@ -108,6 +114,26 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
 
         policy = Project(name);
         return true;
+    }
+
+    /// <summary>
+    ///     The live breaker and budget behind every registered name, for the health check.
+    ///     <para>
+    ///         Resolving each name is what creates those objects, so this projects any name that has not
+    ///         been resolved yet - which is cached, validated and idempotent. The alternative is a health
+    ///         check that reports nothing about a policy until the first request happens to use it, which
+    ///         is exactly backwards for a readiness probe.
+    ///     </para>
+    /// </summary>
+    internal IEnumerable<RegisteredGuards> Guards()
+    {
+        foreach (var name in _names.Set.Keys)
+        {
+            TryGet(name, out _);
+
+            if (_live.TryGetValue(name, out var live))
+                yield return new RegisteredGuards(name, live.Breaker, live.Budget);
+        }
     }
 
     private string Registered()

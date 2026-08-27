@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
 using NResilience.Extensions;
 
 namespace NResilience.Docs;
@@ -142,4 +144,60 @@ public sealed class DependencyInjectionDocs
     {
         internal HttpClient Client { get; } = client;
     }
+    [Fact]
+    public async Task Every_breaker_and_budget_can_be_put_on_the_health_endpoint()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        // <snippet:di-health-checks>
+        services.AddResilience(name: "api", policy: Resilience.Http with { Breaker = Api });
+        services.AddHttpClient(name: "orders").AddResilience();
+
+        // One line. Every breaker behind a registered policy, every per-host breaker held by a
+        // client registered with AddResilience(), and every retry budget's utilization.
+        services.AddHealthChecks().AddResilience();
+
+        // </snippet:di-health-checks>
+
+        using var provider = services.BuildServiceProvider();
+        var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected: HealthStatus.Healthy, actual: report.Status);
+        Assert.Equal(expected: "Closed", actual: report.Entries["resilience"].Data["breaker:api"]);
+    }
+
+    [Fact]
+    public void The_health_check_thresholds_and_statuses_are_configurable()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        // <snippet:di-health-checks-configured>
+        // An open breaker reports Degraded by default: the dependency is down and this process is
+        // shedding load correctly, so reporting Unhealthy invites an orchestrator to restart a pod
+        // that is working. Override it when the process genuinely cannot serve without that
+        // dependency.
+        services.AddHealthChecks().AddResilience(configure: o =>
+        {
+            o.BreakerOpenStatus = HealthStatus.Unhealthy;
+            o.BudgetThreshold = 0.75;
+            o.Watch(name: "payments", breaker: Payments);
+        });
+
+        // </snippet:di-health-checks-configured>
+
+        using var provider = services.BuildServiceProvider();
+        Assert.NotNull(@object: provider.GetRequiredService<HealthCheckService>());
+    }
+
+    /// <summary>
+    ///     Breakers live in static fields, because a breaker created per call has its state discarded
+    ///     per call and can never open. NRES005 says so at build time - including in this project,
+    ///     which is analyzed exactly as a consumer's would be.
+    /// </summary>
+    private static readonly Breaker Api = new() { Name = "api" };
+
+    /// <summary>A breaker held the way a hand-built policy holds one, which DI cannot find on its own.</summary>
+    private static readonly Breaker Payments = new() { Name = "payments" };
 }

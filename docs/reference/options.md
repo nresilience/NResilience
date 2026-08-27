@@ -108,6 +108,26 @@ Set exactly one of `PermitsPerSecond`, `Permits` with `Window`, or `Concurrency`
 
 Call `AcquireOrThrowAsync` inside the callback you hand to `RunAsync`, so the permit is taken once per attempt.
 
+## `AddResilience` on `IHealthChecksBuilder`
+
+| Overload | Description |
+| :--- | :--- |
+| `AddResilience(string name = "resilience", Action<ResilienceHealthOptions>? configure = null, IEnumerable<string>? tags = null)` | Registers a health check reporting every breaker's state and every retry budget's utilization. Validates the options eagerly, so a bad threshold fails at startup rather than on the first probe. |
+
+`ResilienceHealthChecksBuilderExtensions.DefaultName` is the name used when none is given. See [Health checks](../di/health-checks.md).
+
+## `ResilienceHealthOptions`
+
+| Member | Default | Description |
+| :--- | :--- | :--- |
+| `BreakerOpenStatus` | `Degraded` | `Degraded` instead of `Unhealthy`. An open breaker indicates a dependency is down and the process is shedding load correctly. |
+| `BudgetExhaustedStatus` | `Degraded` | What a retry budget at or above `BudgetThreshold` reports. |
+| `BudgetThreshold` | `0.9` | The utilization at which a budget counts as exhausted, from just above 0 to 1. |
+| `IncludeHttpClients` | `true` | Whether the per-host breakers and budgets held by clients registered with `AddResilience()` are included. |
+| `Watch(string name, Breaker breaker)` | - | Also report a breaker the container does not own, such as one in a `static readonly` field. Returns these options. |
+| `Watch(string name, RetryBudget budget)` | - | Also report a retry budget the container does not own. Returns these options. |
+| `Validate()` | - | Throws `ResilienceConfigurationException` listing every problem at once. |
+
 ## `ResilienceTelemetry`
 
 `ResilienceTelemetry` is a `static class` that provides access to the library's instrumentation.

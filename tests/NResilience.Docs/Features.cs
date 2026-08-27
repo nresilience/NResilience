@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Net;
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Testing;
@@ -182,6 +183,48 @@ public sealed class Features
     }
 
     [Fact]
+    public async Task A_database_failure_is_classified_by_the_provider_that_raised_it()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var calls = Sequence.For<int>().Throws(exception: new TransientDbException()).Returns(result: 1);
+
+        // <snippet:classifier-data>
+        // Classifier.Data reads DbException.IsTransient, which maintained ADO.NET providers
+        // implement. This avoids using a driver package or a manual table of error numbers.
+        // Providers that do not implement this property report false, making Classifier.Data
+        // equivalent to Classifier.Default.
+        var db = Resilience.Default with
+        {
+            Classify = Classifier.Data,
+            Backoff = Backoff.Constant(delay: TimeSpan.FromMilliseconds(value: 50)),
+        };
+
+        // </snippet:classifier-data>
+
+        Assert.Equal(expected: 1, actual: await db.RunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken));
+    }
+
+    [Fact]
+    public void A_resource_limit_can_be_called_throttling_with_one_rule_of_your_own()
+    {
+        // <snippet:classifier-data-throttled>
+        // Providers cannot distinguish between a dependency failing and one defending itself.
+        // For example, Azure SQL reports resource limits as 10928 and 10929. Both are
+        // throttling: they use a long backoff curve and do not count as evidence against the
+        // dependency's health.
+        var classify = Classifier.Data.On<SqlLikeException>(e => e.Number is 10928 or 10929
+            ? Verdict.Throttled()
+            : Classifier.Data.ClassifyException(exception: e));
+
+        var db = Resilience.Default with { Classify = classify };
+
+        // </snippet:classifier-data-throttled>
+
+        Assert.Equal(expected: VerdictKind.Throttled, actual: db.Classify.ClassifyException(exception: new SqlLikeException(number: 10928)).Kind);
+        Assert.Equal(expected: VerdictKind.Transient, actual: db.Classify.ClassifyException(exception: new SqlLikeException(number: 4060)).Kind);
+    }
+
+    [Fact]
     public async Task A_result_rule_classifies_what_a_call_returned()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -247,6 +290,20 @@ public sealed class Features
     internal sealed record Reply(string Code);
 
     internal sealed class MyDbException : Exception;
+
+    /// <summary>Reports itself transient, the way a maintained ADO.NET provider does.</summary>
+    internal sealed class TransientDbException() : DbException(message: "the connection reset")
+    {
+        public override bool IsTransient => true;
+    }
+
+    /// <summary>Stands in for SqlException, whose Number is what tells a resource limit from a fault.</summary>
+    internal sealed class SqlLikeException(int number) : DbException(message: $"error {number}")
+    {
+        public override bool IsTransient => true;
+
+        public int Number { get; } = number;
+    }
 
     private sealed class TokenSource
     {

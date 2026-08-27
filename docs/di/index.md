@@ -38,6 +38,7 @@ Calling `AddResilience` performs the following actions:
 - Configures the client so that `HttpClient.Timeout` does not compete with the policy deadline.
 - Names the policy after the client for better observability.
 - Attaches the [telemetry](telemetry.md) meter and the [log listener](logging.md).
+- Records the handler so [health checks](health-checks.md) can report its per-host breakers.
 
 ## Register named policies
 

@@ -86,6 +86,52 @@ To ensure that scripted delays are handled deterministically and do not introduc
 | `CallCount` | How many attempts reached the handler. |
 | `CaptureBodies` | Whether `SentRequest.Body` is populated. Off by default; reading a body buffers it. |
 
+## `Chaos`
+
+`Chaos` is a `record` describing a fault-injection profile. It wraps the callback, not the policy, so an injected outcome is classified, retried, counted against the breaker, and logged exactly like a real one. See [Fault injection](../testing/fault-injection.md).
+
+| Member | Default | Description |
+| :--- | :--- | :--- |
+| `Chaos.None` | - | Injects nothing. `Inject` hands the callback back unwrapped. |
+| `Enabled` | `false` | The master switch. While `false`, `Inject` returns the callback it was given. |
+| `FaultRate` | `0` | The fraction of calls that fail, from 0 to 1. |
+| `Fault` | `null` | `Func<Exception>`. What a failing call throws. `null` throws an `IOException`, which both shipped classifiers call `Transient`. |
+| `LatencyRate` | `0` | The fraction of calls that are slowed, from 0 to 1. |
+| `Latency` | `TimeSpan.Zero` | How much slower a slowed call is. Served on the attempt's token, so `AttemptTimeout` cuts it short. |
+| `Gate` | `null` | `Func<bool>`. Asked before every roll; `false` leaves the call alone and does not consume the random stream. |
+| `Seed` | `null` | Fixes the random stream, so an injected count is repeatable. |
+| `Time` | `TimeProvider.System` | The clock the injected latency is served against. |
+| `Validate()` | - | Throws `ResilienceConfigurationException` listing every problem at once. |
+| `Validated()` | - | Runs `Validate()` and returns this profile. |
+
+The two rates are rolled independently, so a call can be both slowed and failed.
+
+## `ChaosExtensions`
+
+| Member | Description |
+| :--- | :--- |
+| `Inject<T>(Func<CancellationToken, Task<T>> work)` | Wraps the callback. A failing call throws. |
+| `Inject<T>(Func<CancellationToken, Task<T>> work, Func<T> outcome)` | The same, but a failing call returns `outcome()` rather than throwing - so the classifier's *result* rules are what judge it. |
+| `Inject(Func<CancellationToken, Task> work)` | The void form. |
+| `Inject<T>(Func<CancellationToken, ValueTask<T>> work)` | The `ValueTask` form. An inert roll awaits the callback's own `ValueTask` and nothing else. |
+| `Inject<T>(Func<CancellationToken, ValueTask<T>> work, Func<T> outcome)` | The `ValueTask` form with result substitution. |
+| `Inject(Func<CancellationToken, ValueTask> work)` | The void `ValueTask` form. |
+
+Every overload validates the profile eagerly and returns a callback of the shape it was given. A disabled profile returns the callback itself, so `Inject` costs one branch at composition time and nothing per call.
+
+## `ChaosHandler`
+
+`ChaosHandler` is a `DelegatingHandler` that injects into an `HttpClient` pipeline. Add it **after** `AddResilience()`, which makes it inner to the resilience handler so the policy sees the injected faults.
+
+| Member | Description |
+| :--- | :--- |
+| `ChaosHandler(Chaos chaos, Func<HttpResponseMessage>? response = null)` | Creates the handler. `response`, when supplied, is returned by a failing request instead of throwing; it is called once per injected failure and must produce a fresh response each time. |
+| `Chaos` | The profile this handler was built with. |
+| `Injected` | How many requests have been failed. |
+| `Slowed` | How many requests have been slowed. |
+
+Chaos applies only to the asynchronous path. This is not a limitation in practice: `ResilienceHandler.Send` throws `NotSupportedException`, so pipelines with policies have no synchronous path.
+
 ## `SentRequest`
 
 `SentRequest` is a `record` that captures what one attempt sent, before `HttpClient` disposed the message.

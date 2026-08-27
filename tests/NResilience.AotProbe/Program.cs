@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using NResilience.Extensions;
@@ -400,6 +401,11 @@ internal static class Program
         services.AddResilience(configuration.GetSection("Resilience"));
         services.AddHttpClient("probe").AddResilience("api", o => o.OwnTransportTimeout = true);
 
+        // The health check registers through an explicit factory rather than AddCheck<T>(), which
+        // resolves through ActivatorUtilities. Publishing proves that compiled; running the check
+        // and reading a row out of it is what proves nothing on the path needed reflection.
+        services.AddHealthChecks().AddResilience();
+
         using var provider = services.BuildServiceProvider();
         var policies = provider.GetRequiredService<IResiliencePolicies>();
 
@@ -414,6 +420,12 @@ internal static class Program
 
         var result = await api.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("a resolved policy executes under AOT", result == Gate.Value);
+
+        var health = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync().ConfigureAwait(false);
+        var resilience = health.Entries["resilience"];
+
+        failures += Check("the health check runs under AOT", resilience.Status == HealthStatus.Healthy);
+        failures += Check("the health check reports the configured breaker", resilience.Data.ContainsKey("breaker:api"));
 
         // Publishing proves [LoggerMessage] compiled; only running proves the generator ran and the
         // record reached a provider. 1004 is CallSucceeded, raised to Information by the Verbose

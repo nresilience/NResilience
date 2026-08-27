@@ -117,8 +117,17 @@ public sealed class RetryBudget
     /// </summary>
     public bool IsAutomatic => _isAutomatic;
 
-    /// <summary>True for <see cref="None" />, which the executor skips entirely.</summary>
-    internal bool IsNone => _time is null && !_isAutomatic;
+    /// <summary>
+    ///     True for <see cref="None" />, which the executor skips entirely.
+    ///     <para>
+    ///         Public for the same reason <see cref="IsAutomatic" /> is: neither <see cref="None" /> nor
+    ///         <see cref="Automatic" /> is a bucket, so anything reporting on budgets - a dashboard, a
+    ///         health endpoint - has to be able to tell a marker from a real one before reading
+    ///         <see cref="Utilization" /> and finding a zero that means "not applicable" rather than
+    ///         "nothing spent".
+    ///     </para>
+    /// </summary>
+    public bool IsNone => _time is null && !_isAutomatic;
 
     /// <summary>A budget private to whoever holds this instance.</summary>
     /// <param name="fraction">

@@ -241,3 +241,7 @@ To keep your tests fast and deterministic, follow these practices:
 
 - **Disable backoff or fake the clock**. Use `Backoff = Backoff.None` to make retry tests instantaneous. If your test specifically asserts on timing or delays, use `FakeTimeProvider`.
 - **Assert on the attempt log**. Instead of using a stopwatch to verify retries, inspect `result.Attempts`. This log provides a deterministic record of how many attempts ran, their classifications, and the delays that preceded them.
+
+## Inject faults on purpose
+
+The tools above script a dependency's behavior exactly. When what you want instead is a *rate* - one call in ten fails, one in five is slow - see [Fault injection](fault-injection.md). It wraps the callback rather than the policy, so an injected failure is classified, retried, and logged exactly like a real one.
