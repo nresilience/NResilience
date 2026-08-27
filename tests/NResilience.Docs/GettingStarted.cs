@@ -140,8 +140,8 @@ public sealed class GettingStarted
         var id = 1;
 
         // <snippet:reference-valuetask-callback>
-        // ReadAsync returns a ValueTask, so this binds to the ValueTask overload. A read that is
-        // already buffered allocates nothing at all.
+        // ReadAsync returns a ValueTask, so this binds to the ValueTask overload. 
+        // Buffered reads allocate nothing.
         var buffered = await api.RunAsync(
             static (source, attempt) => source.ReadAsync(cancellationToken: attempt),
             state: feed,

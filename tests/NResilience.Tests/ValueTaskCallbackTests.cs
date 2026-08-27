@@ -4,14 +4,13 @@ using NResilience.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-///     Tests for the <see cref="ValueTask" />-returning callback overloads.
+///     Tests for <see cref="ValueTask" />-returning callback overloads.
 ///     <para>
-///         The subject is not "does a ValueTask work" but "does a callback that hands back a pooled
-///         <see cref="IValueTaskSource" /> survive being retried". A <see cref="ValueTask" /> may be
-///         awaited exactly once, so a loop that held on to attempt one's would pass every test written
-///         against a <see cref="Task" />-returning callback and fail only in production. Every retrying
-///         test here is therefore driven by a source that recycles its token, the way
-///         <c>Socket</c> and <c>Channel</c> do.
+///         These tests specifically verify that callbacks returning a pooled 
+///         <see cref="IValueTaskSource" /> survive retries. Because a <see cref="ValueTask" /> 
+///         can be awaited only once, a loop that incorrectly retains a <see cref="ValueTask" /> 
+///         from a previous attempt would fail. These tests use a source that recycles its 
+///         token, mimicking the behavior of <c>Socket</c> and <c>Channel</c>.
 ///     </para>
 /// </summary>
 public sealed class ValueTaskCallbackTests
@@ -210,11 +209,11 @@ public sealed class ValueTaskCallbackTests
         }
     }
 
-    /// <summary>
-    ///     An <see cref="IValueTaskSource{TResult}" /> that recycles one core across calls, the way the
-    ///     pooled sources in the BCL do. Reading it twice from one handed-out token throws, which is the
-    ///     property these tests exist to hold the executor to.
-    /// </summary>
+/// <summary>
+///     An <see cref="IValueTaskSource{TResult}" /> that recycles a single core across calls, 
+///     simulating BCL pooled sources. Awaiting the same token twice throws, which allows these 
+///     tests to verify that the executor does not re-await <see cref="ValueTask" /> objects.
+/// </summary>
     private sealed class PooledSource(int failuresPerCall, bool suspend = false) : IValueTaskSource<int>
     {
         public const int Value = 42;

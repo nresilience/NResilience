@@ -47,12 +47,11 @@ public sealed class AttemptTokenTests
         Assert.Contains("'Helper' takes a cancellation token", reported.GetMessage(), StringComparison.Ordinal);
     }
 
-    /// <summary>
-    ///     The <c>ValueTask</c> execution overloads are extension methods rather than members of
-    ///     <c>Resilience</c>, and a rule that matched only the record's own methods would fall silent on
-    ///     them. That would leave the shape a caller reached for to save an allocation as the one shape
-    ///     with no guard on the failure this rule exists for.
-    /// </summary>
+/// <summary>
+///     The <c>ValueTask</c> execution overloads are extension methods, not members of <c>Resilience</c>. 
+///     A rule that only matches record methods would ignore these overloads, leaving the zero-allocation 
+///     path without the guard this rule provides.
+/// </summary>
     [Fact]
     public void A_ValueTask_callback_is_an_execution_overload_too()
     {

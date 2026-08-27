@@ -51,7 +51,7 @@ The `Resilience` record provides methods to execute calls with the defined resil
 | `Validate()` | `void` |
 | `Validated()` | `Resilience` |
 
-Each of the eight execution overloads has a counterpart that takes a `ValueTask`-returning callback, for `Channel`, `PipeReader`, `Socket`, `Stream` and anything else built on `IValueTaskSource`. They carry the same names and the same argument order:
+The eight execution overloads have counterparts that take `ValueTask`-returning callbacks, for `Channel`, `PipeReader`, `Socket`, `Stream` and anything else built on `IValueTaskSource`. These counterparts use the same names and argument order:
 
 | Method | Return Type |
 | :--- | :--- |
@@ -64,12 +64,12 @@ Each of the eight execution overloads has a counterpart that takes a `ValueTask`
 | `TryRunAsync<TState, T>(…)` | `ValueTask<CallResult<T>>` |
 | `TryRunAsync<TState>(…)` | `ValueTask<CallResult>` |
 
-These are extension methods on `Resilience`, declared in the `NResilience` namespace, so they need no `using` beyond the one that brings `Resilience` itself into scope. A lambda that returns a `ValueTask` binds to them; an `async` lambda binds to the `Task` overload above, because C# considers an extension method only when no instance method applies.
+These extension methods are declared in the `NResilience` namespace, so they require no `using` statement beyond the one for `Resilience`. A lambda that returns a `ValueTask` binds to these methods. An `async` lambda binds to the `Task` overload because C# evaluates extension methods only when no instance method applies.
 
 <!-- snippet: reference-valuetask-callback -->
 ```csharp
-// ReadAsync returns a ValueTask, so this binds to the ValueTask overload. A read that is
-// already buffered allocates nothing at all.
+// ReadAsync returns a ValueTask, so this binds to the ValueTask overload. 
+// Buffered reads allocate nothing.
 var buffered = await api.RunAsync(
     static (source, attempt) => source.ReadAsync(cancellationToken: attempt),
     state: feed,
@@ -80,7 +80,7 @@ var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationTo
 ```
 <!-- endsnippet -->
 
-To put an `async` lambda on the `ValueTask` path, give it an explicit return type: `async ValueTask<int> (ct) => …`. There is rarely a reason to, because an `async` lambda allocates its own state machine either way. See [where the allocations are](../deep-dives/allocations.md) for what the overloads save and why they are shaped this way.
+To use the `ValueTask` path with an `async` lambda, provide an explicit return type: `async ValueTask<int> (ct) => …`. This is rarely necessary because an `async` lambda allocates its own state machine regardless of the return type. See [where the allocations are](../deep-dives/allocations.md) for what the overloads save and why they are shaped this way.
 
 ### Execution behavior
 

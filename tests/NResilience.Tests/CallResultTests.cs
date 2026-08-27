@@ -167,13 +167,14 @@ public sealed class CallResultTests
     }
 
     /// <summary>
-    ///     A value an earlier attempt returned survives a later attempt that throws. This is what
-    ///     <see cref="CallResult{T}.Value" /> promises - an answer the policy judged a failure is still
-    ///     an answer, and for an <c>HttpResponseMessage</c> it is one the caller has to dispose.
+    ///     Verifies that a value returned by an earlier attempt is preserved even if a later 
+    ///     attempt throws. <see cref="CallResult{T}.Value" /> ensures that a result judged as 
+    ///     a failure is still available, which is critical for disposing resources like 
+    ///     <c>HttpResponseMessage</c>.
     ///     <para>
-    ///         Characterisation rather than decoration: the executor threads the attempt's result
-    ///         through the invoker, and doing that with an <c>out</c> parameter instead of a
-    ///         <c>ref</c> one clears this slot at the start of every attempt. Nothing else notices.
+    ///         The executor threads the attempt's result through the invoker. Using a <c>ref</c> 
+    ///         parameter instead of <c>out</c> prevents the slot from being cleared at the start 
+    ///         of each attempt.
     ///     </para>
     /// </summary>
     [Fact]
@@ -198,7 +199,7 @@ public sealed class CallResultTests
         Assert.Equal(503, result.Value);
     }
 
-    /// <summary>The same, through a <see cref="ValueTask" />-returning callback.</summary>
+    /// <summary>Verifies the same behavior using a <see cref="ValueTask" />-returning callback.</summary>
     [Fact]
     public async Task A_value_from_an_earlier_ValueTask_attempt_outlives_a_later_one_that_threw()
     {

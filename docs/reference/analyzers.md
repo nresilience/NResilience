@@ -99,7 +99,7 @@ This is reported only for `using` forms where the client provably does not outli
 
 ## NRES007: Redundant async callback
 
-This rule is reported when a callback is marked `async` but only contains a single `await` whose task the callback can hand back as it is. Removing the `async` keyword avoids the allocation of an unnecessary state machine.
+This rule reports when a callback is marked `async` but only contains a single `await` whose task the callback can return directly. Removing the `async` keyword avoids the allocation of an unnecessary state machine.
 
 ```csharp
 // Reported: unnecessary state machine for a single await.
@@ -109,7 +109,7 @@ await api.RunAsync(async attempt => await client.GetAsync(url, attempt), cancell
 await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 ```
 
-A callback that awaits a `ValueTask` is reported too, and it has more to save. Dropping `async` there re-binds the call to the [`ValueTask` overloads](resilience.md#methods), so the callback stops building both a state machine and a task for a result it already had:
+This rule also reports callbacks that await a `ValueTask`, providing additional savings. Removing `async` re-binds the call to the [`ValueTask` overloads](resilience.md#methods), eliminating both the state machine and the task allocation for synchronously completing calls:
 
 ```csharp
 // Reported: the state machine, plus a task built for a buffered read.
@@ -119,10 +119,10 @@ await api.RunAsync(async attempt => await reader.ReadAsync(attempt), cancellatio
 await api.RunAsync(attempt => reader.ReadAsync(attempt), cancellationToken);
 ```
 
-Two shapes are left alone because the rewrite would change more than the allocation:
+Two patterns are ignored to avoid changing the program's behavior:
 
-- A callback whose return type is **written down**, such as `async Task<int> (attempt) => await reader.ReadAsync(attempt)`. The written type pins the rewritten body rather than resolving the call again, so the `ValueTask` body would not compile under it.
-- A callback that **discards** a `ValueTask<T>` result, such as `async attempt => { await reader.ReadAsync(attempt); }`. That rewrite compiles, but it moves the call from the void overload to the generic one, and the result would start reaching the [classifier](classifier.md).
+- A callback whose return type is **written down**, such as `async Task<int> (attempt) => await reader.ReadAsync(attempt)`. The explicit return type prevents the compiler from re-resolving the call, so a `ValueTask` body would not compile.
+- A callback that **discards** a `ValueTask<T>` result, such as `async attempt => { await reader.ReadAsync(attempt); }`. While this rewrite compiles, it moves the call from the void overload to the generic one, causing the result to be passed to the [classifier](classifier.md).
 
 For details on allocations, see [where the allocations are](../deep-dives/allocations.md).
 

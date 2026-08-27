@@ -7,9 +7,8 @@ using Microsoft.CodeAnalysis.Operations;
 namespace NResilience.Analyzers;
 
 /// <summary>
-///     NRES007: <c>async attempt =&gt; await Work(attempt)</c> pays for a state machine that the
-///     execution overloads never needed, because they take the callback's task directly - in either
-///     shape, since there is a <c>ValueTask</c> overload set beside the <c>Task</c> one.
+///     NRES007: async attempt => await Work(attempt) allocates an unnecessary state machine. 
+///     The execution overloads accept the task directly, regardless of whether it is a Task or ValueTask.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
@@ -79,13 +78,12 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
     /// <summary>
     ///     Whether dropping <c>async</c> lands the callback on the <c>ValueTask</c> overload set.
     ///     <para>
-    ///         Those overloads are extension methods, so the async lambda in front of us bound to the
-    ///         <c>Task</c> instance overload - an async lambda is applicable to it, and C# never looks
-    ///         for an extension method while an instance method applies. Take the <c>async</c> away and
-    ///         the lambda returns a <c>ValueTask</c>, which is applicable to no instance overload, so
-    ///         resolution reaches the extension. The call keeps its name, its arguments and its
-    ///         behavior, and stops building a state machine and a task for a value the callback already
-    ///         had.
+    ///         These overloads are extension methods. An async lambda binds to the Task instance 
+    ///         overload because C# prioritizes instance methods over extension methods. Removing 
+    ///         async causes the lambda to return a ValueTask, which matches no instance overload, 
+    ///         forcing the compiler to use the extension method. This preserves the call's name 
+    ///         and behavior while eliminating the state machine and task allocation for 
+    ///         synchronously completing calls.
     ///     </para>
     /// </summary>
     /// <param name="known">Resolved symbols. The rewrite needs the <c>ValueTask</c> overloads to exist.</param>

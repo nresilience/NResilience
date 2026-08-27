@@ -94,10 +94,9 @@ internal static class Diagnostics
         "This callback awaits a single call; returning its task directly saves a state-machine allocation on every attempt",
         Performance,
         DiagnosticSeverity.Info,
-        "Every async method that actually awaits allocates a state machine. A callback of the form " +
-        "'async attempt => await Work(attempt)' adds one to every attempt for nothing, because the " +
-        "execution overloads take the callback's task directly - a Task-returning delegate, or a " +
-        "ValueTask-returning one, under the same name.");
+        "Every async method that awaits allocates a state machine. A callback like " +
+        "'async attempt => await Work(attempt)' adds an unnecessary allocation to every attempt, because the " +
+        "execution overloads accept the task directly (whether Task-returning or ValueTask-returning).");
 
     private static DiagnosticDescriptor Rule(
         string id,

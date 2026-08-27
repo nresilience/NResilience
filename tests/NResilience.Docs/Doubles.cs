@@ -34,7 +34,7 @@ internal static class Doubles
                 : Task.FromResult(result: name);
     }
 
-    /// <summary>A read whose first answer is already buffered, the way a channel or a pipe behaves.</summary>
+    /// <summary>Simulates a read where the first result is already buffered, similar to a channel or pipe.</summary>
     internal sealed class Feed(string name)
     {
         internal int Reads { get; private set; }

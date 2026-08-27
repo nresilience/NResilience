@@ -31,25 +31,25 @@ A full policy on the synchronous path cannot be completely allocation-free due t
 
 To support attempt timeouts, the callback must receive a token that can be cancelled. The executor cannot determine if a timeout will be necessary until after the callback returns, meaning the cancellation source must be created before the call. 
 
-Furthermore, the executor cannot hand out the pooled timer source's own token because `TryReset` preserves token identity. If a callback outlived its attempt, it would observe the cancellation of the *next* operation. To prevent this, the executor creates one linked source per attempt. This linked source constitutes the allocation floor of 64 bytes (with a 72-byte ceiling).
+Furthermore, the executor cannot hand out the pooled timer source's own token because `TryReset` preserves token identity. If a callback outlived its attempt, it would observe the cancellation of the *next* operation. To prevent this, the executor creates one linked source per attempt. The linked source creates an allocation floor of 64 bytes (with a 72-byte ceiling).
 
-A design that hands out its pooled token reaches 24 bytes here, which is the exact hazard this design refuses.
+A design that hands out its pooled token reduces this to 24 bytes, creating the hazard this design avoids.
 
 ## Callbacks that return `ValueTask`
 
-A callback that returns `ValueTask` costs the executor exactly what a `Task`-returning one does. Both shapes share a single attempt loop and a single hoisted awaiter field, so the suspending figure is identical to the byte.
+A callback that returns `ValueTask` has the same cost as a `Task`-returning one. Both shapes share a single attempt loop and a single hoisted awaiter field, so the suspending figure is identical to the byte.
 
-What differs is the callback's own allocation. A `ValueTask` backed by an `IValueTaskSource` - the shape `Socket`, `Channel`, `PipeReader` and `Stream` hand out - allocates nothing when it completes synchronously. Converting one to a `Task` costs 72 bytes to build a task for an answer already in hand, so a callback written `ct => reader.ReadAsync(ct).AsTask()` pays that on every call. The `ValueTask` overloads hand the answer straight to the attempt loop instead:
+The difference lies in the callback's own allocation. A `ValueTask` backed by an `IValueTaskSource` - the shape `Socket`, `Channel`, `PipeReader` and `Stream` hand out - allocates nothing when it completes synchronously. Converting one to a `Task` costs 72 bytes to build a task for an answer already in hand, so a callback written `ct => reader.ReadAsync(ct).AsTask()` pays that on every call. The `ValueTask` overloads pass the result directly to the attempt loop instead:
 
 | Sync-completing callback, trivial policy | Total allocation |
 | :--- | :---: |
 | `ValueTask` callback | **0 B** |
 | The same callback via `.AsTask()` | 72 B |
 
-The executor reaches this without an `await` on a second awaitable type. A hoisted awaiter field belongs to the generated state-machine *type*, so awaiting a `ValueTask` anywhere in the loop's source would enlarge the box for every caller, whichever shape they passed. Instead the invoker hands back `null` when the callback already has its result, and the loop reads it from a variable it already keeps. A `ValueTask` that genuinely suspends is converted to a `Task`, which costs the one allocation a `Task`-returning callback would have made anyway.
+The executor reaches this without an `await` on a second awaitable type. A hoisted awaiter field belongs to the generated state-machine type, so awaiting a `ValueTask` anywhere in the loop's source would enlarge the box for every caller, whichever shape they passed. Instead the invoker hands back `null` when the callback already has its result, and the loop reads it from a variable it already keeps. A `ValueTask` that genuinely suspends is converted to a `Task`, which costs the one allocation a `Task`-returning callback would have made anyway.
 
 > [!NOTE]
-> The `ValueTask` overloads are extension methods rather than members of `Resilience`. An `async` lambda converts to both delegate shapes with neither conversion better, so declaring both as instance overloads would make `async ct => await client.GetAsync(url, ct)` fail to compile. C# searches for an extension method only when no instance method applies, so an `async` lambda binds to the `Task` overload and a lambda that returns a `ValueTask` finds the extension. Both are called `RunAsync`, and neither needs a `using`.
+> The `ValueTask` overloads are extension methods rather than members of `Resilience`. An `async` lambda converts to both delegate shapes with neither conversion better, so declaring both as instance overloads would make `async ct => await client.GetAsync(url, ct)` fail to compile. C# searches for an extension method only when no instance method applies. Consequently, an `async` lambda binds to the `Task` overload, while a lambda that returns a `ValueTask` binds to the extension. Both are called `RunAsync`, and neither needs a `using`.
 
 ## Telemetry costs
 

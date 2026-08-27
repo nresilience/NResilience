@@ -567,11 +567,11 @@ internal static class Program
         // own token must never be handed to user code.
         failures += Check("no AOT cliff: an attempt timeout still costs exactly one linked source", defaultSync - rawSync <= 72);
 
-        // The ValueTask callback surface, measured against its own raw baseline: a Task-returning
-        // callback builds a task the ValueTask one never does, so subtracting the Task baseline here
-        // would credit the executor with a saving the callback made. Native AOT has no tiered JIT,
-        // so the escape analysis that flatters the Task arms under the JIT does not run - which makes
-        // this the environment where a ValueTask cliff would show up if there were one.
+        // Measure the ValueTask callback surface against its own raw baseline. A Task-returning callback 
+        // allocates a task that a ValueTask callback does not; using a Task baseline would incorrectly 
+        // attribute the callback's saving to the executor. Native AOT lacks a tiered JIT, so the escape 
+        // analysis that optimizes Task allocations under the JIT does not run. This environment 
+        // reveals any ValueTask-related allocation cliffs.
         var rawValueSync = await MeasureAsync("raw ValueTask callback (sync)", Scenarios.RawValueSync, AllocationCounter.ThreadLocal)
             .ConfigureAwait(false);
 
