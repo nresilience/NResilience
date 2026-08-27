@@ -161,7 +161,7 @@ public sealed class Guides
     {
         var result = await policy.TryRunAsync(attempt => FetchAsync(client: Client, cache: cache, cancellationToken: attempt), cancellationToken: cancellationToken);
 
-        return result.TryGetValue(value: out var user) ? user : cache.LastKnownGood;
+        return result.TryGetValue(value: out var user) && user is not null ? user : cache.LastKnownGood;
     }
 
     // </snippet:guide-translating-a-layered-pipeline>
