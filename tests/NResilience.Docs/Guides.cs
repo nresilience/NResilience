@@ -11,6 +11,8 @@ namespace NResilience.Docs;
 /// <summary>The complete examples the guides are built around.</summary>
 public sealed class Guides
 {
+    private static readonly HttpClient Client = new();
+
     [Fact]
     public async Task Retry_an_http_call_end_to_end()
     {
@@ -108,6 +110,85 @@ public sealed class Guides
     }
 
     private sealed record Order(string Id, string Status);
+
+    [Fact]
+    public async Task A_layered_pipeline_translates_to_hooks_and_a_call_site_branch()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var tokens = new TokenSource();
+        var cache = new UserCache(lastKnownGood: new User(Name: "cached"));
+        var policy = TranslatedPolicy(cache: cache, tokens: tokens);
+
+        var served = await ReadUserAsync(policy: policy, cache: cache, cancellationToken: cancellationToken);
+
+        Assert.Equal(expected: "cached", actual: served.Name);
+        Assert.Equal(expected: 1, actual: tokens.Refreshes);
+    }
+
+    // <snippet:guide-translating-a-layered-pipeline>
+    // A traditional pipeline stacks four middleware layers around the call:
+    //   auth-refresh -> cache-check -> retry/timeout -> fallback.
+    // The flat executor has no chain, so each concern moves to a targeted
+    // insertion point, and the fallback becomes a branch at the call site.
+    private static Resilience TranslatedPolicy(UserCache cache, TokenSource tokens) =>
+        Resilience.Http with
+        {
+            // The outermost layer - "refresh the token before the call" - maps to
+            // BeforeAttempt. It runs before every attempt, outside the classified
+            // region. If the auth server is down, the exception escapes the loop
+            // instead of being retried, which is the behavior an outer middleware
+            // layer would have given.
+            BeforeAttempt = next => tokens.RefreshAsync(cancellationToken: next.CancellationToken),
+        };
+
+    // The callback is the seam for everything that returns a value or needs to
+    // run inside the classified region. A cache check belongs here, not in Admit:
+    // Admit returns a verdict (admit or refuse), and a cache hit is a value, not
+    // a verdict. Checking the cache at the top of the callback serves the hit
+    // without calling the dependency, and a miss falls through to the real call.
+    private static async Task<User?> FetchAsync(HttpClient client, UserCache cache, CancellationToken cancellationToken)
+    {
+        if (cache.TryGet(out var cached))
+            return cached;
+
+        return await client.GetFromJsonAsync<User>(requestUri: new Uri(uriString: "https://api.example.com/users/1"), cancellationToken: cancellationToken);
+    }
+
+    // The outermost layer in a pipeline is usually a fallback. The flat executor
+    // has no outermost layer, so the fallback is an `if` at the call site:
+    // TryRunAsync hands back the outcome, and the caller branches on it.
+    private static async Task<User> ReadUserAsync(Resilience policy, UserCache cache, CancellationToken cancellationToken)
+    {
+        var result = await policy.TryRunAsync(attempt => FetchAsync(client: Client, cache: cache, cancellationToken: attempt), cancellationToken: cancellationToken);
+
+        return result.TryGetValue(value: out var user) ? user : cache.LastKnownGood;
+    }
+
+    // </snippet:guide-translating-a-layered-pipeline>
+
+    private sealed class TokenSource
+    {
+        internal int Refreshes { get; private set; }
+
+        internal Task RefreshAsync(CancellationToken cancellationToken)
+        {
+            Refreshes++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class UserCache(User lastKnownGood)
+    {
+        internal User LastKnownGood { get; } = lastKnownGood;
+
+        internal bool TryGet(out User cached)
+        {
+            cached = LastKnownGood;
+            return true;
+        }
+    }
+
+    private sealed record User(string Name);
 
     // <snippet:guide-protect-a-dependency>
     public sealed class Dependencies

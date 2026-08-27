@@ -75,6 +75,31 @@ You can skip bulkheads if you have:
 - **Service mesh** - a service mesh like Istio/Envoy handles isolation at the infrastructure layer
 - **Separate pods per dependency** - each pod connects to only one database or service
 
+## Size a local limit for a fleet
+
+A bulkhead bounds concurrency inside one process. The limit you configure is per pod, not per fleet. When your deployment scales horizontally, the aggregate concurrency against an external dependency is the per-pod limit multiplied by the replica count.
+
+The per-process design is deliberate: a local limit needs no coordination, so it stays fast. The trade-off is that the library cannot see the fleet, which means sizing the local limit for the fleet is your responsibility, not the library's.
+
+To size the limit, start from the external dependency's capacity and divide by the number of replicas you run:
+
+```text
+local limit = floor(external capacity / replica count)
+```
+
+Suppose a payment provider allows 1,000 concurrent connections. You expect to run 50 pods. Set the per-pod bulkhead to 20, not 1,000:
+
+```text
+floor(1000 / 50) = 20 concurrent calls per pod
+```
+
+A limit of 1,000 per pod feels safe in a local test, but at 50 pods it is 50,000 concurrent connections against a provider that caps at 1,000 - the provider rejects the overflow with rate-limit errors, and the local bulkhead never tripped once.
+
+Work backwards from the external cap, not forwards from a number that looks right on one machine. If the replica count changes, the local limit must change with it. A horizontal pod autoscaler can make a fixed limit wrong within an hour of deploying it.
+
+> [!IMPORTANT]
+> A local bulkhead protects the process; it does not orchestrate the fleet. For a hard ceiling across a cluster, use a service mesh or an external rate limiter that the dependency provider enforces, and keep the in-process bulkhead as a second line of defense.
+
 ## Implement a bulkhead for HTTP
 
 For HTTP clients registered via dependency injection, the handler can scope a limiter per host automatically:
