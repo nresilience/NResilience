@@ -239,4 +239,98 @@ public sealed class RetryTests
         Assert.Same(thrown, caught);
         Assert.Null(AttemptLog.Of(caught));
     }
+
+    /// <summary>
+    ///     A deadline that is not a whole number of milliseconds still stops the call as a deadline.
+    ///     <para>
+    ///         <c>CancelAfter</c> measures in whole milliseconds, so an attempt bounded by 200.5 ms of
+    ///         remaining deadline is armed for 200 and its ceiling fires half a millisecond before
+    ///         <c>Remaining()</c> will admit the deadline is spent. A loop that reads the clock to decide
+    ///         spends every remaining attempt on that half-millisecond - each one cancelled before it can
+    ///         send anything - and reports <see cref="StopReason.AttemptsExhausted" /> for a call the
+    ///         deadline stopped.
+    ///     </para>
+    ///     <para>
+    ///         Deterministic rather than incidental: after the first attempt, what is left of a deadline
+    ///         is almost never a whole number of milliseconds, so this is the ordinary case and not an
+    ///         edge one. It was found as an intermittent failure of the real-socket integration suite on
+    ///         one platform.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task A_deadline_of_fractional_milliseconds_still_stops_as_a_deadline()
+    {
+        var time = new FakeTimeProvider();
+        var calls = 0;
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var policy = Resilience.Default with
+        {
+            Time = time,
+            Backoff = Backoff.None,
+            AttemptTimeout = Timeout.InfiniteTimeSpan,
+            Deadline = TimeSpan.FromTicks((200 * TimeSpan.TicksPerMillisecond) + (TimeSpan.TicksPerMillisecond / 2)),
+            Attempts = 3,
+            Budget = null,
+        };
+
+        var call = policy.RunAsync(async ct =>
+        {
+            calls++;
+            started.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return 1;
+        });
+
+        await started.Task;
+
+        // Fires the attempt's ceiling, and leaves half a millisecond of deadline on the clock.
+        time.Advance(TimeSpan.FromMilliseconds(200));
+
+        var caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () => await call);
+
+        Assert.Equal(1, calls);
+        Assert.Single(caught.Attempts);
+        Assert.IsType<AttemptTimeoutException>(caught.InnerException);
+    }
+
+    /// <summary>
+    ///     The other side of it: a ceiling that came from <see cref="Resilience.AttemptTimeout" /> is
+    ///     not the deadline, so firing it retries rather than ending the call.
+    /// </summary>
+    [Fact]
+    public async Task An_attempt_timeout_inside_a_longer_deadline_still_retries()
+    {
+        var time = new FakeTimeProvider();
+        var calls = 0;
+
+        var policy = Resilience.Default with
+        {
+            Time = time,
+            Backoff = Backoff.None,
+            AttemptTimeout = TimeSpan.FromMilliseconds(50),
+            Deadline = TimeSpan.FromSeconds(30),
+            Attempts = 3,
+            Budget = null,
+        };
+
+        var result = await policy.TryRunAsync(async ct =>
+        {
+            if (++calls < 3)
+            {
+                var pending = new TaskCompletionSource();
+                await using (ct.Register(() => pending.TrySetCanceled(ct)))
+                {
+                    time.Advance(TimeSpan.FromMilliseconds(50));
+                    await pending.Task;
+                }
+            }
+
+            return 7;
+        });
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(7, result.Value);
+        Assert.Equal(3, calls);
+    }
 }

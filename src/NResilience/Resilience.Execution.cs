@@ -303,6 +303,13 @@ public sealed partial record Resilience
             // alternative is a liveness bug.
             var recorded = false;
 
+            // Whether the ceiling this attempt was given came from the deadline rather than from
+            // AttemptTimeout. Set when that ceiling fires, and read below instead of the clock, which
+            // buys a stop condition that does not depend on two clocks agreeing. Measured at zero: it
+            // is a third bool live across the await and lands in the padding `recorded` and `hasValue`
+            // already leave, so the suspending budgets do not move.
+            var deadlineSpent = false;
+
             try
             {
                 var remaining = Remaining(Time, start, Deadline, bounded);
@@ -391,6 +398,16 @@ public sealed partial record Resilience
                     // classic bug in timeout implementations.
                     verdict = Verdict.Transient;
                     error = new AttemptTimeoutException(effective, canceled);
+
+                    // Effective() hands back whichever of AttemptTimeout and the remaining deadline is
+                    // smaller. When the deadline supplied it, the ceiling that just fired *was* the
+                    // deadline, and that is the fact to stop on - not what the clock says afterwards.
+                    // CancelAfter measures in whole milliseconds, so a deadline with a fractional
+                    // millisecond left on it arms the timer early and Remaining() still reports the
+                    // remainder. Reading the clock instead spends the rest of the attempt budget on
+                    // attempts that are cancelled before they can send anything, and reports
+                    // AttemptsExhausted for a call the deadline stopped.
+                    deadlineSpent = bounded && effective != AttemptTimeout;
                 }
                 catch (RateLimitedException limited)
                 {
@@ -510,7 +527,7 @@ public sealed partial record Resilience
 
                 var left = Remaining(Time, start, Deadline, bounded);
 
-                if (left == TimeSpan.Zero)
+                if (left == TimeSpan.Zero || deadlineSpent)
                 {
                     reason = StopReason.DeadlineExceeded;
                     NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
@@ -657,6 +674,13 @@ public sealed partial record Resilience
 
             var recorded = false;
 
+            // Whether the ceiling this attempt was given came from the deadline rather than from
+            // AttemptTimeout. Set when that ceiling fires, and read below instead of the clock, which
+            // buys a stop condition that does not depend on two clocks agreeing. Measured at zero: it
+            // is a third bool live across the await and lands in the padding `recorded` and `hasValue`
+            // already leave, so the suspending budgets do not move.
+            var deadlineSpent = false;
+
             try
             {
                 var remaining = Remaining(Time, start, Deadline, bounded);
@@ -738,6 +762,7 @@ public sealed partial record Resilience
                 {
                     verdict = Verdict.Transient;
                     error = new AttemptTimeoutException(effective, canceled);
+                    deadlineSpent = bounded && effective != AttemptTimeout;
                 }
                 catch (RateLimitedException limited)
                 {
@@ -831,7 +856,7 @@ public sealed partial record Resilience
 
                 var left = Remaining(Time, start, Deadline, bounded);
 
-                if (left == TimeSpan.Zero)
+                if (left == TimeSpan.Zero || deadlineSpent)
                 {
                     reason = StopReason.DeadlineExceeded;
                     NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
