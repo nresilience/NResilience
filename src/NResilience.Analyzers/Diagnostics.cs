@@ -96,7 +96,8 @@ internal static class Diagnostics
         DiagnosticSeverity.Info,
         "Every async method that actually awaits allocates a state machine. A callback of the form " +
         "'async attempt => await Work(attempt)' adds one to every attempt for nothing, because the " +
-        "execution overloads already take a Task-returning delegate.");
+        "execution overloads take the callback's task directly - a Task-returning delegate, or a " +
+        "ValueTask-returning one, under the same name.");
 
     private static DiagnosticDescriptor Rule(
         string id,

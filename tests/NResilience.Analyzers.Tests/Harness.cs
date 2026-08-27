@@ -76,6 +76,8 @@ internal static class Harness
                                                                    internal static Task<int> Optional(int first = 1, int second = 2, CancellationToken cancellationToken = default) => Task.FromResult(first);
 
                                                                    internal static ValueTask<int> Buffered(CancellationToken cancellationToken = default) => new(1);
+
+                                                                   internal static ValueTask Drain(CancellationToken cancellationToken = default) => default;
                                                                }
                                                                """;
 

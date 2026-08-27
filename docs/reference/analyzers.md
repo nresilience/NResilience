@@ -99,7 +99,7 @@ This is reported only for `using` forms where the client provably does not outli
 
 ## NRES007: Redundant async callback
 
-This rule is reported when a callback is marked `async` but only contains a single `await` for a task that matches the delegate's return type. Removing the `async` keyword avoids the allocation of an unnecessary state machine.
+This rule is reported when a callback is marked `async` but only contains a single `await` whose task the callback can hand back as it is. Removing the `async` keyword avoids the allocation of an unnecessary state machine.
 
 ```csharp
 // Reported: unnecessary state machine for a single await.
@@ -109,7 +109,22 @@ await api.RunAsync(async attempt => await client.GetAsync(url, attempt), cancell
 await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 ```
 
-This is reported only when the entire body consists of one `await` whose task is already the delegate's return type. For details on allocations, see [where the allocations are](../deep-dives/allocations.md).
+A callback that awaits a `ValueTask` is reported too, and it has more to save. Dropping `async` there re-binds the call to the [`ValueTask` overloads](resilience.md#methods), so the callback stops building both a state machine and a task for a result it already had:
+
+```csharp
+// Reported: the state machine, plus a task built for a buffered read.
+await api.RunAsync(async attempt => await reader.ReadAsync(attempt), cancellationToken);
+
+// The fix: the same call, on the ValueTask overload.
+await api.RunAsync(attempt => reader.ReadAsync(attempt), cancellationToken);
+```
+
+Two shapes are left alone because the rewrite would change more than the allocation:
+
+- A callback whose return type is **written down**, such as `async Task<int> (attempt) => await reader.ReadAsync(attempt)`. The written type pins the rewritten body rather than resolving the call again, so the `ValueTask` body would not compile under it.
+- A callback that **discards** a `ValueTask<T>` result, such as `async attempt => { await reader.ReadAsync(attempt); }`. That rewrite compiles, but it moves the call from the void overload to the generic one, and the result would start reaching the [classifier](classifier.md).
+
+For details on allocations, see [where the allocations are](../deep-dives/allocations.md).
 
 ## Manage analyzer severity
 
