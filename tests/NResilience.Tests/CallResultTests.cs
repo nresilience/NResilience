@@ -166,6 +166,61 @@ public sealed class CallResultTests
         Assert.All(result.Attempts, a => Assert.IsType<IOException>(a.Exception));
     }
 
+    /// <summary>
+    ///     A value an earlier attempt returned survives a later attempt that throws. This is what
+    ///     <see cref="CallResult{T}.Value" /> promises - an answer the policy judged a failure is still
+    ///     an answer, and for an <c>HttpResponseMessage</c> it is one the caller has to dispose.
+    ///     <para>
+    ///         Characterisation rather than decoration: the executor threads the attempt's result
+    ///         through the invoker, and doing that with an <c>out</c> parameter instead of a
+    ///         <c>ref</c> one clears this slot at the start of every attempt. Nothing else notices.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task A_value_from_an_earlier_attempt_outlives_a_later_one_that_threw()
+    {
+        var calls = 0;
+
+        var policy = TestPolicy.Instant with
+        {
+            Attempts = 2,
+            Classify = Classifier.Default.OnResult<int>(status => status == 503 ? Verdict.Transient : Verdict.Ok),
+        };
+
+        var result = await policy.TryRunAsync(ct =>
+        {
+            calls++;
+            return calls == 1 ? Task.FromResult(503) : Task.FromException<int>(new TimeoutException());
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.False(result.HasValue);
+        Assert.Equal(503, result.Value);
+    }
+
+    /// <summary>The same, through a <see cref="ValueTask" />-returning callback.</summary>
+    [Fact]
+    public async Task A_value_from_an_earlier_ValueTask_attempt_outlives_a_later_one_that_threw()
+    {
+        var calls = 0;
+
+        var policy = TestPolicy.Instant with
+        {
+            Attempts = 2,
+            Classify = Classifier.Default.OnResult<int>(status => status == 503 ? Verdict.Transient : Verdict.Ok),
+        };
+
+        var result = await policy.TryRunAsync(ValueTask<int> (ct) =>
+        {
+            calls++;
+            return calls == 1 ? new ValueTask<int>(503) : ValueTask.FromException<int>(new TimeoutException());
+        });
+
+        Assert.False(result.IsSuccess);
+        Assert.False(result.HasValue);
+        Assert.Equal(503, result.Value);
+    }
+
     [Fact]
     public async Task The_log_records_how_much_of_the_deadline_was_left()
     {

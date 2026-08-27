@@ -35,6 +35,12 @@ public sealed class BaselineFixture : IAsyncLifetime
     public double SuspendingOverhead(string arm) => SuspendingBytes(arm) - SuspendingBytes(Baseline.RawSuspending);
 
     public double SyncOverhead(string arm) => SyncBytes(arm) - SyncBytes(Baseline.RawSync);
+
+    /// <summary>
+    ///     Bytes above a raw baseline the caller names, for arms whose callback shape is not the
+    ///     <c>Task</c>-returning one every other arm shares.
+    /// </summary>
+    public double SyncOverheadVersus(string arm, string raw) => SyncBytes(arm) - SyncBytes(raw);
 }
 
 /// <summary>Arm names, in one place, so a rename cannot silently turn a gate into a lookup failure.</summary>
@@ -59,6 +65,9 @@ public static class Baseline
     /// <summary>The same arm with the shipping log listener chained on, at a logger that carries nothing.</summary>
     public const string LibDefaultLogging = "lib: Default + listener + logging";
 
+    /// <summary>The suspending path with a <c>ValueTask</c>-returning callback.</summary>
+    public const string LibDefaultValue = "lib: Default, ValueTask callback";
+
     public const string LibRetry = "lib: retry x2 -> success";
 
     public const string LibLimited = "lib: limited x2 -> success";
@@ -80,11 +89,23 @@ public static class Baseline
 
     public const string RawSync = "raw callback (baseline)";
 
+    /// <summary>The raw baseline for the <c>ValueTask</c> arms. See <c>Scenarios.RawValueSync</c>.</summary>
+    public const string RawValueSync = "raw ValueTask callback (baseline)";
+
     public const string LibNoneSync = "lib: None (passthrough)";
     public const string LibDerivedPassthroughSync = "lib: derived passthrough";
     public const string LibTrivialSyncState = "lib: trivial, static+state";
     public const string LibTrivialSyncCallback = "lib: trivial, callback";
     public const string LibDefaultSyncState = "lib: Default, static+state";
+
+    /// <summary>A <c>ValueTask</c>-returning callback that already has its answer.</summary>
+    public const string LibTrivialValueSyncState = "lib: trivial, ValueTask+state";
+
+    /// <summary>The same callback converted with <c>AsTask()</c>. A reference row, not a gate.</summary>
+    public const string LibTrivialValueAsTaskSyncState = "lib: trivial, ValueTask via AsTask";
+
+    /// <summary>The same, with the attempt timeout's linked source.</summary>
+    public const string LibDefaultValueSyncState = "lib: Default, ValueTask+state";
 
     public const string NoneSync = "fused: None (passthrough)";
     public const string NoTimeoutSyncState = "fused: no timeout, static+state";

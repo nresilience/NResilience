@@ -27,6 +27,7 @@ public static class ShippingScenarios
 {
     private static readonly Func<CancellationToken, Task<int>> SuspendCallback = Gate.SuspendAsync;
     private static readonly Func<CancellationToken, Task<int>> CompleteCallback = Gate.CompleteAsync;
+    private static readonly Func<CancellationToken, ValueTask<int>> ValueSuspendCallback = ValueGate.SuspendAsync;
 
     /// <summary>
     ///     The trivial shipping shape: implements retry and classification without a deadline
@@ -161,6 +162,36 @@ public static class ShippingScenarios
     /// </summary>
     public static ValueTask<int> DefaultSyncState() =>
         Resilience.Default.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
+
+    // ---- ValueTask-returning callbacks. ----
+
+    /// <summary>
+    ///     The headline for a <see cref="ValueTask" />-returning callback: the same zero the
+    ///     <see cref="Task" />-returning form reaches, on the path the callback already had its answer.
+    /// </summary>
+    public static ValueTask<int> TrivialValueSyncState() =>
+        Trivial.RunAsync(static (_, ct) => ValueGate.CompleteAsync(ct), 0);
+
+    /// <summary>
+    ///     The same callback wrapped as a <see cref="Task" />, which is what a caller has to write when
+    ///     there is no <see cref="ValueTask" /> overload to bind to. A reference row rather than a gate:
+    ///     it prices <c>AsTask()</c>, and the gap between it and <see cref="TrivialValueSyncState" /> is
+    ///     the whole reason the overloads exist.
+    /// </summary>
+    public static ValueTask<int> TrivialValueAsTaskSyncState() =>
+        Trivial.RunAsync(static (_, ct) => ValueGate.CompleteAsTaskAsync(ct), 0);
+
+    /// <summary>The same call with an attempt timeout, so the linked source is the only difference.</summary>
+    public static ValueTask<int> DefaultValueSyncState() =>
+        Resilience.Default.RunAsync(static (_, ct) => ValueGate.CompleteAsync(ct), 0);
+
+    /// <summary>
+    ///     A <see cref="ValueTask" /> callback that suspends. Gated against the
+    ///     <see cref="Task" />-returning figure rather than against a budget of its own: the point is
+    ///     that the second callback shape costs the state-machine box nothing, and a number that drifts
+    ///     apart from <see cref="DefaultSuspending" /> means a hoisted awaiter field has appeared.
+    /// </summary>
+    public static ValueTask<int> DefaultValueSuspending() => Resilience.Default.RunAsync(ValueSuspendCallback);
 
     // ---- Retry. ----
 

@@ -366,9 +366,15 @@ public sealed partial record Resilience
 
                 try
                 {
-                    var attempt = invoker.Invoke(state, attemptToken);
-                    await attempt.ConfigureAwait(false);
-                    value = invoker.Result(attempt);
+                    // Null means the callback already had its answer, which only a ValueTask-returning
+                    // one can. The branch is what keeps that case off the heap; see IInvoker.Invoke.
+                    var attempt = invoker.Invoke(state, attemptToken, ref value);
+
+                    if (attempt is not null)
+                    {
+                        await attempt.ConfigureAwait(false);
+                        value = invoker.Result(attempt);
+                    }
                     hasValue = true;
                     verdict = Classify.ClassifyResult(value);
                 }
@@ -707,9 +713,15 @@ public sealed partial record Resilience
 
                     if (decision.Kind == VerdictKind.Ok)
                     {
-                        var attempt = invoker.Invoke(state, attemptToken);
-                        await attempt.ConfigureAwait(false);
-                        value = invoker.Result(attempt);
+                        // Null means the callback already had its answer, which only a ValueTask-returning
+                        // one can. The branch is what keeps that case off the heap; see IInvoker.Invoke.
+                        var attempt = invoker.Invoke(state, attemptToken, ref value);
+
+                        if (attempt is not null)
+                        {
+                            await attempt.ConfigureAwait(false);
+                            value = invoker.Result(attempt);
+                        }
                         hasValue = true;
                         verdict = Classify.ClassifyResult(value);
                     }

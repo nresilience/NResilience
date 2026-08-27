@@ -567,6 +567,25 @@ internal static class Program
         // own token must never be handed to user code.
         failures += Check("no AOT cliff: an attempt timeout still costs exactly one linked source", defaultSync - rawSync <= 72);
 
+        // The ValueTask callback surface, measured against its own raw baseline: a Task-returning
+        // callback builds a task the ValueTask one never does, so subtracting the Task baseline here
+        // would credit the executor with a saving the callback made. Native AOT has no tiered JIT,
+        // so the escape analysis that flatters the Task arms under the JIT does not run - which makes
+        // this the environment where a ValueTask cliff would show up if there were one.
+        var rawValueSync = await MeasureAsync("raw ValueTask callback (sync)", Scenarios.RawValueSync, AllocationCounter.ThreadLocal)
+            .ConfigureAwait(false);
+
+        var trivialValueSync = await MeasureAsync("trivial, ValueTask+state (sync)", ShippingScenarios.TrivialValueSyncState,
+            AllocationCounter.ThreadLocal).ConfigureAwait(false);
+
+        var trivialValueAsTaskSync = await MeasureAsync("trivial, ValueTask via AsTask (sync)", ShippingScenarios.TrivialValueAsTaskSyncState,
+            AllocationCounter.ThreadLocal).ConfigureAwait(false);
+
+        failures += Check("no AOT cliff: a ValueTask callback is free on the synchronous path", trivialValueSync - rawValueSync <= 0);
+
+        failures += Check("the ValueTask overloads still remove the AsTask() conversion",
+            trivialValueAsTaskSync - trivialValueSync >= 64);
+
         var rawSuspending = await MeasureAsync("raw callback (suspending)", Scenarios.RawSuspending, AllocationCounter.ProcessWide)
             .ConfigureAwait(false);
 

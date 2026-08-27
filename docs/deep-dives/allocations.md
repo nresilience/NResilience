@@ -19,6 +19,9 @@ For detailed measurements and gate constants, see [`Budgets.cs`](https://github.
 | Suspending, full policy (with cancellable caller token) | 464 B |
 | `TryRunAsync`, full policy | 640 B |
 | With a telemetry listener attached (delta) | 72 B |
+| Sync-completing `ValueTask` callback, no attempt timeout | **0 B** |
+| Sync-completing `ValueTask` callback, full policy | 72 B |
+| Suspending `ValueTask` callback, full policy | 448 B |
 
 To prevent performance drift, any regression in these figures fails the continuous integration (CI) pipeline. The ceilings include approximately 15% headroom to account for deterministic but non-identical allocation patterns across different hardware architectures.
 
@@ -32,6 +35,22 @@ Furthermore, the executor cannot hand out the pooled timer source's own token be
 
 A design that hands out its pooled token reaches 24 bytes here, which is the exact hazard this design refuses.
 
+## Callbacks that return `ValueTask`
+
+A callback that returns `ValueTask` costs the executor exactly what a `Task`-returning one does. Both shapes share a single attempt loop and a single hoisted awaiter field, so the suspending figure is identical to the byte.
+
+What differs is the callback's own allocation. A `ValueTask` backed by an `IValueTaskSource` - the shape `Socket`, `Channel`, `PipeReader` and `Stream` hand out - allocates nothing when it completes synchronously. Converting one to a `Task` costs 72 bytes to build a task for an answer already in hand, so a callback written `ct => reader.ReadAsync(ct).AsTask()` pays that on every call. The `ValueTask` overloads hand the answer straight to the attempt loop instead:
+
+| Sync-completing callback, trivial policy | Total allocation |
+| :--- | :---: |
+| `ValueTask` callback | **0 B** |
+| The same callback via `.AsTask()` | 72 B |
+
+The executor reaches this without an `await` on a second awaitable type. A hoisted awaiter field belongs to the generated state-machine *type*, so awaiting a `ValueTask` anywhere in the loop's source would enlarge the box for every caller, whichever shape they passed. Instead the invoker hands back `null` when the callback already has its result, and the loop reads it from a variable it already keeps. A `ValueTask` that genuinely suspends is converted to a `Task`, which costs the one allocation a `Task`-returning callback would have made anyway.
+
+> [!NOTE]
+> The `ValueTask` overloads are extension methods rather than members of `Resilience`. An `async` lambda converts to both delegate shapes with neither conversion better, so declaring both as instance overloads would make `async ct => await client.GetAsync(url, ct)` fail to compile. C# searches for an extension method only when no instance method applies, so an `async` lambda binds to the `Task` overload and a lambda that returns a `ValueTask` finds the extension. Both are called `RunAsync`, and neither needs a `using`.
+
 ## Telemetry costs
 
 Raising a `CallEvent` is allocation-free because it is a struct passed by value to an `Action<CallEvent>`. 
@@ -44,7 +63,7 @@ Several design choices were made based on empirical measurement rather than intu
 
 - **Pooled vs. Fresh Sources**: Using a pooled cancellation source combined with a linked source is 96 bytes per call cheaper than creating a fresh linked source and calling `CancelAfter`. This is because a pooled source preserves its timer across resets.
 - **Avoid `Task.Delay` for Timeouts**: Using `CancelAfter` on a token is significantly more efficient (approx. 96 bytes) than racing the call against a `Task.Delay` (approx. 408 bytes).
-- **Task vs. ValueTask for Hooks**: A `Task`-returning `BeforeAttempt` hook is 16 bytes cheaper per suspending call than a `ValueTask`-returning one. This is because Roslyn can share a single hoisted awaiter field between the attempt and the backoff delay.
+- **Task vs. ValueTask for Hooks**: A `Task`-returning `BeforeAttempt` hook is 16 bytes cheaper per suspending call than a `ValueTask`-returning one. This is because Roslyn can share a single hoisted awaiter field between the attempt and the backoff delay. The same reasoning is why the executor converts a pending `ValueTask` callback to a `Task` rather than awaiting it directly.
 - **Budget Storage**: The breaker and the retry budget together add 8 bytes to the state-machine box. The breaker costs nothing, because the policy holding it is already a field; the budget costs one reference field, because it must be resolved before the loop rather than cached per-thread (a continuation resumes on whichever pool thread is free, so a per-thread cache would be missed).
 
 ## Clarifications on performance claims

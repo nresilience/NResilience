@@ -17,6 +17,7 @@ internal sealed class KnownSymbols
 
     private KnownSymbols(
         INamedTypeSymbol resilience,
+        INamedTypeSymbol? resilienceValueTask,
         INamedTypeSymbol cancellationToken,
         INamedTypeSymbol? resilienceHttp,
         INamedTypeSymbol? breaker,
@@ -26,6 +27,7 @@ internal sealed class KnownSymbols
         Compilation compilation)
     {
         Resilience = resilience;
+        ResilienceValueTask = resilienceValueTask;
         CancellationToken = cancellationToken;
         ResilienceHttp = resilienceHttp;
         Breaker = breaker;
@@ -40,6 +42,15 @@ internal sealed class KnownSymbols
     }
 
     internal INamedTypeSymbol Resilience { get; }
+
+    /// <summary>
+    ///     The static class holding the <c>ValueTask</c>-returning execution overloads. They are
+    ///     extension methods rather than members of <see cref="Resilience" />, so an analyzer that
+    ///     recognized only the record's own methods would fall silent on exactly the callback shape a
+    ///     caller reached for to save an allocation - and NRES001 guards a failure that is invisible
+    ///     without it.
+    /// </summary>
+    internal INamedTypeSymbol? ResilienceValueTask { get; }
 
     internal INamedTypeSymbol CancellationToken { get; }
 
@@ -73,6 +84,7 @@ internal sealed class KnownSymbols
 
         known = new KnownSymbols(
             resilience,
+            compilation.GetTypeByMetadataName("NResilience.ResilienceValueTask"),
             token,
             compilation.GetTypeByMetadataName("NResilience.Http.ResilienceHttp"),
             compilation.GetTypeByMetadataName("NResilience.Breaker"),
@@ -84,10 +96,11 @@ internal sealed class KnownSymbols
         return true;
     }
 
-    /// <summary>True when the invocation is one of the eight execution overloads.</summary>
+    /// <summary>True when the invocation is one of the execution overloads, in either callback shape.</summary>
     internal bool IsExecution(IMethodSymbol method) =>
         (method.Name == "RunAsync" || method.Name == "TryRunAsync")
-        && SymbolEqualityComparer.Default.Equals(method.ContainingType, Resilience);
+        && (SymbolEqualityComparer.Default.Equals(method.ContainingType, Resilience)
+            || Is(method.ContainingType, ResilienceValueTask));
 
     internal bool IsCancellationToken(ITypeSymbol? type) => type is not null && SymbolEqualityComparer.Default.Equals(type, CancellationToken);
 

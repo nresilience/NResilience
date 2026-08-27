@@ -130,6 +130,33 @@ public sealed class GettingStarted
     private static Task<User> FetchAsync(CancellationToken cancellationToken) =>
         Task.FromException<User>(exception: new IOException(message: "the socket went away"));
 
+    [Fact]
+    public async Task A_callback_that_returns_a_ValueTask()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var api = Resilience.Default;
+        var db = new Doubles.Database(name: "ada");
+        var feed = new Doubles.Feed(name: "ada");
+        var id = 1;
+
+        // <snippet:reference-valuetask-callback>
+        // ReadAsync returns a ValueTask, so this binds to the ValueTask overload. A read that is
+        // already buffered allocates nothing at all.
+        var buffered = await api.RunAsync(
+            static (source, attempt) => source.ReadAsync(cancellationToken: attempt),
+            state: feed,
+            cancellationToken: cancellationToken);
+
+        // ReadNameAsync returns a Task, so this binds to the Task overload. Same name, same shape.
+        var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationToken: attempt), cancellationToken: cancellationToken);
+
+        // </snippet:reference-valuetask-callback>
+
+        Assert.Equal(expected: "ada", actual: buffered);
+        Assert.Equal(expected: "ada", actual: name);
+        Assert.Equal(expected: 2, actual: feed.Reads);
+    }
+
     private sealed record User(string Name);
 
     private sealed class MyTransportException : Exception;

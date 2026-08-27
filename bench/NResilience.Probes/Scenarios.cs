@@ -58,6 +58,15 @@ public static class Scenarios
 
     public static ValueTask<int> RawSync() => new(Gate.CompleteAsync(CancellationToken.None));
 
+    /// <summary>
+    ///     The unwrapped <see cref="ValueTask" />-returning callback. The <see cref="ValueTask" /> arms
+    ///     report overhead against this rather than against <see cref="RawSync" />, because the two raw
+    ///     shapes do not cost the same thing: <see cref="RawSync" /> is a <see cref="Task" /> the
+    ///     callback had to build, and subtracting it from an arm that never built one would credit the
+    ///     executor with a saving the callback made.
+    /// </summary>
+    public static ValueTask<int> RawValueSync() => ValueGate.CompleteAsync(CancellationToken.None);
+
     public static ValueTask<int> NoneSync() => None.RunAsync(CompleteCallback);
 
     /// <summary>A static lambda with state; it uses no closure or capture, and the state is a value type.</summary>

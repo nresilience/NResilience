@@ -38,6 +38,27 @@ public static class Budgets
     /// </summary>
     public const double FullPolicyWithTimeoutSyncOverhead = 72;
 
+    /// <summary>
+    ///     What converting a synchronously-completing <see cref="ValueTask" /> callback into a
+    ///     <see cref="Task" /> costs, and therefore what the <c>ValueTask</c> execution overloads remove:
+    ///     one task built for an answer already in hand. Measured: 72 B, against an
+    ///     <c>IValueTaskSource</c>-backed callback - the shape <c>Socket</c>, <c>Channel</c> and
+    ///     <c>PipeReader</c> hand out.
+    ///     A floor rather than a ceiling. The gate that uses it asserts the conversion costs at
+    ///     <i>least</i> this much more than the native path, because a figure that collapsed to zero
+    ///     would mean the overloads had stopped being reached - the extension methods losing to an
+    ///     instance overload is a silent failure otherwise.
+    ///     <para>
+    ///         Measured in the same sweep: the raw <c>ValueTask</c> callback allocates 0 B where the raw
+    ///         <c>Task</c> one allocates 72 B, so the trivial policy reaches 0 B/op <i>total</i> with a
+    ///         <c>ValueTask</c> callback rather than 0 B above a callback that already paid. Under
+    ///         <c>Resilience.Default</c> the same call measures 64 B against the <c>Task</c> form's
+    ///         136 B - the same 64 B of executor overhead, with the callback's task no longer built.
+    ///         The suspending path measures 496 B either way, to the byte.
+    ///     </para>
+    /// </summary>
+    public const double ValueTaskConversionFloor = 64;
+
     // ---- Suspending path. Measured against the shipping executor. ----
 
     /// <summary>

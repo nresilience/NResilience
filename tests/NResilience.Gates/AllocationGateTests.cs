@@ -55,6 +55,56 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     public void Full_policy_with_attempt_timeout_costs_one_linked_source_on_the_synchronous_path()
         => AssertSyncOverhead(Baseline.LibDefaultSyncState, Budgets.FullPolicyWithTimeoutSyncOverhead);
 
+    /// <summary>
+    ///     The same zero, reached by a callback that returns a <see cref="ValueTask" />. Measured
+    ///     against the raw <see cref="ValueTask" /> baseline rather than the <see cref="Task" /> one, so
+    ///     the figure is the executor's own overhead and not a saving the callback made.
+    /// </summary>
+    [Fact]
+    public void Full_policy_without_attempt_timeout_is_free_on_the_synchronous_path_with_a_ValueTask_callback()
+        => AssertSyncOverheadVersus(Baseline.LibTrivialValueSyncState, Baseline.RawValueSync, Budgets.FullPolicyNoTimeoutSyncOverhead);
+
+    /// <summary>
+    ///     A <see cref="ValueTask" /> callback under an attempt timeout costs the same one linked source
+    ///     the <see cref="Task" /> form does, and nothing for its shape.
+    /// </summary>
+    [Fact]
+    public void Full_policy_with_attempt_timeout_costs_one_linked_source_with_a_ValueTask_callback()
+        => AssertSyncOverheadVersus(Baseline.LibDefaultValueSyncState, Baseline.RawValueSync, Budgets.FullPolicyWithTimeoutSyncOverhead);
+
+    /// <summary>
+    ///     Why the <see cref="ValueTask" /> overloads exist, as a gate rather than a claim. The two arms
+    ///     run the same policy over the same pooled source and differ only in whether the callback hands
+    ///     back its <see cref="ValueTask" /> or converts it with <c>AsTask()</c>.
+    ///     <para>
+    ///         Asserted as a floor, not a ceiling. These overloads are extension methods precisely so an
+    ///         <c>async</c> lambda still binds to the <see cref="Task" /> form, and the same rule means a
+    ///         future instance overload would silently shadow them - at which point both arms would
+    ///         measure the conversion and this delta would collapse. That failure has no other symptom.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public void The_ValueTask_overloads_remove_the_conversion_a_Task_callback_would_pay()
+    {
+        var native = baseline.SyncBytes(Baseline.LibTrivialValueSyncState);
+        var converted = baseline.SyncBytes(Baseline.LibTrivialValueAsTaskSyncState);
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"ValueTask callback {native:0.0} B/op vs the same callback via AsTask() {converted:0.0} B/op, delta {converted - native:0.0} B (floor {Budgets.ValueTaskConversionFloor:0} B)"));
+
+        Assert.True(
+            converted - native >= Budgets.ValueTaskConversionFloor,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"""
+                 A ValueTask callback measured {native:0.0} B/op against {converted:0.0} B/op for the same
+                 callback converted with AsTask(). The two are no longer distinguishable, which means the
+                 ValueTask overloads are not being reached - most likely because an applicable instance
+                 overload now shadows the extension methods.
+                 """));
+    }
+
     [Fact]
     public void The_trivial_policy_stays_within_one_frame_budget()
         => AssertSuspendingOverhead(Baseline.LibTrivial, Budgets.TrivialOverhead);
@@ -216,6 +266,37 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSuspendingOverhead(Baseline.LibDefaultAdmit, Budgets.AdmitConfiguredOverhead);
 
     /// <summary>
+    ///     The second callback shape has to cost the state-machine box nothing. An <c>await</c> on a
+    ///     <see cref="ValueTask" /> written into the executor's source would add a hoisted awaiter field
+    ///     to the generated state machine, and a hoisted field belongs to the state-machine <b>type</b> -
+    ///     every suspending call would carry it, whichever callback shape it passed. The executor
+    ///     therefore hands a pending <see cref="ValueTask" /> to the loop as a <see cref="Task" />, and
+    ///     this is what holds that arrangement in place: both arms suspend once, in the same sweep, and
+    ///     have to agree to within the instrument's floor.
+    /// </summary>
+    [Fact]
+    public void A_ValueTask_callback_costs_the_suspending_path_nothing()
+    {
+        var value = baseline.SuspendingBytes(Baseline.LibDefaultValue);
+        var task = baseline.SuspendingBytes(Baseline.LibDefault);
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"ValueTask callback {value:0.0} B/op vs Task callback {task:0.0} B/op, delta {value - task:0.0} B (floor {Budgets.SuspendingNoiseFloor:0} B)"));
+
+        Assert.True(
+            value - task <= Budgets.SuspendingNoiseFloor,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"""
+                 A suspending call with a ValueTask callback now costs {value:0.0} B/op against {task:0.0} B/op
+                 with a Task one. The two shapes share one loop and one awaiter field, so a gap between them
+                 means the executor has grown a second hoisted awaiter - which every caller pays for,
+                 including the ones that never pass a ValueTask.
+                 """));
+    }
+
+    /// <summary>
     ///     The falsification test for the shipping executor. The stand-in measured a hand-written fused loop to establish
     ///     what was achievable before any library existed; the shipping executor has to match it while
     ///     doing strictly more - capturing a per-attempt exception, classifying results, and awaiting a
@@ -341,6 +422,24 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
             actual <= budget,
             string.Create(CultureInfo.InvariantCulture,
                 $"'{arm}' now allocates {actual:0.0} B/op above the raw callback, against a budget of {budget:0} B/op."));
+    }
+
+    /// <summary>
+    ///     <see cref="AssertSyncOverhead" /> against a raw baseline other than the <see cref="Task" />
+    ///     one, for arms whose callback shape differs from it.
+    /// </summary>
+    private void AssertSyncOverheadVersus(string arm, string raw, double budget)
+    {
+        var actual = baseline.SyncOverheadVersus(arm, raw);
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"{arm}: {baseline.SyncBytes(arm):0.0} B/op total, {actual:0.0} B/op above '{raw}'; budget {budget:0} B"));
+
+        Assert.True(
+            actual <= budget,
+            string.Create(CultureInfo.InvariantCulture,
+                $"'{arm}' now allocates {actual:0.0} B/op above '{raw}', against a budget of {budget:0} B/op."));
     }
 
     private void AssertSuspendingOverhead(string arm, double budget)

@@ -47,6 +47,43 @@ public sealed class AttemptTokenTests
         Assert.Contains("'Helper' takes a cancellation token", reported.GetMessage(), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    ///     The <c>ValueTask</c> execution overloads are extension methods rather than members of
+    ///     <c>Resilience</c>, and a rule that matched only the record's own methods would fall silent on
+    ///     them. That would leave the shape a caller reached for to save an allocation as the one shape
+    ///     with no guard on the failure this rule exists for.
+    /// </summary>
+    [Fact]
+    public void A_ValueTask_callback_is_an_execution_overload_too()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InMethod(
+            "        await api.RunAsync(attempt => Buffered(), cancellationToken);")));
+
+        Assert.Equal("NRES001", reported.Id);
+        Assert.Contains("'Buffered' takes a cancellation token", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_wrong_token_in_a_ValueTask_callback_is_the_same_bug()
+    {
+        Assert.Equal(["NRES002"], Harness.Ids(Harness.InMethod(
+            "        await api.RunAsync(attempt => Buffered(cancellationToken), cancellationToken);")));
+    }
+
+    [Fact]
+    public void A_ValueTask_callback_that_passes_the_attempt_token_is_not_reported()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InMethod(
+            "        await api.RunAsync(attempt => Buffered(attempt), cancellationToken);")));
+    }
+
+    [Fact]
+    public void The_non_throwing_ValueTask_overload_is_covered_as_well()
+    {
+        Assert.Equal(["NRES002"], Harness.Ids(Harness.InMethod(
+            "        await api.TryRunAsync(attempt => Buffered(cancellationToken), cancellationToken);")));
+    }
+
     [Fact]
     public void Work_that_takes_no_token_at_all_is_not_reported()
     {

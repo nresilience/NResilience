@@ -34,6 +34,17 @@ internal static class Doubles
                 : Task.FromResult(result: name);
     }
 
+    /// <summary>A read whose first answer is already buffered, the way a channel or a pipe behaves.</summary>
+    internal sealed class Feed(string name)
+    {
+        internal int Reads { get; private set; }
+
+        internal ValueTask<string> ReadAsync(CancellationToken cancellationToken) =>
+            Reads++ == 0
+                ? ValueTask.FromException<string>(exception: new IOException(message: "the connection dropped"))
+                : new ValueTask<string>(result: name);
+    }
+
     internal sealed class Queue
     {
         internal int Flushes { get; private set; }
