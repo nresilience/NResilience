@@ -157,6 +157,32 @@ public sealed partial record Resilience
     public Func<NextAttempt, Task<Verdict>>? Admit { get; init; }
 
     /// <summary>
+    ///     Null - the default, and the default in every preset - means no hedging. Set it, and an
+    ///     attempt that is taking longer than <see cref="NResilience.Hedge.Quantile" /> of recent calls
+    ///     to this dependency gets a second copy started alongside it, and the first answer wins.
+    ///     <para>
+    ///         The threshold is always a live quantile rather than a constant, which is what makes the
+    ///         feature safe to leave on: see <see cref="NResilience.Hedge" /> for the argument.
+    ///         <see cref="Attempts" /> still bounds the total number of calls that reach the dependency,
+    ///         and <see cref="NResilience.Hedge.MaxConcurrent" /> bounds how many of them overlap.
+    ///     </para>
+    ///     <para>
+    ///         A hedge is charged to the <see cref="Budget" /> exactly like a retry, fires only while the
+    ///         <see cref="Breaker" /> is closed, and never fires before the estimate has
+    ///         <see cref="NResilience.Hedge.MinimumSamples" /> samples. For HTTP, a request the handler
+    ///         would not retry is never hedged either - the idempotency gate is the same one.
+    ///     </para>
+    ///     <para>
+    ///         Configuring this selects a third execution path, which allocates: a list of legs, a task
+    ///         per leg, and the racing machinery <see cref="Task.WhenAny(Task[])" /> needs. That cost is
+    ///         quarantined to callers who ask for it - the non-hedged budgets are unchanged, and gated.
+    ///         Hedging also takes ownership of disposing the results it discards; see
+    ///         <see cref="NResilience.Hedge" />.
+    ///     </para>
+    /// </summary>
+    public Hedge? Hedge { get; init; }
+
+    /// <summary>
     ///     Told about everything that happens during a call. Null - the default - means the executor
     ///     raises nothing and pays nothing, which is what "pay-for-play telemetry" has to mean if it
     ///     is to mean anything.
@@ -194,6 +220,7 @@ public sealed partial record Resilience
         && AttemptTimeout == Timeout.InfiniteTimeSpan
         && BeforeAttempt is null
         && Admit is null
+        && Hedge is null
 
         // A listener takes a policy out of passthrough even though it imposes no bound. Handing
         // back the callback's own task would be cheaper and would silently raise nothing, and a
@@ -238,6 +265,17 @@ public sealed partial record Resilience
             problems.Add("Time must not be null.");
 
         Backoff.Validate(problems);
+
+        if (Hedge is { } hedge)
+        {
+            hedge.Validate(problems);
+
+            // A hedge is a second attempt that starts early, so a policy with one attempt has nothing
+            // to hedge with. Rejected rather than ignored: silently doing nothing is how a caller ends
+            // up believing a dependency's tail is being managed when it is not.
+            if (Attempts <= 1)
+                problems.Add($"Hedge needs more than one attempt to work with; Attempts is {Attempts}.");
+        }
 
         if (problems.Count > 0)
             throw new ResilienceConfigurationException(problems);

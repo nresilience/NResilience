@@ -22,7 +22,7 @@ The Polly snippets below are illustrative. All NResilience snippets are compiled
 | `AddCircuitBreaker` | [`Breaker`](features/circuit-breaker.md) (an object you maintain) |
 | `AddBulkhead` | [`Limit.Concurrency`](features/rate-limiting.md) (bulkhead pattern) |
 | `AddFallback` | `if` logic on a [`CallResult<T>`](reference/call-result.md) |
-| `AddHedging` | Not implemented. See the [FAQ](faq.md) |
+| `AddHedging` | [`Hedge`](features/hedging.md), against a live latency quantile rather than a fixed delay |
 | `ShouldHandle` predicates | One [`Classifier`](features/classification.md) used by all strategies |
 | `ResilienceContext`, `ResilienceProperties` | `TState` execution overloads |
 | `ResiliencePipelineProvider<string>` | [`IResiliencePolicies`](reference/options.md) |
@@ -207,6 +207,7 @@ When migrating, be aware of these four behavioral differences:
 - **Unrecognized exceptions**: `Classifier.Default` treats unknown exception types as `Permanent`. If you require a broad handler, use `Classifier.RetryEverything`.
 - **Active retry budget**: By default, retries are capped at 10% of successful traffic per policy. A load test against a dead dependency will return `StopReason.BudgetExhausted`. Use `RetryBudget.None` to disable this. See the [Retry budget](features/retry-budget.md) guide for details.
 - **Refusal pause**: An open circuit breaker pauses for 100 milliseconds before reporting a failure. This prevents the breaker from becoming a load generator. See [Guarded rejection](deep-dives/guarded-rejection.md).
+- **One attempt count**: Polly's hedging has its own `MaxHedgedAttempts` alongside retry's `MaxRetryAttempts`, and the product is the real ceiling on load. Here `Attempts` is the total number of calls that reach the dependency whatever shape they run in, and `Hedge.MaxConcurrent` bounds only how many overlap. Migrating `MaxRetryAttempts = 2` plus `MaxHedgedAttempts = 2` means deciding what the total should be, rather than multiplying. There is also no fixed-delay hedge to migrate: see [Hedging](features/hedging.md).
 
 ## Run NResilience and Polly together
 

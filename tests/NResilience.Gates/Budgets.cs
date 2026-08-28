@@ -105,10 +105,14 @@ public static class Budgets
 
     /// <summary>
     ///     <c>TryRunAsync</c>, which always materializes the attempt log because its caller has
-    ///     explicitly asked for a result object. Measured: 561 B on .NET 10, 558 B on .NET 8 (553 B and
-    ///     551 B before the breaker and budget) - so asking for the history costs about 170 B over the throwing form.
-    ///     Budgeted rather than left to be discovered by a caller who assumed the two were the same
+    ///     explicitly asked for a result object. Measured: 568 B on .NET 10 (561 B before hedging, 553 B
+    ///     before the breaker and budget) - so asking for the history costs about 170 B over the throwing
+    ///     form. Budgeted rather than left to be discovered by a caller who assumed the two were the same
     ///     price.
+    ///     The 8 B hedging added is <c>Attempt.StartOffset</c>, one <see cref="TimeSpan" /> per
+    ///     materialized attempt. It is what makes overlapping attempts readable, it cannot be derived
+    ///     from the other fields, and it is charged only on the paths that materialize a log at all -
+    ///     the suspending figures for the throwing entry points did not move.
     /// </summary>
     public const double TryRunDefaultOverhead = 640;
 
@@ -137,6 +141,23 @@ public static class Budgets
     ///     <c>A_policy_with_no_Admit_hook_pays_nothing_for_the_second_execution_path</c> asserts directly.
     /// </summary>
     public const double AdmitConfiguredOverhead = 488;
+
+    /// <summary>
+    ///     <c>Resilience.Default</c> with <see cref="Resilience.Hedge" /> configured, on a call where no
+    ///     hedge actually fires - the steady state, and therefore what turning hedging on costs on the
+    ///     roughly <c>Quantile</c> of calls that never needed it. Measured: 1298 B on .NET 10.
+    ///     This is the one number in this file that is large on purpose. The hedged loop holds a list of
+    ///     legs, runs each in its own <c>async</c> local function, races them with
+    ///     <see cref="Task.WhenAny(Task[])" /> over an array built per wait, and arms a
+    ///     <see cref="Task.Delay(TimeSpan)" /> for the threshold. There is no version of hedging that
+    ///     does not allocate, and pretending otherwise would produce a worse design rather than a
+    ///     cheaper one. It lands at roughly what a Polly retry-plus-timeout pipeline costs per call -
+    ///     except that only callers who asked for hedging pay it.
+    ///     The number that matters more than this one is <see cref="DefaultOverhead" /> holding still,
+    ///     which <c>A_policy_with_no_Hedge_pays_nothing_for_the_third_execution_path</c> asserts
+    ///     directly, in the same sweep.
+    /// </summary>
+    public const double HedgeConfiguredOverhead = 1500;
 
     /// <summary>
     ///     The pay-for-play gate, expressed as the thing it actually claims: what a listener adds must

@@ -18,6 +18,10 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return work(cancellationToken);
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<VoidResult, T, ValueStatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
+                new ValueStatelessInvoker<VoidResult, T>(work), default, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<VoidResult, T, ValueStatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
                 new ValueStatelessInvoker<VoidResult, T>(work), default, cancellationToken);
@@ -33,6 +37,10 @@ public sealed partial record Resilience
 
         if (IsPassthrough)
             return work(cancellationToken);
+
+        if (Hedge is not null)
+            return Discard(ExecuteHedgedAsync<VoidResult, VoidResult, VoidValueStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
+                new VoidValueStatelessInvoker<VoidResult>(work), default, cancellationToken));
 
         if (Admit is not null)
             return Discard(ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidValueStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
@@ -50,6 +58,10 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return work(state, cancellationToken);
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<TState, T, ValueStatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
+                new ValueStatefulInvoker<TState, T>(work), state, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<TState, T, ValueStatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
                 new ValueStatefulInvoker<TState, T>(work), state, cancellationToken);
@@ -66,6 +78,10 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return work(state, cancellationToken);
 
+        if (Hedge is not null)
+            return Discard(ExecuteHedgedAsync<TState, VoidResult, VoidValueStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
+                new VoidValueStatefulInvoker<TState>(work), state, cancellationToken));
+
         if (Admit is not null)
             return Discard(ExecuteWithAdmitAsync<TState, VoidResult, VoidValueStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
                 new VoidValueStatefulInvoker<TState>(work), state, cancellationToken));
@@ -79,6 +95,10 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<VoidResult, T, ValueStatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
+                new ValueStatelessInvoker<VoidResult, T>(work), default, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<VoidResult, T, ValueStatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
                 new ValueStatelessInvoker<VoidResult, T>(work), default, cancellationToken);
@@ -91,6 +111,10 @@ public sealed partial record Resilience
     {
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
+
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<VoidResult, VoidResult, VoidValueStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
+                new VoidValueStatelessInvoker<VoidResult>(work), default, cancellationToken);
 
         if (Admit is not null)
             return ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidValueStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
@@ -106,6 +130,10 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<TState, T, ValueStatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
+                new ValueStatefulInvoker<TState, T>(work), state, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<TState, T, ValueStatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
                 new ValueStatefulInvoker<TState, T>(work), state, cancellationToken);
@@ -118,6 +146,10 @@ public sealed partial record Resilience
     {
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
+
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<TState, VoidResult, VoidValueStatefulInvoker<TState>, CallResult, VoidResultShaper>(
+                new VoidValueStatefulInvoker<TState>(work), state, cancellationToken);
 
         if (Admit is not null)
             return ExecuteWithAdmitAsync<TState, VoidResult, VoidValueStatefulInvoker<TState>, CallResult, VoidResultShaper>(

@@ -4,8 +4,11 @@ NResilience.Attempt.Attempt() -> void
 NResilience.Attempt.DelayBefore.get -> System.TimeSpan
 NResilience.Attempt.Duration.get -> System.TimeSpan
 NResilience.Attempt.Exception.get -> System.Exception?
+NResilience.Attempt.IsDiscarded.get -> bool
+NResilience.Attempt.IsHedged.get -> bool
 NResilience.Attempt.Number.get -> int
 NResilience.Attempt.Remaining.get -> System.TimeSpan
+NResilience.Attempt.StartOffset.get -> System.TimeSpan
 NResilience.Attempt.Verdict.get -> NResilience.Verdict
 NResilience.AttemptLog
 NResilience.AttemptLog.Count.get -> int
@@ -96,6 +99,9 @@ NResilience.CallEventKind.BreakerHalfOpened = 10 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerOpened = 8 -> NResilience.CallEventKind
 NResilience.CallEventKind.DeadlineExceeded = 6 -> NResilience.CallEventKind
 NResilience.CallEventKind.Exhausted = 12 -> NResilience.CallEventKind
+NResilience.CallEventKind.HedgeDiscarded = 15 -> NResilience.CallEventKind
+NResilience.CallEventKind.HedgeStarted = 13 -> NResilience.CallEventKind
+NResilience.CallEventKind.HedgeWon = 14 -> NResilience.CallEventKind
 NResilience.CallEventKind.NestedRetry = 11 -> NResilience.CallEventKind
 NResilience.CallEventKind.NotRetried = 3 -> NResilience.CallEventKind
 NResilience.CallEventKind.OrphanedWork = 7 -> NResilience.CallEventKind
@@ -141,6 +147,19 @@ NResilience.DeadlineExceededException.DeadlineExceededException() -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(System.TimeSpan deadline, NResilience.AttemptLog! attempts, System.Exception? innerException = null) -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message) -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message, System.Exception! innerException) -> void
+NResilience.Hedge
+NResilience.Hedge.Equals(NResilience.Hedge other) -> bool
+NResilience.Hedge.Hedge() -> void
+NResilience.Hedge.MaxConcurrent.get -> int
+NResilience.Hedge.MaxConcurrent.init -> void
+NResilience.Hedge.MinimumDelay.get -> System.TimeSpan
+NResilience.Hedge.MinimumDelay.init -> void
+NResilience.Hedge.MinimumSamples.get -> int
+NResilience.Hedge.MinimumSamples.init -> void
+NResilience.Hedge.Quantile.get -> double
+NResilience.Hedge.Quantile.init -> void
+NResilience.Hedge.Window.get -> System.TimeSpan
+NResilience.Hedge.Window.init -> void
 NResilience.Http.HttpResilienceOptions
 NResilience.Http.HttpResilienceOptions.BreakerPerHost.get -> bool
 NResilience.Http.HttpResilienceOptions.BreakerPerHost.set -> void
@@ -206,6 +225,8 @@ NResilience.Resilience.Classify.init -> void
 NResilience.Resilience.Deadline.get -> System.TimeSpan
 NResilience.Resilience.Deadline.init -> void
 NResilience.Resilience.Equals(NResilience.Resilience? other) -> bool
+NResilience.Resilience.Hedge.get -> NResilience.Hedge?
+NResilience.Resilience.Hedge.init -> void
 NResilience.Resilience.Name.get -> string?
 NResilience.Resilience.Name.init -> void
 NResilience.Resilience.OnEvent.get -> System.Action<NResilience.CallEvent>?
@@ -263,6 +284,8 @@ override NResilience.BreakerSettings.GetHashCode() -> int
 override NResilience.BreakerSettings.ToString() -> string!
 override NResilience.CallEvent.ToString() -> string!
 override NResilience.Classifier.ToString() -> string!
+override NResilience.Hedge.GetHashCode() -> int
+override NResilience.Hedge.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
 override NResilience.Resilience.GetHashCode() -> int
 override NResilience.Resilience.ToString() -> string!
@@ -285,6 +308,9 @@ static NResilience.Classifier.Data.get -> NResilience.Classifier!
 static NResilience.Classifier.Default.get -> NResilience.Classifier!
 static NResilience.Classifier.Http.get -> NResilience.Classifier!
 static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
+static NResilience.Hedge.At(double quantile = 0.95, int maxConcurrent = 2) -> NResilience.Hedge
+static NResilience.Hedge.operator !=(NResilience.Hedge left, NResilience.Hedge right) -> bool
+static NResilience.Hedge.operator ==(NResilience.Hedge left, NResilience.Hedge right) -> bool
 static NResilience.Http.ResilienceHttp.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
 static NResilience.Http.ResilienceHttp.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
 static NResilience.Http.ResilienceHttpRequestExtensions.MarkRepeatable(this System.Net.Http.HttpRequestMessage! request, string? idempotencyKey = null, string! headerName = "Idempotency-Key") -> System.Net.Http.HttpRequestMessage!
@@ -316,3 +342,4 @@ static NResilience.Verdict.operator !=(NResilience.Verdict left, NResilience.Ver
 static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Verdict right) -> bool
 ~override NResilience.Backoff.Equals(object obj) -> bool
 ~override NResilience.Backoff.ToString() -> string
+~override NResilience.Hedge.Equals(object obj) -> bool

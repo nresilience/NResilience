@@ -43,6 +43,9 @@ The `CallEventKind` enum defines the types of events emitted during a call.
 | `BreakerClosed` | No | No | No |
 | `BreakerHalfOpened` | No | No | No |
 | `NestedRetry` | No | No | No |
+| `HedgeStarted` | No | Yes (the latency threshold) | No |
+| `HedgeWon` | No | No | No |
+| `HedgeDiscarded` | No | No | No |
 
 ### Event invariants and behavior
 
@@ -52,6 +55,7 @@ The `CallEventKind` enum defines the types of events emitted during a call.
 - **Retrying Events**: `Retrying` events fire **before** the backoff delay is served, allowing listeners to report the expected idle time.
 - **Orphaned Work**: `OrphanedWork` fires when an attempt exceeds its time ceiling by more than one second. This event is raised retrospectively the moment the work finally returns.
 - **Nested Retries**: `NestedRetry` events are raised exclusively by the HTTP handler.
+- **Hedging**: `HedgeStarted` carries the live latency quantile that triggered it on `Delay`. `HedgeDiscarded` fires when a leg is cancelled because a sibling answered first, and its `Duration` is how long that leg had been running. A discarded leg raises no `Attempt` event, because nothing classified it. See [Hedging](../features/hedging.md).
 - **Breaker Transitions**: Breaker state transitions are raised on the call that triggered the transition, outside of the breaker's internal lock.
 
 ## Listener contract
@@ -90,6 +94,9 @@ The `ILogger` records a registered policy writes. An event ID is a contract the 
 | 1019 | `NestedRetryRepeat` | `Trace` | `Information` | `{Policy} is retrying inside another retrying client` |
 | 1020 | `PolicyResolved` | `Debug` | `Information` | `{Policy} resolved: {Effective}` |
 | 1021 | `PolicyClassifier` | `Trace` | `Debug` | `{Policy} classifier: {Rules}` |
+| 1022 | `HedgeStarted` | `Trace` | `Information` | `{Policy} started hedge attempt {Attempt}: the call has been running longer than {ThresholdMs} ms` |
+| 1023 | `HedgeWon` | `Trace` | `Information` | `{Policy} answered from hedge attempt {Attempt} after {ElapsedMs} ms` |
+| 1024 | `HedgeDiscarded` | `Trace` | `Information` | `{Policy} discarded attempt {Attempt} after {ElapsedMs} ms because a sibling answered first` |
 
 Field names are shared with the metric tag vocabulary wherever both exist (`Policy`, `Verdict`, `Reason`), so a structured record and a metric describe the same call with the same words.
 

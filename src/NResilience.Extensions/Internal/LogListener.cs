@@ -108,6 +108,27 @@ internal sealed class LogListener
             case CallEventKind.NestedRetry:
                 Footgun(e, policy, Log.Ids.NestedRetry, Log.Ids.NestedRetryRepeat);
                 break;
+
+            // Traffic, not incidents: a healthy hedging policy does this on a known fraction of its
+            // calls by construction. The metrics count them; these records exist so that one call can
+            // be followed end to end when somebody is working out why the tail moved.
+            case CallEventKind.HedgeStarted:
+                if (Level(Log.Ids.HedgeStarted, e) is { } hedging)
+                    Log.HedgeStarted(_logger, hedging, policy, e.AttemptNumber, Ms(e.Delay));
+
+                break;
+
+            case CallEventKind.HedgeWon:
+                if (Level(Log.Ids.HedgeWon, e) is { } won)
+                    Log.HedgeWon(_logger, won, policy, e.AttemptNumber, Ms(e.Duration));
+
+                break;
+
+            case CallEventKind.HedgeDiscarded:
+                if (Level(Log.Ids.HedgeDiscarded, e) is { } discarded)
+                    Log.HedgeDiscarded(_logger, discarded, policy, e.AttemptNumber, Ms(e.Duration));
+
+                break;
         }
     }
 
@@ -251,6 +272,9 @@ internal sealed class LogListener
         Log.Codes.AttemptSucceeded => LogLevel.Trace,
         Log.Codes.CallSucceeded => LogLevel.Trace,
         Log.Codes.NestedRetryRepeat => LogLevel.Trace,
+        Log.Codes.HedgeStarted => LogLevel.Trace,
+        Log.Codes.HedgeWon => LogLevel.Trace,
+        Log.Codes.HedgeDiscarded => LogLevel.Trace,
         Log.Codes.PolicyClassifier => LogLevel.Trace,
         Log.Codes.NotRetriedFirstSighting => LogLevel.Warning,
         Log.Codes.RejectedDependencyUnavailable => LogLevel.Warning,

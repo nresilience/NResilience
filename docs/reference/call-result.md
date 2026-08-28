@@ -82,3 +82,6 @@ While `TryRunAsync` always materializes the log, `RunAsync` only materializes it
 | `Verdict` | The classification of the outcome. The kind is recorded; `RetryAfter` is not, because it is observable as the next attempt's `DelayBefore`. |
 | `Exception` | The exception thrown by this attempt, or `null` if it returned a value. |
 | `Remaining` | The time remaining on the deadline when the attempt started. |
+| `StartOffset` | When the attempt started, measured from the start of the call. Two entries whose ranges overlap ran at the same time. |
+| `IsHedged` | Whether this attempt was started as a copy of one that had not come back yet. |
+| `IsDiscarded` | Whether this attempt was cancelled because a sibling answered first. Such an attempt was never classified, so its `Verdict` carries no information. |

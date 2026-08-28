@@ -18,3 +18,4 @@ These guides provide the technical reasoning and measurements behind the design 
 | [Guarded rejection](guarded-rejection.md) | Why does the handler introduce a delay when refusing a call? |
 | [Admission control](admission-control.md) | Why is a limiter refusal not a new verdict kind, and why is the retry budget exempt from it? |
 | [Logging internals](logging-internals.md) | Why are log levels proportional to volume, and what do the records deliberately omit? |
+| [Hedging internals](hedging-internals.md) | Why is hedging against a live quantile safe when hedging against a fixed delay is not? |

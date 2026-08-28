@@ -43,6 +43,9 @@ public sealed class LoggingTests
         (1019, "NestedRetryRepeat"),
         (1020, "PolicyResolved"),
         (1021, "PolicyClassifier"),
+        (1022, "HedgeStarted"),
+        (1023, "HedgeWon"),
+        (1024, "HedgeDiscarded"),
     ];
 
     // ---- The verbosity promise ----
@@ -104,6 +107,9 @@ public sealed class LoggingTests
             (Log.Ids.NestedRetryRepeat.Id, Log.Ids.NestedRetryRepeat.Name!),
             (Log.Ids.PolicyResolved.Id, Log.Ids.PolicyResolved.Name!),
             (Log.Ids.PolicyClassifier.Id, Log.Ids.PolicyClassifier.Name!),
+            (Log.Ids.HedgeStarted.Id, Log.Ids.HedgeStarted.Name!),
+            (Log.Ids.HedgeWon.Id, Log.Ids.HedgeWon.Name!),
+            (Log.Ids.HedgeDiscarded.Id, Log.Ids.HedgeDiscarded.Name!),
         ];
 
         Assert.Equal(Vocabulary.Select(row => (row.Id, row.Name)), actual);

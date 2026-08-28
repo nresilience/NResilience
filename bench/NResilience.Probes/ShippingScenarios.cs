@@ -112,6 +112,23 @@ public static class ShippingScenarios
         Admit = AdmitHook,
     };
 
+    /// <summary>
+    ///     <see cref="Lib.Resilience.Default" /> with hedging configured. This selects the third
+    ///     execution path - <c>Resilience.ExecuteHedgedAsync</c> - which is the one path in the library
+    ///     that deliberately allocates: a list of legs, a task per leg, and the array
+    ///     <see cref="Task.WhenAny(Task[])" /> races over.
+    ///     <para>
+    ///         No hedge actually fires here, and that is the measurement worth having. The callback comes
+    ///         back in microseconds while <see cref="Lib.Hedge.MinimumDelay" /> floors the threshold at
+    ///         10 ms, so this prices the <i>steady state</i> - what a caller pays per call for having
+    ///         turned hedging on, on the calls that never needed it, which is almost all of them.
+    ///     </para>
+    /// </summary>
+    public static readonly Resilience DefaultWithHedge = Resilience.Default with
+    {
+        Hedge = Hedge.At(0.95),
+    };
+
     // ---- Suspending path: the path every real I/O call takes. ----
 
     public static ValueTask<int> NoneSuspending() => Resilience.None.RunAsync(SuspendCallback);
@@ -141,6 +158,8 @@ public static class ShippingScenarios
     public static ValueTask<int> DefaultAdmitSuspending() => DefaultWithAdmit.RunAsync(SuspendCallback);
 
     public static ValueTask<int> DefaultLoggingSuspending() => DefaultWithLogging.RunAsync(SuspendCallback);
+
+    public static ValueTask<int> DefaultHedgeSuspending() => DefaultWithHedge.RunAsync(SuspendCallback);
 
     // ---- Synchronous fast path: where the 0-byte budgets live. ----
 

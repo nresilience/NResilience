@@ -121,6 +121,20 @@ internal static partial class Log
     [LoggerMessage(EventId = Codes.PolicyClassifier, EventName = nameof(Ids.PolicyClassifier), Message = "{Policy} classifier:\n{Rules}")]
     internal static partial void PolicyClassifier(ILogger logger, LogLevel level, string policy, string rules);
 
+    [LoggerMessage(
+        EventId = Codes.HedgeStarted,
+        EventName = nameof(Ids.HedgeStarted),
+        Message = "{Policy} started hedge attempt {Attempt}: the call has been running longer than {ThresholdMs} ms, which is the current quantile of recent calls")]
+    internal static partial void HedgeStarted(ILogger logger, LogLevel level, string policy, int attempt, long thresholdMs);
+
+    [LoggerMessage(EventId = Codes.HedgeWon, EventName = nameof(Ids.HedgeWon),
+        Message = "{Policy} answered from hedge attempt {Attempt} after {ElapsedMs} ms")]
+    internal static partial void HedgeWon(ILogger logger, LogLevel level, string policy, int attempt, long elapsedMs);
+
+    [LoggerMessage(EventId = Codes.HedgeDiscarded, EventName = nameof(Ids.HedgeDiscarded),
+        Message = "{Policy} discarded attempt {Attempt} after {ElapsedMs} ms because a sibling answered first")]
+    internal static partial void HedgeDiscarded(ILogger logger, LogLevel level, string policy, int attempt, long elapsedMs);
+
     /// <summary>
     ///     The IDs as constants, so the <c>[LoggerMessage]</c> attributes and the level switches in
     ///     <c>LogListener</c> - both of which need a compile-time constant - name them rather than
@@ -150,6 +164,9 @@ internal static partial class Log
         internal const int NestedRetryRepeat = 1019;
         internal const int PolicyResolved = 1020;
         internal const int PolicyClassifier = 1021;
+        internal const int HedgeStarted = 1022;
+        internal const int HedgeWon = 1023;
+        internal const int HedgeDiscarded = 1024;
     }
 
     /// <summary>
@@ -180,5 +197,8 @@ internal static partial class Log
         internal static readonly EventId NestedRetryRepeat = new(Codes.NestedRetryRepeat, nameof(NestedRetryRepeat));
         internal static readonly EventId PolicyResolved = new(Codes.PolicyResolved, nameof(PolicyResolved));
         internal static readonly EventId PolicyClassifier = new(Codes.PolicyClassifier, nameof(PolicyClassifier));
+        internal static readonly EventId HedgeStarted = new(Codes.HedgeStarted, nameof(HedgeStarted));
+        internal static readonly EventId HedgeWon = new(Codes.HedgeWon, nameof(HedgeWon));
+        internal static readonly EventId HedgeDiscarded = new(Codes.HedgeDiscarded, nameof(HedgeDiscarded));
     }
 }

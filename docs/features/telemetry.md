@@ -1,7 +1,7 @@
 ---
 title: Telemetry
 description: Observe policy behavior through a single event stream and integrated metrics.
-order: 7
+order: 8
 ---
 
 # Telemetry
@@ -50,6 +50,9 @@ A lambda is still the right answer for anything that is not an `ILogger`. If it 
 | `OrphanedWork` | A callback ran past the timeout that should have stopped it | No |
 | `BreakerOpened` / `BreakerClosed` / `BreakerHalfOpened` | A circuit breaker changed state | No |
 | `NestedRetry` | The request is already inside another retrying client | No |
+| `HedgeStarted` | A copy of a slow attempt was started. `Delay` carries the live [latency quantile](hedging.md) that triggered it | No |
+| `HedgeWon` | The copy answered, so this call saw the shorter of two draws | No |
+| `HedgeDiscarded` | An attempt was cancelled because a sibling answered first | No |
  
 **Every call ends with exactly one terminal event.** This invariant ensures that counts of logical operations are accurate. Use the `IsTerminal` property to identify these events. `IsRejection` is true for the two refusal kinds; use it when a listener treats both rejections alike.
 
@@ -96,6 +99,8 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.rejections` | `{rejection}` | Calls refused by a guard, tagged `dependency_unavailable` or `budget_exhausted` |
 | `nresilience.call.duration` | s | End-to-end duration of a logical operation |
 | `nresilience.attempt.duration` | s | Duration of a single attempt |
+| `nresilience.hedges` | `{hedge}` | [Hedged](hedging.md) attempts, tagged `started`, `won` or `discarded` |
+| `nresilience.hedge.threshold` | s | The latency quantile a hedge fired at, recorded when it fired |
 | `nresilience.limiter.leases` | `{lease}` | Permits a [limiter](rate-limiting.md) was asked for, tagged `acquired` or `denied` |
 | `nresilience.limiter.wait.duration` | s | How long a caller waited on a limiter. Zero unless queueing is enabled |
 

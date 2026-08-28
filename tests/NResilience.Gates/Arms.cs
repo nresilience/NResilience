@@ -73,6 +73,7 @@ public static class Arms
             Arm.Of("lib: Default + listener", ShippingScenarios.DefaultListenerSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: Default + Admit hook", ShippingScenarios.DefaultAdmitSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: Default + listener + logging", ShippingScenarios.DefaultLoggingSuspending, AllocationCounter.ProcessWide),
+            Arm.Of("lib: Default + hedging", ShippingScenarios.DefaultHedgeSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: Default, ValueTask callback", ShippingScenarios.DefaultValueSuspending, AllocationCounter.ProcessWide),
             Arm.Of("lib: retry x2 -> success", shippingRetry.RunAsync, AllocationCounter.ProcessWide, shippingRetry.Reset),
             Arm.Of("lib: limited x2 -> success", shippingLimited.RunAsync, AllocationCounter.ProcessWide,

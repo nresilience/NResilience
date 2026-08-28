@@ -66,6 +66,9 @@ public static class Baseline
     public const string LibDefaultLogging = "lib: Default + listener + logging";
 
     /// <summary>The suspending path with a <c>ValueTask</c>-returning callback.</summary>
+    /// <summary>The third execution path, in its steady state: hedging configured, no hedge firing.</summary>
+    public const string LibDefaultHedge = "lib: Default + hedging";
+
     public const string LibDefaultValue = "lib: Default, ValueTask callback";
 
     public const string LibRetry = "lib: retry x2 -> success";

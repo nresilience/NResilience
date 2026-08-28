@@ -9,11 +9,34 @@ namespace NResilience.Http.Internal;
 ///         and the body is buffered once so that it can.
 ///     </para>
 /// </summary>
+/// <param name="request">The caller's request.</param>
+/// <param name="send">The transport.</param>
+/// <param name="clone">Whether each attempt gets its own copy of the request.</param>
+/// <param name="disposeSuperseded">
+///     Whether this call disposes the response an attempt supersedes.
+///     <para>
+///         True for a sequential call, where nothing else knows that a discarded result owns a socket.
+///         <b>False for a hedged one</b>, where it would be wrong twice over: attempts overlap, so
+///         "the previous response" is not a single thing, and a leg starting while a sibling's response
+///         is on its way back to the caller would dispose the very response that is about to be
+///         returned. A hedged call disposes what it discards in the executor instead, which is the only
+///         place that knows which answer won.
+///     </para>
+/// </param>
 internal sealed class HttpCall(
     HttpRequestMessage request,
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
-    bool clone)
+    bool clone,
+    bool disposeSuperseded = true)
 {
+    /// <summary>
+    ///     Guards <see cref="Clone" />. Reading an <c>HttpHeaders</c> collection parses its values lazily
+    ///     and caches them, so enumerating one is a mutation - and a hedged call clones the same request
+    ///     from two threads at once. Uncontended on every sequential call, which is the price of not
+    ///     having a second, subtly different clone path for hedging.
+    /// </summary>
+    private readonly object _gate = new();
+
     private byte[]? _body;
     private HttpResponseMessage? _previous;
 
@@ -45,7 +68,8 @@ internal sealed class HttpCall(
     /// </summary>
     /// <remarks>
     ///     The superseded response is disposed here rather than by the executor, because the executor
-    ///     does not know that a discarded result owns a socket. Disposing it at the start of the
+    ///     does not know that a discarded result owns a socket - except on the hedged path, which does
+    ///     and therefore switches this off; see <c>disposeSuperseded</c>. Disposing it at the start of the
     ///     <i>next</i> attempt rather than at the end of this one is what keeps the final response -
     ///     the one handed back to the caller, whether it succeeded or is a 503 the policy ran out of
     ///     attempts on - alive.
@@ -58,15 +82,21 @@ internal sealed class HttpCall(
     /// </remarks>
     internal async Task<HttpResponseMessage> SendAsync(CancellationToken cancellationToken)
     {
-        _previous?.Dispose();
-        _previous = null;
+        if (disposeSuperseded)
+        {
+            _previous?.Dispose();
+            _previous = null;
+        }
 
         var attempt = clone ? Clone() : request;
 
         try
         {
             var response = await send(attempt, cancellationToken).ConfigureAwait(false);
-            _previous = response;
+
+            if (disposeSuperseded)
+                _previous = response;
+
             return response;
         }
         finally
@@ -78,6 +108,17 @@ internal sealed class HttpCall(
 
     /// <summary>A fresh request carrying everything the original did.</summary>
     internal HttpRequestMessage Clone()
+    {
+        lock (_gate)
+        {
+            return CloneCore();
+        }
+    }
+
+    /// <summary>Disposes a response the caller will never see. A no-op on a hedged call, which disposes its own.</summary>
+    internal void DisposeLast() => _previous?.Dispose();
+
+    private HttpRequestMessage CloneCore()
     {
         var clone = new HttpRequestMessage(request.Method, request.RequestUri)
         {
@@ -113,7 +154,4 @@ internal sealed class HttpCall(
 
         return clone;
     }
-
-    /// <summary>Disposes a response the caller will never see.</summary>
-    internal void DisposeLast() => _previous?.Dispose();
 }

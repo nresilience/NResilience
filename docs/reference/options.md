@@ -53,13 +53,27 @@ The `IResiliencePolicies` service provides access to registered policies.
 `ResilienceOptions` is a `sealed class` used for binding configuration to a policy. All properties are nullable; a `null` value indicates that the property should not be overridden.
 
 **Properties**:
-`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Telemetry`, `Logging`.
+`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Hedge`, `Telemetry`, `Logging`.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. This method does not perform validation; validation occurs at registration or execution.
 - **Budget Disabling**: Setting `BudgetFraction = 0` disables the retry budget.
 - **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string is used instead of an enum so that typos name the valid values (similar to `Preset`). Values outside this set fail at registration.
 
 For more information on the configuration structure, see [Configuration](../di/configuration.md).
+
+## `HedgeOptions`
+
+`HedgeOptions` provides the bindable shape of [`Hedge`](../features/hedging.md). The presence of the section is what turns hedging on, and every property has a working default - so `"Hedge": {}` is a complete configuration.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Quantile` | `0.95` | The quantile of recent latency a hedge fires at. Also the extra load: 0.95 costs about 5%. |
+| `MaxConcurrent` | `2` | How many attempts may be in flight at once, counting the first. |
+| `MinimumSamples` | `20` | How many recent calls the latency estimate needs before any hedge fires. |
+| `MinimumDelay` | `10 ms` | A floor under the hedge delay. |
+| `Window` | `30 s` | How much history the latency estimate covers. |
+
+There is deliberately no fixed-delay setting. A constant threshold is the failure mode the adaptive one exists to avoid, and it would be one JSON key away if it existed at all.
 
 ## `BreakerOptions`
 

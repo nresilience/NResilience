@@ -145,6 +145,18 @@ internal static class Program
         var unjudged = await classified.TryRunAsync(static ct => Task.FromResult("fine")).ConfigureAwait(false);
         failures += Check("library: an unjudged result type is a success under AOT", unjudged.IsSuccess);
 
+        // The hedged loop is the third execution path, and the only one that type-tests a value at
+        // runtime - `loser is IAsyncDisposable` - which is exactly the shape a trimmer can break. No
+        // hedge fires here (the callback is instant and the floor is 10 ms); what is being checked is
+        // that the path compiles, runs, and returns the callback's answer.
+        var hedged = instant with { Hedge = Hedge.At(0.95) };
+        value = await hedged.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
+        failures += Check("library: the hedged execution path runs under AOT", value == Gate.Value);
+
+        var disposable = await hedged.TryRunAsync(static _ => Task.FromResult(new MemoryStream())).ConfigureAwait(false);
+        disposable.Value?.Dispose();
+        failures += Check("library: a hedged call over a disposable result type succeeds under AOT", disposable.IsSuccess);
+
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync().ConfigureAwait(false);
         var cancelledCorrectly = false;

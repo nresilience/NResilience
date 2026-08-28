@@ -22,6 +22,7 @@ For detailed measurements and gate constants, see [`Budgets.cs`](https://github.
 | Sync-completing `ValueTask` callback, no attempt timeout | **0 B** |
 | Sync-completing `ValueTask` callback, full policy | 72 B |
 | Suspending `ValueTask` callback, full policy | 448 B |
+| Suspending, hedging configured (no hedge firing) | 1500 B |
 
 To prevent performance drift, any regression in these figures fails the continuous integration (CI) pipeline. The ceilings include approximately 15% headroom to account for deterministic but non-identical allocation patterns across different hardware architectures.
 
@@ -56,6 +57,17 @@ The executor reaches this without an `await` on a second awaitable type. A hoist
 Raising a `CallEvent` is allocation-free because it is a struct passed by value to an `Action<CallEvent>`. 
 
 The observed cost of 48–72 bytes when a listener is attached comes from boxing two attempt results. Because a cross-cutting listener cannot be generic over the return type `T`, values must be boxed. When `OnEvent` is `null`, the executor suppresses all event logic, ensuring that the telemetry system is "free when unused."
+
+## The one path that spends
+
+Hedging is the exception to every figure above, and a deliberate one. A hedged call holds a list of legs, runs each in its own `async` local function, races them with `Task.WhenAny` over an array built per wait, and arms a `Task.Delay` for the threshold. There is no version of hedging that does not allocate; a design that pretended otherwise would be a worse design, not a cheaper one.
+
+The measured figure - about 1300 B above the raw callback, on a call where no hedge actually fires - is roughly what a Polly retry-and-timeout pipeline costs *per call*. The difference is who pays it. `Hedge` selects a third execution loop, so a policy without `Hedge` pays nothing for that loop, and that is a gate rather than an intention:
+
+- `A_policy_with_no_Hedge_pays_nothing_for_the_third_execution_path` compares the two arms in one sweep.
+- `The_hedged_path_stays_within_its_own_budget` holds the hedged figure to a ceiling of its own.
+
+One number applies to everybody who reads an attempt log: `Attempt` carries a `StartOffset`, which is 8 B per materialized attempt and is what makes overlapping attempts readable. It is charged only where a log is materialized at all - `TryRunAsync` and the failure path - so the suspending figures for the throwing entry points are unchanged.
 
 ## Implementation decisions based on measurement
 

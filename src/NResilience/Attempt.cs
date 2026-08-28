@@ -35,7 +35,16 @@ public enum StopReason
 /// </summary>
 public readonly struct Attempt
 {
-    internal Attempt(int number, TimeSpan duration, TimeSpan delayBefore, Verdict verdict, Exception? exception, TimeSpan remaining)
+    internal Attempt(
+        int number,
+        TimeSpan duration,
+        TimeSpan delayBefore,
+        Verdict verdict,
+        Exception? exception,
+        TimeSpan remaining,
+        TimeSpan startOffset,
+        bool isHedged,
+        bool isDiscarded)
     {
         Number = number;
         Duration = duration;
@@ -43,6 +52,9 @@ public readonly struct Attempt
         Verdict = verdict;
         Exception = exception;
         Remaining = remaining;
+        StartOffset = startOffset;
+        IsHedged = isHedged;
+        IsDiscarded = isDiscarded;
     }
 
     /// <summary>1-based attempt number.</summary>
@@ -51,8 +63,39 @@ public readonly struct Attempt
     /// <summary>How long the callback ran for.</summary>
     public TimeSpan Duration { get; }
 
-    /// <summary>The backoff delay served immediately before this attempt. Zero on the first.</summary>
+    /// <summary>
+    ///     The backoff delay served immediately before this attempt. Zero on the first, and zero on a
+    ///     hedged one - a hedge starts while a sibling is still running, so there was no pause to
+    ///     measure. Read <see cref="StartOffset" /> for when a hedge actually started.
+    /// </summary>
     public TimeSpan DelayBefore { get; }
+
+    /// <summary>
+    ///     When this attempt started, measured from the start of the call. This is what makes overlapping
+    ///     attempts readable: two entries whose <see cref="StartOffset" /> ranges overlap ran at the same
+    ///     time.
+    /// </summary>
+    public TimeSpan StartOffset { get; }
+
+    /// <summary>
+    ///     True when this attempt was started as a hedge of one that had not come back yet - so it
+    ///     overlapped a sibling rather than following it. False for the first attempt of every round,
+    ///     and for every attempt of a policy that does not hedge.
+    /// </summary>
+    public bool IsHedged { get; }
+
+    /// <summary>
+    ///     True when this attempt was cancelled because a sibling answered first.
+    ///     <para>
+    ///         A discarded attempt is in the log because a hedge you cannot see is a hedge you cannot
+    ///         tune, and it is in the log <i>as nothing else</i>: it was never classified, so its
+    ///         <see cref="Verdict" /> reads <see cref="NResilience.Verdict.Ok" /> for want of anything
+    ///         truer, it was not counted against the circuit breaker, and its
+    ///         <see cref="Duration" /> is how long it ran before being cancelled rather than how long the
+    ///         dependency took. This flag is the field to read; the verdict on this one entry is not.
+    ///     </para>
+    /// </summary>
+    public bool IsDiscarded { get; }
 
     /// <summary>
     ///     How the outcome was classified.
@@ -71,10 +114,13 @@ public readonly struct Attempt
     public TimeSpan Remaining { get; }
 
     /// <inheritdoc />
-    public override string ToString() =>
-        Exception is null
-            ? $"#{Number} {Verdict.Kind} ({Duration.TotalMilliseconds:0.#}ms)"
-            : $"#{Number} {Verdict.Kind} {Exception.GetType().Name} ({Duration.TotalMilliseconds:0.#}ms)";
+    public override string ToString()
+    {
+        var outcome = IsDiscarded ? "discarded" : Exception is null ? $"{Verdict.Kind}" : $"{Verdict.Kind} {Exception.GetType().Name}";
+        var hedged = IsHedged ? "hedge " : string.Empty;
+
+        return $"#{Number} {hedged}{outcome} ({Duration.TotalMilliseconds:0.#}ms)";
+    }
 }
 
 /// <summary>
@@ -187,19 +233,43 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
         text.Append(_attempts.Length).Append(_attempts.Length == 1 ? " attempt over " : " attempts over ");
         text.Append(Format(Elapsed)).Append(':').Append(' ');
 
+        var previousEnd = TimeSpan.Zero;
+
         for (var i = 0; i < _attempts.Length; i++)
         {
             var attempt = _attempts[i];
 
             if (i > 0)
-                text.Append(", +").Append(Format(attempt.DelayBefore)).Append(", ");
+            {
+                // An attempt that started before the previous one finished did not wait for anything,
+                // so reporting a backoff before it would be a fiction. What a reader wants instead is
+                // when it started, which is the number that makes the overlap visible. Entries are in
+                // the order they finished, so a hedge that won is listed before the leg it beat, and
+                // this is the only way to see that.
+                text.Append(attempt.StartOffset < previousEnd
+                    ? $", at {Format(attempt.StartOffset)}, "
+                    : $", +{Format(attempt.DelayBefore)}, ");
+            }
 
-            text.Append(attempt.Verdict.Kind);
+            if (attempt.IsHedged)
+                text.Append("hedge ");
 
-            if (attempt.Exception is not null)
-                text.Append(' ').Append(attempt.Exception.GetType().Name);
+            if (attempt.IsDiscarded)
+                text.Append("discarded");
+            else
+            {
+                text.Append(attempt.Verdict.Kind);
+
+                if (attempt.Exception is not null)
+                    text.Append(' ').Append(attempt.Exception.GetType().Name);
+            }
 
             text.Append(" (").Append(Format(attempt.Duration)).Append(')');
+
+            var end = attempt.StartOffset + attempt.Duration;
+
+            if (end > previousEnd)
+                previousEnd = end;
         }
 
         return text.ToString();

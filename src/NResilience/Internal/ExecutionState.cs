@@ -39,12 +39,19 @@ internal sealed class ExecutionState
 
     private readonly RetryBudget? _automaticBudget;
 
+    private readonly LatencyWindow? _latency;
+
     private ExecutionState(Resilience policy)
     {
         // A policy that cannot retry has nothing to spend and nobody to fund, so it gets no budget
         // at all rather than one that is never consulted. An *explicit* budget on such a policy is
         // still honored, because a shared one is funded by its successful traffic.
         _automaticBudget = policy.Attempts > 1 ? RetryBudget.CreateAutomatic(policy.Time) : null;
+
+        // Only a hedging policy pays for the latency estimate, and it pays once per policy instance
+        // rather than once per call. Validate() has already run, so the quantile and the window are
+        // known good here.
+        _latency = policy.Hedge is { } hedge ? new LatencyWindow(hedge.Quantile, hedge.Window, policy.Time) : null;
     }
 
     /// <summary>Validates the policy on its first execution, and caches the result per thread.</summary>
@@ -74,6 +81,17 @@ internal sealed class ExecutionState
         // comparison it just primed.
         return StateFor(policy)._automaticBudget;
     }
+
+    /// <summary>
+    ///     The latency estimate this policy hedges against, or null when it does not hedge.
+    /// </summary>
+    /// <remarks>
+    ///     Private to the policy instance, and that is exactly the scope hedging wants. The HTTP handler
+    ///     derives one policy per host, so each host gets its own estimate for free - and it has to,
+    ///     because the p95 of one host is not the p95 of another and hedging the fast host against the
+    ///     slow host's tail would hedge everything.
+    /// </remarks>
+    public static LatencyWindow? LatencyFor(Resilience policy) => StateFor(policy)._latency;
 
     /// <summary>
     ///     The state for a policy: the per-thread cache when this thread just used the same policy,

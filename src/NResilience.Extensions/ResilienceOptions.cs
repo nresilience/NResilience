@@ -100,6 +100,12 @@ public sealed class ResilienceOptions
     public BreakerOptions? Breaker { get; set; }
 
     /// <summary>
+    ///     Hedging, or null - the default - for none. Never on by default and never on in a preset, so
+    ///     this section is the only way a registered policy hedges.
+    /// </summary>
+    public HedgeOptions? Hedge { get; set; }
+
+    /// <summary>
     ///     Whether the registered policy records to <see cref="ResilienceTelemetry" />. On by default,
     ///     which is the one place this library is not pay-for-play - see
     ///     <see cref="ResilienceTelemetry" /> for why registering a policy in a container is taken as
@@ -182,6 +188,9 @@ public sealed class ResilienceOptions
         if (Breaker is { } breaker)
             policy = policy with { Breaker = breaker.ToBreaker(Name ?? policy.Name, policy.Time) };
 
+        if (Hedge is { } hedge)
+            policy = policy with { Hedge = hedge.ToHedge() };
+
         return policy;
     }
 
@@ -220,6 +229,57 @@ public sealed class ResilienceOptions
             _ => throw new ResilienceConfigurationException(
                 [$"Preset must be one of None, Default or Http; it is \"{Preset}\"."]),
         };
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.Hedge" />.
+///     <para>
+///         A section of its own rather than five flat properties, so that the presence of the section is
+///         what turns hedging on. There is deliberately no fixed-delay setting here, for the reason
+///         <see cref="NResilience.Hedge" /> gives: a constant threshold is the failure mode the adaptive
+///         one exists to avoid, and it would be one JSON key away if it existed at all.
+///     </para>
+/// </summary>
+public sealed class HedgeOptions
+{
+    /// <summary>
+    ///     <see cref="NResilience.Hedge.Quantile" />. Defaults to 0.95, so <c>"Hedge": {}</c> is a
+    ///     complete configuration.
+    /// </summary>
+    public double? Quantile { get; set; }
+
+    /// <summary><see cref="NResilience.Hedge.MaxConcurrent" />.</summary>
+    public int? MaxConcurrent { get; set; }
+
+    /// <summary><see cref="NResilience.Hedge.MinimumSamples" />.</summary>
+    public int? MinimumSamples { get; set; }
+
+    /// <summary><see cref="NResilience.Hedge.MinimumDelay" />.</summary>
+    public TimeSpan? MinimumDelay { get; set; }
+
+    /// <summary><see cref="NResilience.Hedge.Window" />.</summary>
+    public TimeSpan? Window { get; set; }
+
+    /// <summary>Projects onto the value the policy carries. Every unset property keeps its own default.</summary>
+    /// <returns>The configuration.</returns>
+    public Hedge ToHedge()
+    {
+        var hedge = Hedge.At(Quantile ?? 0.95);
+
+        if (MaxConcurrent is { } concurrent)
+            hedge = hedge with { MaxConcurrent = concurrent };
+
+        if (MinimumSamples is { } samples)
+            hedge = hedge with { MinimumSamples = samples };
+
+        if (MinimumDelay is { } delay)
+            hedge = hedge with { MinimumDelay = delay };
+
+        if (Window is { } window)
+            hedge = hedge with { Window = window };
+
+        return hedge;
     }
 }
 

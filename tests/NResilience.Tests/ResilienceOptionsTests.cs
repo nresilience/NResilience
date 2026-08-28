@@ -300,6 +300,51 @@ public sealed class ResilienceOptionsTests
     }
 
     /// <summary>
+    ///     The presence of the section is what turns hedging on, and an empty one is a complete
+    ///     configuration - so the shortest way to hedge from JSON is <c>"Hedge": {}</c>.
+    /// </summary>
+    [Fact]
+    public void An_empty_hedge_section_is_a_complete_configuration()
+    {
+        var options = new ResilienceOptions();
+        Config(("Hedge:MinimumSamples", "50")).Bind(options);
+
+        var hedge = Assert.NotNull(options.ToPolicy().Hedge);
+
+        Assert.Equal(0.95, hedge.Quantile);
+        Assert.Equal(50, hedge.MinimumSamples);
+        Assert.Equal(2, hedge.MaxConcurrent);
+    }
+
+    [Fact]
+    public void A_policy_with_no_hedge_section_does_not_hedge() =>
+        Assert.Null(new ResilienceOptions { Attempts = 3 }.ToPolicy().Hedge);
+
+    [Fact]
+    public void Every_hedge_setting_projects()
+    {
+        var policy = new ResilienceOptions
+        {
+            Hedge = new HedgeOptions
+            {
+                Quantile = 0.99,
+                MaxConcurrent = 3,
+                MinimumSamples = 5,
+                MinimumDelay = TimeSpan.FromMilliseconds(25),
+                Window = TimeSpan.FromSeconds(10),
+            },
+        }.ToPolicy();
+
+        var hedge = Assert.NotNull(policy.Hedge);
+
+        Assert.Equal(0.99, hedge.Quantile);
+        Assert.Equal(3, hedge.MaxConcurrent);
+        Assert.Equal(5, hedge.MinimumSamples);
+        Assert.Equal(TimeSpan.FromMilliseconds(25), hedge.MinimumDelay);
+        Assert.Equal(TimeSpan.FromSeconds(10), hedge.Window);
+    }
+
+    /// <summary>
     ///     A section cannot name a clock, so a configured breaker and budget take the policy's. Without
     ///     it, a policy under a fake clock would still have a breaker running on wall time.
     /// </summary>

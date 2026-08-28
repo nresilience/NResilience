@@ -26,6 +26,19 @@ NResilience.Extensions.BreakerOptions.SlowCallThreshold.set -> void
 NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null, System.TimeProvider? time = null) -> NResilience.Breaker!
 NResilience.Extensions.BreakerOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.Window.set -> void
+NResilience.Extensions.HedgeOptions
+NResilience.Extensions.HedgeOptions.HedgeOptions() -> void
+NResilience.Extensions.HedgeOptions.MaxConcurrent.get -> int?
+NResilience.Extensions.HedgeOptions.MaxConcurrent.set -> void
+NResilience.Extensions.HedgeOptions.MinimumDelay.get -> System.TimeSpan?
+NResilience.Extensions.HedgeOptions.MinimumDelay.set -> void
+NResilience.Extensions.HedgeOptions.MinimumSamples.get -> int?
+NResilience.Extensions.HedgeOptions.MinimumSamples.set -> void
+NResilience.Extensions.HedgeOptions.Quantile.get -> double?
+NResilience.Extensions.HedgeOptions.Quantile.set -> void
+NResilience.Extensions.HedgeOptions.ToHedge() -> NResilience.Hedge
+NResilience.Extensions.HedgeOptions.Window.get -> System.TimeSpan?
+NResilience.Extensions.HedgeOptions.Window.set -> void
 NResilience.Extensions.IResiliencePolicies
 NResilience.Extensions.IResiliencePolicies.Names.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 NResilience.Extensions.IResiliencePolicies.TryGet(string! name, out NResilience.Resilience! policy) -> bool
@@ -93,6 +106,8 @@ NResilience.Extensions.ResilienceOptions.BudgetMinimumPerSecond.get -> int?
 NResilience.Extensions.ResilienceOptions.BudgetMinimumPerSecond.set -> void
 NResilience.Extensions.ResilienceOptions.Deadline.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.Deadline.set -> void
+NResilience.Extensions.ResilienceOptions.Hedge.get -> NResilience.Extensions.HedgeOptions?
+NResilience.Extensions.ResilienceOptions.Hedge.set -> void
 NResilience.Extensions.ResilienceOptions.Jitter.get -> NResilience.Jitter?
 NResilience.Extensions.ResilienceOptions.Jitter.set -> void
 NResilience.Extensions.ResilienceOptions.Logging.get -> string?

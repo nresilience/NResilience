@@ -266,6 +266,44 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     [Fact]
     public void The_Admit_hook_stays_within_budget_on_the_suspending_path()
         => AssertSuspendingOverhead(Baseline.LibDefaultAdmit, Budgets.AdmitConfiguredOverhead);
+    /// <summary>
+    ///     The claim the hedging design is argued on: a hedged call allocates, and <b>only</b> a hedged
+    ///     call does. The third execution path exists in the assembly whether or not
+    ///     <see cref="Resilience.Hedge" /> is set, and a policy that does not set it must not pay a byte
+    ///     for it. Asserted in the same sweep, so a regression reads as "hedging moved the baseline"
+    ///     rather than requiring two runs to notice.
+    /// </summary>
+    [Fact]
+    public void A_policy_with_no_Hedge_pays_nothing_for_the_third_execution_path()
+    {
+        var withoutHedge = baseline.SuspendingBytes(Baseline.LibDefault);
+        var withHedge = baseline.SuspendingBytes(Baseline.LibDefaultHedge);
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"no hedging {withoutHedge:0.0} B/op vs hedging configured {withHedge:0.0} B/op, delta {withHedge - withoutHedge:0.0} B"));
+
+        Assert.True(
+            withoutHedge < withHedge - Budgets.SuspendingNoiseFloor,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"""
+                 A policy without Hedge configured measured {withoutHedge:0.0} B/op against {withHedge:0.0} B/op
+                 with one configured. The two are indistinguishable, which means either
+                 ExecuteHedgedAsync is not actually a separate code path or the non-hedging entry points
+                 are selecting it anyway.
+                 """));
+    }
+
+    /// <summary>
+    ///     What configuring <see cref="Resilience.Hedge" /> costs on a call where no hedge fires, which
+    ///     is the state a hedging policy is in for about <c>Quantile</c> of its calls. Deliberately
+    ///     budgeted rather than left unmeasured: the hedged path is the one place this library spends,
+    ///     and a spend nobody wrote down is a spend nobody notices growing.
+    /// </summary>
+    [Fact]
+    public void The_hedged_path_stays_within_its_own_budget()
+        => AssertSuspendingOverhead(Baseline.LibDefaultHedge, Budgets.HedgeConfiguredOverhead);
 
     /// <summary>
     ///     Verifies that the <see cref="ValueTask" /> callback shape adds no overhead to the 

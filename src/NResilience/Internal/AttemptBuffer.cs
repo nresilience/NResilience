@@ -3,6 +3,39 @@ using System.Runtime.CompilerServices;
 namespace NResilience.Internal;
 
 /// <summary>
+///     Facts about an attempt that are not its verdict, carried in the spare bits of the same byte the
+///     verdict kind occupies.
+///     <para>
+///         Each value is the mask of the bit it occupies in that byte, so packing is an <c>or</c> and
+///         needs no shifting: <see cref="VerdictKind" />'s four members occupy bits 0-1 and
+///         <see cref="Verdict.SelfImposedFlag" /> takes bit 7, leaving bits 2-6 free. This is what
+///         <see cref="Verdict.SelfImposedFlag" />'s own documentation says the spare bits are for, and it
+///         is why hedging adds nothing to the state-machine box: an
+///         <see cref="AttemptRecord" /> stays 16 bytes and the inline buffer stays
+///         <c>Capacity * 16</c>.
+///     </para>
+/// </summary>
+[Flags]
+internal enum AttemptFlags : byte
+{
+    /// <summary>An ordinary attempt: nothing else was in flight when it started.</summary>
+    None = 0,
+
+    /// <summary>
+    ///     This attempt was started as a hedge of one that had not come back yet. The first attempt of a
+    ///     round never carries this; the copies started alongside it do.
+    /// </summary>
+    Hedged = 0x04,
+
+    /// <summary>
+    ///     This attempt was cancelled because a sibling produced the answer first. Nothing classified it,
+    ///     it is not evidence about the dependency, and nothing was charged for it beyond the hedge that
+    ///     started it.
+    /// </summary>
+    Discarded = 0x08,
+}
+
+/// <summary>
 ///     One attempt's timings and verdict, packed into 16 bytes.
 ///     <para>
 ///         Every byte of this struct is live across the attempt <c>await</c> and is therefore paid for in
@@ -29,24 +62,35 @@ internal struct AttemptRecord
     private const int VerdictShift = 56;
     private const long TicksMask = (1L << VerdictShift) - 1;
 
+    /// <summary>
+    ///     The bits of the packed byte that hold the <see cref="VerdictKind" />. Two, because the enum has
+    ///     four members; everything above them is a flag - <see cref="AttemptFlags" /> and
+    ///     <see cref="Verdict.SelfImposedFlag" />.
+    /// </summary>
+    private const byte KindMask = 0x03;
+
     private long _elapsedAndVerdict;
 
     public long StartOffsetTicks { get; private set; }
 
     public readonly long ElapsedTicks => _elapsedAndVerdict & TicksMask;
 
-    public readonly VerdictKind Kind => (VerdictKind)(byte)(VerdictByte & ~Verdict.SelfImposedFlag);
+    public readonly VerdictKind Kind => (VerdictKind)(byte)(VerdictByte & KindMask);
 
     public readonly bool SelfImposed => (VerdictByte & Verdict.SelfImposedFlag) != 0;
+
+    public readonly bool Hedged => (VerdictByte & (byte)AttemptFlags.Hedged) != 0;
+
+    public readonly bool Discarded => (VerdictByte & (byte)AttemptFlags.Discarded) != 0;
 
     private readonly byte VerdictByte => (byte)((ulong)_elapsedAndVerdict >> VerdictShift);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void Set(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed)
+    public void Set(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed, AttemptFlags flags)
     {
         StartOffsetTicks = startOffsetTicks < 0 ? 0 : startOffsetTicks;
         var clamped = elapsedTicks < 0 ? 0 : elapsedTicks > TicksMask ? TicksMask : elapsedTicks;
-        var packed = (byte)((byte)verdict | (selfImposed ? Verdict.SelfImposedFlag : 0));
+        var packed = (byte)((byte)verdict | (selfImposed ? Verdict.SelfImposedFlag : 0) | (byte)flags);
         _elapsedAndVerdict = clamped | ((long)packed << VerdictShift);
     }
 }
@@ -91,12 +135,13 @@ internal struct AttemptSink
 
     public int Count { get; private set; }
 
-    public void Record(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed, Exception? error)
+    public void Record(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed, Exception? error,
+        AttemptFlags flags = AttemptFlags.None)
     {
         var index = Count++;
 
         if (index < AttemptBuffer.Capacity)
-            _inline[index].Set(startOffsetTicks, elapsedTicks, verdict, selfImposed);
+            _inline[index].Set(startOffsetTicks, elapsedTicks, verdict, selfImposed, flags);
         else
         {
             var spillIndex = index - AttemptBuffer.Capacity;
@@ -106,7 +151,7 @@ internal struct AttemptSink
             else if (spillIndex >= _spill.Length)
                 Array.Resize(ref _spill, _spill.Length * 2);
 
-            _spill[spillIndex].Set(startOffsetTicks, elapsedTicks, verdict, selfImposed);
+            _spill[spillIndex].Set(startOffsetTicks, elapsedTicks, verdict, selfImposed, flags);
         }
 
         if (error is not null)
@@ -137,7 +182,15 @@ internal struct AttemptSink
 
             var start = record.StartOffsetTicks;
             var delay = i == 0 ? 0 : start - previousEnd;
-            previousEnd = start + record.ElapsedTicks;
+
+            // The furthest anything has run to, not the previous entry's end. Hedged attempts overlap,
+            // and a discarded one is recorded after the sibling that beat it - so without the max, an
+            // entry that ended earlier than its predecessor would rewind the clock and report the next
+            // attempt's backoff as longer than it was.
+            var end = start + record.ElapsedTicks;
+
+            if (end > previousEnd)
+                previousEnd = end;
 
             var error = _exceptions is not null && i < _exceptions.Length ? _exceptions[i] : null;
 
@@ -151,7 +204,10 @@ internal struct AttemptSink
                 TimeSpan.FromTicks(delay < 0 ? 0 : delay),
                 new VerdictOf(record.Kind, record.SelfImposed).Value,
                 error,
-                remaining);
+                remaining,
+                TimeSpan.FromTicks(start),
+                record.Hedged,
+                record.Discarded);
         }
 
         return new AttemptLog(attempts, elapsed);

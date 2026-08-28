@@ -56,6 +56,10 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask<T>(work(cancellationToken));
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
+                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
                 new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
@@ -75,6 +79,10 @@ public sealed partial record Resilience
 
         if (IsPassthrough)
             return new ValueTask(work(cancellationToken));
+
+        if (Hedge is not null)
+            return Discard(ExecuteHedgedAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
+                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken));
 
         if (Admit is not null)
             return Discard(ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
@@ -103,6 +111,10 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask<T>(work(state, cancellationToken));
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
+                new StatefulInvoker<TState, T>(work), state, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
                 new StatefulInvoker<TState, T>(work), state, cancellationToken);
@@ -124,6 +136,10 @@ public sealed partial record Resilience
 
         if (IsPassthrough)
             return new ValueTask(work(state, cancellationToken));
+
+        if (Hedge is not null)
+            return Discard(ExecuteHedgedAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
+                new VoidStatefulInvoker<TState>(work), state, cancellationToken));
 
         if (Admit is not null)
             return Discard(ExecuteWithAdmitAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
@@ -151,6 +167,10 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
+                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
                 new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
@@ -167,6 +187,10 @@ public sealed partial record Resilience
     {
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
+
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
+                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken);
 
         if (Admit is not null)
             return ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
@@ -189,6 +213,10 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
+                new StatefulInvoker<TState, T>(work), state, cancellationToken);
+
         if (Admit is not null)
             return ExecuteWithAdmitAsync<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
                 new StatefulInvoker<TState, T>(work), state, cancellationToken);
@@ -207,6 +235,10 @@ public sealed partial record Resilience
     {
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
+
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
+                new VoidStatefulInvoker<TState>(work), state, cancellationToken);
 
         if (Admit is not null)
             return ExecuteWithAdmitAsync<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
@@ -742,26 +774,33 @@ public sealed partial record Resilience
 
     /// <summary>
     ///     Everything that happens between an attempt returning and the loop either retrying it,
-    ///     returning it, or giving up: the attempt log entry, the attempt and orphaned-work events, the
-    ///     breaker sample, and then the six questions in the order they have to be asked - did it
-    ///     succeed, did the caller cancel, is it permanent, are the attempts spent, is the deadline
-    ///     spent, will the budget fund another one.
+    ///     returning it, or giving up. Two halves, run back to back:
+    ///     <see cref="RecordAttempt{T}" /> writes down what happened, and <see cref="Decide{T}" /> asks
+    ///     the six questions in the order they have to be asked - did it succeed, did the caller cancel,
+    ///     is it permanent, are the attempts spent, is the deadline spent, will the budget fund another
+    ///     one.
     ///     <para>
-    ///         Extracted because it is the same code in both execution loops and was previously the same
-    ///         code <i>twice</i>, kept in step by a comment asking contributors to remember. That is the
-    ///         drift this removes: a change to the order of those questions now happens once. It is also
-    ///         what makes a third loop affordable, because the third loop would otherwise be a third
-    ///         copy.
+    ///         Extracted because it is the same code in both sequential execution loops and was
+    ///         previously the same code <i>twice</i>, kept in step by a comment asking contributors to
+    ///         remember. That is the drift this removes: a change to the order of those questions now
+    ///         happens once. It is also what makes a third loop affordable, because the third loop would
+    ///         otherwise be a third copy.
     ///     </para>
     ///     <para>
-    ///         Not <c>async</c>, and that is the whole reason this can be shared at all. A hoisted
+    ///         The two halves are separate methods because the hedged loop needs them separately: it
+    ///         records every leg that comes back, and decides only once, when the last of a round's legs
+    ///         has. A sequential attempt is the degenerate case of that - one leg per round - so it
+    ///         calls both in a row, which is this method.
+    ///     </para>
+    ///     <para>
+    ///         Not <c>async</c>, and that is the whole reason any of this can be shared. A hoisted
     ///         awaiter field is a property of the generated state-machine <b>type</b>, so lifting an
     ///         <c>await</c> out of a loop and into a helper would move the box rather than remove it -
     ///         see <see cref="ExecuteWithAdmitAsync{TState,T,TInvoker,TOut,TShaper}" /> for the same
     ///         argument in the other direction. Everything here is synchronous, so it compiles to an
     ///         ordinary call: the parameters travel in registers and on the stack, none of them reaches
-    ///         the state-machine box, and the two awaits stay in the loops where the box already pays
-    ///         for them.
+    ///         the state-machine box, and the awaits stay in the loops where the box already pays for
+    ///         them.
     ///     </para>
     ///     <para>
     ///         <paramref name="value" /> is passed <c>in</c> rather than by value because <c>T</c> is
@@ -816,17 +855,63 @@ public sealed partial record Resilience
         out TimeSpan wait,
         out StopReason reason)
     {
-        wait = TimeSpan.Zero;
-        reason = StopReason.Succeeded;
+        RecordAttempt(
+            ref log, ref recorded, start, Time.GetElapsedTime(start, attemptStart).Ticks, Time.GetElapsedTime(attemptStart),
+            timed, effective, verdict, error, in value, hasValue, AttemptFlags.None);
 
-        var duration = Time.GetElapsedTime(attemptStart);
+        return Decide(log.Count, start, bounded, deadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken, out wait, out reason);
+    }
 
-        log.Record(
-            Time.GetElapsedTime(start, attemptStart).Ticks,
-            duration.Ticks,
-            verdict.Kind,
-            verdict.SelfImposed,
-            error);
+    /// <summary>
+    ///     Writes one finished attempt down: the inline log entry, the
+    ///     <see cref="CallEventKind.Attempt" /> and <see cref="CallEventKind.OrphanedWork" /> events, and
+    ///     the circuit breaker's sample of it.
+    ///     <para>
+    ///         Everything here is about the attempt that just finished and nothing here decides anything,
+    ///         which is what lets the hedged loop call it once per leg while calling
+    ///         <see cref="Decide{T}" /> once per round.
+    ///     </para>
+    /// </summary>
+    /// <typeparam name="T">What the callback returns, or <c>VoidResult</c>.</typeparam>
+    /// <param name="log">The inline attempt log, which this appends to.</param>
+    /// <param name="recorded">Set to true when the breaker was told about this attempt.</param>
+    /// <param name="start">Timestamp the whole call started at.</param>
+    /// <param name="startOffsetTicks">How far into the call this attempt started.</param>
+    /// <param name="duration">How long the attempt ran.</param>
+    /// <param name="timed">Whether the attempt was given a cancellable ceiling.</param>
+    /// <param name="effective">The ceiling it was given.</param>
+    /// <param name="verdict">How the outcome was classified.</param>
+    /// <param name="error">What it threw, if it threw.</param>
+    /// <param name="value">What it returned, if it returned.</param>
+    /// <param name="hasValue">Whether <paramref name="value" /> holds an answer from this attempt.</param>
+    /// <param name="flags">Whether this attempt was a hedge, and whether it was discarded.</param>
+    private void RecordAttempt<T>(
+        ref AttemptSink log,
+        ref bool recorded,
+        long start,
+        long startOffsetTicks,
+        TimeSpan duration,
+        bool timed,
+        TimeSpan effective,
+        Verdict verdict,
+        Exception? error,
+        in T value,
+        bool hasValue,
+        AttemptFlags flags)
+    {
+        log.Record(startOffsetTicks, duration.Ticks, verdict.Kind, verdict.SelfImposed, error, flags);
+
+        // A leg nobody waited for is not an outcome. It raises its own event, is not classified, and is
+        // not evidence: the breaker must not trip on cancellations this library issued, and the caller's
+        // listener must not be told that a call failed when what happened is that a faster copy of it
+        // succeeded.
+        if ((flags & AttemptFlags.Discarded) != 0)
+        {
+            if (OnEvent is not null)
+                Notify(CallEventKind.HedgeDiscarded, log.Count, Verdict.Ok, duration, null, null, null);
+
+            return;
+        }
 
         if (OnEvent is not null)
         {
@@ -853,6 +938,44 @@ public sealed partial record Resilience
             if (outcome != BreakerTransition.None && OnEvent is not null)
                 NotifyBreaker(outcome, log.Count, Time.GetElapsedTime(start));
         }
+    }
+
+    /// <summary>
+    ///     The six questions, in the order they have to be asked: did it succeed, did the caller cancel,
+    ///     is it permanent, are the attempts spent, is the deadline spent, will the budget fund another
+    ///     one. Nothing here reads the log or the clock except to report; every input arrives as a
+    ///     parameter.
+    /// </summary>
+    /// <typeparam name="T">What the callback returns, or <c>VoidResult</c>.</typeparam>
+    /// <param name="attempts">How many attempts have been recorded, which is the number this one is.</param>
+    /// <param name="start">Timestamp the whole call started at.</param>
+    /// <param name="bounded">Whether <see cref="Deadline" /> is finite.</param>
+    /// <param name="deadlineSpent">Whether the ceiling that fired was the deadline rather than <see cref="AttemptTimeout" />.</param>
+    /// <param name="verdict">How the outcome being judged was classified.</param>
+    /// <param name="error">What it threw, if it threw.</param>
+    /// <param name="value">What it returned, if it returned.</param>
+    /// <param name="hasValue">Whether <paramref name="value" /> holds an answer.</param>
+    /// <param name="budget">The budget this call charges, already resolved.</param>
+    /// <param name="cancellationToken">The caller's token.</param>
+    /// <param name="wait">The pause the loop serves before acting on the return value. See <see cref="AfterAttempt{T}" />.</param>
+    /// <param name="reason">Why the call stopped. Only meaningful for <see cref="NextStep.Stop" />.</param>
+    /// <returns>What the loop does next.</returns>
+    private NextStep Decide<T>(
+        int attempts,
+        long start,
+        bool bounded,
+        bool deadlineSpent,
+        Verdict verdict,
+        Exception? error,
+        in T value,
+        bool hasValue,
+        RetryBudget? budget,
+        CancellationToken cancellationToken,
+        out TimeSpan wait,
+        out StopReason reason)
+    {
+        wait = TimeSpan.Zero;
+        reason = StopReason.Succeeded;
 
         if (verdict.Kind == VerdictKind.Ok)
         {
@@ -866,7 +989,7 @@ public sealed partial record Resilience
             // caller who cancelled while an attempt was already succeeding has waited for that attempt
             // either way, and throwing away work that is done and paid for helps nobody.
             if (OnEvent is not null)
-                Notify(CallEventKind.Succeeded, log.Count, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue),
+                Notify(CallEventKind.Succeeded, attempts, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue),
                     StopReason.Succeeded);
 
             return NextStep.Succeeded;
@@ -882,19 +1005,19 @@ public sealed partial record Resilience
             {
                 // The event that makes "Classifier.Default did not recognize your exception type"
                 // visible rather than mysterious: the type is right there on it.
-                Notify(CallEventKind.NotRetried, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                Notify(CallEventKind.NotRetried, attempts, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
                     StopReason.Permanent);
             }
 
             return NextStep.Stop;
         }
 
-        if (log.Count >= Attempts)
+        if (attempts >= Attempts)
         {
             reason = StopReason.AttemptsExhausted;
 
             if (OnEvent is not null)
-                Notify(CallEventKind.Exhausted, log.Count, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                Notify(CallEventKind.Exhausted, attempts, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
                     StopReason.AttemptsExhausted);
 
             return NextStep.Stop;
@@ -905,7 +1028,7 @@ public sealed partial record Resilience
         if (left == TimeSpan.Zero || deadlineSpent)
         {
             reason = StopReason.DeadlineExceeded;
-            NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
+            NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start), error);
             return NextStep.Stop;
         }
 
@@ -924,20 +1047,20 @@ public sealed partial record Resilience
             wait = GuardDelay(left);
 
             if (OnEvent is not null)
-                Notify(CallEventKind.RejectedByBudget, log.Count, verdict, Time.GetElapsedTime(start), wait, error, ResultOf(value, hasValue),
+                Notify(CallEventKind.RejectedByBudget, attempts, verdict, Time.GetElapsedTime(start), wait, error, ResultOf(value, hasValue),
                     StopReason.BudgetExhausted);
 
             return NextStep.Stop;
         }
 
-        var delay = Backoff.Compute(new NextAttempt(log.Count + 1, verdict, error, left, cancellationToken));
+        var delay = Backoff.Compute(new NextAttempt(attempts + 1, verdict, error, left, cancellationToken));
 
         // A delay that would consume the rest of the budget leaves nothing for the attempt after it,
         // so the deadline stops the operation here rather than sleeping through it.
         if (bounded && delay >= left)
         {
             reason = StopReason.DeadlineExceeded;
-            NotifyDeadline(log.Count, verdict, Time.GetElapsedTime(start), error);
+            NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start), error);
             return NextStep.Stop;
         }
 
@@ -945,7 +1068,7 @@ public sealed partial record Resilience
         {
             // Raised before the backoff is served rather than after it, so a listener sees the retry
             // coming and can report how long the call is about to sit idle.
-            Notify(CallEventKind.Retrying, log.Count + 1, verdict, Time.GetElapsedTime(start), delay, error, ResultOf(value, hasValue));
+            Notify(CallEventKind.Retrying, attempts + 1, verdict, Time.GetElapsedTime(start), delay, error, ResultOf(value, hasValue));
         }
 
         wait = delay;

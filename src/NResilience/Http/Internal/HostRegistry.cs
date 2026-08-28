@@ -48,7 +48,10 @@ internal sealed class HostScope
             Budget = policy.Budget;
 
         Retrying = scoped;
-        Single = scoped with { Attempts = 1 };
+
+        // Hedging goes with the attempts: a hedge is a concurrent retry, so a request that may not be
+        // repeated may not be hedged either, and Validate() would refuse the combination anyway.
+        Single = scoped with { Attempts = 1, Hedge = null };
     }
 
     /// <summary>The host:port these were scoped to.</summary>
@@ -58,8 +61,8 @@ internal sealed class HostScope
     internal Resilience Retrying { get; }
 
     /// <summary>
-    ///     The same policy with one attempt. What a POST gets: the breaker still sees the outcome and
-    ///     the budget still receives its deposit, and nothing is sent twice.
+    ///     The same policy with one attempt and no hedging. What a POST gets: the breaker still sees the
+    ///     outcome and the budget still receives its deposit, and nothing is sent twice.
     /// </summary>
     internal Resilience Single { get; }
 

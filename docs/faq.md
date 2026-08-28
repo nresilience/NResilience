@@ -23,7 +23,11 @@ Using total attempts removes ambiguity. `Attempts = 1` means no retry occurs, el
 No. A retry loop that blocks holds a thread through every backoff delay. Offering both synchronous and asynchronous APIs would either duplicate the engine or risk deadlocks. For this reason, `ResilienceHandler.Send` throws a `NotSupportedException`.
 
 ### Where is hedging?
-Hedging is not implemented. Issuing a second request before the first fails is a dangerous default because it multiplies load on a dependency exactly when it is slow. Implementing hedging safely requires a budget, an adaptive latency threshold, and a per-request idempotency strategy. The [retry budget](./features/retry-budget.md) and the [circuit breaker](./features/circuit-breaker.md) provide the necessary groundwork for this feature.
+It is here, and it is opt-in: set `Hedge = Hedge.At(0.95)`. See [Hedging](features/hedging.md).
+
+Issuing a second request before the first fails multiplies load on a dependency exactly when it is slow. That objection is correct - against a **fixed** delay, which is why there is no `Hedge.After(TimeSpan)`. Hedging against a live quantile of recent latency removes the failure mode by construction: a brownout carries the quantile up with it, so the fraction of calls that hedge stays at about `1 - Quantile`.
+
+The three gates a hedge passes are a budget, an adaptive latency threshold, and a per-request idempotency strategy. See [Hedging internals](deep-dives/hedging-internals.md) for the argument.
 
 ### Where is a rate limiter?
 `NResilience.Extensions` provides one, and it does not reimplement `System.Threading.RateLimiting` - it gives the platform's limiters a correct place to stand. See [Rate limiting](features/rate-limiting.md).

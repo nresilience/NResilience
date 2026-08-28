@@ -89,6 +89,30 @@ public enum CallEventKind
     ///     </para>
     /// </summary>
     Exhausted,
+
+    /// <summary>
+    ///     A second copy of an attempt that had not come back yet has been started.
+    ///     <see cref="CallEvent.AttemptNumber" /> is the copy, and <see cref="CallEvent.Delay" /> is the
+    ///     latency threshold that triggered it - which is the adaptive quantile, so watching this number
+    ///     move during an incident is how you tell a brownout from a tail.
+    /// </summary>
+    HedgeStarted,
+
+    /// <summary>
+    ///     A hedge produced the answer, so the attempt it was started alongside was the slow one and the
+    ///     caller saw the shorter of the two. Not terminal: <see cref="Succeeded" /> follows.
+    /// </summary>
+    HedgeWon,
+
+    /// <summary>
+    ///     An attempt was cancelled because a sibling answered first.
+    ///     <see cref="CallEvent.Duration" /> is how long it had been running.
+    ///     <para>
+    ///         This is the cost side of the ledger. Counting these against
+    ///         <see cref="HedgeStarted" /> is how you see what the extra load bought.
+    ///     </para>
+    /// </summary>
+    HedgeDiscarded,
 }
 
 /// <summary>

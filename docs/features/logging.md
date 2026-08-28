@@ -1,7 +1,7 @@
 ---
 title: Logging
 description: Read what a policy did through ILogger, and tune the level per record.
-order: 8
+order: 9
 ---
 
 # Logging

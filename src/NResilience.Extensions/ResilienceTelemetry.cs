@@ -75,6 +75,28 @@ public static class ResilienceTelemetry
         "{lease}",
         "Permits a limiter was asked for, tagged by whether it granted one.");
 
+    private static readonly Counter<long> HedgeCounter = Meter.CreateCounter<long>(
+        "nresilience.hedges",
+        "{hedge}",
+        "Hedged attempts, tagged started, won or discarded. Started against nresilience.calls is the extra load hedging is costing; won is what that load bought.");
+
+    /// <summary>
+    ///     The adaptive threshold, sampled at the moments it actually decided something.
+    ///     <para>
+    ///         A histogram rather than the observable gauge this obviously wants to be, and the reason is
+    ///         worth stating: a gauge would have to reach into the live latency estimate of every hedging
+    ///         policy in the process, which means a registry of policies that outlives them - and the
+    ///         estimate is private to a policy instance on purpose. Recording the threshold each time a
+    ///         hedge fires needs no registry and answers the same question, because the moments a hedge
+    ///         fires are exactly the moments the number mattered. Watching this move during an incident is
+    ///         how you tell a brownout from a tail.
+    ///     </para>
+    /// </summary>
+    private static readonly Histogram<double> HedgeThreshold = Meter.CreateHistogram<double>(
+        "nresilience.hedge.threshold",
+        "s",
+        "The latency quantile a hedge fired at, recorded when it fired.");
+
     private static readonly Histogram<double> LeaseWait = Meter.CreateHistogram<double>(
         "nresilience.limiter.wait.duration",
         unit: "s",
@@ -174,6 +196,25 @@ public static class ResilienceTelemetry
                 Terminal(e, policy);
                 break;
 
+            case CallEventKind.HedgeStarted:
+                HedgeCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Hedge("started"));
+
+                if (e.Delay is { } threshold)
+                    HedgeThreshold.Record(threshold.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
+
+                Annotate(e, "nresilience.hedge_started");
+                break;
+
+            case CallEventKind.HedgeWon:
+                HedgeCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Hedge("won"));
+                Annotate(e, "nresilience.hedge_won");
+                break;
+
+            case CallEventKind.HedgeDiscarded:
+                HedgeCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Hedge("discarded"));
+                Annotate(e, "nresilience.hedge_discarded");
+                break;
+
             case CallEventKind.BreakerOpened:
             case CallEventKind.BreakerClosed:
             case CallEventKind.BreakerHalfOpened:
@@ -224,6 +265,9 @@ public static class ResilienceTelemetry
         CallEventKind.OrphanedWork => "nresilience.orphaned_work",
         _ => "nresilience.nested_retry",
     };
+
+    /// <summary>The outcome tag on <c>nresilience.hedges</c>. Constants, so nothing here allocates.</summary>
+    private static KeyValuePair<string, object?> Hedge(string outcome) => new("nresilience.outcome", outcome);
 
     private static void Annotate(CallEvent e, string name)
     {
