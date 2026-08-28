@@ -23,11 +23,17 @@ namespace NResilience.Http.Internal;
 ///         place that knows which answer won.
 ///     </para>
 /// </param>
+    /// <param name="deadline">
+    ///     Tells the peer what this side is waiting for, or null when
+    ///     <see cref="HttpResilienceOptions.PropagateDeadline" /> is off. Written per attempt, as each
+    ///     attempt has less of the deadline remaining.
+    /// </param>
 internal sealed class HttpCall(
     HttpRequestMessage request,
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
     bool clone,
-    bool disposeSuperseded = true)
+    bool disposeSuperseded = true,
+    DeadlineStamp? deadline = null)
 {
     /// <summary>
     ///     Guards <see cref="Clone" />. Reading an <c>HttpHeaders</c> collection parses its values lazily
@@ -89,6 +95,16 @@ internal sealed class HttpCall(
         }
 
         var attempt = clone ? Clone() : request;
+
+        if (deadline is { } stamp)
+        {
+            // Replaced rather than added: a clone carries whatever the caller wrote, and the number
+            // this side is actually waiting for is the more accurate of the two.
+            attempt.Headers.Remove(stamp.Header);
+
+            if (stamp.Value() is { } left)
+                attempt.Headers.TryAddWithoutValidation(stamp.Header, left);
+        }
 
         try
         {

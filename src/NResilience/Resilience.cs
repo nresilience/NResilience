@@ -183,6 +183,25 @@ public sealed partial record Resilience
     public Hedge? Hedge { get; init; }
 
     /// <summary>
+    ///     Whether this policy's deadline is clamped by the inherited deadline of the current call.
+    ///     Off by default.
+    ///     <para>
+    ///         When set, the effective deadline is
+    ///         <c>min(<see cref="Deadline" />, <see cref="ResilienceDeadline.Remaining" />)</c>, resolved
+    ///         once at the start of the call. <see cref="AttemptTimeout" /> remains <c>min(configured, time left)</c>,
+    ///         so a shorter deadline reduces attempt durations. Calls with an already expired inherited
+    ///         deadline stop immediately with <see cref="DeadlineExceededException" />.
+    ///     </para>
+    ///     <para>
+    ///         Reading an <see cref="AsyncLocal{T}" /> has a cost, and most calls lack an inbound deadline.
+    ///         When false, the cost is one branch per call; when true, it is one read. Use
+    ///         <see cref="ResilienceDeadline.Begin" /> to publish an inbound deadline, or
+    ///         <c>UseResilienceDeadline()</c> from <c>NResilience.AspNetCore</c> in ASP.NET Core apps.
+    ///     </para>
+    /// </summary>
+    public bool UseAmbientDeadline { get; init; }
+
+    /// <summary>
     ///     Told about everything that happens during a call. Null - the default - means the executor
     ///     raises nothing and pays nothing, which is what "pay-for-play telemetry" has to mean if it
     ///     is to mean anything.
@@ -221,6 +240,11 @@ public sealed partial record Resilience
         && BeforeAttempt is null
         && Admit is null
         && Hedge is null
+
+        // An inbound deadline is a bound like any other, and a policy asking to be clamped by one has
+        // asked for a bound it cannot see from here - so passthrough is off the table whether or not
+        // the current call actually inherited one.
+        && !UseAmbientDeadline
 
         // A listener takes a policy out of passthrough even though it imposes no bound. Handing
         // back the callback's own task would be cheaper and would silently raise nothing, and a

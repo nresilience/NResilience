@@ -43,6 +43,68 @@ var api = Resilience.Default with
 
 `AttemptTimeout` covers a single attempt. If no time remains on the deadline, a retry is never started; the call fails immediately with a deadline exception rather than sleeping through a backoff delay.
 
+## Propagate the deadline across a hop
+
+A deadline stops at the process edge unless something carries it. A service with 200 ms left that sends a request the peer works on for 10 seconds has already produced garbage, and neither side can tell. Two halves fix that, and each is useful without the other.
+
+### Send the deadline
+
+Set `PropagateDeadline` on the HTTP options, and every attempt carries how long this side is going to wait for it:
+
+<!-- snippet: deadline-propagate -->
+```csharp
+// The outbound half. Every attempt carries the time this side is prepared to wait:
+// min(AttemptTimeout, time left on the deadline). This allows peers to stop
+// work that is no longer needed. Off by default.
+var api = Resilience.Http with
+{
+    Deadline = TimeSpan.FromSeconds(value: 10),
+    AttemptTimeout = TimeSpan.FromSeconds(value: 3),
+};
+
+var options = new HttpResilienceOptions { PropagateDeadline = true };
+
+using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: transport, policy: api, options: options));
+using var response = await client.GetAsync(requestUri: uri, cancellationToken: cancellationToken);
+
+// X-Deadline-Ms: 3000 on the first attempt, and less on every attempt after it.
+```
+<!-- endsnippet -->
+
+The value is the attempt's own ceiling - `min(AttemptTimeout, time left on the deadline)` - in whole milliseconds, and it is recomputed for every attempt and every hedged leg. `DeadlineHeader` changes the header name, which defaults to `X-Deadline-Ms`.
+
+> [!NOTE]
+> `grpc-timeout` is not a drop-in name for it. gRPC's value carries a unit suffix rather than a bare count of milliseconds, and the gRPC client stack already propagates its own deadlines from `CallOptions.Deadline`.
+
+### Inherit the deadline
+
+Set `UseAmbientDeadline` on the policy, and the effective deadline becomes `min(Deadline, the time the caller is still waiting)`:
+
+<!-- snippet: deadline-inherit -->
+```csharp
+// The inbound half. The policy is bounded by the inherited deadline, so its
+// effective deadline is min(Deadline, time the caller is still waiting), resolved once
+// at the start of the call.
+var api = Resilience.Http with { UseAmbientDeadline = true };
+
+// In an ASP.NET Core app, UseResilienceDeadline() publishes what the caller sent. Anywhere else -
+// a queue consumer reading a deadline off a message, or a test - publish it yourself.
+using var inbound = ResilienceDeadline.Begin(remaining: TimeSpan.FromMilliseconds(value: 200));
+```
+<!-- endsnippet -->
+
+Nothing else in the model changes. `AttemptTimeout` is already `min(configured, time left)`, so a shorter deadline shortens the attempts with it, and a call whose inherited deadline has already expired fails immediately with `DeadlineExceededException` without contacting the dependency at all.
+
+In an ASP.NET Core app, install `NResilience.AspNetCore` and read the header with one line:
+
+```csharp
+app.UseResilienceDeadline();
+```
+
+Register it before anything that makes an outbound call. `UseResilienceDeadline` also takes a callback: `Header` changes the header it reads, `Maximum` caps what it will believe from a caller, and `Reserve` keeps part of the deadline back for this service's own work.
+
+`UseAmbientDeadline` is off by default and stays off in every preset, because reading the ambient value costs an `AsyncLocal<T>` read on calls that mostly have no inbound deadline to read. For what that costs and why the read happens once per call rather than once per attempt, see [the cancellation contract](../deep-dives/cancellation.md).
+
 ## Handle timeout exceptions
 
 Both `DeadlineExceededException` and `AttemptTimeoutException` derive from `TimeoutException`. You can catch them together or separately. Both exceptions include the attempt log.

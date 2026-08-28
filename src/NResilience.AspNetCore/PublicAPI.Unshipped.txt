@@ -1,0 +1,11 @@
+#nullable enable
+NResilience.AspNetCore.ResilienceDeadlineApplicationBuilderExtensions
+NResilience.AspNetCore.ResilienceDeadlineOptions
+NResilience.AspNetCore.ResilienceDeadlineOptions.Header.get -> string!
+NResilience.AspNetCore.ResilienceDeadlineOptions.Header.set -> void
+NResilience.AspNetCore.ResilienceDeadlineOptions.Maximum.get -> System.TimeSpan?
+NResilience.AspNetCore.ResilienceDeadlineOptions.Maximum.set -> void
+NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.get -> System.TimeSpan
+NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.set -> void
+NResilience.AspNetCore.ResilienceDeadlineOptions.ResilienceDeadlineOptions() -> void
+static NResilience.AspNetCore.ResilienceDeadlineApplicationBuilderExtensions.UseResilienceDeadline(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Action<NResilience.AspNetCore.ResilienceDeadlineOptions!>? configure = null) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!

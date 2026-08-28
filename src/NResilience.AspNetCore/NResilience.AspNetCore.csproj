@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>NResilience.AspNetCore</RootNamespace>
+
+    <IsShippingLibrary>true</IsShippingLibrary>
+
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+
+    <PackageId>NResilience.AspNetCore</PackageId>
+    <Description>The inbound half of deadline propagation for NResilience: middleware that reads the deadline a caller sent and publishes it for the rest of the request, so outbound policies are bounded by the time their caller is actually still waiting. A separate package because it is the only part of NResilience that requires ASP.NET Core.</Description>
+    <PackageTags>resilience;deadline;timeout;aspnetcore;middleware;propagation;polly</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!-- The nuget.org package page shows this package's own README, not the root one. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!--
+      RS0026 forbids overload sets that each carry an optional parameter. The registration here
+      takes an optional configure callback, which is the shape the whole ecosystem uses; the
+      public API manifest is what protects source compatibility, and it is reviewed.
+    -->
+    <NoWarn>$(NoWarn);RS0026</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience/NResilience.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The whole reason this package exists. A FrameworkReference is what a library targeting
+      ASP.NET Core uses instead of package references, and it is also what makes the package
+      unusable from a worker or a console app - which is why the middleware is here and not in
+      NResilience.Extensions, whose registrations have to work in both.
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+  </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, readme. -->
+  <Import Project="../../Release.props"/>
+
+</Project>

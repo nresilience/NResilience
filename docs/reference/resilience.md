@@ -25,6 +25,7 @@ NResilience provides several presets for common scenarios:
 | `Attempts` | `int` | 3 | The total number of attempts, including the first. |
 | `Deadline` | `TimeSpan` | 30 s | The wall-clock budget for the entire call. Use `Timeout.InfiniteTimeSpan` to disable the bound. |
 | `AttemptTimeout` | `TimeSpan` | 10 s | The maximum duration for a single attempt. The effective value is the minimum of this property and the remaining time on the deadline. |
+| `UseAmbientDeadline` | `bool` | `false` | Whether the deadline is clamped by the one the current call inherited from its caller. When set, the effective deadline is the minimum of `Deadline` and `ResilienceDeadline.Remaining`, resolved once per call. |
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
 | `Classify` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
@@ -123,6 +124,20 @@ The `NextAttempt` `readonly struct` is passed to `BeforeAttempt` and `Backoff.Cu
 | `PreviousException` | The exception thrown by the previous attempt, if any. |
 | `Remaining` | The time remaining on the deadline, or `Timeout.InfiniteTimeSpan`. |
 | `CancellationToken` | The caller's cancellation token. |
+
+## `ResilienceDeadline`
+
+`ResilienceDeadline` is a `static class` holding the deadline the current logical call inherited, and the two helpers that put one on a wire. Read by the executor only for a policy whose `UseAmbientDeadline` is set.
+
+| Member | Description |
+| :--- | :--- |
+| `Header` | The default header name: `"X-Deadline-Ms"`. |
+| `Remaining` | How long the inbound deadline has left, or `null` when the call inherited none. `TimeSpan.Zero` when it inherited one that has expired. |
+| `Begin(remaining, time = null)` | Publishes an inbound deadline for the current logical call. Returns a `DeadlineScope` that restores the previous value when disposed. `Timeout.InfiniteTimeSpan` clears the deadline for the scope rather than publishing an unbounded one. |
+| `TryParse(value, out remaining)` | Reads a header value: whole milliseconds as a positive integer. Anything else - empty, zero, negative, unit-suffixed, or above `int.MaxValue` milliseconds - is no deadline, and the failure is silent. |
+| `Format(remaining)` | Writes a header value: whole milliseconds, rounded down, never below 1. `null` when there is nothing to say. |
+
+The effective deadline is `min(Deadline, Remaining)`, resolved once when the call starts. See [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) for both halves, and [the cancellation contract](../deep-dives/cancellation.md) for what the ambient read costs.
 
 ## Equality
 

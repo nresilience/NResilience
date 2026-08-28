@@ -130,6 +130,8 @@ NResilience.Extensions.ResilienceOptions.ThrottledBaseDelay.set -> void
 NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseline = null) -> NResilience.Resilience!
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.set -> void
+NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.get -> bool?
+NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.set -> void
 NResilience.Extensions.ResilienceTelemetry
 NResilience.Extensions.SlowCallOptions
 NResilience.Extensions.SlowCallOptions.MinimumSamples.get -> int?

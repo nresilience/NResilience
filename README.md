@@ -99,3 +99,4 @@ For more information, see these resources:
 | `NResilience`            | The core library, HTTP handler, and analyzers.                            |
 | `NResilience.Extensions` | Dependency injection, configuration binding, metrics, and health checks. |
 | `NResilience.Testing`    | Helpers for testing your policies, and fault injection.                  |
+| `NResilience.AspNetCore` | Middleware that reads the deadline a caller sent, so outbound calls inherit it. |

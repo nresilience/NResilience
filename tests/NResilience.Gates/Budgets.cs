@@ -4,6 +4,11 @@ namespace NResilience.Gates;
 ///     The checked-in allocation budgets. Every number here was measured on 2026-08-19, .NET 10.0.0
 ///     and .NET 8.0.22, arm64, Release, workstation non-concurrent GC, and is recorded with its
 ///     measured value beside it so a failure reads as "this moved" rather than "this is wrong".
+    ///     Deadline propagation increased every suspending figure by <b>16 bytes</b>. The effective
+    ///     deadline is resolved once per call and stored in the state-machine box for all callers,
+    ///     regardless of <c>UseAmbientDeadline</c>. This avoids re-reading an <c>AsyncLocal</c> per attempt.
+    ///     The 8-byte value costs 16 bytes due to box alignment; dropping the <c>bounded</c> flag did
+    ///     not recover space, indicating it resided in padding.
 ///     The breaker and the retry budget moved every suspending figure by exactly
 ///     <b>8 bytes</b> - one reference field in the state-machine box, for the budget the call will
 ///     charge. No budget was widened for it; the design's open question 1 allowed 64 B of headroom for
@@ -80,23 +85,24 @@ public static class Budgets
 
     /// <summary>
     ///     The trivial shipping shape: retry and classification, no deadline and no attempt timeout.
-    ///     Measured: 328 B on .NET 10, 313 B on .NET 8, against the stand-in's 336 B.
-    ///     (320 B and 308 B before the breaker and budget.)
+    ///     Measured: 344 B on .NET 10, 334 B on .NET 8, against the stand-in's 336 B.
+    ///     (328 B and 313 B before deadline propagation; 320 B and 308 B before the breaker and budget.)
     /// </summary>
     public const double TrivialOverhead = 368;
 
     /// <summary>
     ///     The realistic policy - <c>Resilience.Default</c>: three attempts, a deadline, an attempt
     ///     timeout, exponential backoff, classification and the inline attempt log.
-    ///     Measured: 393 B on .NET 10, 390 B on .NET 8, against the stand-in's 401 B.
-    ///     (384 B and 381 B before the breaker and budget.)
+    ///     Measured: 408 B on .NET 10, 407 B on .NET 8, against the stand-in's 399 B.
+    ///     (393 B and 390 B before deadline propagation; 384 B and 381 B before the breaker and budget.)
     /// </summary>
     public const double DefaultOverhead = 448;
 
     /// <summary>
     ///     The same call with a caller token that can be cancelled and never is - the production case.
-    ///     Measured: 408 B on .NET 10, 407 B on .NET 8, against the stand-in's 416 B (400 B and 397 B
-    ///     before the breaker and budget). The extra 15 B over <see cref="DefaultOverhead" /> is the marginal cost of
+    ///     Measured: 424 B on .NET 10, 423 B on .NET 8, against the stand-in's 416 B (408 B and 407 B
+    ///     before deadline propagation; 400 B and 397 B before the breaker and budget). The extra 16 B
+    ///     over <see cref="DefaultOverhead" /> is the marginal cost of
     ///     linking against a long-lived source whose registration storage already exists; see
     ///     <see cref="MinimumSocketRatioVersusPolly" /> for what the same link costs when real I/O
     ///     registers on the resulting token.
@@ -105,8 +111,8 @@ public static class Budgets
 
     /// <summary>
     ///     <c>TryRunAsync</c>, which always materializes the attempt log because its caller has
-    ///     explicitly asked for a result object. Measured: 568 B on .NET 10 (561 B before hedging, 553 B
-    ///     before the breaker and budget) - so asking for the history costs about 170 B over the throwing
+    ///     explicitly asked for a result object. Measured: 584 B on .NET 10 (568 B before deadline
+    ///     propagation, 561 B before hedging, 553 B before the breaker and budget) - so asking for the history costs about 170 B over the throwing
     ///     form. Budgeted rather than left to be discovered by a caller who assumed the two were the same
     ///     price.
     ///     The 8 B hedging added is <c>Attempt.StartOffset</c>, one <see cref="TimeSpan" /> per
@@ -117,7 +123,7 @@ public static class Budgets
     public const double TryRunDefaultOverhead = 640;
 
     /// <summary>
-    ///     <c>Resilience.Default</c> with a listener attached. Measured: 440 B on .NET 10, 439 B on
+    ///     <c>Resilience.Default</c> with a listener attached. Measured: 456 B on .NET 10, 455 B on
     ///     .NET 8 - 48 B over <see cref="DefaultOverhead" />, which is two boxed <c>int</c> results,
     ///     one for the attempt and one for the success.
     ///     The whole claim is in that number: raising the events themselves is free, because
@@ -133,7 +139,7 @@ public static class Budgets
     ///     against <c>ShippingScenarios.AdmitHook</c>, a cached delegate returning a cached completed
     ///     <c>Task&lt;Verdict&gt;</c> - so this prices only what the executor's second,
     ///     <c>ExecuteWithAdmitAsync</c> loop costs, not the hook's own allocation.
-    ///     Measured: 424.0 B on .NET 10, 423.8 B on .NET 8 - 31.2 B and 32.5 B over
+    ///     Measured: 440.0 B on .NET 10, 439.4 B on .NET 8 - 32.0 B and 31.9 B over
     ///     <see cref="DefaultOverhead" />'s measured figure, the one extra hoisted
     ///     <c>TaskAwaiter&lt;Verdict&gt;</c> field <see cref="Admit" /> costs a caller who configures it.
     ///     This is the Tier 2 spike from <c>plans/flat-executor-debate-review.md</c>: the number that
@@ -145,7 +151,10 @@ public static class Budgets
     /// <summary>
     ///     <c>Resilience.Default</c> with <see cref="Resilience.Hedge" /> configured, on a call where no
     ///     hedge actually fires - the steady state, and therefore what turning hedging on costs on the
-    ///     roughly <c>Quantile</c> of calls that never needed it. Measured: 1298 B on .NET 10.
+    ///     roughly <c>Quantile</c> of calls that never needed it. Measured: 1285 B on .NET 10, which
+    ///     moves by more than the 16 B deadline propagation cost the sequential loops: the hedged loop's
+    ///     local functions capture the effective deadline in the closure they already share, on top of
+    ///     the box field.
     ///     This is the one number in this file that is large on purpose. The hedged loop holds a list of
     ///     legs, runs each in its own <c>async</c> local function, races them with
     ///     <see cref="Task.WhenAny(Task[])" /> over an array built per wait, and arms a
@@ -180,10 +189,15 @@ public static class Budgets
 
     /// <summary>
     ///     The shipping executor must not be more expensive than the hand-written stand-in
-    ///     used to establish the achievable floor. Measured: 393 B against 401 B on .NET 10 - the real
-    ///     loop is <i>cheaper</i>, while additionally capturing a per-attempt exception, classifying
-    ///     results, awaiting a pre-attempt hook and carrying the retry budget the stand-in's own
-    ///     breaker-and-budget arm did not charge for.
+    ///     used to establish the achievable floor. Measured: 408 B against 399 B on .NET 10, while
+    ///     additionally capturing a per-attempt exception, classifying results, awaiting a pre-attempt
+    ///     hook, carrying the retry budget the stand-in's own breaker-and-budget arm did not charge for,
+    ///     and clamping against an inherited deadline the stand-in has no concept of.
+    ///     It read 393 B against 401 B - the real loop <i>cheaper</i> than the floor - until deadline
+    ///     propagation put 16 B in the box, and it now sits 9 B above the stand-in, inside an allowance
+    ///     that was set for tier and GC drift. That is the honest reading: the shipping loop does strictly
+    ///     more than the floor it is measured against, and the margin for the next feature that costs
+    ///     every caller a field is now 7 B rather than 16.
     ///     This is the gate that would catch the design's central mechanism failing to survive
     ///     implementation. The allowance is
     ///     for tier and GC drift between two arms of the same sweep, not for regression headroom.

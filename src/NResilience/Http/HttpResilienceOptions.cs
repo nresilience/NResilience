@@ -94,6 +94,36 @@ public sealed class HttpResilienceOptions
     public int? MaxHosts { get; set; } = 1024;
 
     /// <summary>
+    ///     Whether each outbound attempt carries how long this side is going to wait for it. Off by
+    ///     default.
+    ///     <para>
+    ///         The value is the attempt's own ceiling - <c>min(<see cref="Resilience.AttemptTimeout" />,
+    ///         time left on the deadline)</c> - in whole milliseconds, written to
+    ///         <see cref="DeadlineHeader" />, and recomputed for every attempt and every hedged leg,
+    ///         because each one has less of the deadline left than the last. A peer that reads it can
+    ///         stop work nobody is waiting for; a peer that ignores it is unaffected.
+    ///     </para>
+    ///     <para>
+    ///         Off by default because a header is only useful when the other side reads it, and the
+    ///         library cannot know that. Turning it on costs one header on the request and no allocation
+    ///         the request was not already making.
+    ///     </para>
+    /// </summary>
+    public bool PropagateDeadline { get; set; }
+
+    /// <summary>
+    ///     The header <see cref="PropagateDeadline" /> writes. Defaults to
+    ///     <see cref="ResilienceDeadline.Header" />, which is what the inbound half reads.
+    /// </summary>
+    /// <remarks>
+    ///     There is no standard for this on plain HTTP, so the name is yours to change - one service
+    ///     mesh's convention is another's. <c>grpc-timeout</c> is not a drop-in value for it: gRPC's
+    ///     format carries a unit suffix rather than a bare count of milliseconds, and the gRPC client
+    ///     stack already propagates its own deadlines from <c>CallOptions.Deadline</c>.
+    /// </remarks>
+    public string DeadlineHeader { get; set; } = ResilienceDeadline.Header;
+
+    /// <summary>
     ///     Whether the handler stamps <see cref="ResilienceHttp.NestedRetryHeader" /> on outbound
     ///     requests and reports nesting it detects. On by default; it costs one header on a request
     ///     that can be retried.

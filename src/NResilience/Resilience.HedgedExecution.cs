@@ -67,7 +67,9 @@ public sealed partial record Resilience
         // this method is only reached for those.
         var latency = ExecutionState.LatencyFor(this)!;
 
-        var bounded = Deadline != Timeout.InfiniteTimeSpan;
+        // The effective deadline, resolved once per call. See the sequential loop for why the ambient
+        // read happens here and not per attempt; the local functions below close over it.
+        var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
         var start = Time.GetTimestamp();
@@ -103,7 +105,7 @@ public sealed partial record Resilience
                     // stops exactly as it would without hedging configured.
                     budgetRefused = false;
 
-                    var remaining = Remaining(Time, start, Deadline, bounded);
+                    var remaining = Remaining(Time, start, deadline);
 
                     if (remaining == TimeSpan.Zero)
                     {
@@ -234,11 +236,11 @@ public sealed partial record Resilience
                     // Ok is Decide's first branch and always comes back Succeeded, so the return value
                     // has nothing to say. Going through it anyway is what keeps the budget deposit and
                     // the terminal event in one place for all three loops.
-                    _ = Decide(winner, start, bounded, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken,
+                    _ = Decide(winner, start, deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken,
                         out _, out _);
 
                     var succeeded = shaper.WantsLogOnSuccess
-                        ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
+                        ? log.Materialize(Time.GetElapsedTime(start), deadline)
                         : AttemptLog.Empty;
 
                     return shaper.Success(value, succeeded);
@@ -250,7 +252,7 @@ public sealed partial record Resilience
                     continue;
 
                 var next = Decide(
-                    log.Count, start, bounded, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken,
+                    log.Count, start, deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken,
                     out var wait, out var stopped);
 
                 if (next == NextStep.Stop)
@@ -292,7 +294,7 @@ public sealed partial record Resilience
             legs.Clear();
         }
 
-        var attempts = log.Materialize(Time.GetElapsedTime(start), Deadline, bounded);
+        var attempts = log.Materialize(Time.GetElapsedTime(start), deadline);
 
         var retryAfter = reason switch
         {
@@ -301,7 +303,7 @@ public sealed partial record Resilience
             _ => null,
         };
 
-        return shaper.Failure(value, hasValue, error, reason, Deadline, attempts, retryAfter);
+        return shaper.Failure(value, hasValue, error, reason, deadline, attempts, retryAfter);
 
         // ---------------------------------------------------------------------------------------
         // Local functions. They capture the loop's state rather than taking twelve parameters each;
@@ -328,7 +330,7 @@ public sealed partial record Resilience
             if (threshold < hedge.MinimumDelay)
                 threshold = hedge.MinimumDelay;
 
-            var left = Remaining(Time, start, Deadline, bounded);
+            var left = Remaining(Time, start, deadline);
 
             if (left != Timeout.InfiniteTimeSpan && threshold >= left)
                 return null;
@@ -350,7 +352,7 @@ public sealed partial record Resilience
                 StartTimestamp = Time.GetTimestamp(),
             };
 
-            if (bounded || AttemptTimeout != Timeout.InfiniteTimeSpan)
+            if (deadline != Timeout.InfiniteTimeSpan || AttemptTimeout != Timeout.InfiniteTimeSpan)
             {
                 // A pooled source drives the ceiling and is never handed out; the leg's own source links
                 // it with the caller's token. Same arrangement as the sequential loops, and for the same
@@ -378,7 +380,7 @@ public sealed partial record Resilience
                 // Outside the try below, exactly as in the sequential loops: this hook is documented as
                 // running outside the classification region, so what it throws propagates out of the
                 // call unchanged rather than being retried.
-                await beforeAttempt(new NextAttempt(leg.Number, verdict, error, Remaining(Time, start, Deadline, bounded), cancellationToken))
+                await beforeAttempt(new NextAttempt(leg.Number, verdict, error, Remaining(Time, start, deadline), cancellationToken))
                     .ConfigureAwait(false);
             }
 
@@ -386,7 +388,7 @@ public sealed partial record Resilience
             // bounds the attempt rather than the setup.
             leg.StartTimestamp = Time.GetTimestamp();
 
-            var remaining = Remaining(Time, start, Deadline, bounded);
+            var remaining = Remaining(Time, start, deadline);
             var effective = Effective(AttemptTimeout, remaining);
 
             leg.Effective = effective;
@@ -448,7 +450,7 @@ public sealed partial record Resilience
                 // See the sequential loop: when the deadline supplied the ceiling, the ceiling that
                 // fired *was* the deadline, and that is the fact to stop on rather than what the clock
                 // says afterwards.
-                deadlineSpent = bounded && effective != AttemptTimeout;
+                deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
             }
             catch (RateLimitedException limited)
             {

@@ -273,7 +273,12 @@ public sealed partial record Resilience
         // whole design exists to minimize: caching the policy's Backoff in a local costs 56 bytes
         // on every suspending call to save a field load that the JIT keeps in a register anyway.
         // `this` is already a field of the box, so reading a property off it is free.
-        var bounded = Deadline != Timeout.InfiniteTimeSpan;
+        // The effective deadline: the policy's own, or the tighter of it and the one this call
+        // inherited from its caller. Resolved once here rather than per attempt, because an inbound
+        // deadline is a fixed point in time and re-reading the AsyncLocal it lives in would charge
+        // every attempt for a value that cannot have changed. Costs 8 bytes of state-machine box on
+        // the suspending path for every caller, set or not; see Budgets.AmbientDeadlineDelta.
+        var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
 
         // The one local the breaker and budget add to the box, at 8 bytes: either the policy's own
@@ -316,7 +321,7 @@ public sealed partial record Resilience
                 if (!admitted)
                 {
                     reason = StopReason.DependencyUnavailable;
-                    var pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
+                    var pause = GuardDelay(Remaining(Time, start, deadline));
 
                     if (OnEvent is not null)
                         Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
@@ -344,7 +349,7 @@ public sealed partial record Resilience
 
             try
             {
-                var remaining = Remaining(Time, start, Deadline, bounded);
+                var remaining = Remaining(Time, start, deadline);
 
                 if (remaining == TimeSpan.Zero)
                 {
@@ -362,7 +367,7 @@ public sealed partial record Resilience
                     await beforeAttempt(new NextAttempt(log.Count + 1, verdict, error, remaining, cancellationToken)).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    remaining = Remaining(Time, start, Deadline, bounded);
+                    remaining = Remaining(Time, start, deadline);
 
                     if (remaining == TimeSpan.Zero)
                     {
@@ -439,7 +444,7 @@ public sealed partial record Resilience
                     // remainder. Reading the clock instead spends the rest of the attempt budget on
                     // attempts that are cancelled before they can send anything, and reports
                     // AttemptsExhausted for a call the deadline stopped.
-                    deadlineSpent = bounded && effective != AttemptTimeout;
+                    deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
                 }
                 catch (RateLimitedException limited)
                 {
@@ -472,13 +477,13 @@ public sealed partial record Resilience
                 }
 
                 var next = AfterAttempt(
-                    ref log, ref recorded, start, attemptStart, bounded, attemptSource is not null, effective, deadlineSpent,
+                    ref log, ref recorded, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
                     verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
                 {
                     var succeeded = shaper.WantsLogOnSuccess
-                        ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
+                        ? log.Materialize(Time.GetElapsedTime(start), deadline)
                         : AttemptLog.Empty;
 
                     return shaper.Success(value, succeeded);
@@ -507,7 +512,7 @@ public sealed partial record Resilience
             }
         }
 
-        var attempts = log.Materialize(Time.GetElapsedTime(start), Deadline, bounded);
+        var attempts = log.Materialize(Time.GetElapsedTime(start), deadline);
 
         // Read after the guarded delay rather than before it, which is both more accurate - the
         // hint is that much shorter by the time the caller sees it - and keeps a TimeSpan? out of
@@ -519,7 +524,7 @@ public sealed partial record Resilience
             _ => null,
         };
 
-        return shaper.Failure(value, hasValue, error, reason, Deadline, attempts, retryAfter);
+        return shaper.Failure(value, hasValue, error, reason, deadline, attempts, retryAfter);
     }
 
     /// <summary>
@@ -558,7 +563,12 @@ public sealed partial record Resilience
     {
         var admit = Admit!;
 
-        var bounded = Deadline != Timeout.InfiniteTimeSpan;
+        // The effective deadline: the policy's own, or the tighter of it and the one this call
+        // inherited from its caller. Resolved once here rather than per attempt, because an inbound
+        // deadline is a fixed point in time and re-reading the AsyncLocal it lives in would charge
+        // every attempt for a value that cannot have changed. Costs 8 bytes of state-machine box on
+        // the suspending path for every caller, set or not; see Budgets.AmbientDeadlineDelta.
+        var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
         var start = Time.GetTimestamp();
@@ -584,7 +594,7 @@ public sealed partial record Resilience
                 if (!admitted)
                 {
                     reason = StopReason.DependencyUnavailable;
-                    var pause = GuardDelay(Remaining(Time, start, Deadline, bounded));
+                    var pause = GuardDelay(Remaining(Time, start, deadline));
 
                     if (OnEvent is not null)
                         Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
@@ -606,7 +616,7 @@ public sealed partial record Resilience
 
             try
             {
-                var remaining = Remaining(Time, start, Deadline, bounded);
+                var remaining = Remaining(Time, start, deadline);
 
                 if (remaining == TimeSpan.Zero)
                 {
@@ -620,7 +630,7 @@ public sealed partial record Resilience
                     await beforeAttempt(new NextAttempt(log.Count + 1, verdict, error, remaining, cancellationToken)).ConfigureAwait(false);
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    remaining = Remaining(Time, start, Deadline, bounded);
+                    remaining = Remaining(Time, start, deadline);
 
                     if (remaining == TimeSpan.Zero)
                     {
@@ -685,7 +695,7 @@ public sealed partial record Resilience
                 {
                     verdict = Verdict.Transient;
                     error = new AttemptTimeoutException(effective, canceled);
-                    deadlineSpent = bounded && effective != AttemptTimeout;
+                    deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
                 }
                 catch (RateLimitedException limited)
                 {
@@ -710,13 +720,13 @@ public sealed partial record Resilience
                 }
 
                 var next = AfterAttempt(
-                    ref log, ref recorded, start, attemptStart, bounded, attemptSource is not null, effective, deadlineSpent,
+                    ref log, ref recorded, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
                     verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
                 {
                     var succeeded = shaper.WantsLogOnSuccess
-                        ? log.Materialize(Time.GetElapsedTime(start), Deadline, bounded)
+                        ? log.Materialize(Time.GetElapsedTime(start), deadline)
                         : AttemptLog.Empty;
 
                     return shaper.Success(value, succeeded);
@@ -745,7 +755,7 @@ public sealed partial record Resilience
             }
         }
 
-        var attempts = log.Materialize(Time.GetElapsedTime(start), Deadline, bounded);
+        var attempts = log.Materialize(Time.GetElapsedTime(start), deadline);
 
         var retryAfter = reason switch
         {
@@ -754,7 +764,7 @@ public sealed partial record Resilience
             _ => null,
         };
 
-        return shaper.Failure(value, hasValue, error, reason, Deadline, attempts, retryAfter);
+        return shaper.Failure(value, hasValue, error, reason, deadline, attempts, retryAfter);
     }
 
     /// <summary>
@@ -815,7 +825,7 @@ public sealed partial record Resilience
     /// </param>
     /// <param name="start">Timestamp the whole call started at.</param>
     /// <param name="attemptStart">Timestamp this attempt started at.</param>
-    /// <param name="bounded">Whether <see cref="Deadline" /> is finite.</param>
+    /// <param name="deadline">The effective deadline: <see cref="Deadline" />, clamped by an inbound one when <see cref="UseAmbientDeadline" /> is set.</param>
     /// <param name="timed">
     ///     Whether this attempt was given a cancellable ceiling, which is what makes an overrun
     ///     measurable and therefore reportable as <see cref="CallEventKind.OrphanedWork" />.
@@ -842,7 +852,7 @@ public sealed partial record Resilience
         ref bool recorded,
         long start,
         long attemptStart,
-        bool bounded,
+        TimeSpan deadline,
         bool timed,
         TimeSpan effective,
         bool deadlineSpent,
@@ -859,7 +869,7 @@ public sealed partial record Resilience
             ref log, ref recorded, start, Time.GetElapsedTime(start, attemptStart).Ticks, Time.GetElapsedTime(attemptStart),
             timed, effective, verdict, error, in value, hasValue, AttemptFlags.None);
 
-        return Decide(log.Count, start, bounded, deadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken, out wait, out reason);
+        return Decide(log.Count, start, deadline, deadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken, out wait, out reason);
     }
 
     /// <summary>
@@ -949,7 +959,7 @@ public sealed partial record Resilience
     /// <typeparam name="T">What the callback returns, or <c>VoidResult</c>.</typeparam>
     /// <param name="attempts">How many attempts have been recorded, which is the number this one is.</param>
     /// <param name="start">Timestamp the whole call started at.</param>
-    /// <param name="bounded">Whether <see cref="Deadline" /> is finite.</param>
+    /// <param name="deadline">The effective deadline: <see cref="Deadline" />, clamped by an inbound one when <see cref="UseAmbientDeadline" /> is set.</param>
     /// <param name="deadlineSpent">Whether the ceiling that fired was the deadline rather than <see cref="AttemptTimeout" />.</param>
     /// <param name="verdict">How the outcome being judged was classified.</param>
     /// <param name="error">What it threw, if it threw.</param>
@@ -963,7 +973,7 @@ public sealed partial record Resilience
     private NextStep Decide<T>(
         int attempts,
         long start,
-        bool bounded,
+        TimeSpan deadline,
         bool deadlineSpent,
         Verdict verdict,
         Exception? error,
@@ -976,6 +986,10 @@ public sealed partial record Resilience
     {
         wait = TimeSpan.Zero;
         reason = StopReason.Succeeded;
+
+        // Derived rather than passed: everything here is synchronous, so a comparison costs a register
+        // and a parameter would cost a slot on a call the loop makes once per attempt.
+        var bounded = deadline != Timeout.InfiniteTimeSpan;
 
         if (verdict.Kind == VerdictKind.Ok)
         {
@@ -1023,7 +1037,7 @@ public sealed partial record Resilience
             return NextStep.Stop;
         }
 
-        var left = Remaining(Time, start, Deadline, bounded);
+        var left = Remaining(Time, start, deadline);
 
         if (left == TimeSpan.Zero || deadlineSpent)
         {
@@ -1167,9 +1181,9 @@ public sealed partial record Resilience
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static TimeSpan Remaining(TimeProvider time, long start, TimeSpan deadline, bool bounded)
+    internal static TimeSpan Remaining(TimeProvider time, long start, TimeSpan deadline)
     {
-        if (!bounded)
+        if (deadline == Timeout.InfiniteTimeSpan)
             return Timeout.InfiniteTimeSpan;
 
         var left = deadline - time.GetElapsedTime(start);
@@ -1177,7 +1191,7 @@ public sealed partial record Resilience
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static TimeSpan Effective(TimeSpan attemptTimeout, TimeSpan remaining)
+    internal static TimeSpan Effective(TimeSpan attemptTimeout, TimeSpan remaining)
     {
         if (attemptTimeout == Timeout.InfiniteTimeSpan)
             return remaining;

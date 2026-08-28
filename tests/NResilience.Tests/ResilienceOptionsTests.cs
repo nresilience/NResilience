@@ -432,6 +432,22 @@ public sealed class ResilienceOptionsTests
     }
 
     /// <summary>
+    ///     Off by default and in every preset. Inheriting an inbound deadline is a deliberate
+    ///     configuration decision since the policy cannot see this bound at definition time.
+    /// </summary>
+    [Fact]
+    public void An_unmentioned_ambient_deadline_stays_off()
+    {
+        Assert.False(new ResilienceOptions().ToPolicy().UseAmbientDeadline);
+        Assert.False(new ResilienceOptions { Preset = "Http" }.ToPolicy().UseAmbientDeadline);
+
+        // And a section that mentions it wins over a baseline that had it on, in both directions.
+        var baseline = Resilience.Http with { UseAmbientDeadline = true };
+        Assert.False(new ResilienceOptions { UseAmbientDeadline = false }.ToPolicy(baseline).UseAmbientDeadline);
+        Assert.True(new ResilienceOptions().ToPolicy(baseline).UseAmbientDeadline);
+    }
+
+    /// <summary>
     ///     The whole DTO binds from one section, which is the claim the design makes about it: every
     ///     property is a primitive, a <see cref="TimeSpan" /> or an enum, and the platform's binder
     ///     handles all three.
@@ -446,6 +462,7 @@ public sealed class ResilienceOptionsTests
                 ("Attempts", "5"),
                 ("Deadline", "00:00:10"),
                 ("AttemptTimeout", "00:00:03"),
+                ("UseAmbientDeadline", "true"),
                 ("MaxDelay", "00:00:04"),
                 ("Jitter", "Equal"),
                 ("BudgetFraction", "0.25"),
@@ -459,6 +476,7 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(5, policy.Attempts);
         Assert.Equal(TimeSpan.FromSeconds(10), policy.Deadline);
         Assert.Equal(TimeSpan.FromSeconds(3), policy.AttemptTimeout);
+        Assert.True(policy.UseAmbientDeadline);
         Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.Max);
         Assert.Equal(Jitter.Equal, policy.Backoff.Jitter);
         Assert.Same(Classifier.Http, policy.Classify);

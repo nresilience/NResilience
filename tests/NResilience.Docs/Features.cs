@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Net;
 using Microsoft.Extensions.Time.Testing;
+using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Docs;
@@ -159,6 +160,67 @@ public sealed class Features
         // </snippet:deadline-handle-exception>
 
         Assert.Equal(expected: StopReason.DeadlineExceeded, actual: result.StopReason);
+    }
+
+    [Fact]
+    public async Task A_call_inherits_the_deadline_its_caller_sent()
+    {
+        var time = new FakeTimeProvider();
+
+        // <snippet:deadline-inherit>
+        // The inbound half. The policy is bounded by the inherited deadline, so its
+        // effective deadline is min(Deadline, time the caller is still waiting), resolved once
+        // at the start of the call.
+        var api = Resilience.Http with { UseAmbientDeadline = true };
+
+        // In an ASP.NET Core app, UseResilienceDeadline() publishes what the caller sent. Anywhere else -
+        // a queue consumer reading a deadline off a message, or a test - publish it yourself.
+        using var inbound = ResilienceDeadline.Begin(remaining: TimeSpan.FromMilliseconds(value: 200));
+        // </snippet:deadline-inherit>
+
+        var calls = Sequence.For<int>(time: time).Delays(delay: TimeSpan.FromSeconds(value: 30)).Returns(result: 1);
+        var pending = RunAsync(policy: api with { Time = time, AttemptTimeout = Timeout.InfiniteTimeSpan }, calls: calls);
+
+        time.Advance(delta: TimeSpan.FromSeconds(value: 1));
+        var result = await pending;
+
+        // Stopped by the caller's 200 ms rather than by the policy's own 30 s, and reported against the
+        // deadline that actually applied.
+        Assert.Equal(expected: StopReason.DeadlineExceeded, actual: result.StopReason);
+
+        // At most the 200 ms the caller sent - the inbound deadline is measured against the system clock
+        // here, because that is the clock the snippet's Begin defaults to.
+        var reported = Assert.IsType<DeadlineExceededException>(@object: result.Exception).Deadline;
+        Assert.InRange(actual: reported, low: TimeSpan.FromMilliseconds(value: 100), high: TimeSpan.FromMilliseconds(value: 200));
+    }
+
+    [Fact]
+    public async Task Each_attempt_tells_the_peer_how_long_it_will_be_waited_for()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var transport = new ScriptedHttpHandler().Respond(status: HttpStatusCode.OK);
+        var uri = new Uri(uriString: "https://api.example.com/orders");
+
+        // <snippet:deadline-propagate>
+        // The outbound half. Every attempt carries the time this side is prepared to wait:
+        // min(AttemptTimeout, time left on the deadline). This allows peers to stop
+        // work that is no longer needed. Off by default.
+        var api = Resilience.Http with
+        {
+            Deadline = TimeSpan.FromSeconds(value: 10),
+            AttemptTimeout = TimeSpan.FromSeconds(value: 3),
+        };
+
+        var options = new HttpResilienceOptions { PropagateDeadline = true };
+
+        using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: transport, policy: api, options: options));
+        using var response = await client.GetAsync(requestUri: uri, cancellationToken: cancellationToken);
+
+        // X-Deadline-Ms: 3000 on the first attempt, and less on every attempt after it.
+        // </snippet:deadline-propagate>
+
+        Assert.True(condition: transport.Requests[index: 0].Headers.TryGetValues(name: ResilienceDeadline.Header, out var sent));
+        Assert.Equal(expected: "3000", actual: sent.Single());
     }
 
     [Fact]

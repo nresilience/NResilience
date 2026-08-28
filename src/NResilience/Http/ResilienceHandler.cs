@@ -142,7 +142,7 @@ public sealed class ResilienceHandler : DelegatingHandler
 
         // A hedged policy runs the callback concurrently and disposes every response it discards, so the
         // call must not also dispose "the previous one" - there is no such thing when attempts overlap.
-        var call = new HttpCall(request, _send, retrying, disposeSuperseded: policy.Hedge is null);
+        var call = new HttpCall(request, _send, retrying, disposeSuperseded: policy.Hedge is null, deadline: StampFor(policy));
 
         if (retrying)
             await call.BufferAsync(cancellationToken).ConfigureAwait(false);
@@ -198,6 +198,31 @@ public sealed class ResilienceHandler : DelegatingHandler
         }
 
         return found;
+    }
+
+    /// <summary>
+    ///     Tells the peer how long this side is prepared to wait, or null when
+    ///     <see cref="HttpResilienceOptions.PropagateDeadline" /> is off.
+    /// </summary>
+    /// <remarks>
+    ///     The clock is read here because the executor cannot return a timestamp. Reading it before
+    ///     buffering the body makes the figure slightly conservative, ensuring the peer is told it
+    ///     has no more time than it actually does.
+    /// </remarks>
+    private DeadlineStamp? StampFor(Resilience policy)
+    {
+        if (!Options.PropagateDeadline)
+            return null;
+
+        // The same clamp the executor is about to apply. Read here as well because the handler has to
+        // put a number on the wire before the executor has started, and the inbound deadline is what
+        // makes that number honest.
+        var deadline = policy.UseAmbientDeadline ? ResilienceDeadline.Clamp(policy.Deadline) : policy.Deadline;
+
+        if (deadline == Timeout.InfiniteTimeSpan && policy.AttemptTimeout == Timeout.InfiniteTimeSpan)
+            return null;
+
+        return new DeadlineStamp(Options.DeadlineHeader, deadline, policy.AttemptTimeout, policy.Time.GetTimestamp(), policy.Time);
     }
 
     private bool ShouldRetry(HttpRequestMessage request) => Policy.Attempts > 1 && IsRepeatable(request);

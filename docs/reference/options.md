@@ -36,6 +36,24 @@ If `logging` is `null`, the process default is used. Registered policies log und
 
 If the policy does not have its own name, it is named after the client. This prevents multiple clients using `Resilience.Http` from all reporting under the same name in telemetry.
 
+## `UseResilienceDeadline` on `IApplicationBuilder`
+
+`UseResilienceDeadline` is in the `NResilience.AspNetCore` package, which is separate because it is the only part of NResilience that requires ASP.NET Core. It reads the deadline a caller sent and publishes it for the rest of the request, so every policy with `UseAmbientDeadline` set is bounded by `min(its own deadline, the time the caller is still waiting)`.
+
+| Overload | Description |
+| :--- | :--- |
+| `UseResilienceDeadline(Action<ResilienceDeadlineOptions>? configure = null)` | Adds the middleware. Register it before anything that makes an outbound call. |
+
+`ResilienceDeadlineOptions` is a `sealed class`:
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Header` | `"X-Deadline-Ms"` | The header carrying whole milliseconds left. |
+| `Maximum` | `null` | The longest inbound deadline this service believes. A header above it is ignored. `null` believes any of them. |
+| `Reserve` | `TimeSpan.Zero` | How much of the inbound deadline is kept back for this service's own work, and therefore withheld from outbound calls. |
+
+The clock is `TimeProvider` from the container when one is registered, and `TimeProvider.System` otherwise. An expired inbound deadline does not fail the request; it fails the outbound calls, which is the distinction [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) explains.
+
 ## `IResiliencePolicies`
 
 The `IResiliencePolicies` service provides access to registered policies.
@@ -53,7 +71,7 @@ The `IResiliencePolicies` service provides access to registered policies.
 `ResilienceOptions` is a `sealed class` used for binding configuration to a policy. All properties are nullable; a `null` value indicates that the property should not be overridden.
 
 **Properties**:
-`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Hedge`, `Telemetry`, `Logging`.
+`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Hedge`, `Telemetry`, `Logging`.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. This method does not perform validation; validation occurs at registration or execution.
 - **Budget Disabling**: Setting `BudgetFraction = 0` disables the retry budget.

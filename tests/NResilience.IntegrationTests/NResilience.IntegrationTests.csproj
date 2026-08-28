@@ -19,14 +19,21 @@
     <PackageReference Include="xunit.v3"/>
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing"/>
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
-    <PackageReference Include="Microsoft.Extensions.Hosting"/>
-    <PackageReference Include="Microsoft.Extensions.Http"/>
-    <PackageReference Include="Microsoft.Extensions.Logging"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      The deadline middleware, and the ASP.NET Core shared framework it needs. Its tests live here
+      rather than in the behavioural suite because what is worth asserting about a middleware is what
+      a real server does with a real request - and because the framework reference belongs in the one
+      test project that already runs on net10.0 only.
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App"/>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
+    <ProjectReference Include="../../src/NResilience.AspNetCore/NResilience.AspNetCore.csproj"/>
     <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj"/>
   </ItemGroup>

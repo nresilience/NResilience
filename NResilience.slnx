@@ -24,6 +24,7 @@
   <Folder Name="/Tools/">
     <Project Path="tools/NResilience.DocSnippets/NResilience.DocSnippets.csproj" />
   </Folder>
+  <Project Path="src/NResilience.AspNetCore/NResilience.AspNetCore.csproj" />
   <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj" />
   <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
   <Project Path="src/NResilience/NResilience.csproj" />

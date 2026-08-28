@@ -10,7 +10,7 @@ The **executor** is the internal loop that manages the execution of each attempt
 
 | Topic | Types and Members |
 | :--- | :--- |
-| [`Resilience`](resilience.md) | `Resilience`, execution methods, `NextAttempt` |
+| [`Resilience`](resilience.md) | `Resilience`, execution methods, `NextAttempt`, `ResilienceDeadline` |
 | [`CallResult<T>`](call-result.md) | `CallResult<T>`, `CallResult`, `StopReason`, `AttemptLog`, `Attempt` |
 | [Classifier and verdicts](classifier.md) | `Classifier`, `Verdict`, `VerdictKind` |
 | [`Backoff`](backoff.md) | `Backoff`, `BackoffKind`, `Jitter` |
@@ -19,6 +19,6 @@ The **executor** is the internal loop that manages the execution of each attempt
 | [`CallEvent`](events.md) | `CallEvent`, `CallEventKind` |
 | [Exceptions](exceptions.md) | `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, `ResilienceConfigurationException` |
 | [HTTP](http.md) | `ResilienceHandler`, `HttpResilienceOptions`, `ResilienceHttp` |
-| [Options and registration](options.md) | `ResilienceOptions`, `BreakerOptions`, `IResiliencePolicies`, `ResilienceTelemetry`, `AddResilience` |
+| [Options and registration](options.md) | `ResilienceOptions`, `BreakerOptions`, `IResiliencePolicies`, `ResilienceTelemetry`, `AddResilience`, `UseResilienceDeadline` |
 | [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder`, `TestPolicy`, `ScriptedHttpHandler`, `SentRequest` |
 | [Analyzers](analyzers.md) | Diagnostics `NRES001` through `NRES007` |

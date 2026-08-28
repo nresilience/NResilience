@@ -65,6 +65,12 @@ public sealed class ResilienceOptions
     /// <summary><see cref="Resilience.AttemptTimeout" />.</summary>
     public TimeSpan? AttemptTimeout { get; set; }
 
+    /// <summary>
+    ///     <see cref="Resilience.UseAmbientDeadline" /> - whether the deadline is clamped by the one the
+    ///     current request inherited from its caller. Off by default.
+    /// </summary>
+    public bool? UseAmbientDeadline { get; set; }
+
     /// <summary>The first delay after a <see cref="VerdictKind.Transient" /> failure.</summary>
     public TimeSpan? TransientBaseDelay { get; set; }
 
@@ -155,6 +161,9 @@ public sealed class ResilienceOptions
 
         if (AttemptTimeout is { } attemptTimeout)
             policy = policy with { AttemptTimeout = attemptTimeout };
+
+        if (UseAmbientDeadline is { } ambient)
+            policy = policy with { UseAmbientDeadline = ambient };
 
         if (Name is { } name)
             policy = policy with { Name = name };

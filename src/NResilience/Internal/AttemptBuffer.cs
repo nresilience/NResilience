@@ -168,7 +168,7 @@ internal struct AttemptSink
         }
     }
 
-    public AttemptLog Materialize(TimeSpan elapsed, TimeSpan deadline, bool bounded)
+    public AttemptLog Materialize(TimeSpan elapsed, TimeSpan deadline)
     {
         if (Count == 0)
             return AttemptLog.Empty;
@@ -194,7 +194,7 @@ internal struct AttemptSink
 
             var error = _exceptions is not null && i < _exceptions.Length ? _exceptions[i] : null;
 
-            var remaining = bounded
+            var remaining = deadline != Timeout.InfiniteTimeSpan
                 ? deadline.Ticks > start ? TimeSpan.FromTicks(deadline.Ticks - start) : TimeSpan.Zero
                 : Timeout.InfiniteTimeSpan;
 

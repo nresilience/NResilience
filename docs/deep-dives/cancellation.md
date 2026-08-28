@@ -44,6 +44,22 @@ This is a common failure mode in resilience libraries. Rather than racing the at
 
 While the library cannot fix uncooperative code that never finishes, it prevents forgetting the token and provides diagnostics when it happens. If a call hangs indefinitely, a stack dump is the necessary diagnostic tool.
 
+## The deadline a caller sent
+
+A deadline is the honest bound on a call, and the argument for it over a per-attempt timeout is that only the deadline answers the question the caller actually asked: how long will I be waiting. That argument stops working at the process edge. A service holding 200 ms of its caller's patience sends a request that the next service will happily work on for ten seconds, and the work is garbage before it finishes. Nobody in the chain is behaving unreasonably; nobody has the number they would need to behave otherwise.
+
+`UseAmbientDeadline` passes the number. The effective deadline becomes `min(Deadline, the time the caller is still waiting)`, and no new concept enters the model: the attempt ceiling was already `min(AttemptTimeout, time left)`, so a shorter deadline shortens the attempts, the backoff that will not fit, and the retry that would start too late - all through arithmetic that was already there. This is also the honest answer to the local-versus-fleet objection: it makes a bound true across a call graph without coordinating any state, by passing one number that needs no coordination.
+
+Three decisions in it are worth stating, because each one costs something.
+
+**It is opt-in.** The inbound deadline lives in an `AsyncLocal<T>`, and reading one is not free. Most calls in most processes have no inbound deadline to read, so the read is behind a policy property rather than always-on. A policy that leaves it false pays one branch per call.
+
+**The read happens once per call, not once per attempt.** An inbound deadline is a fixed point in time, so re-reading it can only ever produce the same answer more expensively - and the callers who would pay for that are exactly the ones who opted in. Resolving it once means the effective deadline is a local, live across the attempt `await`, and therefore a field in the state-machine box of *every* suspending call: **16 bytes**, whether or not anybody set the property. The budgets in `tests/NResilience.Gates/Budgets.cs` record the move and the reasoning; the shipping loop now sits 9 B above the hand-written floor it is measured against, which is stated there rather than smoothed over.
+
+**The policy is not derived per call.** The tempting alternative - clamp by handing the loops a `policy with { Deadline = clamped }` - would cost non-users nothing at all. It is wrong for a reason that has nothing to do with allocation: the automatic retry budget and the hedging latency window are keyed by policy instance, so a fresh policy per call would hand every call a fresh budget and a fresh latency estimate. A budget that resets on every call is not a budget. The 16 bytes buy a clamp that leaves both of those where they are.
+
+An inherited deadline that has already expired stops the call before it starts: no attempt runs, `DeadlineExceededException` reports the deadline that applied, and the dependency is never asked for an answer nobody is waiting for. That is the whole point of the feature, and it is why the inbound middleware does not reject the request itself - the request may still be answerable from cache, and refusing it would be a policy decision the library has no standing to make.
+
 ## `HttpClient.Timeout`
 
 The transport timeout is a bound that the resilience policy cannot see. By default, it is 100 seconds and covers the entire send operation, including all retries and backoff delays. Because having two silent timeout systems is problematic, the NResilience HTTP integration takes ownership of this setting. For more information, see the [HTTP guide](../http/index.md).
