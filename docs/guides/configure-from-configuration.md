@@ -42,7 +42,7 @@ The `AddResilience` method expects a configuration section structured as follows
       "Breaker": {
         "ConsecutiveFailures": 5,
         "BreakDuration": "00:00:15",
-        "SlowCallThreshold": "00:00:02"
+        "SlowCalls": { "Multiple": 3 }
       }
     },
     "reports": {

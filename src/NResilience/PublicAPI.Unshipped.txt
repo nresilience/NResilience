@@ -43,6 +43,7 @@ NResilience.Breaker.Breaker(NResilience.BreakerSettings? settings = null) -> voi
 NResilience.Breaker.Isolate() -> void
 NResilience.Breaker.Name.get -> string?
 NResilience.Breaker.Name.init -> void
+NResilience.Breaker.NormalLatency.get -> System.TimeSpan?
 NResilience.Breaker.OpenedAt.get -> System.DateTimeOffset?
 NResilience.Breaker.Reset() -> void
 NResilience.Breaker.Settings.get -> NResilience.BreakerSettings!
@@ -69,6 +70,8 @@ NResilience.BreakerSettings.SlowCallRatio.get -> double
 NResilience.BreakerSettings.SlowCallRatio.init -> void
 NResilience.BreakerSettings.SlowCallThreshold.get -> System.TimeSpan?
 NResilience.BreakerSettings.SlowCallThreshold.init -> void
+NResilience.BreakerSettings.SlowCalls.get -> NResilience.SlowCalls?
+NResilience.BreakerSettings.SlowCalls.init -> void
 NResilience.BreakerSettings.Time.get -> System.TimeProvider!
 NResilience.BreakerSettings.Time.init -> void
 NResilience.BreakerSettings.Validate() -> void
@@ -256,6 +259,17 @@ NResilience.RetryBudget.IsAutomatic.get -> bool
 NResilience.RetryBudget.IsNone.get -> bool
 NResilience.RetryBudget.Name.get -> string?
 NResilience.RetryBudget.Utilization.get -> double
+NResilience.SlowCalls
+NResilience.SlowCalls.Equals(NResilience.SlowCalls other) -> bool
+NResilience.SlowCalls.MinimumSamples.get -> int
+NResilience.SlowCalls.MinimumSamples.init -> void
+NResilience.SlowCalls.Multiple.get -> double
+NResilience.SlowCalls.Multiple.init -> void
+NResilience.SlowCalls.Quantile.get -> double
+NResilience.SlowCalls.Quantile.init -> void
+NResilience.SlowCalls.SlowCalls() -> void
+NResilience.SlowCalls.Window.get -> System.TimeSpan
+NResilience.SlowCalls.Window.init -> void
 NResilience.StopReason
 NResilience.StopReason.AttemptsExhausted = 2 -> NResilience.StopReason
 NResilience.StopReason.BudgetExhausted = 4 -> NResilience.StopReason
@@ -289,6 +303,8 @@ override NResilience.Hedge.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
 override NResilience.Resilience.GetHashCode() -> int
 override NResilience.Resilience.ToString() -> string!
+override NResilience.SlowCalls.GetHashCode() -> int
+override NResilience.SlowCalls.ToString() -> string!
 override NResilience.Verdict.Equals(object? obj) -> bool
 override NResilience.Verdict.GetHashCode() -> int
 override NResilience.Verdict.ToString() -> string!
@@ -332,6 +348,9 @@ static NResilience.RetryBudget.Automatic.get -> NResilience.RetryBudget!
 static NResilience.RetryBudget.None.get -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Of(double fraction = 0.1, int minimumPerSecond = 3, System.TimeProvider? time = null) -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Shared(string! name, double fraction = 0.1, int minimumPerSecond = 3) -> NResilience.RetryBudget!
+static NResilience.SlowCalls.Above(double multiple = 3) -> NResilience.SlowCalls
+static NResilience.SlowCalls.operator !=(NResilience.SlowCalls left, NResilience.SlowCalls right) -> bool
+static NResilience.SlowCalls.operator ==(NResilience.SlowCalls left, NResilience.SlowCalls right) -> bool
 static NResilience.Verdict.Limited(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Ok.get -> NResilience.Verdict
 static NResilience.Verdict.Permanent.get -> NResilience.Verdict
@@ -343,3 +362,4 @@ static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Ver
 ~override NResilience.Backoff.Equals(object obj) -> bool
 ~override NResilience.Backoff.ToString() -> string
 ~override NResilience.Hedge.Equals(object obj) -> bool
+~override NResilience.SlowCalls.Equals(object obj) -> bool

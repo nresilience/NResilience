@@ -51,6 +51,34 @@ public sealed class Guards
     }
 
     [Fact]
+    public void A_breaker_can_learn_what_slow_means()
+    {
+        // <snippet:breaker-adaptive-slow-calls>
+        // "3x slower than usual" ports to any dependency. "800 ms" does not: it is a number you
+        // have to guess per dependency, before that dependency has ever run in production, and
+        // re-guess every time its latency changes. The breaker measures normal itself, from the
+        // successful attempts it already samples.
+        var breaker = new Breaker(settings: new BreakerSettings
+        {
+            SlowCalls = SlowCalls.Above(multiple: 3), // slow = 3x the recent median
+            SlowCallRatio = 0.5, // half the window being slow trips it
+            MinimumCalls = 20,
+        })
+        {
+            Name = "search",
+        };
+
+        // What the dependency normally costs, as this breaker measures it. Worth graphing; null
+        // until 20 successful calls have landed, and the trip is not armed until then either.
+        var normal = breaker.NormalLatency;
+
+        // </snippet:breaker-adaptive-slow-calls>
+
+        Assert.Null(normal);
+        Assert.Equal(expected: 3, actual: breaker.Settings.SlowCalls!.Value.Multiple);
+    }
+
+    [Fact]
     public void A_breaker_can_be_read_and_driven_by_an_operator()
     {
         var breaker = new Breaker { Name = "payments" };

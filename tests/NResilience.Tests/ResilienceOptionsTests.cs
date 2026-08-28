@@ -320,6 +320,50 @@ public sealed class ResilienceOptionsTests
     public void A_policy_with_no_hedge_section_does_not_hedge() =>
         Assert.Null(new ResilienceOptions { Attempts = 3 }.ToPolicy().Hedge);
 
+    /// <summary>
+    ///     The same arrangement for the adaptive slow-call trip, and for the same reason: the presence
+    ///     of the section arms it, and every default is usable, so <c>"SlowCalls": {}</c> is a complete
+    ///     brownout trip that needs nobody to have guessed a millisecond figure.
+    /// </summary>
+    [Fact]
+    public void An_empty_slow_calls_section_is_a_complete_brownout_trip()
+    {
+        var options = new ResilienceOptions();
+        Config(("Breaker:SlowCalls:Multiple", "5")).Bind(options);
+
+        var slow = Assert.NotNull(options.ToPolicy().Breaker!.Settings.SlowCalls);
+
+        Assert.Equal(5, slow.Multiple);
+        Assert.Equal(0.5, slow.Quantile);
+        Assert.Equal(TimeSpan.FromMinutes(5), slow.Window);
+        Assert.Equal(20, slow.MinimumSamples);
+    }
+
+    [Fact]
+    public void Every_slow_call_setting_projects()
+    {
+        var policy = new ResilienceOptions
+        {
+            Breaker = new BreakerOptions
+            {
+                SlowCalls = new SlowCallOptions
+                {
+                    Multiple = 4,
+                    Quantile = 0.25,
+                    Window = TimeSpan.FromMinutes(10),
+                    MinimumSamples = 100,
+                },
+            },
+        }.ToPolicy();
+
+        var slow = Assert.NotNull(policy.Breaker!.Settings.SlowCalls);
+
+        Assert.Equal(4, slow.Multiple);
+        Assert.Equal(0.25, slow.Quantile);
+        Assert.Equal(TimeSpan.FromMinutes(10), slow.Window);
+        Assert.Equal(100, slow.MinimumSamples);
+    }
+
     [Fact]
     public void Every_hedge_setting_projects()
     {

@@ -327,6 +327,13 @@ public sealed class BreakerOptions
     /// </summary>
     public TimeSpan? SlowCallThreshold { get; set; }
 
+    /// <summary>
+    ///     <see cref="BreakerSettings.SlowCalls" /> - the same brownout trip stated as a multiple of
+    ///     measured normal latency instead of a constant. A section of its own, so its presence is what
+    ///     turns it on. Set this or <see cref="SlowCallThreshold" />, not both.
+    /// </summary>
+    public SlowCallOptions? SlowCalls { get; set; }
+
     /// <summary><see cref="BreakerSettings.SlowCallRatio" />.</summary>
     public double? SlowCallRatio { get; set; }
 
@@ -369,9 +376,55 @@ public sealed class BreakerOptions
         if (SlowCallThreshold is { } slow)
             settings = settings with { SlowCallThreshold = slow };
 
+        if (SlowCalls is { } adaptive)
+            settings = settings with { SlowCalls = adaptive.ToSlowCalls() };
+
         if (SlowCallRatio is { } slowRatio)
             settings = settings with { SlowCallRatio = slowRatio };
 
         return new Breaker(settings) { Name = name };
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.SlowCalls" />.
+///     <para>
+///         A section rather than four flat properties, so <c>"SlowCalls": { "Multiple": 3 }</c> is a
+///         complete configuration and the presence of the section is what arms the adaptive trip.
+///     </para>
+/// </summary>
+public sealed class SlowCallOptions
+{
+    /// <summary>
+    ///     <see cref="NResilience.SlowCalls.Multiple" />. Defaults to 3, so <c>"SlowCalls": {}</c> is a
+    ///     complete configuration.
+    /// </summary>
+    public double? Multiple { get; set; }
+
+    /// <summary><see cref="NResilience.SlowCalls.Quantile" />.</summary>
+    public double? Quantile { get; set; }
+
+    /// <summary><see cref="NResilience.SlowCalls.Window" />.</summary>
+    public TimeSpan? Window { get; set; }
+
+    /// <summary><see cref="NResilience.SlowCalls.MinimumSamples" />.</summary>
+    public int? MinimumSamples { get; set; }
+
+    /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
+    /// <returns>The configuration.</returns>
+    public SlowCalls ToSlowCalls()
+    {
+        var slow = NResilience.SlowCalls.Above(Multiple ?? 3.0);
+
+        if (Quantile is { } quantile)
+            slow = slow with { Quantile = quantile };
+
+        if (Window is { } window)
+            slow = slow with { Window = window };
+
+        if (MinimumSamples is { } samples)
+            slow = slow with { MinimumSamples = samples };
+
+        return slow;
     }
 }

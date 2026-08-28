@@ -36,6 +36,7 @@ Each guard is one entry in the check's `Data` dictionary:
 | Key | Value |
 | :--- | :--- |
 | `breaker:<name>` | `Closed`, `HalfOpen`, or `Open since <timestamp>` / `Isolated since <timestamp>`. |
+| `breaker:<name>:normal` | For a breaker with `SlowCalls` configured, the measured normal latency in milliseconds. Absent until the baseline has enough samples. |
 | `budget:<name>` | Utilization, from 0 to 1. |
 
 For a registered policy, `<name>` is the registration name. For an HTTP client it is `<client>:<host:port>`, so a client talking to three hosts reports three breakers and you can tell which one is in trouble.

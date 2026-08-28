@@ -23,6 +23,8 @@ NResilience.Extensions.BreakerOptions.SlowCallRatio.get -> double?
 NResilience.Extensions.BreakerOptions.SlowCallRatio.set -> void
 NResilience.Extensions.BreakerOptions.SlowCallThreshold.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.SlowCallThreshold.set -> void
+NResilience.Extensions.BreakerOptions.SlowCalls.get -> NResilience.Extensions.SlowCallOptions?
+NResilience.Extensions.BreakerOptions.SlowCalls.set -> void
 NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null, System.TimeProvider? time = null) -> NResilience.Breaker!
 NResilience.Extensions.BreakerOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.Window.set -> void
@@ -129,6 +131,17 @@ NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseli
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.set -> void
 NResilience.Extensions.ResilienceTelemetry
+NResilience.Extensions.SlowCallOptions
+NResilience.Extensions.SlowCallOptions.MinimumSamples.get -> int?
+NResilience.Extensions.SlowCallOptions.MinimumSamples.set -> void
+NResilience.Extensions.SlowCallOptions.Multiple.get -> double?
+NResilience.Extensions.SlowCallOptions.Multiple.set -> void
+NResilience.Extensions.SlowCallOptions.Quantile.get -> double?
+NResilience.Extensions.SlowCallOptions.Quantile.set -> void
+NResilience.Extensions.SlowCallOptions.SlowCallOptions() -> void
+NResilience.Extensions.SlowCallOptions.ToSlowCalls() -> NResilience.SlowCalls
+NResilience.Extensions.SlowCallOptions.Window.get -> System.TimeSpan?
+NResilience.Extensions.SlowCallOptions.Window.set -> void
 const Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExtensions.DefaultName = "resilience" -> string!
 const NResilience.Extensions.ResilienceLogging.CategoryPrefix = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.ActivitySourceName = "NResilience" -> string!

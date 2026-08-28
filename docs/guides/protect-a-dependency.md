@@ -23,7 +23,7 @@ public sealed class Dependencies
     public Breaker Payments { get; } = new(settings: new BreakerSettings
     {
         ConsecutiveFailures = 5,
-        SlowCallThreshold = TimeSpan.FromSeconds(value: 2),
+        SlowCalls = SlowCalls.Above(multiple: 3), // a brownout is 3x normal, whatever normal is
         BreakDuration = TimeSpan.FromSeconds(value: 15),
     })
     {
@@ -46,7 +46,7 @@ public sealed class Dependencies
 ### Key implementation details
 
 - **Breaker scope**: The [circuit breaker](../features/circuit-breaker.md) is defined as a field. Every policy that uses the `Charge` property shares this breaker, ensuring consistent state across all calls to the payment service.
-- **Slow call detection**: The `SlowCallThreshold` ensures the breaker trips during "brownouts" (when the service is slow) as well as during outright failures. This prevents the application from hanging on slow responses.
+- **Slow call detection**: `SlowCalls` ensures the breaker trips during "brownouts" (when the service is slow) as well as during outright failures. It measures what normal looks like for this dependency, so you supply a multiple rather than a millisecond figure. See [Trip on brownouts](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number).
 - **Exponential backoff**: The `BreakDuration` doubles on each consecutive open state (up to `MaxBreakDuration`). This prevents the breaker from reopening on a fixed schedule and overwhelming the dependency during a long outage.
 - **Shared retry budget**: The [retry budget](../features/retry-budget.md) is shared by name. Multiple policies (such as charges and refunds) throttle against a single pool, while unrelated services remain unaffected.
 - **Observability**: The `Name` property is included in every event and metric tag, allowing you to distinguish this dependency from others in your monitoring dashboard.

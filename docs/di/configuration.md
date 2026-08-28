@@ -35,7 +35,7 @@ Every child of the specified section is treated as a policy, with the key servin
       "Breaker": {
         "ConsecutiveFailures": 5,
         "BreakDuration": "00:00:15",
-        "SlowCallThreshold": "00:00:02"
+        "SlowCalls": { "Multiple": 3 }
       }
     },
     "reports": {
@@ -65,6 +65,8 @@ All properties are nullable. A `null` value means the property remains unchanged
 | `Telemetry` | Set to `false` to opt this policy out of the telemetry meter. |
 
 The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md), supporting properties such as `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`.
+
+`Breaker:SlowCalls` is a nested section rather than a flat property, and its presence arms the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number). Every setting has a default, so `"SlowCalls": {}` is complete; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. Set this or `SlowCallThreshold`, not both - a section that sets both is rejected when the breaker is built.
 
 ## Projection via ResilienceOptions
 

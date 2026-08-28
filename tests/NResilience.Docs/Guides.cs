@@ -198,7 +198,7 @@ public sealed class Guides
         public Breaker Payments { get; } = new(settings: new BreakerSettings
         {
             ConsecutiveFailures = 5,
-            SlowCallThreshold = TimeSpan.FromSeconds(value: 2),
+            SlowCalls = SlowCalls.Above(multiple: 3), // a brownout is 3x normal, whatever normal is
             BreakDuration = TimeSpan.FromSeconds(value: 15),
         })
         {

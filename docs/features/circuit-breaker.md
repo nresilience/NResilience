@@ -50,7 +50,8 @@ A circuit breaker can trip based on consecutive failures or based on rates of fa
 | `FailureRatio` | null | An optional rate-based trip condition, evaluated alongside the consecutive failure counter. |
 | `MinimumCalls` | 20 | The minimum number of calls required before a ratio-based trip is evaluated. |
 | `Window` | 30 s | The sliding window over which rates are measured. |
-| `SlowCallThreshold` | null | The latency threshold; any attempt slower than this counts as a slow call. |
+| `SlowCallThreshold` | null | A constant latency threshold; any attempt slower than this counts as a slow call. |
+| `SlowCalls` | null | The same trip, expressed as a multiple of measured normal latency. Set this or `SlowCallThreshold`, not both. |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls within the window that trips the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles on each consecutive open. |
@@ -80,6 +81,43 @@ var breaker = new Breaker(settings: new BreakerSettings
 <!-- endsnippet -->
 
 The breaker samples individual **attempts**. Only `Transient` outcomes count as evidence of failure. `Throttled` responses indicate the dependency is functioning and defending itself, and `Permanent` outcomes are typically client-side issues.
+
+## Trip on brownouts without guessing a number
+
+`SlowCallThreshold` asks for a millisecond figure per dependency, before that dependency has ever run in production, and again every time its latency changes. `SlowCalls` asks for a multiple instead, and lets the breaker measure the rest.
+
+<!-- snippet: breaker-adaptive-slow-calls -->
+```csharp
+// "3x slower than usual" ports to any dependency. "800 ms" does not: it is a number you
+// have to guess per dependency, before that dependency has ever run in production, and
+// re-guess every time its latency changes. The breaker measures normal itself, from the
+// successful attempts it already samples.
+var breaker = new Breaker(settings: new BreakerSettings
+{
+    SlowCalls = SlowCalls.Above(multiple: 3), // slow = 3x the recent median
+    SlowCallRatio = 0.5, // half the window being slow trips it
+    MinimumCalls = 20,
+})
+{
+    Name = "search",
+};
+
+// What the dependency normally costs, as this breaker measures it. Worth graphing; null
+// until 20 successful calls have landed, and the trip is not armed until then either.
+var normal = breaker.NormalLatency;
+```
+<!-- endsnippet -->
+
+The breaker keeps a baseline of how long a successful call takes - by default the median over the last five minutes - and counts an attempt as slow when it exceeds `Multiple` times that. Read the baseline back from `Breaker.NormalLatency`.
+
+Two settings make this work rather than decorate it, both with defaults you can leave alone:
+
+- `Quantile` (default 0.5, capped there) is the quantile that counts as normal. A brownout only starts moving the median once it accounts for more than half the baseline window.
+- `Window` (default 5 minutes) is how far back the baseline reaches - ten times the trip window, so the trip window fills with slow calls long before the baseline notices them.
+
+`BreakerSettings.Validate` rejects combinations where the baseline would move first, because such a breaker never opens on latency at all. See [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold) for the arithmetic.
+
+Only successful attempts feed the baseline, and the baseline survives an open, a close, and a `Reset` - it is a measurement of the dependency, not a decision about it. That is what makes a slow probe against a still-degraded dependency recognisable as one.
 
 ## Handle refused calls
 

@@ -68,6 +68,12 @@ internal sealed class ResilienceHealthCheck(
             data[$"breaker:{name}"] = breaker.OpenedAt is { } since
                 ? $"{state} since {since.ToString("O", CultureInfo.InvariantCulture)}"
                 : state.ToString();
+
+            // What an adaptive breaker currently thinks a healthy call to this dependency costs. Only
+            // present when it is configured that way and has enough samples to have an opinion, which
+            // is the same condition under which its slow-call trip is armed at all.
+            if (breaker.NormalLatency is { } normal)
+                data[$"breaker:{name}:normal"] = normal.TotalMilliseconds;
         }
 
         // RetryBudget.None and the Automatic marker both report zero utilization and neither is a

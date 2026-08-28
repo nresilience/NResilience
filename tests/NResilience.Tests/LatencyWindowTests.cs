@@ -247,6 +247,28 @@ public sealed class LatencyWindowTests
         Assert.Equal(1, window.Samples);
     }
 
+    /// <summary>
+    ///     The breaker asks both questions about every attempt it samples, so it asks them together and
+    ///     reads the clock once. The combined form has to be the two separate ones and nothing else.
+    /// </summary>
+    [Fact]
+    public void Recording_and_reading_together_answers_what_the_two_calls_answer()
+    {
+        var combined = New(out _);
+        var separate = New(out _);
+
+        for (var i = 1; i <= 500; i++)
+        {
+            var duration = TimeSpan.FromMilliseconds(i % 50);
+
+            separate.Record(duration);
+
+            Assert.Equal(separate.Threshold(minimumSamples: 20), combined.RecordAndThreshold(duration, minimumSamples: 20));
+        }
+
+        Assert.Equal(separate.Samples, combined.Samples);
+    }
+
     private static LatencyWindow New(out FakeTimeProvider time, double quantile = 0.95)
     {
         time = new FakeTimeProvider();

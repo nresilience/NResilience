@@ -1,3 +1,5 @@
+using NResilience.Internal;
+
 namespace NResilience;
 
 /// <summary>What a <see cref="Breaker" /> is currently doing.</summary>
@@ -78,15 +80,35 @@ public sealed record BreakerSettings
     public TimeSpan Window { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
-    ///     Trip on brownouts, not just errors. An attempt slower than this counts against
+    ///     Trip on brownouts, not just errors: a constant above which an attempt counts against
     ///     <see cref="SlowCallRatio" />, even when it succeeded.
     ///     <para>
     ///         The most common real degradation is not a dependency returning errors, it is a dependency
     ///         returning 200s at 30× normal latency while your thread pool and connection pool fill. An
     ///         error-rate breaker sits closed through the entire incident.
     ///     </para>
+    ///     <para>
+    ///         This is the number an operator has to pick per dependency, in milliseconds, before that
+    ///         dependency has ever run in production. <see cref="SlowCalls" /> is the same trip expressed
+    ///         as a multiple of measured normal latency, which is the form that ports. Set one or the
+    ///         other, not both.
+    ///     </para>
     /// </summary>
     public TimeSpan? SlowCallThreshold { get; init; }
+
+    /// <summary>
+    ///     The same brownout trip as <see cref="SlowCallThreshold" />, defined relative to how long a
+    ///     call to this dependency normally takes: <c>SlowCalls.Above(3)</c> is "three times slower than
+    ///     normal".
+    ///     <para>
+    ///         The breaker measures normal itself, from the successful attempts it already samples, so
+    ///         nothing has to be guessed up front and nothing has to be re-tuned when the dependency's
+    ///         latency changes. See <see cref="NResilience.SlowCalls" /> for why the baseline is a low
+    ///         quantile over a long window, and why both halves of that are required rather than
+    ///         cosmetic.
+    ///     </para>
+    /// </summary>
+    public SlowCalls? SlowCalls { get; init; }
 
     /// <summary>The proportion of slow calls in the window that opens the breaker.</summary>
     public double SlowCallRatio { get; init; } = 0.5;
@@ -168,6 +190,23 @@ public sealed record BreakerSettings
         if (SlowCallThreshold is { } slow && slow <= TimeSpan.Zero)
             problems.Add($"{nameof(SlowCallThreshold)} must be positive, or null for no slow-call trip; it is {slow}.");
 
+        if (SlowCalls is { } adaptive)
+        {
+            if (SlowCallThreshold is not null)
+            {
+                problems.Add(
+                    $"Set {nameof(SlowCallThreshold)} or {nameof(SlowCalls)}, not both; they are the same trip " +
+                    "defined two ways. Keep SlowCalls unless the dependency has a real, externally-fixed budget.");
+            }
+
+            adaptive.Validate(problems);
+
+            // Only worth asking once the two values it is measured against are themselves sane; each of
+            // those has its own message, and a second one derived from a NaN would only be noise.
+            if (Window > TimeSpan.Zero && SlowCallRatio > 0 && SlowCallRatio <= 1)
+                ValidateRace(adaptive, problems);
+        }
+
         if (SlowCallRatio <= 0 || SlowCallRatio > 1 || double.IsNaN(SlowCallRatio))
             problems.Add($"{nameof(SlowCallRatio)} must be in (0, 1]; it is {SlowCallRatio}.");
 
@@ -188,6 +227,39 @@ public sealed record BreakerSettings
 
         if (problems.Count > 0)
             throw new ResilienceConfigurationException(problems);
+    }
+
+    /// <summary>
+    ///     Checks the one thing that is wrong only in combination: an adaptive threshold whose baseline
+    ///     is contaminated by a brownout before the trip window has filled with it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A total brownout starts moving the baseline once it accounts for more than
+    ///         <c>1 - SlowCalls.Quantile</c> of <see cref="NResilience.SlowCalls.Window" />, so the baseline
+    ///         survives for <c>Quantile × Window</c>. The trip needs <see cref="SlowCallRatio" /> of
+    ///         <see cref="Window" /> to fill with slow calls, which takes <c>SlowCallRatio × Window</c>.
+    ///         Lose that race and the breaker cannot open on latency at all - it does not open late, it
+    ///         never opens, because the baseline catches up and the calls stop being slow.
+    ///     </para>
+    ///     <para>
+    ///         A factor of two is the margin: the estimate lags the traffic by up to a quarter of its
+    ///         window, and a real brownout is neither total nor instant. The defaults win by ten.
+    ///     </para>
+    /// </remarks>
+    private void ValidateRace(SlowCalls adaptive, List<string> problems)
+    {
+        var survives = adaptive.Quantile * adaptive.Window.TotalSeconds;
+        var fills = SlowCallRatio * Window.TotalSeconds;
+
+        if (survives >= 2 * fills)
+            return;
+
+        problems.Add(
+            $"{nameof(SlowCalls)}.Quantile x {nameof(SlowCalls)}.Window ({survives:0.##}s) must be at least twice " +
+            $"{nameof(SlowCallRatio)} x {nameof(Window)} ({fills:0.##}s), or a brownout moves the baseline before the " +
+            $"window fills with slow calls and the breaker can never open on latency. Lengthen {nameof(SlowCalls)}.Window, " +
+            $"lower {nameof(SlowCalls)}.Quantile, or shorten {nameof(Window)}.");
     }
 }
 
@@ -249,6 +321,15 @@ public sealed class Breaker
     private readonly int[]? _failures;
 
     private readonly object _gate = new();
+
+    /// <summary>
+    ///     The measured baseline an adaptive <see cref="BreakerSettings.SlowCalls" /> is relative to.
+    ///     Thread-safe on its own, and deliberately never cleared by <see cref="ClearWindow" />: it is a
+    ///     measurement of the dependency, not a decision about it, and the whole design depends on it
+    ///     outliving the trip window it is raced against.
+    /// </summary>
+    private readonly LatencyWindow? _normal;
+
     private readonly int[]? _slow;
     private readonly long _startedAt;
     private readonly long _ticksPerBucket;
@@ -290,6 +371,13 @@ public sealed class Breaker
             _failures = new int[BucketCount];
             _slow = new int[BucketCount];
         }
+
+        // Only an adaptive breaker pays for the estimate, and it lives on the breaker rather than on
+        // the policy because the breaker is the object whose scope is already explicit. Two policies
+        // sharing a breaker are two views of one dependency, and they should share one idea of what
+        // that dependency's normal latency is.
+        if (Settings.SlowCalls is { } adaptive)
+            _normal = new LatencyWindow(adaptive.Quantile, adaptive.Window, _time);
     }
 
     /// <summary>A name for this breaker, used in diagnostics and health endpoints.</summary>
@@ -319,6 +407,20 @@ public sealed class Breaker
             }
         }
     }
+
+    /// <summary>
+    ///     How long a call to this dependency currently takes when it is healthy, as this breaker
+    ///     measures it - the number an adaptive <see cref="BreakerSettings.SlowCalls" /> multiplies. Null
+    ///     when the breaker is not configured adaptively, or has not seen
+    ///     <see cref="NResilience.SlowCalls.MinimumSamples" /> successful attempts yet.
+    ///     <para>
+    ///         Worth graphing. It is the library's answer to "what does this dependency normally cost
+    ///         me?", and an adaptive breaker's trip point is exactly
+    ///         <c>NormalLatency × SlowCalls.Multiple</c>.
+    ///     </para>
+    /// </summary>
+    public TimeSpan? NormalLatency =>
+        _normal is null ? null : _normal.Threshold(Settings.SlowCalls!.Value.MinimumSamples);
 
     /// <summary>When the breaker last opened, or null while it is closed.</summary>
     public DateTimeOffset? OpenedAt
@@ -350,8 +452,14 @@ public sealed class Breaker
     }
 
     /// <summary>
-    ///     Forces the breaker closed and discards everything it had learned, including the accumulated
-    ///     break-duration growth.
+    ///     Forces the breaker closed and discards every decision it had reached, including the
+    ///     accumulated break-duration growth.
+    ///     <para>
+    ///         <see cref="NormalLatency" /> survives. It is a measurement of the dependency rather than a
+    ///         verdict on it, throwing it away would leave an adaptive breaker unable to see a brownout
+    ///         until it had re-learned what normal is, and nothing an operator means by "reset" includes
+    ///         forgetting how fast the dependency was.
+    ///     </para>
     /// </summary>
     public void Reset()
     {
@@ -469,7 +577,7 @@ public sealed class Breaker
 
         if (kind == VerdictKind.Ok)
         {
-            var slow = Settings.SlowCallThreshold is { } threshold && duration >= threshold;
+            var slow = IsSlow(duration);
             _consecutiveFailures = 0;
             Bucket(now, false, slow);
 
@@ -527,8 +635,33 @@ public sealed class Breaker
         }
     }
 
+    /// <summary>
+    ///     Whether a successful attempt counts as slow, against a constant or against the measured
+    ///     baseline. Always called with the lock held, on the success path only.
+    /// </summary>
+    /// <remarks>
+    ///     The attempt is added to the baseline before it is judged against it, which is what keeps the
+    ///     estimate live without a second pass over the call. It cannot make a call judge itself
+    ///     healthy: the answer is memoized per slice of the baseline window, so one sample out of
+    ///     thousands moves nothing, and the first samples of a cold window are below
+    ///     <see cref="NResilience.SlowCalls.MinimumSamples" /> anyway.
+    /// </remarks>
+    private bool IsSlow(TimeSpan duration)
+    {
+        if (Settings.SlowCallThreshold is { } threshold)
+            return duration >= threshold;
+
+        if (_normal is null)
+            return false;
+
+        var adaptive = Settings.SlowCalls!.Value;
+        var normal = _normal.RecordAndThreshold(duration, adaptive.MinimumSamples);
+
+        return normal is { } measured && duration >= adaptive.ThresholdFor(measured);
+    }
+
     private static bool IsWindowed(BreakerSettings settings) =>
-        settings.FailureRatio is not null || settings.SlowCallThreshold is not null;
+        settings.FailureRatio is not null || settings.SlowCallThreshold is not null || settings.SlowCalls is not null;
 
     private long Elapsed() => _time.GetElapsedTime(_startedAt).Ticks;
 
@@ -554,7 +687,7 @@ public sealed class Breaker
             return;
         }
 
-        if (Settings.SlowCallThreshold is not null && Sum(_slow!) >= Settings.SlowCallRatio * calls)
+        if ((Settings.SlowCallThreshold is not null || _normal is not null) && Sum(_slow!) >= Settings.SlowCallRatio * calls)
             OpenCore(now);
     }
 

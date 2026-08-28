@@ -14,15 +14,20 @@ namespace NResilience.Internal;
 ///         operator's guess.
 ///     </para>
 ///     <para>
-///         The same estimate is what lets <c>BreakerSettings.SlowCallThreshold</c> stop being a number
-///         somebody has to pick per dependency before that dependency has ever run in production.
+///         The same estimator, read at a low quantile over a long window, is what lets
+///         <see cref="SlowCalls" /> replace a slow-call threshold somebody has to pick per dependency
+///         before that dependency has ever run in production. That reading is the opposite one, and
+///         deliberately so - see the remarks.
 ///     </para>
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <b>Nothing allocates this yet.</b> It is the shared primitive the hedging and adaptive
-///         slow-call work are built on, landed on its own so its behavior can be argued about
-///         separately from either.
+///         <b>Two consumers, measuring opposite things.</b> <see cref="Hedge" /> reads a high quantile
+///         of a short window - it wants the tail, and it wants the tail to move with the dependency so
+///         the load multiplier stays bounded. <see cref="SlowCalls" /> reads a low quantile of a long
+///         one - it wants the body, and it wants the body to <i>resist</i> moving, because a baseline
+///         that follows a brownout is a breaker that never opens. Same primitive, opposite ends, and no
+///         reason for one scope to share a window between them.
 ///     </para>
 ///     <para>
 ///         <b>One window answers one quantile.</b> The quantile is fixed at construction so the answer
@@ -138,18 +143,26 @@ internal sealed class LatencyWindow
     ///     estimate over thousands of calls, and paying for a lock per attempt to keep one of them would
     ///     be the wrong trade.
     /// </remarks>
-    internal void Record(TimeSpan duration)
+    internal void Record(TimeSpan duration) => RecordAt(Epoch(), duration);
+
+    /// <summary>
+    ///     Adds one completed call and reports the quantile including it, for a consumer that needs
+    ///     both on every call.
+    /// </summary>
+    /// <param name="duration">How long it took. A negative duration is ignored.</param>
+    /// <param name="minimumSamples">How many samples are required before an answer is given at all.</param>
+    /// <returns>The quantile, or null.</returns>
+    /// <remarks>
+    ///     Exists to read the clock once rather than twice. <see cref="Breaker" /> asks both questions
+    ///     about every successful attempt it samples, and <see cref="Epoch" /> is a timestamp read and a
+    ///     division that neither answer needs its own copy of.
+    /// </remarks>
+    internal TimeSpan? RecordAndThreshold(TimeSpan duration, int minimumSamples)
     {
-        if (duration < TimeSpan.Zero)
-            return;
-
         var epoch = Epoch();
-        var slot = (int)(epoch & (Rings - 1));
+        RecordAt(epoch, duration);
 
-        if (Volatile.Read(ref _ringEpochs[slot]) != epoch)
-            Claim(slot, epoch);
-
-        Interlocked.Increment(ref _rings[slot][IndexOf(duration)]);
+        return ThresholdAt(epoch, minimumSamples);
     }
 
     /// <summary>
@@ -164,9 +177,31 @@ internal sealed class LatencyWindow
     ///     about a distribution rather than about the last call, and rescanning four rings per attempt
     ///     to answer it sooner would cost every call for an answer that moves on the scale of seconds.
     /// </remarks>
-    internal TimeSpan? Threshold(int minimumSamples)
+    internal TimeSpan? Threshold(int minimumSamples) => ThresholdAt(Epoch(), minimumSamples);
+
+    /// <summary>
+    ///     The bucket a duration falls in: a linear region below <see cref="SubBuckets" /> microseconds,
+    ///     then <see cref="SubBuckets" /> buckets per octave. The layout HdrHistogram uses, at the
+    ///     smallest precision that answers this question.
+    /// </summary>
+    private static int IndexOfPlaceholder(TimeSpan duration) => 0;
+
+    private void RecordAt(long epoch, TimeSpan duration)
     {
-        var answer = Current();
+        if (duration < TimeSpan.Zero)
+            return;
+
+        var slot = (int)(epoch & (Rings - 1));
+
+        if (Volatile.Read(ref _ringEpochs[slot]) != epoch)
+            Claim(slot, epoch);
+
+        Interlocked.Increment(ref _rings[slot][IndexOf(duration)]);
+    }
+
+    private TimeSpan? ThresholdAt(long epoch, int minimumSamples)
+    {
+        var answer = Current(epoch);
 
         if (answer.Samples >= minimumSamples)
             return answer.Threshold;
@@ -237,11 +272,11 @@ internal sealed class LatencyWindow
         }
     }
 
-    private Answer Current()
+    private Answer Current(long epoch)
     {
         var answer = Volatile.Read(ref _answer);
 
-        return answer is not null && answer.Epoch == Epoch() ? answer : Recompute();
+        return answer is not null && answer.Epoch == epoch ? answer : Recompute();
     }
 
     /// <summary>Computes this slice's answer and publishes it, whatever the memo already held.</summary>

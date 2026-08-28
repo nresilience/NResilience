@@ -28,6 +28,32 @@ public sealed class HealthCheckTests
     }
 
     /// <summary>
+    ///     An adaptive breaker knows what this dependency normally costs, and that is the number a
+    ///     dashboard wants next to the state. It appears only once the baseline can answer, which is the
+    ///     same condition under which the slow-call trip is armed.
+    /// </summary>
+    [Fact]
+    public async Task An_adaptive_breaker_reports_the_latency_it_measured()
+    {
+        var breaker = new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above(3) });
+        using var provider = Provider(services => services
+            .AddResilience("api", Resilience.Default with { Breaker = breaker })
+            .AddHealthChecks().AddResilience());
+
+        Assert.DoesNotContain("breaker:api:normal", (await Check(provider)).Data.Keys);
+
+        for (var i = 0; i < 20; i++)
+        {
+            Assert.True(breaker.TryEnter(out _));
+            breaker.Record(VerdictKind.Ok, TimeSpan.FromMilliseconds(40));
+        }
+
+        var report = await Check(provider);
+
+        Assert.InRange((double)report.Data["breaker:api:normal"], 40, 45);
+    }
+
+    /// <summary>
     ///     The default that matters most. An open breaker means a dependency is down and this process is
     ///     shedding load correctly; reporting Unhealthy for that gets a working pod restarted.
     /// </summary>
