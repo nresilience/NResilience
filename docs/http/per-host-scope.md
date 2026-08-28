@@ -31,6 +31,10 @@ Eviction is approximate: a host seen since the last sweep survives the next one,
 > [!IMPORTANT]
 > Eviction discards state. A dropped host forgets if its breaker was open. If this loss of protection is unacceptable, set `BreakerPerHost` and `BudgetPerHost` to `false` and define the guard scope directly on the policy instead.
 
+## The same scoping, keyed by something else
+
+Per-host scoping is one instance of a general mechanism. To key a policy by a tenant, a shard, a queue, or a gRPC channel, use [`PolicyScope<TKey>`](../features/policy-scope.md) - the same bound, the same eviction, keyed the way you choose.
+
 ## Monitor host state
 
 You can inspect the state of breakers and budgets for all hosts seen by the handler. This is useful for implementing health endpoints or monitoring dashboards.

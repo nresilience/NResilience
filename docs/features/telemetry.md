@@ -1,7 +1,7 @@
 ---
 title: Telemetry
 description: Observe policy behavior through a single event stream and integrated metrics.
-order: 8
+order: 9
 ---
 
 # Telemetry

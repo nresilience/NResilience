@@ -22,6 +22,7 @@ internal sealed class KnownSymbols
         INamedTypeSymbol? resilienceHttp,
         INamedTypeSymbol? breaker,
         INamedTypeSymbol? retryBudget,
+        INamedTypeSymbol? policyScope,
         INamedTypeSymbol? timeSpan,
         INamedTypeSymbol? timeout,
         Compilation compilation)
@@ -32,6 +33,7 @@ internal sealed class KnownSymbols
         ResilienceHttp = resilienceHttp;
         Breaker = breaker;
         RetryBudget = retryBudget;
+        PolicyScope = policyScope;
         TimeSpan = timeSpan;
         Timeout = timeout;
 
@@ -59,6 +61,12 @@ internal sealed class KnownSymbols
     internal INamedTypeSymbol? Breaker { get; }
 
     internal INamedTypeSymbol? RetryBudget { get; }
+
+    /// <summary>
+    ///     The unbound generic <c>PolicyScope&lt;TKey&gt;</c>. Held as its definition, because every
+    ///     construction a consumer writes is a different constructed type over the same one rule.
+    /// </summary>
+    internal INamedTypeSymbol? PolicyScope { get; }
 
     internal INamedTypeSymbol? TimeSpan { get; }
 
@@ -89,6 +97,7 @@ internal sealed class KnownSymbols
             compilation.GetTypeByMetadataName("NResilience.Http.ResilienceHttp"),
             compilation.GetTypeByMetadataName("NResilience.Breaker"),
             compilation.GetTypeByMetadataName("NResilience.RetryBudget"),
+            compilation.GetTypeByMetadataName("NResilience.PolicyScope`1"),
             compilation.GetTypeByMetadataName("System.TimeSpan"),
             compilation.GetTypeByMetadataName("System.Threading.Timeout"),
             compilation);
@@ -111,6 +120,9 @@ internal sealed class KnownSymbols
     internal bool IsRetryBudget(ITypeSymbol? type) => Is(type, RetryBudget);
 
     internal bool IsResilienceHttp(ITypeSymbol? type) => Is(type, ResilienceHttp);
+
+    /// <summary>True for any construction of <c>PolicyScope&lt;TKey&gt;</c>, whatever the key type.</summary>
+    internal bool IsPolicyScope(ITypeSymbol? type) => Is((type as INamedTypeSymbol)?.OriginalDefinition, PolicyScope);
 
     /// <summary>True when the method is the compilation's entry point.</summary>
     internal bool IsEntryPoint(IMethodSymbol method) => SymbolEqualityComparer.Default.Equals(method, EntryPoint);

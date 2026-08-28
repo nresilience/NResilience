@@ -139,6 +139,22 @@ The `NextAttempt` `readonly struct` is passed to `BeforeAttempt` and `Backoff.Cu
 
 The effective deadline is `min(Deadline, Remaining)`, resolved once when the call starts. See [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) for both halves, and [the cancellation contract](../deep-dives/cancellation.md) for what the ambient read costs.
 
+## `PolicyScope<TKey>`
+
+`PolicyScope<TKey>` is a `sealed class` holding one policy per key, each with its own breaker, retry budget, and hedging latency estimate. `TKey` must be non-nullable. Every member is thread-safe. Hold one for the process; see [keyed policy scope](../features/policy-scope.md).
+
+| Member | Description |
+| :--- | :--- |
+| `PolicyScope(template, shape = null, maxKeys = 1024, comparer = null)` | Creates a scope. `template` is validated eagerly. `shape` derives a key's policy on first sight. `maxKeys` must be at least 1. `comparer` defaults to `EqualityComparer<TKey>.Default`. |
+| `For(key)` | The policy for one key, derived on first sight and cached. |
+| `Breakers()` | A snapshot of the breakers, by key. Empty when the template carries no breaker. |
+| `Budgets()` | A snapshot of the retry budgets, by key. |
+| `Template` | The policy every key starts from, as handed in. |
+| `MaxKeys` | How many keys the scope keeps. |
+| `Count` | How many keys it currently holds. Approximate under concurrency, and briefly above `MaxKeys` while a sweep catches up. |
+
+A `Breaker` on the template is a **prototype**: each key gets its own breaker with those settings, and the template's instance is never executed against. A `Budget` that is `null` or `RetryBudget.Automatic` becomes one budget per key; an explicit instance, such as `RetryBudget.Shared(name)`, is left alone.
+
 ## Equality
 
 Two policies are considered equal if all their properties are equal. `Breaker` and `RetryBudget` are compared by reference because they are live state objects rather than configuration. `ToString` returns the policy configuration.

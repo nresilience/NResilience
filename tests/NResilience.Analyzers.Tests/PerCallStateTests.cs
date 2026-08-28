@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace NResilience.Analyzers.Tests;
 
-/// <summary>NRES005 and NRES006: state that has to outlive the call.</summary>
+/// <summary>NRES005 and NRES006: state that has to outlive the call - a breaker, a budget, a policy scope, a client.</summary>
 public sealed class PerCallStateTests
 {
     [Fact]
@@ -87,6 +87,68 @@ public sealed class PerCallStateTests
                                                     internal static class Dependencies
                                                     {
                                                         internal static Resilience Api(Breaker breaker) => Resilience.Http with { Breaker = breaker };
+                                                    }
+                                                    """)));
+    }
+
+    [Fact]
+    public void A_policy_scope_built_per_call_is_a_dictionary_of_breakers_that_never_sees_a_second_call()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Tenants
+                                                                {
+                                                                    private static readonly Resilience Template = Resilience.Default with { Breaker = new Breaker() };
+
+                                                                    internal static Resilience For(string tenant) => new PolicyScope<string>(Template).For(tenant);
+                                                                }
+                                                                """)));
+
+        Assert.Equal("NRES005", reported.Id);
+        Assert.Contains("policy scope", reported.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("'For'", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_policy_scope_held_in_a_local_that_never_leaves_the_method_is_the_same_bug()
+    {
+        Assert.Equal(["NRES005"], Harness.Ids(Harness.InFile("""
+                                                             internal static class Tenants
+                                                             {
+                                                                 internal static Resilience For(string tenant)
+                                                                 {
+                                                                     var scope = new PolicyScope<string>(Resilience.Default);
+                                                                     return scope.For(tenant);
+                                                                 }
+                                                             }
+                                                             """)));
+    }
+
+    [Fact]
+    public void A_policy_scope_in_a_static_field_is_the_shape_the_docs_teach()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Tenants
+                                                    {
+                                                        private static readonly PolicyScope<string> Scope = new(Resilience.Default with { Breaker = new Breaker() });
+
+                                                        internal static Resilience For(string tenant) => Scope.For(tenant);
+                                                    }
+                                                    """)));
+    }
+
+    [Fact]
+    public void A_policy_scope_the_method_hands_back_is_not_per_call()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Tenants
+                                                    {
+                                                        internal static PolicyScope<string> Build() => new(Resilience.Default);
+
+                                                        internal static PolicyScope<string> BuildLocal()
+                                                        {
+                                                            var scope = new PolicyScope<string>(Resilience.Default);
+                                                            return scope;
+                                                        }
                                                     }
                                                     """)));
     }

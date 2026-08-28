@@ -204,6 +204,14 @@ NResilience.NextAttempt.Number.get -> int
 NResilience.NextAttempt.PreviousException.get -> System.Exception?
 NResilience.NextAttempt.PreviousVerdict.get -> NResilience.Verdict
 NResilience.NextAttempt.Remaining.get -> System.TimeSpan
+NResilience.PolicyScope<TKey>
+NResilience.PolicyScope<TKey>.Breakers() -> System.Collections.Generic.IReadOnlyDictionary<TKey, NResilience.Breaker!>!
+NResilience.PolicyScope<TKey>.Budgets() -> System.Collections.Generic.IReadOnlyDictionary<TKey, NResilience.RetryBudget!>!
+NResilience.PolicyScope<TKey>.Count.get -> int
+NResilience.PolicyScope<TKey>.For(TKey key) -> NResilience.Resilience!
+NResilience.PolicyScope<TKey>.MaxKeys.get -> int
+NResilience.PolicyScope<TKey>.PolicyScope(NResilience.Resilience! template, System.Func<TKey, NResilience.Resilience!>? shape = null, int maxKeys = 1024, System.Collections.Generic.IEqualityComparer<TKey>? comparer = null) -> void
+NResilience.PolicyScope<TKey>.Template.get -> NResilience.Resilience!
 NResilience.RateLimitedException
 NResilience.RateLimitedException.Limiter.get -> string?
 NResilience.RateLimitedException.RateLimitedException() -> void

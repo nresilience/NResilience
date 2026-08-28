@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+using NResilience.Internal;
 
 namespace NResilience.Http.Internal;
 
@@ -10,7 +10,7 @@ namespace NResilience.Http.Internal;
 ///     Derived once per host rather than per request. <c>with</c> on a record is cheap, but it is not
 ///     free, and the HTTP path runs it on every send otherwise.
 /// </remarks>
-internal sealed class HostScope
+internal sealed class HostScope : Scoped
 {
     internal HostScope(Resilience policy, string host, HttpResilienceOptions options)
     {
@@ -71,110 +71,28 @@ internal sealed class HostScope
 
     /// <summary>This host's budget, whether created here or inherited from the policy.</summary>
     internal RetryBudget? Budget { get; }
-
-    /// <summary>
-    ///     Set on use and cleared by an eviction sweep, so a host seen since the last sweep survives
-    ///     the next one. A plain field rather than an interlocked counter: this is an approximation,
-    ///     and a lost race under-counts a host's recency by one sweep, which is not a correctness
-    ///     property.
-    /// </summary>
-    internal int Used;
 }
 
 /// <summary>
 ///     Host scopes, created on first sight of a host and kept until an eviction sweep drops them.
 /// </summary>
 /// <remarks>
-///     Bounded by <see cref="HttpResilienceOptions.MaxHosts" />. The read path stays a lock-free
-///     dictionary lookup plus a predicated store, and eviction is second chance rather than true LRU:
-///     maintaining access order would put linked-list surgery under a lock on every HTTP send, which
-///     is a worse trade than approximating recency.
+///     Bounded by <see cref="HttpResilienceOptions.MaxHosts" />. The bound, the sweep and the
+///     dictionary are <see cref="ScopeRegistry{TKey,TScope}" />'s; what is left here is the host
+///     comparison - <see cref="StringComparer.OrdinalIgnoreCase" />, because a host is not case
+///     sensitive and two spellings of one authority must not get two breakers.
 /// </remarks>
-internal sealed class HostRegistry(Resilience policy, HttpResilienceOptions options)
+internal sealed class HostRegistry
 {
-    private readonly ConcurrentDictionary<string, HostScope> _scopes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ScopeRegistry<string, HostScope> _scopes;
 
-    /// <summary>The cap, or zero for an unbounded registry.</summary>
-    private readonly int _max = options.MaxHosts is > 0 ? options.MaxHosts.Value : 0;
+    internal HostRegistry(Resilience policy, HttpResilienceOptions options) =>
+        _scopes = new ScopeRegistry<string, HostScope>(
+            host => new HostScope(policy, host, options),
+            options.MaxHosts ?? 0,
+            StringComparer.OrdinalIgnoreCase);
 
-    private int _sweeping;
+    internal IEnumerable<HostScope> Scopes => _scopes.Scopes;
 
-    internal IEnumerable<HostScope> Scopes => _scopes.Values;
-
-    internal HostScope For(string host)
-    {
-        if (_scopes.TryGetValue(host, out var scope))
-        {
-            // Guarded so a steady-state request does not dirty a shared cache line on every send.
-            if (scope.Used == 0)
-                scope.Used = 1;
-
-            return scope;
-        }
-
-        var created = _scopes.GetOrAdd(host, static (key, state) => new HostScope(state.Policy, key, state.Options), (Policy: policy, Options: options));
-
-        created.Used = 1;
-
-        if (_max > 0 && _scopes.Count > _max)
-            Sweep();
-
-        return created;
-    }
-
-    /// <summary>
-    ///     Drops the hosts that have not been seen since the last sweep, plus enough headroom that a
-    ///     sweep runs once per batch of new hosts rather than once per host past the cap.
-    /// </summary>
-    private void Sweep()
-    {
-        var count = _scopes.Count;
-
-        // Past twice the cap the registry has stopped approximating its bound and is simply
-        // growing, and the two concessions below are both withdrawn until it is back under.
-        var crowded = count > _max * 2;
-
-        // One sweeper at a time. Everyone else keeps serving requests against a registry that is
-        // briefly over its cap, which is the correct trade: the cap bounds growth, it is not a hard
-        // invariant worth blocking a request for.
-        //
-        // Deferring unconditionally is a different matter. The sweeper is an ordinary request thread
-        // holding no lock, so a loaded scheduler can leave it descheduled part-way through its
-        // iteration while every other thread adds a host and declines to sweep - and then nothing
-        // bounds anything. Eight threads looking up 400 hosts against a cap of 32 were observed
-        // keeping all 400. So a thread that arrives while the registry is crowded sweeps alongside
-        // whoever is already sweeping. Concurrent sweeps need no coordination: TryRemove settles
-        // which one evicts an entry, and Used is an approximation by construction.
-        if (Interlocked.Exchange(ref _sweeping, 1) == 1 && !crowded)
-            return;
-
-        try
-        {
-            var target = count - _max + (_max / 8);
-
-            foreach (var (host, scope) in _scopes)
-            {
-                if (target <= 0)
-                    return;
-
-                // Second chance: seen since the last sweep, so it survives this one. Withheld while
-                // crowded, because a caller whose every lookup is a host it has not seen before
-                // leaves every entry warm, and a sweep that can only clear flags reclaims nothing.
-                // Evicting a warm host costs it a rebuilt breaker and budget; not evicting it costs
-                // the bound the cap exists to provide.
-                if (scope.Used != 0 && !crowded)
-                {
-                    scope.Used = 0;
-                    continue;
-                }
-
-                if (_scopes.TryRemove(host, out _))
-                    target--;
-            }
-        }
-        finally
-        {
-            Volatile.Write(ref _sweeping, 0);
-        }
-    }
+    internal HostScope For(string host) => _scopes.For(host);
 }

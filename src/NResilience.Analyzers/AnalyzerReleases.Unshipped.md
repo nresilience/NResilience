@@ -8,6 +8,6 @@
  NRES002 | Reliability | Warning  | A different cancellation token is passed inside the callback. 
  NRES003 | Usage       | Warning  | The policy will not pass validation.                          
  NRES004 | Usage       | Warning  | AttemptTimeout is longer than Deadline.                       
- NRES005 | Reliability | Warning  | A breaker or retry budget is created per call.                
+ NRES005 | Reliability | Warning  | A breaker, retry budget or policy scope is created per call.  
  NRES006 | Reliability | Info     | A resilient HttpClient is created per call.                   
  NRES007 | Performance | Info     | The callback does not need to be async.                       

@@ -44,6 +44,8 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 
         if (known.IsBreaker(creation.Type))
             ReportGuardIfPerCall(context, creation, known, "breaker", "open");
+        else if (known.IsPolicyScope(creation.Type))
+            ReportScopeIfPerCall(context, creation, known);
     }
 
     private static void AnalyzeInvocation(OperationAnalysisContext context, KnownSymbols known)
@@ -84,6 +86,78 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
             guardKind,
             container,
             cannotEver));
+    }
+
+    /// <summary>
+    ///     A <c>PolicyScope</c> is a dictionary of breakers and budgets, so building one per call is
+    ///     NRES005 one level up: every key starts again with a closed breaker and an empty budget.
+    /// </summary>
+    /// <remarks>
+    ///     Reported only for a scope that provably dies with the call - one used straight away as a
+    ///     receiver, or one held in a local that never leaves the method. A scope handed to something
+    ///     else may well be handed to something that keeps it, and a diagnostic on a shape that is
+    ///     often correct is a diagnostic people turn off.
+    /// </remarks>
+    private static void ReportScopeIfPerCall(OperationAnalysisContext context, IOperation scope, KnownSymbols known)
+    {
+        if (!DiesWithTheCall(scope) || !InsideSomethingCalledRepeatedly(context, known, out var container))
+            return;
+
+        context.ReportDiagnostic(Diagnostic.Create(
+            Diagnostics.PerCallGuardState,
+            scope.Syntax.GetLocation(),
+            "policy scope",
+            container,
+            "open a breaker or throttle a retry storm"));
+    }
+
+    /// <summary>
+    ///     True when the created object cannot outlive the method: it is dereferenced on the spot, or
+    ///     it initializes a local whose every use is a member access on it.
+    /// </summary>
+    private static bool DiesWithTheCall(IOperation creation)
+    {
+        var parent = creation.Parent;
+
+        while (parent is IConversionOperation)
+        {
+            parent = parent.Parent;
+        }
+
+        // new PolicyScope<string>(policy).For(key) - nothing holds it at all.
+        if (parent is IInvocationOperation or IPropertyReferenceOperation or IFieldReferenceOperation)
+            return true;
+
+        if (parent is not IVariableInitializerOperation { Parent: IVariableDeclaratorOperation declarator })
+            return false;
+
+        var local = declarator.Symbol;
+        var body = Root(creation);
+
+        foreach (var reference in body.Descendants().OfType<ILocalReferenceOperation>())
+        {
+            if (!SymbolEqualityComparer.Default.Equals(reference.Local, local))
+                continue;
+
+            // Anything other than "call something on it" could hand it to a field, a caller, or a
+            // collection that outlives the method, and the analyzer does not follow it there.
+            if (reference.Parent is not (IInvocationOperation or IPropertyReferenceOperation or IFieldReferenceOperation))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static IOperation Root(IOperation operation)
+    {
+        var current = operation;
+
+        while (current.Parent is { } parent)
+        {
+            current = parent;
+        }
+
+        return current;
     }
 
     private static void ReportClientIfPerCall(OperationAnalysisContext context, IOperation client, KnownSymbols known)

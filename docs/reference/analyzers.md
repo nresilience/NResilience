@@ -14,7 +14,7 @@ Installing `NResilience` automatically includes seven diagnostics. These analyze
 | [NRES002](#nres002) | A different cancellation token is passed inside the callback. | Reliability | Warning |
 | [NRES003](#nres003) | The policy will not pass validation. | Usage | Warning |
 | [NRES004](#nres004) | `AttemptTimeout` is longer than `Deadline`. | Usage | Warning |
-| [NRES005](#nres005) | A breaker or retry budget is created per call. | Reliability | Warning |
+| [NRES005](#nres005) | A breaker, retry budget, or policy scope is created per call. | Reliability | Warning |
 | [NRES006](#nres006) | A resilient `HttpClient` is created per call. | Reliability | Info |
 | [NRES007](#nres007) | The callback does not need to be `async`. | Performance | Info |
 
@@ -74,7 +74,7 @@ This is only reported when both properties are set within the same expression.
 
 ## NRES005: Guard created per call
 
-Circuit breakers and retry budgets must outlive the call they protect to be effective. If a breaker is created inside a method body, it will never have seen a prior failure and will never open.
+Circuit breakers, retry budgets, and policy scopes must outlive the call they protect. A breaker created inside a method body never sees a prior failure and never opens. A [`PolicyScope<TKey>`](../features/policy-scope.md) created inside a method body similarly fails because every call receives a fresh set of guards.
 
 ```csharp
 // Reported: a new breaker is created every time the method is called.
@@ -84,7 +84,15 @@ static Resilience Payments() => Resilience.Http with { Breaker = new Breaker() }
 static readonly Resilience Payments = Resilience.Http with { Breaker = new Breaker() };
 ```
 
-This rule is reported for guards written directly into a policy's initializer inside a method. It does not report guards that are locals or parameters, as they may be stored elsewhere. `RetryBudget.Shared(name)` is not reported because it is looked up by name.
+```csharp
+// Reported: the scope, and everything it keys, dies with the call.
+static Resilience For(string tenant) => new PolicyScope<string>(Template).For(tenant);
+
+// Not reported: the scope is held in a static field.
+static readonly PolicyScope<string> Tenants = new(Template);
+```
+
+This rule reports guards written directly into a policy's initializer inside a method. It ignores locals or parameters that may be stored elsewhere. A policy scope is reported if it provably dies with the call, such as when used immediately or held in a local that does not leave the method. `RetryBudget.Shared(name)` is ignored because it is looked up by name.
 
 ## NRES006: HttpClient created per call
 
