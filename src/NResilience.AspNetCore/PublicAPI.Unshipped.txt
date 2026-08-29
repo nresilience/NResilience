@@ -8,4 +8,10 @@ NResilience.AspNetCore.ResilienceDeadlineOptions.Maximum.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.get -> System.TimeSpan
 NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.ResilienceDeadlineOptions() -> void
+NResilience.AspNetCore.ResilienceNestedRetryApplicationBuilderExtensions
+NResilience.AspNetCore.ResilienceNestedRetryOptions
+NResilience.AspNetCore.ResilienceNestedRetryOptions.Header.get -> string!
+NResilience.AspNetCore.ResilienceNestedRetryOptions.Header.set -> void
+NResilience.AspNetCore.ResilienceNestedRetryOptions.ResilienceNestedRetryOptions() -> void
 static NResilience.AspNetCore.ResilienceDeadlineApplicationBuilderExtensions.UseResilienceDeadline(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Action<NResilience.AspNetCore.ResilienceDeadlineOptions!>? configure = null) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static NResilience.AspNetCore.ResilienceNestedRetryApplicationBuilderExtensions.UseResilienceNestedRetry(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Action<NResilience.AspNetCore.ResilienceNestedRetryOptions!>? configure = null) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!

@@ -65,16 +65,17 @@ internal static class Diagnostics
         "backoff included, and each attempt is capped by what remains of it. An attempt timeout above the " +
         "deadline is dead configuration that reads as a deliberate 30-second attempt.");
 
-    /// <summary>NRES005: per-call breaker or budget state.</summary>
+    /// <summary>NRES005: per-call breaker, budget or policy scope state.</summary>
     internal static readonly DiagnosticDescriptor PerCallGuardState = Rule(
         PerCallGuardStateId,
-        "A breaker or retry budget created per call keeps no state",
+        "A breaker, retry budget or policy scope created per call keeps no state",
         "This {0} is created inside '{1}', so every call gets a new one; a {0} whose state is discarded each call can never {2}",
         Reliability,
         DiagnosticSeverity.Warning,
-        "A breaker counts consecutive failures and a budget counts deposits over a window. Both are " +
-        "mutable state whose whole purpose is to outlive the call. Hold one in a static readonly field, " +
-        "in a container-managed singleton, or on the long-lived object it protects.");
+        "A breaker counts consecutive failures, a budget counts deposits over a window, and a policy " +
+        "scope holds one of each per key. All three are mutable state whose whole purpose is to outlive " +
+        "the call. Hold one in a static readonly field, in a container-managed singleton, or on the " +
+        "long-lived object it protects.");
 
     /// <summary>NRES006: per-call resilient client.</summary>
     internal static readonly DiagnosticDescriptor PerCallClient = Rule(
