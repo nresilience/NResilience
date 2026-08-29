@@ -15,7 +15,7 @@
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
 
     <PackageId>NResilience.AspNetCore</PackageId>
-    <Description>The ASP.NET Core integration for NResilience: middleware that reads the deadline and the nested-retry marker a caller sent and publishes them for the rest of the request, so outbound policies are bounded by the time their caller is actually still waiting and never retry a retry, and an IExceptionHandler that maps the exceptions NResilience throws to the HTTP responses they mean - 504 for an exceeded deadline, 503 with Retry-After for a rejected call. A separate package because it is the only part of NResilience that requires ASP.NET Core.</Description>
+    <Description>The ASP.NET Core integration for NResilience: middleware that reads the deadline and the nested-retry marker a caller sent and publishes them for the rest of the request, so outbound policies are bounded by the time their caller is actually still waiting and report the retry loops they are nested inside, and an IExceptionHandler that maps the exceptions NResilience throws to the HTTP responses they mean - 504 for an exceeded deadline, 503 with Retry-After for a rejected call. A separate package because it is the only part of NResilience that requires ASP.NET Core.</Description>
     <PackageTags>resilience;deadline;timeout;aspnetcore;middleware;propagation;problemdetails;exception-handler;polly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 

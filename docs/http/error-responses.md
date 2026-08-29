@@ -43,7 +43,7 @@ The body is a [problem document](https://www.rfc-editor.org/rfc/rfc9457.html) - 
   "type": "urn:nresilience:dependency-unavailable",
   "title": "Dependency Unavailable",
   "status": 503,
-  "detail": "The operation exceeded its 10s deadline after 3 attempt(s).",
+  "detail": "The call was rejected: DependencyUnavailable.",
   "instance": "/orders"
 }
 ```

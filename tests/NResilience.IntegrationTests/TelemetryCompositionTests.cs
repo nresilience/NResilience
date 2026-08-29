@@ -78,10 +78,12 @@ public sealed class TelemetryCompositionTests
         Assert.Equal("succeeded", span.GetTagItem("nresilience.outcome"));
         Assert.Equal(2, span.Events.Count(e => e.Name == "nresilience.attempt"));
 
-        // The meter counted one call and two attempts. The policy name is host-scoped
-        // ("http:127.0.0.1:port"), so filter by prefix.
-        Assert.Equal(1, recording.CallsForPrefix("http:"));
-        Assert.Equal(2, recording.AttemptsForPrefix("http:"));
+        // The meter counted one call and two attempts. Scoped to this test's own server: the
+        // listener is attached to the process-wide meter, and "http:" alone would also sum every
+        // host-scoped policy that another test running in parallel happens to drive.
+        var policyName = HostScopedName(server);
+        Assert.Equal(1, recording.CallsForPrefix(policyName));
+        Assert.Equal(2, recording.AttemptsForPrefix(policyName));
 
         // The logger wrote something - the log is not empty.
         Assert.NotEmpty(logger.Collector.GetSnapshot());
@@ -122,7 +124,7 @@ public sealed class TelemetryCompositionTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Empty(spans);
-        Assert.Equal(0, recording.CallsForPrefix("http:"));
+        Assert.Equal(0, recording.CallsForPrefix(HostScopedName(server)));
     }
 
     /// <summary>
@@ -174,9 +176,10 @@ public sealed class TelemetryCompositionTests
         var span = Assert.Single(spans, s => s.DisplayName == "resilience test");
         Assert.Equal("attempts_exhausted", span.GetTagItem("nresilience.outcome"));
 
-        // The meter counted one call and three attempts. The policy name is host-scoped.
-        Assert.Equal(1, recording.CallsForPrefix("http:"));
-        Assert.Equal(3, recording.AttemptsForPrefix("http:"));
+        // The meter counted one call and three attempts, scoped to this test's own server.
+        var policyName = HostScopedName(server);
+        Assert.Equal(1, recording.CallsForPrefix(policyName));
+        Assert.Equal(3, recording.AttemptsForPrefix(policyName));
     }
 
     /// <summary>
@@ -184,6 +187,13 @@ public sealed class TelemetryCompositionTests
     ///     of <c>MetricsTests.Recording</c> - enough to assert on the call and attempt counters for
     ///     one policy, excluding other tests running in parallel.
     /// </summary>
+    /// <summary>
+    ///     The name <see cref="ResilienceHandler" /> scopes its policy to for one loopback server:
+    ///     the policy's own name and the authority, which includes the ephemeral port and is
+    ///     therefore unique to the test that started the server.
+    /// </summary>
+    private static string HostScopedName(LoopbackHttp server) => $"http:{server.BaseUri.Authority}";
+
     private sealed class MeterRecording : IDisposable
     {
         private readonly Dictionary<string, long> _attemptsByPolicy = [];

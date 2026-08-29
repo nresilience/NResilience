@@ -1,6 +1,7 @@
 using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Primitives;
 using NResilience.AspNetCore;
 using NResilience.Http;
 
@@ -77,6 +78,38 @@ public sealed class NestedRetryMiddlewareTests
         using var response = await client.SendAsync(request);
 
         Assert.Equal("not", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task The_marker_is_read_from_any_value_on_the_header()
+    {
+        // The same question ResilienceHandler.CarriesRetryMarker asks of an outbound request. An
+        // intermediary that appends its own empty value to a header a retrying caller really did
+        // send must not turn the marker off - a presence marker does not get less true for having
+        // something written after it.
+        //
+        // The two values are set on the request rather than sent by the client on purpose:
+        // HttpClient joins repeated headers into one comma-separated line, which Kestrel surfaces
+        // as the single value "1, " and neither half of this feature treats as the marker. The
+        // multi-value StringValues this guards against comes from a raw multi-line request, and
+        // setting it in the pipeline is how to reach that shape without hand-writing a socket.
+        await using var app = await TestApp.StartAsync(pipeline =>
+        {
+            pipeline.Use((context, next) =>
+            {
+                context.Request.Headers[ResilienceHttp.NestedRetryHeader] =
+                    new StringValues([ResilienceNestedRetry.Marker, string.Empty]);
+
+                return next(context);
+            });
+
+            pipeline.UseResilienceNestedRetry();
+            pipeline.Run(context => context.Response.WriteAsync(ResilienceNestedRetry.IsCallerRetrying ? "retrying" : "not"));
+        });
+
+        using var client = new HttpClient();
+
+        Assert.Equal("retrying", await client.GetStringAsync(app.Uri));
     }
 
     [Fact]

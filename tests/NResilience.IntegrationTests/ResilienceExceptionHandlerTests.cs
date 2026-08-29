@@ -231,6 +231,27 @@ public sealed class ResilienceExceptionHandlerTests
     }
 
     [Fact]
+    public void Registering_twice_registers_one_handler()
+    {
+        // AddExceptionHandler<T>() is a plain AddSingleton, so the registration has to be the thing
+        // that is idempotent: a library and the application hosting it can both want the mapping,
+        // and neither knows about the other.
+        var services = new ServiceCollection();
+
+        services.AddResilienceExceptionHandler();
+        services.AddResilienceExceptionHandler(o => o.IncludeAttemptDetails = true);
+
+        // The handler type itself is internal to the package, so the descriptor's service type is
+        // what there is to count - which is the right question anyway: one IExceptionHandler.
+        Assert.Single(services, descriptor => descriptor.ServiceType == typeof(IExceptionHandler));
+
+        // And the second call's configuration still applies - idempotent on the handler, additive
+        // on the options, which is what Configure() means everywhere else.
+        using var provider = services.BuildServiceProvider();
+        Assert.True(provider.GetRequiredService<IOptions<ResilienceExceptionHandlerOptions>>().Value.IncludeAttemptDetails);
+    }
+
+    [Fact]
     public async Task The_handler_composes_with_another_handler()
     {
         // The chain of responsibility: the resilience handler passes an unrecognized exception to

@@ -31,10 +31,11 @@ When the handler detects nesting, it fires a `NestedRetry` [event](../features/t
 
 ## Handle nested retries on the inbound side
 
-If you are building a service that receives requests, you can check for the nested retry header to determine if the caller will retry the operation. This is what the middleware in `NResilience.AspNetCore` does:
+If you are building a service that receives requests, you can check for the nested retry header to determine if the caller will retry the operation. Check the value, not just the header's presence: an intermediary that forwards unknown headers can add an empty one, and `1` is the only value a retrying handler writes.
 
 ```csharp
-bool callerWillRetry = request.Headers.ContainsKey(ResilienceHttp.NestedRetryHeader);
+bool callerWillRetry = request.Headers[ResilienceHttp.NestedRetryHeader]
+    .Any(ResilienceNestedRetry.IsMarker);
 ```
 
 In an ASP.NET Core app, install `NResilience.AspNetCore` and read the marker with one line:

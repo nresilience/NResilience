@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using NResilience.AspNetCore;
 
@@ -52,7 +52,11 @@ public static class ResilienceExceptionHandlerServiceCollectionExtensions
                 static o => IsStatus(o.TimeoutStatusCode) && IsStatus(o.RejectedStatusCode) && IsStatus(o.RateLimitedStatusCode),
                 "Status codes must be between 100 and 599.");
 
-        services.AddExceptionHandler<ResilienceExceptionHandler>();
+        // AddExceptionHandler<T>() is a plain AddSingleton, so calling this twice - a library and
+        // the application it is hosted in, both wanting the mapping - would register the handler
+        // twice. TryAddEnumerable keys on the implementation type, so it is a no-op the second
+        // time and still leaves room for every other IExceptionHandler.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IExceptionHandler, ResilienceExceptionHandler>());
         return services;
     }
 
