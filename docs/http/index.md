@@ -22,9 +22,10 @@ The `ResilienceHandler` runs a [policy](../reference/resilience.md) around the H
 - **Request regeneration**: Builds a fresh `HttpRequestMessage` for every attempt.
 - **Idempotency protection**: Prevents the retry of `POST` or `PATCH` methods unless explicitly configured to do so.
 - **Per-host scoping**: Scopes the circuit breaker and retry budget to the target host.
-- **Nested retry detection**: Reports when retries are occurring in nested layers.
+- **Nested retry detection**: Reports when retries are occurring in nested layers. Its inbound half - the middleware that reads the marker a retrying caller sent - is [`UseResilienceNestedRetry`](nested-retries.md).
 - **Response management**: Disposes of responses that are superseded by a retry.
 - **Transport timeout management**: Manages `HttpClient.Timeout` to ensure the policy deadline is honored.
+- **Error responses**: When an NResilience exception reaches the top of an ASP.NET Core app, `NResilience.AspNetCore` maps it to the response it means. See [Error responses](error-responses.md).
 
 ## Create a resilient client
 

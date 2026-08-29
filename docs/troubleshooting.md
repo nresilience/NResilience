@@ -127,6 +127,15 @@ Dependency injection validates policies eagerly to ensure configuration mistakes
 
 ## Performance and testing
 
+### Symptom: A dependency is down, and my service returns 500 for every request.
+
+> [!CAUTION] Quick fix
+> Register the exception handler: `builder.Services.AddResilienceExceptionHandler()`, with `AddProblemDetails()` and `UseExceptionHandler()` alongside it.
+
+**Why this happens**: An unhandled `DeadlineExceededException` or `CallRejectedException` becomes the framework's 500 - the response that means "this service is broken", for a failure that means "this service's dependency is broken". The handler maps them to 504 and 503, the statuses that let a caller or a gateway shed load instead of panicking.
+
+See [Error responses](./http/error-responses.md) for the full mapping.
+
 ### Symptom: Retries are refused with `BudgetExhausted`.
 
 **Why this happens**: The [retry budget](./features/retry-budget.md) is functioning correctly. Retries are funded at 10% of successful traffic. If a dependency fails completely, it funds no retries, preventing the client from turning an outage into a load test.

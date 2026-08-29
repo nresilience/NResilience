@@ -71,3 +71,7 @@ This exception is thrown by `Resilience.Validate()`, `BreakerSettings.Validate()
 ## Caller cancellation
 
 If the `CancellationToken` you provided is cancelled, an `OperationCanceledException` is thrown. This exception is never retried, counted as an attempt, converted into a timeout, or suppressed - even when using `TryRunAsync`.
+
+## Mapping to HTTP responses
+
+In an ASP.NET Core app, the four exceptions the library invents map to the HTTP responses they mean - 504 for the timeouts, 503 with `Retry-After` for the refusals - via one registration, with no try/catch per endpoint. For the mapping table, the problem-document body, and the status code options, see [Error responses](../http/error-responses.md).

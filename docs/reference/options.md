@@ -54,6 +54,41 @@ If the policy does not have its own name, it is named after the client. This pre
 
 The clock is `TimeProvider` from the container when one is registered, and `TimeProvider.System` otherwise. An expired inbound deadline does not fail the request; it fails the outbound calls, which is the distinction [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) explains.
 
+## `UseResilienceNestedRetry` on `IApplicationBuilder`
+
+`UseResilienceNestedRetry` is in the `NResilience.AspNetCore` package. It reads the nested-retry marker a retrying caller sent and publishes it for the rest of the request, so the outbound handler reports `NestedRetry` for this request's own outbound calls.
+
+| Overload | Description |
+| :--- | :--- |
+| `UseResilienceNestedRetry(Action<ResilienceNestedRetryOptions>? configure = null)` | Adds the middleware. Register it before anything that makes an outbound call. |
+
+`ResilienceNestedRetryOptions` is a `sealed class`:
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Header` | `"X-NResilience-Retrying"` | The header carrying the marker. |
+
+Only the value `"1"` counts as the marker. Like the deadline middleware, it reports and does not intervene; see [Nested retries](../http/nested-retries.md).
+
+## `AddResilienceExceptionHandler` on `IServiceCollection`
+
+`AddResilienceExceptionHandler` is in the `NResilience.AspNetCore` package. It registers an `IExceptionHandler` that maps the exceptions NResilience throws to the HTTP responses they mean, so no endpoint needs its own try/catch.
+
+| Overload | Description |
+| :--- | :--- |
+| `AddResilienceExceptionHandler(Action<ResilienceExceptionHandlerOptions>? configure = null)` | Registers the handler. The parameterless `UseExceptionHandler()` overload requires `AddProblemDetails()` as well. |
+
+`ResilienceExceptionHandlerOptions` is a `sealed class`:
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `TimeoutStatusCode` | `504` | The status for `DeadlineExceededException` and `AttemptTimeoutException`. |
+| `RejectedStatusCode` | `503` | The status for `CallRejectedException`, with `Retry-After` when the rejection carried a hint. |
+| `RateLimitedStatusCode` | `503` | The status for `RateLimitedException`. Not 429: the refusal is self-imposed. Set it to 429 when the limiter is per-caller quota. |
+| `IncludeAttemptDetails` | `false` | Whether the body carries the attempt count and elapsed time. Off by default; see the [caution](../http/error-responses.md#read-the-response). |
+
+Status codes are validated at startup; a value outside 100-599 fails registration rather than the first request. See [Error responses](../http/error-responses.md) for what the handler produces.
+
 ## `IResiliencePolicies`
 
 The `IResiliencePolicies` service provides access to registered policies.

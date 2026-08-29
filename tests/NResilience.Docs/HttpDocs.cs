@@ -146,4 +146,33 @@ public sealed class HttpDocs
         Assert.True(condition: handler.WillRetry(request: get));
         Assert.False(condition: handler.WillRetry(request: post));
     }
+
+    [Fact]
+    public async Task A_queue_consumer_publishes_the_marker_itself()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+
+        // <snippet:nested-retry-publish>
+        // In an ASP.NET Core app, UseResilienceNestedRetry() publishes what the caller sent. Anywhere
+        // else - a queue consumer reading the retrying marker off a message - publish it yourself:
+        // read the header the message carries and begin the scope with what it means.
+        string? marker = "1";
+        using var inbound = ResilienceNestedRetry.Begin(callerRetrying: ResilienceNestedRetry.IsMarker(marker));
+        // </snippet:nested-retry-publish>
+
+        var events = new EventRecorder();
+
+        using var client = ResilienceHttp.CreateClient(
+            policy: Resilience.Http with { OnEvent = events.Record },
+            innerHandler: transport);
+
+        using var response = await client.GetAsync(
+            requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);
+
+        // With the flag published, this service's own outbound call reports the nesting it is part of.
+        Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
+        Assert.Contains(collection: events.Events, filter: e => e.Kind == CallEventKind.NestedRetry);
+    }
 }
