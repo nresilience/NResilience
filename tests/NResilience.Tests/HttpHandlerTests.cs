@@ -599,6 +599,84 @@ public sealed class HttpHandlerTests
     }
 
     [Fact]
+    public async Task An_ambient_caller_retrying_flag_is_reported_as_nesting()
+    {
+        var recorder = new EventRecorder();
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+
+        using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
+
+        // The inbound half: a server published the caller's marker as an ambient flag, and the
+        // outbound calls this request makes are the ones that need to know.
+        using var scope = ResilienceNestedRetry.Begin(callerRetrying: true);
+        (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+
+        Assert.True(recorder.Contains(CallEventKind.NestedRetry));
+    }
+
+    [Fact]
+    public async Task The_ambient_flag_is_ignored_when_detection_is_off()
+    {
+        var recorder = new EventRecorder();
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+
+        using var client = Client(
+            transport,
+            new HttpResilienceOptions { DetectNestedRetries = false },
+            TestPolicy.InstantHttp with { OnEvent = recorder.Record });
+
+        using var scope = ResilienceNestedRetry.Begin(callerRetrying: true);
+        (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+
+        Assert.False(recorder.Contains(CallEventKind.NestedRetry));
+    }
+
+    [Fact]
+    public async Task The_ambient_flag_is_ignored_for_a_single_attempt_client()
+    {
+        var recorder = new EventRecorder();
+        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+
+        using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1, OnEvent = recorder.Record });
+
+        using var scope = ResilienceNestedRetry.Begin(callerRetrying: true);
+        (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+
+        Assert.False(recorder.Contains(CallEventKind.NestedRetry));
+    }
+
+    [Fact]
+    public async Task The_handler_restores_the_in_process_flag_it_found()
+    {
+        var recorder = new EventRecorder();
+        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+
+        // The regression test for the restore: wasInside is the value the finally restores, and it
+        // must stay "what this handler's own AsyncLocal was before this send" - not OR-ed with the
+        // ambient flag, which would leave InsideRetryingClient = true on a context where it was
+        // false and make every later call through this context report nesting from nothing.
+        using var client = Client(inner, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
+
+        using (ResilienceNestedRetry.Begin(callerRetrying: true))
+        {
+            (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+
+            Assert.True(recorder.Contains(CallEventKind.NestedRetry),
+                "the ambient flag should make the send report nesting");
+        }
+
+        recorder.Clear();
+
+        // Outside the ambient scope, on the same execution context the first send ran on: the
+        // handler must have restored InsideRetryingClient to the false it found, so a second send
+        // reports nothing - nesting comes only from a source that is present, never from a leak.
+        (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+
+        Assert.False(recorder.Contains(CallEventKind.NestedRetry),
+            "a leaked InsideRetryingClient would make a clean send report nesting");
+    }
+
+    [Fact]
     public void CreateClient_takes_ownership_of_the_transport_timeout()
     {
         using var owned = ResilienceHttp.CreateClient(TestPolicy.InstantHttp, innerHandler: new ScriptedHttpHandler());

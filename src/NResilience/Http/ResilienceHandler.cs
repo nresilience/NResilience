@@ -128,14 +128,20 @@ public sealed class ResilienceHandler : DelegatingHandler
         if (retrying && Options.DetectNestedRetries)
         {
             wasInside = InsideRetryingClient.Value;
-            var inbound = request.Headers.Contains(ResilienceHttp.NestedRetryHeader);
-            nested = wasInside || inbound;
+            var inbound = CarriesRetryMarker(request);
+
+            // The three ways this call can already be inside a retry loop: an outer handler in this process,
+            // a marker on the outbound request itself, and the inbound request that started this one - the
+            // half that needs a server to read it, and the one that makes the middle hop of a chain able to
+            // see the amplification it is part of. The ambient read is last so a call already known to be
+            // nested does not pay for it.
+            nested = wasInside || inbound || ResilienceNestedRetry.IsCallerRetrying;
 
             if (nested && policy.OnEvent is { } listener)
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
 
             if (!inbound)
-                request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, "1");
+                request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, ResilienceNestedRetry.Marker);
 
             InsideRetryingClient.Value = true;
         }
@@ -241,11 +247,31 @@ public sealed class ResilienceHandler : DelegatingHandler
 
     private static bool IsIdempotentMethod(HttpMethod method) =>
         method == HttpMethod.Get
-        || method == HttpMethod.Head
-        || method == HttpMethod.Put
-        || method == HttpMethod.Delete
-        || method == HttpMethod.Options
-        || method == HttpMethod.Trace;
+            || method == HttpMethod.Head
+            || method == HttpMethod.Put
+            || method == HttpMethod.Delete
+            || method == HttpMethod.Options
+            || method == HttpMethod.Trace;
+
+    /// <summary>
+    ///     Whether the request already carries the retry marker. Presence is not enough: an
+    ///     intermediary that forwards unknown headers can add an empty value, and only
+    ///     <see cref="ResilienceNestedRetry.Marker" /> is a value this library wrote. A loop rather
+    ///     than LINQ - this runs on every retrying send.
+    /// </summary>
+    private static bool CarriesRetryMarker(HttpRequestMessage request)
+    {
+        if (!request.Headers.TryGetValues(ResilienceHttp.NestedRetryHeader, out var values))
+            return false;
+
+        foreach (var value in values)
+        {
+            if (ResilienceNestedRetry.IsMarker(value))
+                return true;
+        }
+
+        return false;
+    }
 
     private Task<HttpResponseMessage> SendCoreAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
         base.SendAsync(request, cancellationToken);
