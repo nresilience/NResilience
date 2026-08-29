@@ -271,6 +271,10 @@ NResilience.ResilienceDeadline
 NResilience.ResilienceDeadline.DeadlineScope
 NResilience.ResilienceDeadline.DeadlineScope.DeadlineScope() -> void
 NResilience.ResilienceDeadline.DeadlineScope.Dispose() -> void
+NResilience.ResilienceNestedRetry
+NResilience.ResilienceNestedRetry.NestedRetryScope
+NResilience.ResilienceNestedRetry.NestedRetryScope.Dispose() -> void
+NResilience.ResilienceNestedRetry.NestedRetryScope.NestedRetryScope() -> void
 NResilience.ResilienceValueTask
 NResilience.RetryBudget
 NResilience.RetryBudget.IsAutomatic.get -> bool
@@ -309,6 +313,7 @@ NResilience.VerdictKind.Transient = 1 -> NResilience.VerdictKind
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
 const NResilience.Http.ResilienceHttp.NestedRetryHeader = "X-NResilience-Retrying" -> string!
 const NResilience.ResilienceDeadline.Header = "X-Deadline-Ms" -> string!
+const NResilience.ResilienceNestedRetry.Marker = "1" -> string!
 override NResilience.Attempt.ToString() -> string!
 override NResilience.AttemptLog.ToString() -> string!
 override NResilience.Backoff.GetHashCode() -> int
@@ -359,6 +364,9 @@ static NResilience.ResilienceDeadline.Begin(System.TimeSpan remaining, System.Ti
 static NResilience.ResilienceDeadline.Format(System.TimeSpan remaining) -> string?
 static NResilience.ResilienceDeadline.Remaining.get -> System.TimeSpan?
 static NResilience.ResilienceDeadline.TryParse(string? value, out System.TimeSpan remaining) -> bool
+static NResilience.ResilienceNestedRetry.Begin(bool callerRetrying) -> NResilience.ResilienceNestedRetry.NestedRetryScope
+static NResilience.ResilienceNestedRetry.IsCallerRetrying.get -> bool
+static NResilience.ResilienceNestedRetry.IsMarker(string? value) -> bool
 static NResilience.ResilienceValueTask.RunAsync(this NResilience.Resilience! policy, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 static NResilience.ResilienceValueTask.RunAsync<T>(this NResilience.Resilience! policy, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
 static NResilience.ResilienceValueTask.RunAsync<TState, T>(this NResilience.Resilience! policy, System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
