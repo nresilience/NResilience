@@ -1,9 +1,7 @@
 using System.Globalization;
 using System.Net;
 using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using NResilience.AspNetCore;
 using NResilience.Http;
 
@@ -25,7 +23,7 @@ public sealed class DeadlineMiddlewareTests
     [Fact]
     public async Task The_deadline_a_caller_sent_is_readable_for_the_whole_request()
     {
-        await using var app = await StartAsync(pipeline =>
+        await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline();
 
@@ -51,7 +49,7 @@ public sealed class DeadlineMiddlewareTests
     [Fact]
     public async Task A_request_without_a_deadline_inherits_nothing()
     {
-        await using var app = await StartAsync(pipeline =>
+        await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline();
             pipeline.Run(context => context.Response.WriteAsync(Report(ResilienceDeadline.Remaining)));
@@ -64,7 +62,7 @@ public sealed class DeadlineMiddlewareTests
     [Fact]
     public async Task An_absurd_deadline_can_be_refused()
     {
-        await using var app = await StartAsync(pipeline =>
+        await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline(o => o.Maximum = TimeSpan.FromSeconds(5));
             pipeline.Run(context => context.Response.WriteAsync(Report(ResilienceDeadline.Remaining)));
@@ -82,7 +80,7 @@ public sealed class DeadlineMiddlewareTests
     [Fact]
     public async Task A_reserve_is_kept_back_from_what_the_caller_sent()
     {
-        await using var app = await StartAsync(pipeline =>
+        await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline(o => o.Reserve = TimeSpan.FromSeconds(2));
             pipeline.Run(context => context.Response.WriteAsync(Report(ResilienceDeadline.Remaining)));
@@ -114,7 +112,7 @@ public sealed class DeadlineMiddlewareTests
             UseAmbientDeadline = true,
         };
 
-        await using var app = await StartAsync(pipeline =>
+        await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline();
 
@@ -166,7 +164,7 @@ public sealed class DeadlineMiddlewareTests
 
         var options = new HttpResilienceOptions { PropagateDeadline = true };
 
-        await using var app = await StartAsync(pipeline =>
+        await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline();
 
@@ -197,30 +195,4 @@ public sealed class DeadlineMiddlewareTests
 
     private static string Report(TimeSpan? remaining) =>
         remaining is { } left ? left.TotalMilliseconds.ToString("F0", CultureInfo.InvariantCulture) : "none";
-
-    private static async Task<TestApp> StartAsync(Action<WebApplication> configure)
-    {
-        var builder = WebApplication.CreateSlimBuilder();
-        builder.WebHost.UseUrls("http://127.0.0.1:0");
-        builder.Logging.ClearProviders();
-
-        var app = builder.Build();
-        configure(app);
-
-        await app.StartAsync();
-
-        return new TestApp(app);
-    }
-
-    /// <summary>A started server and the address it ended up on, so a test can point a client at it.</summary>
-    private sealed class TestApp(WebApplication app) : IAsyncDisposable
-    {
-        internal Uri Uri => new(app.Urls.First(), UriKind.Absolute);
-
-        public async ValueTask DisposeAsync()
-        {
-            await app.StopAsync();
-            await app.DisposeAsync();
-        }
-    }
 }
