@@ -1,4 +1,5 @@
 #nullable enable
+Microsoft.Extensions.DependencyInjection.ResilienceExceptionHandlerServiceCollectionExtensions
 NResilience.AspNetCore.ResilienceDeadlineApplicationBuilderExtensions
 NResilience.AspNetCore.ResilienceDeadlineOptions
 NResilience.AspNetCore.ResilienceDeadlineOptions.Header.get -> string!
@@ -8,6 +9,16 @@ NResilience.AspNetCore.ResilienceDeadlineOptions.Maximum.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.get -> System.TimeSpan
 NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.ResilienceDeadlineOptions() -> void
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.IncludeAttemptDetails.get -> bool
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.IncludeAttemptDetails.set -> void
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RateLimitedStatusCode.get -> int
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RateLimitedStatusCode.set -> void
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RejectedStatusCode.get -> int
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RejectedStatusCode.set -> void
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.ResilienceExceptionHandlerOptions() -> void
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.TimeoutStatusCode.get -> int
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.TimeoutStatusCode.set -> void
 NResilience.AspNetCore.ResilienceNestedRetryApplicationBuilderExtensions
 NResilience.AspNetCore.ResilienceNestedRetryOptions
 NResilience.AspNetCore.ResilienceNestedRetryOptions.Header.get -> string!
@@ -15,3 +26,4 @@ NResilience.AspNetCore.ResilienceNestedRetryOptions.Header.set -> void
 NResilience.AspNetCore.ResilienceNestedRetryOptions.ResilienceNestedRetryOptions() -> void
 static NResilience.AspNetCore.ResilienceDeadlineApplicationBuilderExtensions.UseResilienceDeadline(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Action<NResilience.AspNetCore.ResilienceDeadlineOptions!>? configure = null) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
 static NResilience.AspNetCore.ResilienceNestedRetryApplicationBuilderExtensions.UseResilienceNestedRetry(this Microsoft.AspNetCore.Builder.IApplicationBuilder! app, System.Action<NResilience.AspNetCore.ResilienceNestedRetryOptions!>? configure = null) -> Microsoft.AspNetCore.Builder.IApplicationBuilder!
+static Microsoft.Extensions.DependencyInjection.ResilienceExceptionHandlerServiceCollectionExtensions.AddResilienceExceptionHandler(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<NResilience.AspNetCore.ResilienceExceptionHandlerOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
