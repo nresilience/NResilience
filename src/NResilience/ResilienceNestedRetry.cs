@@ -2,7 +2,7 @@ namespace NResilience;
 
 /// <summary>
 ///     Whether the caller of this logical call is already retrying, and the two halves of carrying
-///     that across a process boundary: reading a header into an ambient flag, and recognising the
+///     that across a process boundary: reading a header into an ambient flag, and recognizing the
 ///     marker a retrying handler writes.
 ///     <para>
 ///         <see cref="Http.ResilienceHandler" /> already knows when it is nested inside another

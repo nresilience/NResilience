@@ -16,7 +16,7 @@ namespace NResilience.AspNetCore;
 /// </summary>
 /// <remarks>
 ///     An <see cref="IExceptionHandler" /> rather than a middleware: it is a chain of responsibility,
-///     so an exception this handler does not recognise falls through to the application's own
+///     so an exception this handler does not recognize falls through to the application's own
 ///     handlers and then to the framework's, and it is registered in DI rather than positioned in a
 ///     pipeline.
 /// </remarks>

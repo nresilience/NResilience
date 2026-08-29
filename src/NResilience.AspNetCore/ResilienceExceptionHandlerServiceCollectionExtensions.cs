@@ -25,7 +25,7 @@ public static class ResilienceExceptionHandlerServiceCollectionExtensions
     /// <returns><paramref name="services" />, so the call chains.</returns>
     /// <remarks>
     ///     Call <c>app.UseExceptionHandler()</c> as well - that is the framework middleware that runs
-    ///     registered handlers. Anything this handler does not recognise is reported unhandled, so it
+    ///     registered handlers. Anything this handler does not recognize is reported unhandled, so it
     ///     composes with the application's own handlers and with MVC's exception filters.
     /// </remarks>
     /// <example>

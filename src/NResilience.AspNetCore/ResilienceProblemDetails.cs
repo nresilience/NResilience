@@ -6,7 +6,7 @@ namespace NResilience.AspNetCore;
 /// <summary>
 ///     An RFC 9457 problem document, as the handful of members this handler writes.
 ///     <para>
-///         Not <c>Microsoft.AspNetCore.Mvc.ProblemDetails</c>: that type serialises through MVC's
+///         Not <c>Microsoft.AspNetCore.Mvc.ProblemDetails</c>: that type serializes through MVC's
 ///         reflection-based path, and this package is <c>IsAotCompatible</c>. A record with a
 ///         source-generated context is the AOT-clean equivalent.
 ///     </para>
@@ -38,7 +38,7 @@ internal sealed record ResilienceAttemptDetails
 }
 
 /// <summary>
-///     The only serialisation this package does. Source-generated, so the AOT and trim analyzers stay
+///     The only serialization this package does. Source-generated, so the AOT and trim analyzers stay
 ///     quiet and the published binary carries no reflection metadata for it.
 /// </summary>
 [JsonSourceGenerationOptions(JsonSerializerDefaults.Web, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]

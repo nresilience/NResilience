@@ -5,7 +5,7 @@ namespace NResilience.Tests;
 ///     reads the marker a retrying caller put on the request and publishes it for everything the
 ///     request handler does.
 ///     <para>
-///         The claim being tested is that the flag behaves like the ambient deadline it is modelled
+///         The claim being tested is that the flag behaves like the ambient deadline it is modeled
 ///         on - it flows across awaits, nested scopes restore rather than overwrite, and an
 ///         explicit opt-out is possible - while staying a bool, because unlike a deadline it does
 ///         not decay and needs no clock.

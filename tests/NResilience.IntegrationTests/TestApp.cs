@@ -24,6 +24,27 @@ public static class TestApp
 
         return new TestServer(app);
     }
+
+    /// <summary>
+    ///     Starts a server whose container and pipeline are both configured by the test, on an
+    ///     ephemeral port - for the tests whose subject is a registered service rather than the
+    ///     pipeline alone.
+    /// </summary>
+    public static async Task<TestServer> StartAsync(Action<WebApplicationBuilder> configureBuilder, Action<WebApplication> configure)
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.WebHost.UseUrls("http://127.0.0.1:0");
+        builder.Logging.ClearProviders();
+
+        configureBuilder(builder);
+
+        var app = builder.Build();
+        configure(app);
+
+        await app.StartAsync();
+
+        return new TestServer(app);
+    }
 }
 
 /// <summary>A started server and the address it ended up on, so a test can point a client at it.</summary>
