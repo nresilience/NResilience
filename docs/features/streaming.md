@@ -6,7 +6,7 @@ order: 11
 
 # Streaming
 
-Streaming calls are **opt-in** - they use the same policy as everything else, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry, deadlines, attempt ceilings, the classifier, the breaker and the retry budget all compose; the only thing that changes is what an attempt is.
+Streaming calls are **opt-in** - they use the same policy as everything else, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry, deadlines, attempt ceilings, the classifier, the breaker, and the retry budget all compose; the only thing that changes is what an attempt is.
 
 An attempt over a stream ends at the **first element**. Before the first element, a stream is indistinguishable from a call: a connection reset, a throttling reply or a deadline all arrive before anything is yielded, and that window is exactly what the existing machinery classifies. After the first element, the call has succeeded - a retry would duplicate or drop work the consumer has already acted on - so the rest of the enumeration passes to the caller untouched.
 
@@ -39,7 +39,7 @@ await foreach (var item in Resilience.Default.RunAsync(
 
 ## What the policy judges
 
-The **first element is the one verdict point**. It is classified like any result - `OnResult<T>` works, where `T` is the element type - and a non-`Ok` verdict on it is retryable, with the consumer never seeing that element.
+The **first element is the one verdict point**. It is classified like any result - `OnResult<T>` works, where `T` is the element type - and a non-`Ok` verdict on it is retryable; the consumer never sees that element.
 
 <!-- snippet: stream-classifier -->
 ```csharp
@@ -53,11 +53,11 @@ await foreach (var item in api.RunAsync(ct => streams.Next(ct)))
 
 Elements after the first pass through unclassified, because the call already succeeded and re-judging mid-stream data would be a second policy nobody configured.
 
-A stream the policy could not start successfully **throws from the first `MoveNextAsync`**. If the attempts run out on an element the classifier kept refusing, or the classifier calls a verdict `Permanent`, or a guard refuses the retry, the consumer receives nothing: an element does not self-describe its failure the way a response with a status code does, so a one-element stream completing normally would be indistinguishable from success. The verdict, the stop reason and the attempt log travel on the exception instead - `CallRejectedException`, `DeadlineExceededException`, or whatever the source threw - exactly the exceptions a failed call throws.
+A stream the policy could not start successfully **throws from the first `MoveNextAsync`**. If the attempts run out on an element the classifier kept refusing, or the classifier calls a verdict `Permanent`, or a guard refuses the retry, the consumer receives nothing: an element does not self-describe its failure the way a response with a status code does, so a one-element stream completing normally would be indistinguishable from success. The verdict, the stop reason, and the attempt log travel on the exception instead - `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, or whatever the source threw - exactly the exceptions a failed call throws.
 
 Two outcomes are successes without a verdict point:
 
-- **An empty source that completes** is a success - no element, nothing to judge. The consumer's enumeration simply yields nothing.
+- **An empty source that completes** is a success - no element, nothing to judge. The consumer's enumeration yields nothing.
 - **A caller who stops pulling** is the consumer's business, as with any enumerable.
 
 ## What belongs to the consumer
@@ -82,11 +82,11 @@ catch (InvalidOperationException e)
 <!-- endsnippet -->
 
 > [!NOTE]
-> What the breaker, budget and latency window sample is **time to the first element**. A stream that opens in 2 ms and dies at minute nine is a fast success to all three, because the attempt genuinely ended at the first element. If a dependency always fails at element two, the breaker will not notice - see the [deep dive](../deep-dives/one-executor.md#the-streaming-path) for why that is the honest choice rather than an accident.
+> What the breaker samples is **time to the first element**. A stream that opens in 2 ms and dies at minute nine is a fast success to the breaker, because the attempt genuinely ended at the first element. If a dependency always fails at element two, the breaker will not notice - see the [deep dive](../deep-dives/one-executor.md#the-streaming-path) for why that is the honest choice rather than an accident.
 
 ## Attempt ceilings and deadlines
 
-`AttemptTimeout` bounds **time to the first element only**. Once the element is in hand the ceiling is disarmed, so a slow middle of a stream never loses the enumeration. `Deadline` and `Backoff` work between attempts exactly as for calls, and the same failure surfaces from the first `MoveNextAsync` that a failed call would have thrown: `DeadlineExceededException`, `CallRejectedException` or the original exception, with the attempt log attached.
+`AttemptTimeout` bounds **time to the first element only**. Once the element is in hand the ceiling is disarmed, so a slow middle of a stream never loses the enumeration. `Deadline` and `Backoff` work between attempts exactly as for calls, and the first `MoveNextAsync` throws the exception a failed call would have thrown: `DeadlineExceededException`, `CallRejectedException`, `AttemptTimeoutException`, or the original exception, with the attempt log attached.
 
 ## What composes, what is refused
 
@@ -103,7 +103,7 @@ Assert.Throws<ResilienceConfigurationException>(() => hedged.RunAsync<int>(stati
 
 `Admit` runs before the first pull and is classified exactly as for calls; `OnEvent` hears stream attempts like any other; `UseAmbientDeadline` composes unchanged.
 
-## Testing a streaming policy
+## Test a streaming policy
 
 `ScriptedStream` is to a streaming source what `Sequence` is to a callback: a script of stream-shaped outcomes served one per attempt, with counters for which attempts started, which were abandoned, and which survived.
 
