@@ -6,7 +6,7 @@ order: 8
 
 # Keyed policy scope
 
-A **policy scope** keys a policy by a value - such as a tenant, shard, queue, or gRPC channel - and gives every key its own [circuit breaker](circuit-breaker.md), [retry budget](retry-budget.md), and [hedging](hedging.md) latency estimate. This provides the same mechanism as [per-host scoping](../http/per-host-scope.md) for non-HTTP calls.
+A **policy scope** keys a policy by a value - a tenant, shard, queue, or gRPC channel - and gives every key its own [circuit breaker](circuit-breaker.md), [retry budget](retry-budget.md), and [hedging](hedging.md) latency estimate. It is the same mechanism as [per-host scoping](../http/per-host-scope.md), for non-HTTP calls.
 
 Policy scopes are **opt-in**. Only the HTTP handler creates one automatically.
 
@@ -69,9 +69,9 @@ private static readonly PolicyScope<string> Shards = new(
 ```
 <!-- endsnippet -->
 
-Unbounded keying is a memory leak because every entry includes a breaker and a budget. Therefore, there is no unbounded mode: the default is 1024, and the minimum is 1.
+Unbounded keying is a memory leak - every entry includes a breaker and a budget - so there is no unbounded mode. The default is 1024, and the minimum is 1.
 
-Eviction is the same approximation the host registry uses: a key seen since the last sweep survives the next one, the scope can briefly hold more than `maxKeys` while a sweep catches up, and no lookup ever waits on a sweep.
+Eviction uses the same approximation the host registry does: a key seen since the last sweep survives the next one, the scope can briefly hold more than `maxKeys` while a sweep catches up, and no lookup ever waits on a sweep.
 
 > [!IMPORTANT]
 > Eviction discards state. A dropped key that comes back gets a fresh breaker, which does not remember that it was open. Size `maxKeys` above the number of keys you expect to be active at once.
@@ -87,7 +87,7 @@ foreach (var (tenant, breaker) in Tenants.Breakers())
 ```
 <!-- endsnippet -->
 
-`Breakers()` and `Budgets()` are snapshots using the scope's keys. `Count` is the number of current keys; `Template` and `MaxKeys` are the initial configuration.
+`Breakers()` and `Budgets()` are snapshots over the scope's keys. `Count` is the number of current keys; `Template` and `MaxKeys` are the initial configuration.
 
 ## Go deeper
 

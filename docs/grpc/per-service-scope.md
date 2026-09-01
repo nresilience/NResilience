@@ -6,7 +6,7 @@ order: 4
 
 # Per-service scope
 
-The HTTP handler scopes its circuit breaker per host, so one dead dependency does not trip calls to the healthy ones. A gRPC channel serves exactly one host, so there is no per-host scoping to do - but the blast-radius argument is the same one, and the gRPC unit it applies to is the **service**.
+The HTTP handler scopes its circuit breaker per host, so one dead dependency does not trip calls to healthy ones. A gRPC channel serves exactly one host, so there is no per-host scoping to do - but the blast-radius argument is the same, and the gRPC unit it applies to is the **service**.
 
 One expensive RPC failing should not open the circuit on every other method the client exposes. By default, each gRPC service gets its own [circuit breaker](../features/circuit-breaker.md), its own [retry budget](../features/retry-budget.md), and its own hedging latency estimate:
 
@@ -41,9 +41,9 @@ The retry budget follows the same rule. `RetryBudget.Automatic` - the shipped de
 
 ## Where the state lives
 
-The guards live on the interceptor, and the interceptor is registered at **channel scope**. One channel gets one set of guards, for the life of the client.
+The guards live on the interceptor, and the interceptor is registered at **channel scope**. One channel gets one set of guards for the life of the client.
 
-That matters more than it sounds. An interceptor built per call hands every call a fresh breaker that has never seen a failure and a fresh budget that has never seen a deposit - resilience that reads as configured and provides none. `NRES005` catches it. `AddGrpcResilience()` passes the scope explicitly rather than relying on a default, so the registration cannot ship the failure it exists to prevent.
+That matters more than it sounds. An interceptor built per call hands every call a fresh breaker that has never seen a failure and a fresh budget that has never seen a deposit - resilience that reads as configured but provides none. `NRES005` catches it. `AddGrpcResilience()` passes the scope explicitly rather than relying on a default, so the registration cannot ship the failure it exists to prevent.
 
 Hold an interceptor you build by hand in a `static readonly` field or a container singleton, for the same reason.
 

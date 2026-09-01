@@ -6,7 +6,7 @@ order: 1
 
 # Quick start
 
-Install the NResilience package:
+Install the package:
 
 ```bash
 dotnet add package NResilience
@@ -22,7 +22,7 @@ private static async Task<User?> GetUserAsync(int id, CancellationToken cancella
 ```
 <!-- endsnippet -->
 
-This creates a working retried client. Provide only your own cancellation token.
+That is a working retried client. Your only job is to pass your own cancellation token.
 
 `CreateClient()` uses the [`Resilience.Http`](../reference/resilience.md) preset, which provides:
 - Three attempts
@@ -31,7 +31,7 @@ This creates a working retried client. Provide only your own cancellation token.
 - A 10-second attempt timeout
 - An HTTP classifier that retries `503` responses but not `404` responses
 
-The client's [handler](../http/index.md) handles HTTP-specific logic: it rebuilds the request for every attempt, excludes POST requests from the retry path, and scopes the circuit breaker to the host.
+The client's [policy](../http/index.md) handles HTTP-specific logic: it rebuilds the request for every attempt, excludes POST requests from the retry path, and scopes the circuit breaker to the host.
 
 ## Run any call, not just HTTP
 
@@ -47,12 +47,12 @@ var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationTo
 
 The callback provides an `attempt` token, which differs from the `cancellationToken` you pass in:
 - `attempt` is cancelled when the specific attempt hits its [`AttemptTimeout`](../features/deadlines.md).
-- `cancellationToken` cancels the entire operation.
+- `cancellationToken` cancels the entire call.
 
-Pass the `attempt` token into your work to ensure that timed-out attempts actually stop.
+Pass the `attempt` token into your work so timed-out attempts actually stop.
 
 > [!TIP]
-> Every execution overload requires a callback that takes a `CancellationToken`. An [analyzer in the package](../reference/analyzers.md) notifies you at build time if you pass the wrong token to your work.
+> Every call overload requires a callback that takes a `CancellationToken`. An [analyzer in the package](../reference/analyzers.md) notifies you at build time if you pass the wrong token to your work.
 
 ## Handle outcomes without exceptions
 
@@ -71,7 +71,7 @@ if (!result.TryGetValue(value: out var user))
 ```
 <!-- endsnippet -->
 
-Implement your fallback strategy in the `if` block, such as by serving a cached value or a default.
+Implement your fallback policy in the `if` block, such as by serving a cached value or a default.
 
 ## Next steps
 

@@ -6,10 +6,10 @@ order: 6
 
 # Dependency injection
 
-NResilience integrates with dependency injection (DI) containers to simplify the management of resilience policies in production applications. The `NResilience.Extensions` package allows you to:
-- Integrate handlers into the `IHttpClientFactory` pipeline.
-- Name policies to distinguish clients in monitoring dashboards.
-- Apply configuration changes without redeploying your application.
+NResilience integrates with dependency injection (DI) containers to make resilience policies manageable in production applications. The `NResilience.Extensions` package lets you:
+- Add handlers to the `IHttpClientFactory` pipeline.
+- Name policies so clients are distinguishable in dashboards.
+- Apply configuration changes without redeploying.
 
 To get started, add the extensions package:
 
@@ -19,7 +19,7 @@ dotnet add package NResilience.Extensions
 
 ## Use resilience with HttpClient
 
-You can add resilience to a typed or named `HttpClient` with a single method call.
+Add resilience to a typed or named `HttpClient` with one method call.
 
 <!-- snippet: di-http-client -->
 ```csharp
@@ -33,16 +33,16 @@ services.AddHttpClient(name: "payments").AddResilience(policyName: "api", o => o
 ```
 <!-- endsnippet -->
 
-Calling `AddResilience` performs the following actions:
+`AddResilience` does the following:
 - Adds the [resilience handler](../http/index.md).
-- Configures the client so that `HttpClient.Timeout` does not compete with the policy deadline.
-- Names the policy after the client for better observability.
+- Configures the client so `HttpClient.Timeout` does not compete with the policy deadline.
+- Names the policy after the client for observability.
 - Attaches the [telemetry](telemetry.md) meter and the [log listener](logging.md).
 - Records the handler so [health checks](health-checks.md) can report its per-host breakers.
 
 ## Register named policies
 
-Named policies allow you to define the resilience requirements for a dependency in one place and reuse them across the application.
+Named policies let you define a dependency's resilience requirements in one place and reuse them across the application.
 
 <!-- snippet: di-register-named -->
 ```csharp
@@ -59,11 +59,11 @@ services.AddResilience(name: "reports", o =>
 ```
 <!-- endsnippet -->
 
-Policy registration is validated eagerly. For example, setting `Attempts = 0` causes a failure at startup rather than during the first request.
+Policy registration is validated eagerly: `Attempts = 0` fails at startup rather than on the first request.
 
 ### Inject the policy roster
 
-Inject `IResiliencePolicies` (the roster of registered policies) instead of a specific policy instance.
+Inject `IResiliencePolicies` (the roster of registered policies) rather than a specific policy instance.
 
 <!-- snippet: di-inject -->
 ```csharp
@@ -81,28 +81,28 @@ public sealed class Orders(IResiliencePolicies policies)
 <!-- endsnippet -->
 
 > [!IMPORTANT]
-> Resolve the policy from the roster on every call. If you capture a policy in a `readonly` field during construction, you create a snapshot. This prevents configuration reloads from reaching the policy.
+> Resolve the policy from the roster on every call. Capturing a policy in a `readonly` field at construction creates a snapshot, which configuration reloads can never reach.
 
-Use `TryGet` for a non-throwing lookup. The `Names` property returns the list of all registered policy names.
+Use `TryGet` for a non-throwing lookup. The `Names` property lists all registered policy names.
 
 ## Hot reload and state persistence
 
-Hot reload allows you to change policy settings without redeploying. Because policies are immutable values, a reload is a simple reference swap: `IOptionsMonitor` triggers, the configuration section projects onto a new `Resilience` instance, and the roster provides the new instance to callers.
+Hot reload changes policy settings without a redeploy. Policies are immutable values, so a reload is a reference swap: `IOptionsMonitor` triggers, the configuration section projects onto a new `Resilience` instance, and the roster hands callers the new instance.
 
 ### Persisting breaker and budget state
 
-Circuit breaker and retry budget states are not replaced during a reload because their internal state is critical for stability.
-- A **circuit breaker** that is open because a dependency is down remains open across a configuration edit.
-- A **retry budget** preserves its traffic history.
+Circuit breaker and retry budget states survive a reload, because discarding them would discard stability:
+- A **circuit breaker** that is open because a dependency is down stays open across a configuration edit.
+- A **retry budget** keeps its traffic history.
 
-Budgets and breakers are pinned to the registration name rather than the policy instance to ensure this continuity.
+Budgets and breakers are pinned to the registration name rather than the policy instance to keep this continuity.
 
 ### HttpClient reload timing
 
-An `HttpClient` observes a reloaded policy at the next handler rotation. By default, `IHttpClientFactory` rebuilds handler chains every two minutes. Handlers hold per-host state; rebuilding them on every request to achieve instant reloads would discard this state.
+An `HttpClient` observes a reloaded policy at the next handler rotation. `IHttpClientFactory` rebuilds handler chains every two minutes by default. Handlers hold per-host state, so rebuilding them on every request for instant reloads would throw that state away.
 
 ## Next steps
 
-- [Configuration](configuration.md): Learn about the bindable configuration shape and JSON limitations.
-- [Telemetry](telemetry.md): Learn which metrics are enabled by default and how to manage them.
-- [Logging](logging.md): Learn what a registered policy writes through `ILogger` and how to filter it per policy. For the profiles and levels, see [Logging](../features/logging.md).
+- [Configuration](configuration.md): The bindable configuration shape, and what JSON cannot express.
+- [Telemetry](telemetry.md): Which metrics are on by default, and how to manage them.
+- [Logging](logging.md): What a registered policy writes through `ILogger`, and how to filter it per policy. For profiles and levels, see [Logging](../features/logging.md).

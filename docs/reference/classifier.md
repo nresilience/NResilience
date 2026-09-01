@@ -6,7 +6,7 @@ order: 3
 
 # `Classifier`
 
-The `Classifier` is a `sealed class` used to categorize the outcome of an attempt. It is immutable; every modification returns a new instance.
+The `Classifier` is a `sealed class` that categorizes the outcome of an attempt. It is immutable: every modification returns a new instance.
 
 | Member | Description |
 | :--- | :--- |
@@ -16,7 +16,7 @@ The `Classifier` is a `sealed class` used to categorize the outcome of an attemp
 | `Classifier.RetryEverything` | Contains no specific rules; every exception is classified as `Transient`. |
 | `On<TException>(Verdict)` | Assigns a fixed verdict to a specific exception type and its subclasses. |
 | `On<TException>(Func<TException, Verdict>)` | Assigns a verdict based on a predicate that can inspect the exception. |
-| `OnResult<T>(Func<T, Verdict>)` | Assigns a verdict to a returned value. The type `T` must match exactly. |
+| `OnResult<T>(Func<T, Verdict>)` | Assigns a verdict to a returned value. `T` must match exactly. |
 | `ClassifyException(Exception)` | Returns the verdict for a given exception. |
 | `ClassifyResult<T>(T)` | Returns the verdict for a given result. Returns `Verdict.Ok` if no rule is registered for type `T`. |
 | `ToString()` | Returns a list of all rules in evaluation order, including the default verdict for unrecognized exceptions. |
@@ -36,7 +36,7 @@ Rules are evaluated in reverse order of addition; the most recently added rule t
 The `Retry-After` value is supported as both a delta-seconds value and an HTTP date. Both are converted to a `TimeSpan` and floored at zero.
 
 ### Database rules
-`Classifier.Data` reads `DbException.IsTransient`, which is implemented by the provider. Providers that do not override this property report `false`, making `Classifier.Data` equivalent to `Classifier.Default`. Resource limits are reported as transient; see [Classify database failures](../features/classification.md#classify-database-failures) for the rule that classifies them as throttling.
+`Classifier.Data` reads `DbException.IsTransient`, which the provider implements. Providers that do not override it report `false`, making `Classifier.Data` equivalent to `Classifier.Default`. Resource limits are reported as transient; see [Classify database failures](../features/classification.md#classify-database-failures) for the rule that classifies them as throttling.
 
 ## `Verdict`
 
@@ -53,7 +53,7 @@ The `Retry-After` value is supported as both a delta-seconds value and an HTTP d
 | `Verdict.Throttled(TimeSpan?)` | The dependency is defending itself, potentially with a suggested retry delay. |
 | `Verdict.Limited(TimeSpan?)` | A [limiter](../features/rate-limiting.md) in this process refused the attempt. `Kind` is `Throttled` and `SelfImposed` is `true`. |
 
-`Verdict` implements value equality, and `SelfImposed` is part of it: `Verdict.Throttled()` and `Verdict.Limited()` are not equal. `ToString()` prints a human-readable summary, such as `Throttled (retry after 2s)` or `Throttled (self-imposed, retry after 2s)`.
+`Verdict` implements value equality, and `SelfImposed` is part of it: `Verdict.Throttled()` and `Verdict.Limited()` are not equal. `ToString()` prints a summary such as `Throttled (retry after 2s)` or `Throttled (self-imposed, retry after 2s)`.
 
 ## `VerdictKind`
 

@@ -6,7 +6,7 @@ order: 4
 
 # Health checks
 
-A circuit breaker holds the single most operationally interesting fact in the process: whether a dependency is currently considered unusable. `AddResilience()` on an `IHealthChecksBuilder` puts that fact, and every retry budget's utilization, on your health endpoint.
+A circuit breaker holds the most operationally interesting fact in the process: whether a dependency is currently considered unusable. `AddResilience()` on an `IHealthChecksBuilder` puts that fact, and every retry budget's utilization, on your health endpoint.
 
 ## Register the check
 
@@ -39,11 +39,11 @@ Each guard is one entry in the check's `Data` dictionary:
 | `breaker:<name>:normal` | For a breaker with `SlowCalls` configured, the measured normal latency in milliseconds. Absent until the baseline has enough samples. |
 | `budget:<name>` | Utilization, from 0 to 1. |
 
-For a registered policy, `<name>` is the registration name. For an HTTP client it is `<client>:<host:port>`, so a client talking to three hosts reports three breakers and you can tell which one is in trouble.
+For a registered policy, `<name>` is the registration name. For an HTTP client it is `<client>:<host:port>`, so a client talking to three hosts reports three breakers, and you can tell which one is in trouble.
 
 The `Description` summarizes: either `"4 breaker(s) closed, 2 retry budget(s) funding retries."` or, when something is wrong, `"1 of 4 breaker(s) open or isolated."`
 
-A process with nothing to report says so rather than claiming health - if you see `"No breakers or retry budgets are registered"`, either nothing is configured with one, or the policies that have them are not registered in this container.
+A process with nothing to report says so rather than claiming health: if you see `"No breakers or retry budgets are registered"`, either nothing is configured with one, or the policies that have them are not registered in this container.
 
 ## An open breaker is Degraded, not Unhealthy
 
@@ -79,18 +79,18 @@ services.AddHealthChecks().AddResilience(configure: o =>
 | `Watch(name, breaker)` | - | Also report a breaker DI does not own. |
 | `Watch(name, budget)` | - | Also report a retry budget DI does not own. |
 
-The budget threshold is not `1.0` on purpose. A budget sitting at 0.9 is already refusing retries in bursts, and by the time it reads exactly 1.0 the thing worth alerting on has been happening for a while.
+The budget threshold is not `1.0` on purpose. A budget sitting at 0.9 is already refusing retries in bursts, and by the time it reads exactly 1.0 the symptom should trigger an alert.
 
 ## What the check does not do
 
-**It contacts nothing.** The check reads state that is already in memory, so it cannot itself time out, hang, or add load to the dependency it is reporting on. That makes it safe on a liveness endpoint as well as a readiness one, and it is why the check is a read rather than the more obvious design of having the health endpoint make a real call.
+**It contacts nothing.** The check reads state already in memory, so it cannot time out, hang, or add load to the dependency it reports on. That makes it safe on a liveness endpoint as well as a readiness one, and it is why the check is a read rather than the more obvious design of having the health endpoint make a real call.
 
 **It reports the current handler generation.** `IHttpClientFactory` rebuilds each client's handler chain when the handler lifetime expires - two minutes by default - and an HTTP client's per-host breakers belong to the handler. A breaker that opened is therefore reported until that rotation and not after it. What the check shows is the state guarding the *next* request, which is the state worth probing.
 
-**It does not aggregate across the fleet.** Breakers and retry budgets are per-process by design, which is what lets them work with no coordination protocol. One pod's endpoint tells you about one pod. The fleet-level view comes from aggregating the [`nresilience.*` metrics](telemetry.md).
+**It does not aggregate across the fleet.** Breakers and retry budgets are per-process by design, which is what lets them work with no coordination protocol. One pod's endpoint tells you about one pod; the fleet-level view comes from aggregating the [`nresilience.*` metrics](telemetry.md).
 
 ## Go deeper
 
-- [Circuit breaker](../features/circuit-breaker.md) - what opens one, and what closes it again.
+- [Circuit breaker](../features/circuit-breaker.md) - what opens one and what closes it again.
 - [Retry budget](../features/retry-budget.md) - what utilization means and why it is a fraction of traffic.
 - [Telemetry](telemetry.md) - the metrics that answer the same questions across a fleet.

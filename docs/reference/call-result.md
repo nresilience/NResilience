@@ -6,7 +6,7 @@ order: 2
 
 # `CallResult<T>`
 
-`CallResult<T>` is a `readonly struct` returned by the `TryRunAsync` overloads. It encapsulates the outcome of a resilience operation and provides access to the attempt history.
+`CallResult<T>` is a `readonly struct` returned by the `TryRunAsync` overloads. It carries the outcome of a resilience operation and the attempt history.
 
 | Member | Description |
 | :--- | :--- |
@@ -23,8 +23,8 @@ order: 2
 
 **Note**: `TryRunAsync` still throws an exception if the caller's `CancellationToken` is cancelled.
 
-### Example: Implement a fallback
-You can use the result to provide a fallback value when a resilience operation fails:
+### Example: implement a fallback
+Use the result to serve a fallback value when a call fails:
 
 <!-- snippet: fallback-is-an-if -->
 ```csharp
@@ -43,7 +43,7 @@ private async Task<User> ReadUserAsync(UserCache cache, CancellationToken cancel
 
 ## `StopReason`
 
-The `StopReason` enum indicates why the resilience loop stopped executing.
+The `StopReason` enum says why the resilience loop stopped.
 
 | Value | Meaning |
 | :--- | :--- |
@@ -68,7 +68,7 @@ The `StopReason` enum indicates why the resilience loop stopped executing.
 | `AttemptLog.DataKey` | The `Exception.Data` key used to store the log: `"NResilience.Attempts"`. |
 | `ToString()` | Returns a human-readable summary of the attempts and delays. |
 
-While `TryRunAsync` always materializes the log, `RunAsync` only materializes it when a call is about to fail.
+`TryRunAsync` always materializes the log; `RunAsync` materializes it only when a call is about to fail.
 
 ## `Attempt`
 

@@ -25,7 +25,7 @@ Console.WriteLine(exhausted.Kind); // Throttled - the dependency is defending it
 ```
 <!-- endsnippet -->
 
-`GrpcResilience.Default` is `Resilience.Default` with that classifier already on it, so `AddGrpcResilience()` needs no classifier argument. For more information about verdicts, see [Classification](../features/classification.md).
+`GrpcResilience.Default` is `Resilience.Default` with that classifier already on it, so `AddGrpcResilience()` needs no classifier argument. See [Classification](../features/classification.md) for verdicts.
 
 ## The shipped table
 
@@ -59,11 +59,11 @@ var policy = GrpcResilience.Default with
 ```
 <!-- endsnippet -->
 
-`Aborted` is the row most often worth changing. A transactional store that reports write conflicts as `Aborted` and expects the client to retry them is a real shape - it is just not the only one, and repeating a conflicting write against a store that does not expect it is worse than failing.
+`Aborted` is the row most often worth changing. A transactional store that reports write conflicts as `Aborted` and expects the client to retry them is a real shape - just not the only one, and repeating a conflicting write against a store that does not expect it is worse than failing.
 
 ## What the classifier does not see
 
-Two things reach the caller without passing the classifier at all, and both are deliberate:
+Two things reach the caller without passing the classifier, both deliberate:
 
 - **Your own cancellation.** A cancelled caller token is never a failure, is never retried, and no classifier can override it.
 - **Your own attempt timeout.** An attempt that exceeds its ceiling produces an `AttemptTimeoutException`, judged by the executor rather than by a predicate. See [Deadlines](deadlines.md) for how the interceptor keeps a gRPC `DeadlineExceeded` from being confused with one.

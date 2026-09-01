@@ -6,15 +6,15 @@ order: 4
 
 # `Backoff`
 
-`Backoff` is a `readonly record struct` that determines the delay between retry attempts.
+`Backoff` is a `readonly record struct` that sets the delay between retry attempts.
 
 | Member | Description |
 | :--- | :--- |
 | `Backoff.Default` | Uses `Exponential()` with a 100 ms transient base, 1 s throttled base, factor of 2, 30 s cap, and full jitter. |
 | `Backoff.None` | Retries immediately. Use this only when the dependency is not shared. |
 | `Backoff.Exponential(transientBase, throttledBase, factor, max)` | Uses exponential backoff with separate bases for different retryable verdicts. All parameters are optional. |
-| `Backoff.Constant(delay)` | Applies the same delay before every retry. |
-| `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Allows you to compute the delay yourself. This mode ignores the `Max` property and jitter. |
+| `Backoff.Constant(delay)` | Uses the same delay before every retry. |
+| `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Computes the delay yourself. This mode ignores the `Max` property and jitter. |
 | `Jitter` | Determines the amount of randomness applied to the delay. |
 | `Max` | The maximum allowable delay for any single attempt. Defaults to 30 s. Use `Timeout.InfiniteTimeSpan` for no cap. |
 | `TransientBase` | The base delay for a `Transient` verdict. Zero for a `Custom` curve. |
@@ -53,7 +53,7 @@ The factories remain the only way to *construct* a `Backoff`; the properties are
 there is no partial-object shape to get wrong.
 
 ### Exponential backoff calculation
-For exponential backoff, the delay for attempt *n* is calculated as:
+For exponential backoff, the delay for attempt *n* is:
 `base × factor^(n-2)`
 
 The result is capped at `Max` and then jittered. The first retry is served the base delay.
@@ -65,9 +65,9 @@ The result is capped at `Max` and then jittered. The first retry is served the b
 - `max`: 30 s
 
 ### Priority and constraints
-The `Verdict.RetryAfter` value takes precedence over all backoff curves. It is honored verbatim, capped only by `Max`, and no jitter is applied.
+`Verdict.RetryAfter` wins over all backoff curves: it is honored verbatim, capped only by `Max`, with no jitter.
 
-The [executor](index.md) also ensures that a delay does not consume the remaining time on the deadline. If a delay would exceed the deadline, the call fails immediately with a deadline exception instead of sleeping.
+The [executor](index.md) also keeps a delay from consuming the deadline's remaining time. If a delay would exceed the deadline, the call fails immediately with a deadline exception instead of sleeping.
 
 **Note**: `default(Backoff)` is equivalent to `Backoff.Default`.
 
@@ -83,7 +83,7 @@ The [executor](index.md) also ensures that a delay does not consume the remainin
 
 ## `Jitter`
 
-Jitter adds randomness to the delay to prevent "thundering herd" problems where multiple clients retry simultaneously.
+Jitter adds randomness to the delay to prevent thundering-herd problems, where many clients retry simultaneously.
 
 | Value | Resulting Delay |
 | :--- | :--- |

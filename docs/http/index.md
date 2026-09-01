@@ -6,11 +6,9 @@ order: 4
 
 # HTTP
 
-A [policy](../getting-started/key-concepts.md#what-is-a-policy) manages retries, timeouts, and circuit breaking for any call. However, HTTP introduces specific constraints that a general policy cannot address on its own.
+A [policy](../getting-started/key-concepts.md#what-is-a-policy) manages retries, timeouts, and circuit breaking for any call. HTTP adds constraints a general policy cannot handle alone: an `HttpRequestMessage` can only be sent once, so a retry needs a fresh request; retrying a `POST` can duplicate orders or charges; and a circuit breaker should be scoped per host so one failing server does not block calls to healthy ones.
 
-For example, an `HttpRequestMessage` can only be sent once, so a retry requires a fresh request. Additionally, retrying a `POST` request can lead to duplicate orders or charges, and a circuit breaker should be scoped per host to prevent a single failing server from blocking calls to healthy ones.
-
-The `ResilienceHandler` is a `DelegatingHandler` that manages these HTTP-specific requirements. The handler ships in the core package - there is no separate HTTP install.
+The `ResilienceHandler` is a `DelegatingHandler` that manages those HTTP-specific requirements. It ships in the core package - there is no separate HTTP install.
 
 > [!IMPORTANT]
 > `HttpClient.Timeout` defaults to 100 seconds and covers the entire request sequence - including all attempts and backoff delays. This silently caps any policy with a longer deadline. By default, the resilience handler takes ownership of this timeout so that the policy's [deadline](../features/deadlines.md) is the only active bound.
@@ -47,11 +45,11 @@ private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cance
 ```
 <!-- endsnippet -->
 
-Using a long-lived client is essential because the per-host circuit breakers and retry budgets reside within the handler. Rebuilding the client for every call discards this state. In applications using a dependency injection container, use [`AddResilience()`](../di/index.md) on the client builder.
+A long-lived client matters because the per-host circuit breakers and retry budgets live in the handler; rebuilding the client for every call throws that state away. In a DI container, use [`AddResilience()`](../di/index.md) on the client builder.
 
 ## Configure the handler
 
-You can customize the handler's behavior using `HttpResilienceOptions`.
+Customize the handler's behavior with `HttpResilienceOptions`.
 
 <!-- snippet: http-options -->
 ```csharp
@@ -71,18 +69,18 @@ using var client = ResilienceHttp.CreateClient(
 
 | Option | Default | Description | Reference |
 | :--- | :--- | :--- | :--- |
-| `RetryUnsafeMethods` | `false` | Determines if `POST` and `PATCH` are retried. | [Idempotency](idempotency.md) |
-| `OwnTransportTimeout` | `true` | Sets `HttpClient.Timeout` to infinite to avoid conflicting with the deadline. | below |
+| `RetryUnsafeMethods` | `false` | Whether `POST` and `PATCH` are retried. | [Idempotency](idempotency.md) |
+| `OwnTransportTimeout` | `true` | Sets `HttpClient.Timeout` to infinite so it does not conflict with the deadline. | below |
 | `BreakerPerHost` | `true` | Scopes the circuit breaker to the target host. | [Per-host scope](per-host-scope.md) |
 | `BudgetPerHost` | `true` | Scopes the retry budget to the target host. | [Per-host scope](per-host-scope.md) |
 | `MaxHosts` | `1024` | Bounds the per-host registry. `null` is unbounded. | [Per-host scope](per-host-scope.md) |
-| `DetectNestedRetries` | `true` | Enables detection of nested retry loops. | [Nested retries](nested-retries.md) |
+| `DetectNestedRetries` | `true` | Detects nested retry loops. | [Nested retries](nested-retries.md) |
 
 ## Manage the transport timeout
 
-When `OwnTransportTimeout` is set to `true`, NResilience sets `HttpClient.Timeout` to `Timeout.InfiniteTimeSpan`. This ensures the [deadline](../features/deadlines.md) is the only active time bound.
+When `OwnTransportTimeout` is `true`, NResilience sets `HttpClient.Timeout` to `Timeout.InfiniteTimeSpan`, leaving the [deadline](../features/deadlines.md) as the only active time bound.
 
-If you manually instantiate an `HttpClient` and pass it a `ResilienceHandler`, the `OwnTransportTimeout` option has no effect because the handler cannot modify the client that contains it. In this case, you must set the timeout manually:
+If you construct an `HttpClient` yourself and pass it a `ResilienceHandler`, `OwnTransportTimeout` has no effect - the handler cannot modify the client that contains it - so set the timeout manually:
 
 <!-- snippet: troubleshoot-transport-timeout -->
 ```csharp
@@ -98,7 +96,7 @@ using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: n
 
 ## Verify retry behavior
 
-You can use the `WillRetry` method to determine if the handler will retry a specific request based on its method and configuration.
+`WillRetry` tells you whether the handler will retry a specific request, based on its method and configuration.
 
 <!-- snippet: http-will-retry -->
 ```csharp
@@ -112,4 +110,4 @@ Console.WriteLine(value: handler.WillRetry(request: post)); // False
 
 ## Limitations
 
-The synchronous `Send` method is not supported and throws a `NotSupportedException`. Synchronous retry loops that block threads during backoff delays are inefficient and can lead to thread pool starvation.
+The synchronous `Send` method is not supported and throws `NotSupportedException`. A synchronous retry loop blocks threads during backoff delays, which wastes threads and can starve the thread pool.

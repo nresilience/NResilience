@@ -26,7 +26,7 @@ The estimate lives in `LatencyWindow`, an internal type with no public surface. 
 
 **Storage is an HdrHistogram-lite.** Durations land in a log-linear bucket array: a linear region below 8 µs, then eight buckets per octave up to about 134 seconds. 208 buckets, four of them in rotation, about 3.3 KB per scope - allocated only when a policy actually hedges, and only once per policy instance. Recording a sample is one clock read, one division, one bucket index, and one interlocked increment.
 
-**The rings carry their own epoch stamp** rather than being cleared on a timer. This is the [circuit breaker's](breaker-internals.md) clear-on-write idea one level up, and it makes idle behavior fall out for free: after a quiet period every ring's stamp is stale, the sum is zero, and the window reports nothing rather than something left over from a previous revolution. No timer ever runs on behalf of an idle policy.
+**The rings carry their own epoch stamp** rather than being cleared on a timer - the [circuit breaker's](breaker-internals.md) clear-on-write idea one level up. Idle behavior falls out for free: after a quiet period every ring's stamp is stale, the sum is zero, and the window reports nothing rather than leftovers from a previous revolution. No timer ever runs on behalf of an idle policy.
 
 The answer is memoized per slice - a quarter of the window, so 7.5 s at the default - which makes the read path in the hot loop a volatile read and a comparison rather than a scan of four rings. That staleness is deliberate: the question is about a distribution, not the last call, and rescanning a few thousand counters per attempt to answer it a few seconds sooner would charge every call for it. The one exception is a window that has not yet reached `MinimumSamples`; a stale "not enough yet" would keep a cold process from ever starting, so that case always recomputes.
 
@@ -34,7 +34,7 @@ The answer is memoized per slice - a quarter of the window, so 7.5 s at the defa
 
 ## What is not evidence
 
-The loser of a race was cancelled by this library. It is not a failure, and reporting it as one would corrupt every downstream signal at once - the breaker would trip on our own cancellations, the retry budget would be charged for a call whose outcome was thrown away, and `nresilience.attempts ÷ nresilience.calls` would count work nobody waited for.
+The loser of a race was cancelled by this library. It is not a failure, and reporting it as one would corrupt every downstream signal at once: the breaker would trip on our own cancellations, the budget would be charged for a call whose outcome was thrown away, and `nresilience.attempts ÷ nresilience.calls` would count work nobody waited for.
 
 So a discarded leg is not classified, records no outcome against the breaker, returns the probe slot it took, and makes no deposit to the budget. It **is** written to the attempt log, flagged, because a hedge you cannot see is a hedge you cannot tune. Its log entry is written at the moment of cancellation rather than when the leg finally returns: waiting would hand the caller's success back only once every loser had stopped, and a callback that ignores its cancellation token could hold up the very call hedging exists to make faster.
 
@@ -47,7 +47,7 @@ else if (loser is IDisposable d)
     d.Dispose();
 ```
 
-`HttpResponseMessage` is `IDisposable`, so a hedged HTTP call leaks no sockets without a line of HTTP-specific code in the core. The alternative - a `Func<T, ValueTask>` disposal hook - cannot live on a non-generic `Resilience`, and making the policy generic to accommodate one feature would trade the library's central design claim for it. The same rule covers values a later round supersedes: hedging asked for answers nobody requested, so hedging disposes the ones it throws away.
+`HttpResponseMessage` is `IDisposable`, so a hedged HTTP call leaks no sockets without a line of HTTP-specific code in the core. The alternative - a `Func<T, ValueTask>` disposal hook - cannot live on a non-generic `Resilience`, and making the policy generic for one feature would trade away the library's central design claim. The same rule covers values a later round supersedes: hedging asked for answers nobody requested, so hedging disposes the ones it throws away.
 
 ## The third loop
 
@@ -55,9 +55,9 @@ The executor is [one fused `async` frame](one-executor.md), written twice alread
 
 Two decisions cap it at three.
 
-**The post-attempt decision is shared, and it is not `async`.** Everything between "the attempt returned" and "await the backoff" is pure synchronous logic - record, notify, sample the breaker, then the six questions in the order they have to be asked. It lives in `RecordAttempt` and `Decide`, two non-`async` helpers all three loops call. Nothing reaches the state-machine box, because nothing there awaits: the parameters travel in registers and on the stack. This keeps the three loops in lockstep, so there is no drift to manage between them.
+**The post-attempt decision is shared, and it is not `async`.** Everything between "the attempt returned" and "await the backoff" is pure synchronous logic - record, notify, sample the breaker, then the six questions in the order they have to be asked. It lives in `RecordAttempt` and `Decide`, two non-`async` helpers all three loops call. Nothing reaches the state-machine box, because nothing there awaits: the parameters travel in registers and on the stack. This keeps the three loops synchronized, so there is no drift to manage between them.
 
-**The hedged loop is allowed to allocate.** It runs a task per in-flight leg, races them with `Task.WhenAny`, and holds a list. There is no version of hedging that does not, and pretending otherwise would produce a worse design rather than a cheaper one. What matters is that the cost is quarantined: the loop is selected only when `Hedge` is set, so the [allocation budgets](allocations.md) for every other caller do not move by a byte. That is a gate, not an intention.
+**The hedged loop is allowed to allocate.** It runs a task per in-flight leg, races them with `Task.WhenAny`, and holds a list. No version of hedging avoids that, and pretending otherwise would be a worse design, not a cheaper one. What matters is quarantine: the loop is selected only when `Hedge` is set, so the [allocation budgets](allocations.md) for every other caller do not move by a byte. That is a gate, not an intention.
 
 One thing came out cheaper than expected. Because each leg runs in its own `async` local function, the `Admit` hook is awaited inside the leg rather than in the shared loop - so its hoisted field is charged per leg of a hedged call instead of to every caller of a merged loop.
 

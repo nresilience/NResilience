@@ -6,7 +6,7 @@ order: 3
 
 # Features
 
-NResilience provides several features to improve the resilience of your applications. The following table summarizes these features and their default settings.
+The table below summarizes each feature and its default setting.
 
 | Feature | Default setting | Documentation |
 | :--- | :--- | :--- |

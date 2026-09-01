@@ -6,15 +6,15 @@ order: 9
 
 # Telemetry
 
-When a call is slow or fails in production, you need visibility into the policy's behavior - such as which attempts are being retried, how long they take, whether a circuit breaker opened, or if the retry budget is exhausted. Telemetry provides this visibility through a single event stream.
+When a call is slow or fails in production, you need to know what the policy did: which attempts were retried, how long they took, whether the breaker opened, whether the budget ran out. Telemetry gives you that through a single event stream.
 
-Telemetry is enabled by default for policies registered in a container. For policies built manually, it is opt-in. If `OnEvent` is `null`, the [executor](../reference/index.md) raises no events and incurs no performance overhead.
+Telemetry is on by default for policies registered in a container and opt-in for policies built manually. If `OnEvent` is `null`, the [executor](../reference/index.md) raises no events and incurs no overhead.
 
 The telemetry system uses a single struct, `CallEvent`, and a single delegate, `Resilience.OnEvent`.
 
 ## Attach a listener
 
-You can attach a listener to a policy to log or record events.
+Attach a listener to a policy to log or record events.
 
 <!-- snippet: telemetry-listener -->
 ```csharp
@@ -29,7 +29,7 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-The listener is synchronous and runs on the same thread as the executor. To avoid blocking the call, only perform fast operations such as logging, counting, or enqueuing; do not perform synchronous I/O. Any exception thrown by a listener is swallowed to prevent telemetry from failing the operation it is observing.
+The listener is synchronous and runs on the executor's thread. Keep it fast - logging, counting, enqueuing - and avoid synchronous I/O. Any exception a listener throws is swallowed so telemetry cannot fail the operation it is observing.
 
 To use multiple listeners, combine them using the `+` operator: `OnEvent = first + second`.
 
@@ -54,7 +54,7 @@ A lambda is still the right answer for anything that is not an `ILogger`. If it 
 | `HedgeWon` | The copy answered, so this call saw the shorter of two draws | No |
 | `HedgeDiscarded` | An attempt was cancelled because a sibling answered first | No |
  
-**Every call ends with exactly one terminal event.** This invariant ensures that counts of logical operations are accurate. Use the `IsTerminal` property to identify these events. `IsRejection` is true for the two refusal kinds; use it when a listener treats both rejections alike.
+**Every call ends with exactly one terminal event.** That invariant is what makes counts of logical operations accurate. Use the `IsTerminal` property to identify these events. `IsRejection` is true for the two refusal kinds; use it when a listener treats both rejections alike.
 
 <!-- snippet: telemetry-recorder -->
 ```csharp
@@ -104,6 +104,6 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.limiter.leases` | `{lease}` | Permits a [limiter](rate-limiting.md) was asked for, tagged `acquired` or `denied` |
 | `nresilience.limiter.wait.duration` | s | How long a caller waited on a limiter. Zero unless queueing is enabled |
 
-The **retry fraction** is calculated as `nresilience.attempts ÷ nresilience.calls`. This is the primary metric for monitoring retry feedback loops and identifying potential retry storms.
+The **retry fraction** is `nresilience.attempts ÷ nresilience.calls` - the primary metric for spotting retry feedback loops and retry storms.
 
-For more information, see [Telemetry in DI](../di/telemetry.md).
+For more, see [Telemetry in DI](../di/telemetry.md).

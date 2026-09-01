@@ -6,7 +6,7 @@ order: 6
 
 # `RetryBudget`
 
-The `RetryBudget` is a `sealed class` that bounds the number of retries based on a fraction of the total traffic. Like a circuit breaker, it is a live object that tracks state over time.
+The `RetryBudget` is a `sealed class` that bounds retries as a fraction of total traffic. Like a circuit breaker, it is a live object that tracks state over time.
 
 | Member | Description |
 | :--- | :--- |
@@ -18,26 +18,26 @@ The `RetryBudget` is a `sealed class` that bounds the number of retries based on
 | `IsAutomatic` | True for `RetryBudget.Automatic`. |
 | `Utilization` | A value from 0 to 1 indicating how much of the current budget has been spent. Reads 0 on `RetryBudget.Automatic` itself, which holds no tokens. |
 
-Both factories throw a `ResilienceConfigurationException` if the `fraction` is outside the range (0, 1] or if `minimumPerSecond` is negative. To disable the budget, use `RetryBudget.None` rather than a fraction of zero.
+Both factories throw `ResilienceConfigurationException` when `fraction` is outside (0, 1] or `minimumPerSecond` is negative. Disable the budget with `RetryBudget.None`, not a fraction of zero.
 
 ## Behavior
 
-The retry budget uses a token-bucket mechanism to control retries:
+The retry budget uses a token-bucket mechanism:
 
-- **Deposits**: Every successful attempt deposits tokens into the bucket based on the `fraction` value. For example, a `fraction` of `0.1` funds one retry for every ten successes.
-- **Spending**: Every retry attempt spends one token.
-- **Floor Rate**: The `minimumPerSecond` parameter refills the bucket at a constant rate regardless of traffic. This ensures that a quiet client can still perform retries. A value of zero means only successful traffic funds retries.
-- **Burst Bound**: The bucket capacity is limited to ten seconds of the floor rate. This bounds the burst of retries a recovering client can spend at once.
-- **Cold Start**: A new process starts with a full bucket. This prevents deployment from being penalized by throttling the first few retries of a fresh instance.
-- **Charging**: Only retries are charged. The first attempt of every call always executes.
+- **Deposits**: Every successful attempt deposits tokens based on the `fraction` value. A `fraction` of `0.1` funds one retry for every ten successes.
+- **Spending**: Every retry spends one token.
+- **Floor rate**: `minimumPerSecond` refills the bucket at a constant rate regardless of traffic, so a quiet client can still retry. Zero means only successful traffic funds retries.
+- **Burst bound**: The bucket capacity is ten seconds of the floor rate, bounding the burst a recovering client can spend at once.
+- **Cold start**: A new process starts with a full bucket, so a fresh instance is not penalized on its first retries.
+- **Charging**: Only retries are charged; the first attempt of every call always executes.
 
 ### Failure handling
-When the budget is exhausted, the handler stops the call with `StopReason.BudgetExhausted` after a short pause. The `CallRejectedException.RetryAfter` property indicates how long the caller must wait before the floor rate accrues another token.
+When the budget is exhausted, the call stops with `StopReason.BudgetExhausted` after a short pause. `CallRejectedException.RetryAfter` indicates how long to wait before the floor rate accrues another token.
 
 ## Configuration
 
-`Resilience.Default` and `Resilience.Http` use `RetryBudget.Automatic`. Each policy instance resolves this marker to its own private budget on first execution. Set `Budget` to `null` or `RetryBudget.None` to disable the budget.
+`Resilience.Default` and `Resilience.Http` use `RetryBudget.Automatic`; each policy instance resolves that marker to its own private budget on first execution. Set `Budget` to `null` or `RetryBudget.None` to disable the budget.
 
-When using dependency injection, the budget is pinned to the registration name. This ensures that a configuration reload does not discard the traffic history.
+With DI, the budget is pinned to the registration name, so a configuration reload does not discard the traffic history.
 
 For a detailed explanation of the mechanism, see [Retry budget internals](../deep-dives/retry-budget-internals.md).

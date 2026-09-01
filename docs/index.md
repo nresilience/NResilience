@@ -8,16 +8,16 @@ order: 0
 
 Prevent cascading failures in your .NET applications.
 
-A struggling dependency can hang your requests, tie up your threads, and crash your application. Blind retries often worsen the problem by overwhelming the failing service. NResilience wraps your calls in retries, timeouts, and circuit breakers so your application degrades gracefully instead of crashing.
+A struggling dependency can hang your requests, tie up your threads, and crash your application. Blind retries make it worse by piling onto the failing service. NResilience wraps your calls in retries, timeouts, and circuit breakers so your application degrades gracefully instead of crashing.
 
 ## Why NResilience?
 
-NResilience replaces complex fluent builders, confusing strategy ordering, and mandatory `Build()` calls with values and C# `with` expressions.
+NResilience replaces fluent builders, strategy ordering, and mandatory `Build()` calls with values and C# `with` expressions.
 
-- **No fluent builders.** Configure policies using `with` expressions to change one setting while keeping others.
-- **Sensible defaults.** Get a working, retried HTTP call with one line of code.
-- **Unified execution.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
-- **Retry budget.** A cap on retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
+- **No fluent builders.** Configure policies with `with` expressions: change one setting, keep the rest.
+- **Sensible defaults.** A working, retried HTTP call in one line of code.
+- **One execution method.** `RunAsync` works for HTTP calls, database queries, or queue reads.
+- **Retry budget.** Caps retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
 - **Native AOT compatible.** Zero external dependencies and no reflection.
 
@@ -77,11 +77,11 @@ User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGoo
 
 ## Performance and correctness
 
-NResilience is built for high-performance .NET applications:
+Built for high-performance .NET applications:
 
-- **Low overhead.** A flat execution path ensures that cost doesn't grow as you add more policy settings.
+- **Low overhead.** One flat execution path, so cost does not grow as you add policy settings.
 - **Built-in analyzers.** Seven diagnostics ship with the package to prevent silent failures.
-- **Native AOT.** Fully compatible with `net8.0` and `net10.0` trimming and AOT publishing.
+- **Native AOT.** Works with `net8.0` and `net10.0` trimming and AOT publishing.
 
 ## Start here
 

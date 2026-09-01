@@ -6,7 +6,7 @@ order: 8
 
 # Logging internals
 
-The log listener is a translation layer: it turns the `CallEvent` stream into records that say what each event means. The design questions are which level each record gets, how a pathological state is kept quiet, and what the records deliberately leave out.
+The log listener is a translation layer: it turns the `CallEvent` stream into records that say what each event means. The design questions are which level each record gets, how pathological states stay quiet, and what the records deliberately leave out.
 
 ## Why levels are proportional to volume
 
@@ -27,15 +27,15 @@ The `Verbose` profile exists to lift traffic records above a sink's ingestion th
 
 Three noise types use three different mechanisms, because each has a different shape.
 
-- **Rejections** are traffic-proportional: an open breaker refuses every call for the duration of the break. Events 1010 and 1011 warn at most once per `RepeatWindow` per policy and reason. Within the window, rejections are counted and written as event 1012 at `Debug`, and the count is included in the `Suppressed` field of the next warning. No records are dropped, only demoted, so the count is never lost.
-- **Footguns** (`OrphanedWork` and `NestedRetry`) are configuration errors, not events. Each warns the first time it is detected for a policy and remains quiet thereafter, because a repeated warning adds no information.
+- **Rejections** are traffic-proportional: an open breaker refuses every call for the duration of the break. Events 1010 and 1011 warn at most once per `RepeatWindow` per policy and reason. Within the window, rejections are counted and written as event 1012 at `Debug`, with the count in the `Suppressed` field of the next warning. No records are dropped, only demoted, so the count is never lost.
+- **Footguns** (`OrphanedWork` and `NestedRetry`) are configuration errors, not events. Each warns the first time it is detected for a policy and stays quiet after, because a repeated warning adds no information.
 - **Unretried exception types** are first-sighting events. Event 1007 names an exception type the first time a policy declines to retry it. HTTP status codes are classified from responses and arrive without exceptions, so they follow the quiet path even for the ten thousandth 404.
 
 The suppression state is why the listener is stateful: it holds the per-policy, per-reason window and the first-sighting flags. This is also why at most one log listener attaches per policy, and the first one attached wins.
 
 ## What the records do not carry
 
-Gaps in the records are intentional to avoid duplication; correlation is more efficient.
+Gaps in the records are intentional - duplication is waste; correlation is cheaper.
 
 | Not in the records | Where it lives |
 | :--- | :--- |
@@ -45,9 +45,9 @@ Gaps in the records are intentional to avoid duplication; correlation is more ef
 | The full attempt history | `AttemptLog.Of(exception)` on the thrown exception. |
 | Anything for a call the caller cancelled | Nothing. Caller cancellation rethrows before any event is raised, so a cancelled call is silent by construction. |
 
-Exception objects attach to terminal records, allowing providers to render stack traces. Per-attempt and retry records include the exception type in the message and only attach the object when `IncludeStackTracesOnRetry` is enabled. This prevents a three-attempt call from writing three stack traces for a single failure.
+Exception objects attach to terminal records so providers can render stack traces. Per-attempt and retry records include the exception type in the message and attach the object only when `IncludeStackTracesOnRetry` is enabled, so a three-attempt call does not write three stack traces for one failure.
 
 ## Go deeper
 
 - [Logging](../features/logging.md): The profiles, the levels, and how to instrument a policy you built yourself.
-- [Event IDs](../reference/events.md#log-event-ids): The full table, which is the contract an alert is built on.
+- [Event IDs](../reference/events.md#log-event-ids): The full table, the contract an alert is built on.

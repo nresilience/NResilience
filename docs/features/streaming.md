@@ -8,7 +8,7 @@ order: 11
 
 Streaming calls are **opt-in** - they use the same policy as everything else, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry, deadlines, attempt ceilings, the classifier, the breaker, and the retry budget all compose; the only thing that changes is what an attempt is.
 
-An attempt over a stream ends at the **first element**. Before the first element, a stream is indistinguishable from a call: a connection reset, a throttling reply or a deadline all arrive before anything is yielded, and that window is exactly what the existing machinery classifies. After the first element, the call has succeeded - a retry would duplicate or drop work the consumer has already acted on - so the rest of the enumeration passes to the caller untouched.
+An attempt over a stream ends at the **first element**. Before the first element, a stream is indistinguishable from a call: a connection reset, a throttling reply, or a deadline all arrive before anything is yielded, and that window is exactly what the existing machinery classifies. After the first element the call has succeeded - a retry would duplicate or drop work the consumer has already acted on - so the rest of the enumeration passes to the caller untouched.
 
 <!-- snippet: stream-basic -->
 ```csharp
@@ -53,7 +53,9 @@ await foreach (var item in api.RunAsync(ct => streams.Next(ct)))
 
 Elements after the first pass through unclassified, because the call already succeeded and re-judging mid-stream data would be a second policy nobody configured.
 
-A stream the policy could not start successfully **throws from the first `MoveNextAsync`**. If the attempts run out on an element the classifier kept refusing, or the classifier calls a verdict `Permanent`, or a guard refuses the retry, the consumer receives nothing: an element does not self-describe its failure the way a response with a status code does, so a one-element stream completing normally would be indistinguishable from success. The verdict, the stop reason, and the attempt log travel on the exception instead - `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, or whatever the source threw - exactly the exceptions a failed call throws.
+Elements after the first pass through unclassified, because the call already succeeded and re-judging mid-stream data would be a second policy nobody configured.
+
+A stream the policy could not start successfully **throws from the first `MoveNextAsync`**. If the attempts run out on an element the classifier kept refusing, the classifier calls a verdict `Permanent`, or a guard refuses the retry, the consumer receives nothing: an element does not self-describe its failure the way a response with a status code does, so a one-element stream completing normally would be indistinguishable from success. The verdict, the stop reason, and the attempt log travel on the exception instead - `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, or whatever the source threw - exactly the exceptions a failed call throws.
 
 Two outcomes are successes without a verdict point:
 
@@ -62,7 +64,7 @@ Two outcomes are successes without a verdict point:
 
 ## What belongs to the consumer
 
-A fault after the first element propagates out of `MoveNextAsync` verbatim: unclassified, no event raised, nothing recorded against the breaker or the budget. The call succeeded; what the source does afterwards is the consumer's exception, same as any other enumerable.
+A fault after the first element propagates out of `MoveNextAsync` verbatim: unclassified, no event raised, nothing recorded against the breaker or the budget. The call succeeded; what the source does afterward is the consumer's exception, same as any other enumerable.
 
 <!-- snippet: stream-post-start -->
 ```csharp
@@ -90,7 +92,7 @@ catch (InvalidOperationException e)
 
 ## What composes, what is refused
 
-Everything composes except hedging. A hedge is a concurrent second copy of a value-returning attempt; two interleaved enumerables is a buffering problem, not a hedge, so the streaming overloads refuse a hedged policy **at the `RunAsync` call** rather than silently doing nothing. The same policy still runs calls.
+Everything composes except hedging. A hedge is a concurrent second copy of a value-returning attempt; two interleaved enumerables are a buffering problem, not a hedge. The streaming overloads refuse a hedged policy **at the `RunAsync` call** rather than silently doing nothing. The same policy still runs calls.
 
 <!-- snippet: stream-hedge-refusal -->
 ```csharp
@@ -131,4 +133,4 @@ A gRPC server-streaming call is this feature with the plumbing already done: `Ad
 
 ## Go deeper
 
-[The streaming path](../deep-dives/one-executor.md#the-streaming-path) in the executor deep dive covers the one design point that makes streaming different: the surviving attempt's enumerator and token outlive the loop that produced them, and the timer that armed its ceiling is never returned to the pool.
+[The streaming path](../deep-dives/one-executor.md#the-streaming-path) in the executor deep dive covers the design point that makes streaming different: the surviving attempt's enumerator and token outlive the loop that produced them, and the timer that armed its ceiling is never returned to the pool.

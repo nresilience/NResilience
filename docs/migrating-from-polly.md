@@ -6,9 +6,9 @@ order: 10
 
 # Migrating from Polly
 
-NResilience provides a different approach to resilience than Polly. This guide provides a translation table for core concepts and explains the behavioral differences you will encounter during migration.
+NResilience approaches resilience differently from Polly. This guide translates the core concepts and explains the behavioral differences you will meet during migration.
 
-The Polly snippets below are illustrative. All NResilience snippets are compiled and verified.
+The Polly snippets below are illustrative; all NResilience snippets are compiled and verified.
 
 ## Concept translation
 
@@ -74,7 +74,7 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-In this migration, `Attempts` represents the total number of calls, so `MaxRetryAttempts = 2` becomes `Attempts = 3`. The status-code and exception predicates are handled by a [classifier](features/classification.md), which is pre-configured for HTTP in the `Resilience.Http` preset.
+In this migration, `Attempts` is the total number of calls, so `MaxRetryAttempts = 2` becomes `Attempts = 3`. The status-code and exception predicates become a [classifier](features/classification.md), already configured for HTTP in the `Resilience.Http` preset.
 
 ## Implement a fallback
 
@@ -96,7 +96,7 @@ var value = result.TryGetValue(value: out var fetched) ? fetched : "cached";
 ```
 <!-- endsnippet -->
 
-A fallback is implemented as an `if` check on the `CallResult`. Implementing this at the call site makes it clear whether the value came from the dependency or from the fallback.
+A fallback is an `if` check on the `CallResult`, and doing it at the call site makes it obvious whether the value came from the dependency or the fallback.
 
 ## Register the policy
 
@@ -169,14 +169,14 @@ var result = await policy.RunAsync(async ct =>
 ```
 <!-- endsnippet -->
 
-The bulkhead pattern prevents one slow dependency from monopolizing your thread pool. In NResilience, `Limit.Concurrency` achieves this more efficiently than Polly's thread pool partitioning:
+The bulkhead pattern keeps one slow dependency from monopolizing your thread pool. `Limit.Concurrency` does this more efficiently than Polly's thread pool partitioning:
 
 - Zero allocation when unused
 - Each attempt acquires its own permit (retries don't reuse slots)
-- Refusals are classified as `Verdict.Throttled(SelfImposed: true)`, which are retried on the long backoff curve and never open the breaker
+- Refusals are classified `Verdict.Throttled(SelfImposed: true)`: retried on the long backoff curve, never opening the breaker
 - For HTTP, scoped per host by default (like circuit breakers)
 
-For a complete guide with real-world examples, see [Resource isolation with bulkheads](guides/resource-isolation.md).
+The full guide with examples is [Resource isolation with bulkheads](guides/resource-isolation.md).
 
 ## Handle exceptions and state
 
@@ -201,18 +201,18 @@ catch (HttpRequestException e)
 ```
 <!-- endsnippet -->
 
-The original exception is returned unchanged, so existing `catch` blocks continue to work. Instead of a context object, use the `TState` execution overloads to pass your own state to the callback, which also allows the lambda to be `static`.
+The original exception comes back unchanged, so existing `catch` blocks keep working. Instead of a context object, use the `TState` execution overloads to pass your own state to the callback - which also lets the lambda be `static`.
 
 ## Behavioral differences
 
-When migrating, be aware of these four behavioral differences:
+Four behavioral differences to know about when migrating:
 
-- **Limited HTTP retries**: `Classifier.Http` treats all 4xx status codes as answers, except 408 and 429. The [HTTP handler](http/idempotency.md) does not retry `POST` or `PATCH` requests unless you explicitly mark the request as repeatable.
-- **Unrecognized exceptions**: `Classifier.Default` treats unknown exception types as `Permanent`. If you require a broad handler, use `Classifier.RetryEverything`.
-- **Active retry budget**: By default, retries are capped at 10% of successful traffic per policy. A load test against a dead dependency will return `StopReason.BudgetExhausted`. Use `RetryBudget.None` to disable this. See the [Retry budget](features/retry-budget.md) guide for details.
-- **Refusal pause**: An open circuit breaker pauses for 100 milliseconds before reporting a failure. This prevents the breaker from becoming a load generator. See [Guarded rejection](deep-dives/guarded-rejection.md).
-- **One attempt count**: Polly's hedging has its own `MaxHedgedAttempts` alongside retry's `MaxRetryAttempts`, and the product is the real ceiling on load. Here `Attempts` is the total number of calls that reach the dependency whatever shape they run in, and `Hedge.MaxConcurrent` bounds only how many overlap. Migrating `MaxRetryAttempts = 2` plus `MaxHedgedAttempts = 2` means deciding what the total should be, rather than multiplying. There is also no fixed-delay hedge to migrate: see [Hedging](features/hedging.md).
+- **Limited HTTP retries**: `Classifier.Http` treats all 4xx statuses as answers, except 408 and 429. The [HTTP handler](http/idempotency.md) does not retry `POST` or `PATCH` unless you mark the request repeatable.
+- **Unrecognized exceptions**: `Classifier.Default` treats unknown exception types as `Permanent`. For a broad handler, use `Classifier.RetryEverything`.
+- **Active retry budget**: By default, retries are capped at 10% of successful traffic per policy. A load test against a dead dependency returns `StopReason.BudgetExhausted`. Disable with `RetryBudget.None`; see the [Retry budget](features/retry-budget.md) guide.
+- **Refusal pause**: An open circuit breaker pauses 100 milliseconds before reporting a failure, so the breaker cannot become a load generator. See [Guarded rejection](deep-dives/guarded-rejection.md).
+- **One attempt count**: Polly's hedging has its own `MaxHedgedAttempts` alongside retry's `MaxRetryAttempts`, and the product is the real ceiling on load. Here `Attempts` is the total number of calls that reach the dependency whatever shape they run in, and `Hedge.MaxConcurrent` bounds only how many overlap. Migrating `MaxRetryAttempts = 2` plus `MaxHedgedAttempts = 2` means deciding what the total should be, not multiplying. There is also no fixed-delay hedge to migrate: see [Hedging](features/hedging.md).
 
 ## Run NResilience and Polly together
 
-You can run both libraries in the same process. Because the metric names, tag names, and event names do not overlap with Polly's vocabulary, you can distinguish between them in your dashboards. This allows you to migrate clients one at a time.
+Both libraries can run in the same process. The metric names, tag names, and event names do not overlap with Polly's vocabulary, so they are distinguishable in dashboards. Migrate clients one at a time.

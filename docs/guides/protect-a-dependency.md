@@ -6,13 +6,13 @@ order: 2
 
 # Protect a dependency
 
-When a critical dependency - such as a payment gateway - becomes flaky or unavailable, you must prevent your application from "hammering" the service. If you continue to send requests to a failing dependency, you risk exhausting your own resources and preventing the dependency from recovering.
+When a critical dependency - a payment gateway, say - goes flaky or unavailable, you need to stop hammering it. Keep sending requests to a failing dependency and you exhaust your own resources while making it harder for the dependency to recover.
 
-To solve this, you can use a circuit breaker to stop requests to a failing service and a retry budget to limit the total number of retries across your application.
+A circuit breaker stops requests to a failing service, and a retry budget limits how many retries you send across the application.
 
 ## Implementation example
 
-The following example demonstrates how to define a circuit breaker and retry budget scoped to a single dependency.
+This example defines a circuit breaker and retry budget scoped to a single dependency.
 
 <!-- snippet: guide-protect-a-dependency -->
 ```csharp
@@ -45,15 +45,15 @@ public sealed class Dependencies
 
 ### Key implementation details
 
-- **Breaker scope**: The [circuit breaker](../features/circuit-breaker.md) is defined as a field. Every policy that uses the `Charge` property shares this breaker, ensuring consistent state across all calls to the payment service.
-- **Slow call detection**: `SlowCalls` ensures the breaker trips during "brownouts" (when the service is slow) as well as during outright failures. It measures what normal looks like for this dependency, so you supply a multiple rather than a millisecond figure. See [Trip on brownouts](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number).
-- **Exponential backoff**: The `BreakDuration` doubles on each consecutive open state (up to `MaxBreakDuration`). This prevents the breaker from reopening on a fixed schedule and overwhelming the dependency during a long outage.
-- **Shared retry budget**: The [retry budget](../features/retry-budget.md) is shared by name. Multiple policies (such as charges and refunds) throttle against a single pool, while unrelated services remain unaffected.
-- **Observability**: The `Name` property is included in every event and metric tag, allowing you to distinguish this dependency from others in your monitoring dashboard.
+- **Breaker scope**: The [circuit breaker](../features/circuit-breaker.md) is defined as a field. Every policy that uses the `Charge` property shares this breaker, so state is consistent across all calls to the payment service.
+- **Slow call detection**: `SlowCalls` makes the breaker trip during brownouts (the service is slow but not failing) as well as outright failures. It measures what normal looks like for this dependency, so you supply a multiple rather than a millisecond figure. See [Trip on brownouts](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number).
+- **Exponential backoff**: `BreakDuration` doubles on each consecutive open state (up to `MaxBreakDuration`), so the breaker does not reopen on a fixed schedule and pile onto the dependency during a long outage.
+- **Shared retry budget**: The [retry budget](../features/retry-budget.md) is shared by name. Multiple policies (charges and refunds, say) throttle against one pool, while unrelated services are unaffected.
+- **Observability**: The `Name` property appears in every event and metric tag, so you can tell this dependency from others on your dashboard.
 
 ## Expose state via a health endpoint
 
-You can monitor the health of your dependencies by reading the state of the circuit breaker.
+Read the breaker's state to report dependency health.
 
 <!-- snippet: guide-health-endpoint -->
 ```csharp
@@ -68,21 +68,21 @@ var report = dependencies.Payments.State switch
 ```
 <!-- endsnippet -->
 
-Reading the `State` property does not consume a probe slot, so health checks cannot interfere with the breaker's recovery process.
+Reading `State` does not consume a probe slot, so health checks cannot interfere with the breaker's recovery.
 
 ## Handle call rejections
 
-When a breaker or budget refuses a call, NResilience throws a `CallRejectedException`. You can use the `Reason` property to determine why the call was refused:
+When a breaker or budget refuses a call, NResilience throws `CallRejectedException`. The `Reason` property says why:
 
 - `DependencyUnavailable`: The circuit breaker is open.
-- `BudgetExhausted`: The retry budget has been reached.
+- `BudgetExhausted`: The retry budget is spent.
 
-Distinguishing between these reasons allows you to implement different responses - for example, notifying an operator that a service is down versus slowing down your own retry rate.
+The distinction lets you respond differently - notify an operator that a service is down, versus slow down your own retry rate.
 
-To prevent "busy-spinning" (where a caller in a tight loop burns CPU by repeatedly calling and being rejected), NResilience introduces a short pause before returning a refusal.
+To stop a caller in a tight loop from burning CPU by calling and being rejected over and over, NResilience pauses briefly before returning a refusal.
 
 ## For more information
 
-- [Breaker internals](../deep-dives/breaker-internals.md): Learn about the state machine and why probes require two successes.
-- [Guarded rejection](../deep-dives/guarded-rejection.md): Understand why refusing a call introduces a short delay.
-- [Per-host scope](../http/per-host-scope.md): Learn how the HTTP handler manages this logic automatically per host.
+- [Breaker internals](../deep-dives/breaker-internals.md): The state machine, and why probes require two successes.
+- [Guarded rejection](../deep-dives/guarded-rejection.md): Why refusing a call introduces a short delay.
+- [Per-host scope](../http/per-host-scope.md): How the HTTP handler manages this automatically per host.

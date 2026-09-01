@@ -8,7 +8,7 @@ order: 6
 
 A **limiter** bounds what leaves this process: the absolute rate of outbound calls, or how many run at once. It is opt-in, and it is the only guard that acts before anything has gone wrong.
 
-It is a different guard from the two the library turns on for you. The [circuit breaker](circuit-breaker.md) reacts to evidence that a dependency is unhealthy. The [retry budget](retry-budget.md) bounds retries as a *fraction* of traffic. Neither bounds an absolute number, so neither stops you exceeding a published quota or opening 500 concurrent connections to one host.
+It is a different guard from the two the library turns on for you. The [circuit breaker](circuit-breaker.md) reacts to evidence that a dependency is unhealthy. The [retry budget](retry-budget.md) bounds retries as a *fraction* of traffic. Neither bounds an absolute number, so neither stops you from exceeding a published quota or opening 500 concurrent connections to one host.
 
 ## Turn it on for an HTTP client
 
@@ -27,7 +27,7 @@ services.AddHttpClient(name: "api")
 > [!IMPORTANT]
 > `AddRateLimit` goes **after** `AddResilience`. Handlers run in registration order, outermost first, so this is what puts the limiter inside the retry loop, where it takes one permit per attempt.
 
-The other order would take one permit for an operation that then makes three calls, so it is refused rather than accepted.
+The other order takes one permit for an operation that then makes three calls, so it is refused rather than accepted.
 
 <!-- snippet: limit-order -->
 ```csharp
@@ -63,7 +63,7 @@ var value = await api.RunAsync(async ct =>
 ```
 <!-- endsnippet -->
 
-`ct` is the attempt's token, which is already `min(AttemptTimeout, remaining deadline)` linked with the caller's. A limiter that waits is therefore bounded by the policy's own time budget with nothing further to configure.
+`ct` is the attempt's token, already `min(AttemptTimeout, remaining deadline)` linked with the caller's. A limiter that waits is therefore bounded by the policy's own time budget with nothing further to configure.
 
 ## Choose a shape
 
@@ -85,7 +85,7 @@ using var adaptive = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maxi
 ```
 <!-- endsnippet -->
 
-Set exactly one of them in `RateLimitOptions`. Asking for two is a configuration error; the library does not resolve this for you.
+Set exactly one of them in `RateLimitOptions`. Asking for two is a configuration error; the library does not pick one for you.
 
 <!-- snippet: limit-validate -->
 ```csharp
@@ -97,9 +97,9 @@ var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitO
 
 ## Let it find its own concurrency
 
-`Limit.Concurrency(50)` is correct on one pod and wrong on a hundred. The arithmetic that makes it right - the dependency's ceiling divided by the expected pod count - goes stale on the next scaling change, and nobody revisits it.
+`Limit.Concurrency(50)` is right on one pod and wrong on a hundred. The arithmetic that makes it right - the dependency's ceiling divided by the expected pod count - goes stale on the next scaling change, and nobody revisits it.
 
-`Limit.Adaptive` measures instead. Latency under load reveals queueing, which is the only observable difference between a dependency that is keeping up and one that is not.
+`Limit.Adaptive` measures instead. Latency under load reveals queueing, the only observable difference between a dependency that is keeping up and one that is not.
 
 <!-- snippet: limit-adaptive -->
 ```csharp
@@ -143,14 +143,14 @@ A **round** is one limit's worth of calls - so the loop reacts at the pace the d
 - Fastest above `Threshold` x baseline, and the limit is multiplied by `DecreaseFactor`.
 - Otherwise, if the limit was what was actually constraining you during the round, it grows by one.
 
-Multiplicative decrease against additive increase, in that pairing, for the reason TCP uses it: the cost of being too high is paid by the dependency and the cost of being too low is paid by you, so the two directions must not move at the same speed.
+Multiplicative decrease against additive increase, in that pairing, for the reason TCP uses it: the cost of being too high is paid by the dependency, the cost of being too low by you, so the two directions must not move at the same speed.
 
-The growth condition matters as much as the shrink one. A limiter that grew while idle would ratchet to `Maximum` during a quiet period, and the first burst afterwards would meet no limit at all.
+The growth condition matters as much as the shrink one. A limiter that grew while idle would ratchet to `Maximum` during a quiet period, and the first burst afterward would meet no limit at all.
 
 > [!NOTE]
 > The baseline is measured, so it can be measured wrong. A process that starts *while the dependency is already queueing* learns the queued latency as normal and grows to `Maximum`. That is what the ceiling is for: make it a number the dependency can survive, not one you expect never to reach.
 
-It reads its own state for a dashboard - `CurrentLimit` is the number it settled on, and `Baseline` is what it thinks a fast call looks like. It also records `nresilience.limiter.limit` whenever the limit moves.
+It reads its own state for a dashboard - `CurrentLimit` is the number it settled on, `Baseline` is what it thinks a fast call looks like. It also records `nresilience.limiter.limit` whenever the limit moves.
 
 ### From configuration
 
@@ -206,7 +206,7 @@ If every attempt is refused, the call ends with `StopReason.AttemptsExhausted` a
 
 `QueueLimit` is `0` by default: a call that cannot get a permit is refused immediately rather than queued.
 
-That is deliberate, because the library is already good at waiting. A refusal becomes a retry on the throttled curve, capped by `Backoff.Max` and by the time left on the deadline, and visible in telemetry as a retry. Queue time is instead charged against `AttemptTimeout`, where it is indistinguishable from a slow dependency.
+That is deliberate, because the library is already good at waiting. A refusal becomes a retry on the throttled curve, capped by `Backoff.Max` and by the time left on the deadline, and visible in telemetry as a retry. Queue time instead counts against `AttemptTimeout`, where it is indistinguishable from a slow dependency.
 
 > [!CAUTION]
 > If you set `QueueLimit` above zero, raise `AttemptTimeout` to cover the wait. A queued call that exceeds the attempt timeout reports as a timeout, and a `SlowCallThreshold` breaker will count it against a dependency that is perfectly healthy.
@@ -225,7 +225,7 @@ The limiter records these itself rather than deriving them from a `CallEvent`, b
 
 ## Learn by example
 
-For a step-by-step guide to implementing bulkhead isolation (using `Limit.Concurrency` to prevent resource exhaustion), see [Resource isolation with bulkheads](../guides/resource-isolation.md).
+For a step-by-step guide to bulkhead isolation with `Limit.Concurrency`, see [Resource isolation with bulkheads](../guides/resource-isolation.md).
 
 ## Go deeper
 

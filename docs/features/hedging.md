@@ -6,9 +6,9 @@ order: 7
 
 # Hedging
 
-**Hedging** starts a second copy of an attempt that is taking longer than almost every other call to the same dependency, and returns whichever answer arrives first. A call that has already outrun the p95 is unlikely to finish quickly, and a fresh attempt often beats it - so the caller sees the p99 of two draws rather than the p99 of one.
+**Hedging** starts a second copy of an attempt that is taking longer than almost every other call to the same dependency, and returns whichever answer arrives first. A call that has already outrun the p95 is unlikely to finish quickly, and a fresh attempt often beats it, so the caller sees the p99 of two draws rather than the p99 of one.
 
-Hedging is **opt-in**. It is off in `Resilience.Default`, off in `Resilience.Http`, and off in `AddResilience()`. Set `Hedge` to turn it on.
+Hedging is **opt-in**: off in `Resilience.Default`, off in `Resilience.Http`, and off in `AddResilience()`. Set `Hedge` to turn it on.
 
 ## Turn it on
 
@@ -27,7 +27,7 @@ var api = Resilience.Http with
 
 `Hedge.At` is the only way to configure it. There is deliberately no fixed-delay form: the threshold is always a **live quantile of recent latency**, which is what makes the feature safe to leave on. See [Hedging internals](../deep-dives/hedging-internals.md) for the argument.
 
-`Attempts` stays what it says: the total number of calls that reach the dependency, whether they run one after another or at the same time. `Attempts = 3` with `MaxConcurrent = 2` means at most three wire calls, at most two of them in flight at once. There is one number to reason about, not two multiplied together.
+`Attempts` stays what it says: the total number of calls that reach the dependency, sequential or concurrent. `Attempts = 3` with `MaxConcurrent = 2` means at most three wire calls, at most two of them in flight at once. One number to reason about, not two multiplied together.
 
 ## Tune it
 
@@ -55,11 +55,11 @@ var api = Resilience.Http with
 | `MinimumDelay` | `10 ms` | A floor under the delay, so a dependency with a sub-millisecond p95 does not hedge everything. |
 | `Window` | `30 s` | How much history the estimate covers. |
 
-Pick `Quantile` by the load you are willing to add. Everything else has a working default, and `Hedge.At(0.95)` is a complete configuration.
+Pick `Quantile` by the load you are willing to add. Everything else has a working default, so `Hedge.At(0.95)` is a complete configuration.
 
 ## Hold the policy
 
-The latency estimate is private to the policy **instance**, exactly as the [automatic retry budget](retry-budget.md) is. A policy rebuilt on every call never accumulates samples, never reaches `MinimumSamples`, and never hedges anything.
+The latency estimate is private to the policy **instance**, exactly like the [automatic retry budget](retry-budget.md). A policy rebuilt on every call never accumulates samples, never reaches `MinimumSamples`, and never hedges anything.
 
 <!-- snippet: hedging-static-policy -->
 ```csharp
@@ -111,7 +111,7 @@ request.MarkRepeatable();
 ```
 <!-- endsnippet -->
 
-Each leg builds its own request from a buffered body, and the responses that lose the race are disposed - so a hedged call leaks no sockets.
+Each leg builds its own request from a buffered body, and responses that lose the race are disposed, so a hedged call leaks no sockets.
 
 One consequence of [per-host scoping](../http/per-host-scope.md) is worth knowing: the latency estimate belongs to the handler, and `IHttpClientFactory` rotates handler chains every two minutes by default. A rotated client starts with a cold estimate and hedges nothing until it has seen `MinimumSamples` calls again - the same way its per-host breakers start closed.
 
@@ -142,7 +142,7 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-In `NResilience.Extensions`, the same facts arrive as `nresilience.hedges` tagged `started`, `won` and `discarded`, plus `nresilience.hedge.threshold` - the adaptive threshold, recorded each time a hedge fires. Watching that number move during an incident is how you tell a brownout from a tail.
+In `NResilience.Extensions`, the same facts arrive as `nresilience.hedges` tagged `started`, `won` and `discarded`, plus `nresilience.hedge.threshold` - the adaptive threshold, recorded each time a hedge fires. Watching that number during an incident tells a brownout from a tail.
 
 The [attempt log](../reference/call-result.md) shows both legs, and a discarded one reads as what it is:
 
@@ -150,17 +150,17 @@ The [attempt log](../reference/call-result.md) shows both legs, and a discarded 
 2 attempts over 41ms: hedge Ok (1ms), at 40ms, discarded (41ms)
 ```
 
-`Attempt.IsHedged` says the attempt started alongside one already in flight, `Attempt.IsDiscarded` says it was cancelled because a sibling answered, and `Attempt.StartOffset` is what makes the overlap visible. A discarded attempt was never classified, so its `Verdict` carries no information - read the flag instead.
+`Attempt.IsHedged` says the attempt started alongside one already in flight, `Attempt.IsDiscarded` says it was cancelled because a sibling answered, and `Attempt.StartOffset` makes the overlap visible. A discarded attempt was never classified, so its `Verdict` carries no information - read the flag instead.
 
 ## When a hedge does not fire
 
-All five conditions must hold. If any fails, the call waits, exactly as it would without hedging configured:
+All five conditions must hold. If any fails, the call waits exactly as it would without hedging:
 
 1. `Hedge` is set on the policy.
 2. The call is repeatable. For HTTP, the same gate retry uses.
-3. The circuit breaker is closed. A dependency that is failing does not need a second copy of every slow request.
+3. The circuit breaker is closed. A failing dependency does not need a second copy of every slow request.
 4. The estimate has at least `MinimumSamples` samples. A cold process does not guess a threshold.
-5. The [retry budget](retry-budget.md) funds it. Hedges and retries draw on one bucket, so a policy already retrying at its limit stops hedging - a retry is evidence that something failed, and a hedge is only a guess that something is slow.
+5. The [retry budget](retry-budget.md) funds it. Hedges and retries draw on one bucket, so a policy already retrying at its limit stops hedging - a retry is evidence that something failed, a hedge only a guess that something is slow.
 
 ## Go deeper
 

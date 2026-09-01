@@ -8,7 +8,7 @@ order: 3
 
 The HTTP integration refuses to retry a `POST`, because a repeated `POST` is a duplicate order or a duplicate charge. The gRPC default is the opposite: **every unary method is repeatable unless you say otherwise.**
 
-This is not an inconsistency. Every gRPC call is a `POST` at the transport, and most of them are reads at the application, so carrying the HTTP rule across would make the interceptor inert.
+This is not an inconsistency. Every gRPC call is a `POST` at the transport, but most are reads at the application, so carrying the HTTP rule across would make the interceptor inert.
 
 The direction of the declaration flips instead. In HTTP you name the writes that *are* safe to repeat; in gRPC you name the ones that are not.
 
@@ -32,7 +32,7 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 ```
 <!-- endsnippet -->
 
-A method that is not repeatable gets exactly one attempt. The breaker still sees the outcome and the [retry budget](../features/retry-budget.md) still receives its deposit - nothing is sent twice, and the guards see everything.
+A method that is not repeatable gets exactly one attempt. The breaker still sees the outcome and the [retry budget](../features/retry-budget.md) still gets its deposit - nothing is sent twice, and the guards see everything.
 
 `ResilienceInterceptor.WillRetry(IMethod)` answers the same question without making a call, which is what a test asserts on.
 

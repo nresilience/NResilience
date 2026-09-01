@@ -6,9 +6,9 @@ order: 1
 
 # Idempotency
 
-An HTTP method is **idempotent** if sending the same request multiple times has the same effect as sending it once. For example, a `GET` request re-reads the same resource, and a `DELETE` request removes a resource; neither action duplicates data. In contrast, a `POST` request that creates an order can result in multiple orders if retried.
+An HTTP method is **idempotent** when sending the same request multiple times has the same effect as sending it once. A `GET` re-reads the same resource and a `DELETE` removes a resource; neither duplicates anything. A `POST` that creates an order can create several orders if retried.
 
-To prevent data duplication, the NResilience handler only retries methods that are safe to repeat.
+To prevent duplicates, the NResilience handler only retries methods that are safe to repeat.
 
 ## Default retry behavior
 
@@ -20,15 +20,15 @@ The handler retries the following methods:
 - `OPTIONS`
 - `TRACE`
 
-`POST` and `PATCH` are not retried by default. Additionally, any unrecognized HTTP methods are treated as unsafe and are not retried to avoid unintended side effects.
+`POST` and `PATCH` are not retried by default. Unrecognized HTTP methods are also treated as unsafe and are not retried, to avoid unintended side effects.
 
-A retried `POST` is a duplicate order, a duplicate message, or a duplicate charge. Microsoft's standard handler retries `POST` by default, which creates duplicates; it offers an opt-out. NResilience inverts this default.
+A retried `POST` is a duplicate order, a duplicate message, or a duplicate charge. Microsoft's standard handler retries `POST` by default and offers an opt-out; NResilience inverts that default.
 
 ## Mark a request as repeatable
 
-If you know a specific `POST` or `PATCH` request is safe to repeat - for example, because it includes an idempotency key - you can mark it as repeatable on a per-request basis. This is the most precise way to control retry behavior.
+If you know a specific `POST` or `PATCH` request is safe to repeat - it carries an idempotency key, say - mark it repeatable per request. That is the most precise way to control retry behavior.
 
-`MarkRepeatable` writes both halves of that decision in one call, and both halves matter because they serve different consumers. The `ResilienceHttp.Repeatable` option tells *this client* the request may be sent again; the idempotency key header tells *the service* to discard the second copy. A retryable `POST` needs both - the option without a key duplicates the order, and the key without the option is never used.
+`MarkRepeatable` writes both halves of that decision in one call, and both matter because they serve different consumers: the `ResilienceHttp.Repeatable` option tells *this client* the request may be sent again, and the idempotency key header tells *the service* to discard the second copy. A retryable `POST` needs both - the option without a key duplicates the order, and the key without the option is never used.
 
 <!-- snippet: http-repeatable -->
 ```csharp
@@ -43,7 +43,7 @@ using var response = await client.SendAsync(request: request, cancellationToken:
 ```
 <!-- endsnippet -->
 
-`Idempotency-Key` is an IETF draft rather than a standard, so the header name is a parameter: `request.MarkRepeatable(key, headerName: "X-Request-Id")`. Passing no key at all leaves the headers alone, for a service that does not deduplicate. An existing key on the request is never replaced, because two idempotency keys on one request is a request most services reject outright.
+`Idempotency-Key` is an IETF draft rather than a standard, so the header name is a parameter: `request.MarkRepeatable(key, headerName: "X-Request-Id")`. Passing no key at all leaves the headers alone, for a service that does not deduplicate. An existing key on the request is never replaced - two idempotency keys on one request is a request most services reject outright.
 
 The `ResilienceHttp.Repeatable` option overrides the client-level `RetryUnsafeMethods` setting in both directions:
 - Setting it to `true` - what `MarkRepeatable` does - allows a `POST` or `PATCH` request to be retried.
@@ -53,14 +53,14 @@ Both helpers return the same request, so they compose in an initializer.
 
 ## Enable retries for a client
 
-You can enable retries for `POST` and `PATCH` across an entire client by setting `HttpResilienceOptions.RetryUnsafeMethods = true`. 
+Turn on retries for `POST` and `PATCH` across a whole client with `HttpResilienceOptions.RetryUnsafeMethods = true`.
 
-Use this setting only if the entire API served by that client is genuinely idempotent. For most scenarios, the per-request `MarkRepeatable` / `MarkSingleShot` pair is safer and more precise.
+Use that only if the entire API served by the client is genuinely idempotent. For most cases, the per-request `MarkRepeatable` / `MarkSingleShot` pair is safer and more precise.
 
 ## Request and response handling
 
-To ensure retries are successful and resource-efficient, the handler manages requests and responses as follows:
+The handler manages requests and responses as follows:
 
 - **Request cloning**: Each retry attempt uses a fresh `HttpRequestMessage`. The handler copies the original method, URI, version, headers, and options.
-- **Body buffering**: The request body is buffered once before the first attempt. Every subsequent attempt receives a fresh copy of the buffered content, ensuring compatibility with both `StringContent` and `StreamContent`.
-- **Response disposal**: The handler automatically disposes of any `HttpResponseMessage` that is superseded by a retry. The final response - whether it is a success or the final failure - is returned to the caller for manual disposal.
+- **Body buffering**: The request body is buffered once before the first attempt. Every later attempt gets a fresh copy of the buffered content, so both `StringContent` and `StreamContent` work.
+- **Response disposal**: The handler disposes any `HttpResponseMessage` superseded by a retry. The final response - success or final failure - is returned to the caller for disposal.

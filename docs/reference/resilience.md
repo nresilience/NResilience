@@ -6,11 +6,11 @@ order: 1
 
 # `Resilience`
 
-The `Resilience` type is a `sealed partial record` in the `NResilience` namespace. It is immutable; use the `with` expression to derive a variant.
+The `Resilience` type is a `sealed partial record` in the `NResilience` namespace. It is immutable; derive a variant with the `with` expression.
 
 ## Presets
 
-NResilience provides several presets for common scenarios:
+The presets cover common scenarios:
 
 | Preset | Behavior |
 | :--- | :--- |
@@ -38,7 +38,7 @@ NResilience provides several presets for common scenarios:
 
 ## Methods
 
-The `Resilience` record provides methods to execute calls with the defined resilience policy.
+The `Resilience` record provides the execution methods.
 
 | Method | Return Type |
 | :--- | :--- |
@@ -68,7 +68,7 @@ The eight execution overloads have counterparts that take `ValueTask`-returning 
 | `TryRunAsync<TState, T>(…)` | `ValueTask<CallResult<T>>` |
 | `TryRunAsync<TState>(…)` | `ValueTask<CallResult>` |
 
-These extension methods are declared in the `NResilience` namespace, so they require no `using` statement beyond the one for `Resilience`. A lambda that returns a `ValueTask` binds to these methods. An `async` lambda binds to the `Task` overload because C# evaluates extension methods only when no instance method applies.
+These extension methods live in the `NResilience` namespace, so they need no `using` beyond the one for `Resilience`. A lambda returning a `ValueTask` binds to these methods. An `async` lambda binds to the `Task` overload, because C# considers extension methods only when no instance method applies.
 
 <!-- snippet: reference-valuetask-callback -->
 ```csharp
@@ -84,9 +84,9 @@ var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationTo
 ```
 <!-- endsnippet -->
 
-To use the `ValueTask` path with an `async` lambda, provide an explicit return type: `async ValueTask<int> (ct) => …`. This is rarely necessary because an `async` lambda allocates its own state machine regardless of the return type. See [where the allocations are](../deep-dives/allocations.md) for what the overloads save and why they are shaped this way.
+To use the `ValueTask` path with an `async` lambda, provide an explicit return type: `async ValueTask<int> (ct) => …`. This is rarely necessary, because an `async` lambda allocates its own state machine regardless of return type. See [where the allocations are](../deep-dives/allocations.md) for what the overloads save and why they are shaped this way.
 
-The two streaming overloads take a **cold source** - a callback returning `IAsyncEnumerable<T>` - rather than a task, so a lambda binds to them by its return type alone. Each attempt re-invokes the source, retrying until the first element is yielded and then handing the rest of the enumeration to the caller untouched. A policy with `Hedge` configured is refused by these overloads at the call. See [streaming](../features/streaming.md) for the semantics.
+The two streaming overloads take a **cold source** - a callback returning `IAsyncEnumerable<T>` - rather than a task, so a lambda binds to them by return type alone. Each attempt re-invokes the source, retrying until the first element is yielded, then hands the rest of the enumeration to the caller untouched. A policy with `Hedge` configured is refused by these overloads at the call. See [streaming](../features/streaming.md) for the semantics.
 
 ### Execution behavior
 
@@ -94,18 +94,18 @@ The two streaming overloads take a **cold source** - a callback returning `IAsyn
 
 #### Cancellation tokens
 Every method signature includes two different `CancellationToken` parameters:
-1. **The callback token**: Passed to the execution callback. It is cancelled when the attempt hits its `AttemptTimeout` or when the caller's token is cancelled.
-2. **The caller token**: The trailing parameter. It cancels the entire operation, including all retries.
+1. **The callback token**: Passed to the execution callback. Cancelled when the attempt hits its `AttemptTimeout` or when the caller's token is cancelled.
+2. **The caller token**: The trailing parameter. Cancels the whole operation, including all retries.
 
 For more information, see the [cancellation contract](../deep-dives/cancellation.md).
 
 #### State and allocation
-The `TState` overloads allow you to use `static` callbacks, which avoids closure allocations. These overloads provide the same functionality as the closure-based forms.
+The `TState` overloads allow `static` callbacks, which avoid closure allocations. They behave the same as the closure-based forms.
 
 #### Validation
-The `Validate` method checks the policy configuration for errors and throws a `ResilienceConfigurationException` if any are found. Validation does not occur at construction; it happens when you call `Validate` explicitly, during eager DI registration, or lazily on the first execution of a policy instance.
+`Validate` checks the policy configuration and throws `ResilienceConfigurationException` if it finds problems. Validation does not happen at construction; it runs when you call `Validate` explicitly, during eager DI registration, or lazily on a policy instance's first execution.
 
-`Validated()` runs the same check and returns the policy, so a bad configuration throws where the policy is written rather than on the first call. This is the shape for a `static readonly` field, where a lazily-thrown configuration error would otherwise surface as a `TypeInitializationException` much later:
+`Validated()` runs the same check and returns the policy, so a bad configuration throws where the policy is written rather than on the first call. That is the shape for a `static readonly` field, where a lazily-thrown configuration error would otherwise surface much later as a `TypeInitializationException`:
 
 ```csharp
 public static class Policies
@@ -131,7 +131,7 @@ The `NextAttempt` `readonly struct` is passed to `BeforeAttempt` and `Backoff.Cu
 
 ## `ResilienceDeadline`
 
-`ResilienceDeadline` is a `static class` holding the deadline the current logical call inherited, and the two helpers that put one on a wire. Read by the executor only for a policy whose `UseAmbientDeadline` is set.
+`ResilienceDeadline` is a `static class` holding the deadline the current logical call inherited, plus the two helpers that put one on a wire. The executor reads it only for a policy whose `UseAmbientDeadline` is set.
 
 | Member | Description |
 | :--- | :--- |
@@ -145,7 +145,7 @@ The effective deadline is `min(Deadline, Remaining)`, resolved once when the cal
 
 ## `PolicyScope<TKey>`
 
-`PolicyScope<TKey>` is a `sealed class` holding one policy per key, each with its own breaker, retry budget, and hedging latency estimate. `TKey` must be non-nullable. Every member is thread-safe. Hold one for the process; see [keyed policy scope](../features/policy-scope.md).
+`PolicyScope<TKey>` is a `sealed class` holding one policy per key, each with its own breaker, retry budget, and hedging latency estimate. `TKey` must be non-nullable. Every member is thread-safe. Hold one for the life of the process - see [keyed policy scope](../features/policy-scope.md).
 
 | Member | Description |
 | :--- | :--- |
@@ -161,4 +161,4 @@ A `Breaker` on the template is a **prototype**: each key gets its own breaker wi
 
 ## Equality
 
-Two policies are considered equal if all their properties are equal. `Breaker` and `RetryBudget` are compared by reference because they are live state objects rather than configuration. `ToString` returns the policy configuration.
+Two policies are equal when all their properties are equal. `Breaker` and `RetryBudget` are compared by reference because they are live state objects rather than configuration. `ToString` returns the policy configuration.

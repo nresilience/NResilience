@@ -6,7 +6,7 @@ order: 12
 
 # Troubleshooting
 
-This guide helps you diagnose and resolve common issues when using NResilience.
+Diagnose and fix common NResilience issues.
 
 ## Retries not occurring
 
@@ -18,7 +18,7 @@ This guide helps you diagnose and resolve common issues when using NResilience.
 Classify = Classifier.Default.On<MyDbException>(Verdict.Transient)
 ```
 
-**Why this happens**: `Classifier.Default` treats unrecognized exception types as `Permanent`. This prevents programming errors from being converted into slow, confusing failures. You must explicitly define which exception types are transient.
+**Why this happens**: `Classifier.Default` treats unrecognized exception types as `Permanent`, so programming errors fail fast instead of becoming slow, confusing failures. You must say which exception types are transient.
 
 <!-- snippet: troubleshoot-not-retried -->
 ```csharp
@@ -32,13 +32,13 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-To identify which exception type is not being recognized, attach a telemetry listener and monitor the `NotRetried` event.
+To find which exception type is not recognized, attach a telemetry listener and watch the `NotRetried` event.
 
 For a list of shipped rules, see [Classification](./features/classification.md). If you require the broad behavior of retrying all exceptions, use `Classifier.RetryEverything`.
 
 ### Symptom: HTTP 400 or 404 responses are not retried.
 
-**Why this happens**: This is the intended behavior. `Classifier.Http` treats all 4xx status codes as answers rather than failures, except for 408 and 429. A 404 response is an answer, not a transient error.
+**Why this happens**: Intended behavior. `Classifier.Http` treats all 4xx statuses as answers rather than failures, except 408 and 429. A 404 is an answer, not a transient error.
 
 If a specific status code is transient for your API, add a custom rule. For an example, see [Configure predicates](./migrating-from-polly.md#configure-predicates).
 
@@ -50,7 +50,7 @@ If a specific status code is transient for your API, add a custom rule. For an e
 request.MarkRepeatable(idempotencyKey);
 ```
 
-**Why this happens**: `POST` and `PATCH` requests are not retried by default to prevent duplicate orders, messages, or charges.
+**Why this happens**: `POST` and `PATCH` are not retried by default, to prevent duplicate orders, messages, or charges.
 
 <!-- snippet: troubleshoot-post-not-retried -->
 ```csharp
@@ -59,7 +59,7 @@ request.MarkRepeatable(idempotencyKey: Guid.NewGuid().ToString()); // the option
 ```
 <!-- endsnippet -->
 
-Only set this option for requests that are safe to repeat, such as those carrying an idempotency key. To enable this behavior for all requests on a client, set `HttpResilienceOptions.RetryUnsafeMethods = true`. For more details, see [Idempotency](./http/idempotency.md).
+Set this only for requests that are safe to repeat, such as those carrying an idempotency key. To turn it on for all requests on a client, set `HttpResilienceOptions.RetryUnsafeMethods = true`. For more information, see [Idempotency](./http/idempotency.md).
 
 ## Timeouts and deadlines
 
@@ -71,7 +71,7 @@ Only set this option for requests that are safe to repeat, such as those carryin
 client.Timeout = Timeout.InfiniteTimeSpan;
 ```
 
-**Why this happens**: `HttpClient.Timeout` defaults to 100 seconds and covers the entire operation, including all retries and backoff delays. This silently caps any deadline longer than 100 seconds. Because a `DelegatingHandler` cannot modify the client that precedes it in the pipeline, you must configure this on the client itself.
+**Why this happens**: `HttpClient.Timeout` defaults to 100 seconds and covers the whole operation, including all retries and backoff. It silently caps any deadline longer than 100 seconds. A `DelegatingHandler` cannot modify the client that precedes it in the pipeline, so configure this on the client itself.
 
 ```csharp
 // HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence.
@@ -86,9 +86,9 @@ using var client = new HttpClient(new ResilienceHandler(new HttpClientHandler())
 
 ### Symptom: The attempt timeout fires, but the call continues to run.
 
-**Why this happens**: The callback is ignoring its cancellation token. A timeout cannot stop work that does not observe cancellation, and the executor must await the task. Check for calls inside the callback that do not accept a token or use `CancellationToken.None`.
+**Why this happens**: The callback is ignoring its cancellation token. A timeout cannot stop work that does not observe cancellation, and the executor must await the task. Check for calls inside the callback that accept no token or use `CancellationToken.None`.
 
-When the work eventually returns, an `OrphanedWork` event fires and names the associated policy. For more information, see [The cancellation contract](./deep-dives/cancellation.md).
+When the work eventually returns, an `OrphanedWork` event fires and names the policy. For more information, see [The cancellation contract](./deep-dives/cancellation.md).
 
 ## Configuration and registration
 
@@ -96,19 +96,19 @@ When the work eventually returns, an `OrphanedWork` event fires and names the as
 
 **Solution**: Ensure you are binding to `ResilienceOptions` via `services.AddResilience(name, section)` rather than binding directly to the `Resilience` record.
 
-**Why this happens**: Direct binding to the `Resilience` record is silently partial. For example, `Backoff:Max` is dropped, `Classify` is ignored, and `Breaker:ConsecutiveFailures` creates a breaker with default settings while ignoring your specified value.
+**Why this happens**: Binding directly to the `Resilience` record is silently partial. `Backoff:Max` is dropped, `Classify` is ignored, and `Breaker:ConsecutiveFailures` creates a breaker with default settings while ignoring your value.
 
-For more information, see [Why the binding target is a DTO](./di/configuration.md#why-the-binding-target-is-a-dto). Additionally, verify that the property is bindable; classifiers, `BeforeAttempt`, and `OnEvent` are lambdas and must be configured in the `configure` callback.
+For more information, see [Why the binding target is a DTO](./di/configuration.md#why-the-binding-target-is-a-dto). Also check that the property is bindable: classifiers, `BeforeAttempt`, and `OnEvent` are lambdas and must be set in the `configure` callback.
 
 ### Symptom: A configuration reload does not reach the client.
 
-**Why this happens**: A policy resolved by name on an `HttpClient` is read when the handler chain is built. `IHttpClientFactory` rebuilds this chain every two minutes by default. This lag is intentional because the handler maintains per-host breakers and budgets; rebuilding the handler per request would discard this state.
+**Why this happens**: A policy resolved by name on an `HttpClient` is read when the handler chain is built, and `IHttpClientFactory` rebuilds that chain every two minutes by default. The lag is intentional: the handler holds per-host breakers and budgets, and rebuilding it per request would throw that state away.
 
-If you store a policy in a `readonly` field, configuration reloads will never reach it. Instead, resolve policies from [`IResiliencePolicies`](./reference/options.md) on a per-call basis.
+If you store a policy in a `readonly` field, reloads never reach it. Resolve policies from [`IResiliencePolicies`](./reference/options.md) per call instead.
 
 ### Symptom: `ResilienceConfigurationException` occurs at startup.
 
-**Solution**: Read the `Problems` property of the exception. It lists all configuration errors at once rather than just the first one.
+**Solution**: Read the exception's `Problems` property. It lists every configuration error at once, not just the first.
 
 <!-- snippet: troubleshoot-validate -->
 ```csharp
@@ -123,7 +123,7 @@ Console.WriteLine(value: string.Join(separator: Environment.NewLine, values: pro
 ```
 <!-- endsnippet -->
 
-Dependency injection validates policies eagerly to ensure configuration mistakes cause startup failures rather than request failures. If you use literals, the [NRES003](./reference/analyzers.md) analyzer identifies these issues at build time.
+DI validates policies eagerly so configuration mistakes fail at startup, not per request. With literals, the [NRES003](./reference/analyzers.md) analyzer catches them at build time.
 
 ## Performance and testing
 
@@ -138,14 +138,14 @@ See [Error responses](./http/error-responses.md) for the full mapping.
 
 ### Symptom: Retries are refused with `BudgetExhausted`.
 
-**Why this happens**: The [retry budget](./features/retry-budget.md) is functioning correctly. Retries are funded at 10% of successful traffic. If a dependency fails completely, it funds no retries, preventing the client from turning an outage into a load test.
+**Why this happens**: The [retry budget](./features/retry-budget.md) is working as designed. Retries are funded at 10% of successful traffic, so a completely failed dependency funds no retries - which stops the client from turning an outage into a load test.
 
-If this occurs during a test that hammers a dead dependency, set `Budget = RetryBudget.None`. In production, this symptom indicates that the retry fraction has exceeded the range where retrying is effective.
+In a test hammering a dead dependency, set `Budget = RetryBudget.None`. In production, this symptom means the retry fraction has left the range where retrying helps.
 
 ### Symptom: A test is slow or flaky.
 
 **Solution**:
-- Set `Backoff = Backoff.None` for tests that only verify that a retry occurred.
+- Set `Backoff = Backoff.None` for tests that only verify a retry occurred.
 - Use `FakeTimeProvider` (from `Microsoft.Extensions.TimeProvider.Testing`) to advance time manually for tests that assert timing. Pass the same clock to both the policy and the scripted sequence.
 
 For more details, see [Testing](./testing/index.md).
@@ -154,7 +154,7 @@ For more details, see [Testing](./testing/index.md).
 
 ### Symptom: You need to see the actual sequence of events for a call.
 
-**Solution**: Use the `AttemptLog` to inspect the history of a call.
+**Solution**: Use the `AttemptLog` to inspect a call's history.
 
 <!-- snippet: troubleshoot-attempt-log -->
 ```csharp
@@ -172,7 +172,7 @@ foreach (var attempt in result.Attempts)
 ```
 <!-- endsnippet -->
 
-For exceptions rethrown by the library, use `AttemptLog.Of(exception)` to read the log from `Exception.Data`.
+For exceptions the library rethrew, read the log from `Exception.Data` with `AttemptLog.Of(exception)`.
 
 ### Symptom: A call is not being retried and you cannot see why.
 
@@ -197,6 +197,6 @@ See [Configuration](di/configuration.md) for the bindable shape and [Logging in 
 > [!CAUTION] Quick fix
 > Decrease the log level for the noisy policy: `"Logging": { "LogLevel": { "NResilience.reports": "Warning" } }`.
 
-Each policy logs under `NResilience.<name>`, so you can silence one client without affecting others. To disable the listener for a policy, set `"Logging": "Off"` in its section.
+Each policy logs under `NResilience.<name>`, so you can silence one client without touching the others. To turn the listener off for a policy, set `"Logging": "Off"` in its section.
 
 See [Filter per policy](di/logging.md#filter-per-policy).

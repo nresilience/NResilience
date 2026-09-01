@@ -5,9 +5,9 @@ description: Prevent one dependency's resource exhaustion from starving other pa
 
 # Resource isolation with bulkheads
 
-A **bulkhead** isolates a dependency's resource usage so its degradation doesn't affect other services. When one dependency becomes slow, a bulkhead prevents its requests from monopolizing your application's thread pool or connection pool.
+A **bulkhead** keeps one dependency's resource usage from spilling onto everything else. When a dependency slows down, a bulkhead stops its requests from monopolizing your thread pool or connection pool.
 
-## The problem: Cascading thread pool starvation
+## The problem: cascading thread pool starvation
 
 Imagine your application calls three dependencies: User API (fast), Payment API (sometimes slow), and Search API (fast). When Payment becomes slow, returning responses in 30 seconds instead of 100 ms:
 
@@ -34,9 +34,9 @@ Without isolation:
 
 **The slow dependency starves the fast ones.**
 
-## The solution: Concurrency limits
+## The solution: concurrency limits
 
-Use `Limit.Concurrency` to bound how many calls run against one dependency at once:
+Bound how many calls run against one dependency at once with `Limit.Concurrency`:
 
 ```csharp
 using var paymentLimiter = Limit.Concurrency(10);  // at most 10 concurrent calls
@@ -62,7 +62,7 @@ Now:
 
 ## When to use bulkheads
 
-Add a bulkhead when you have:
+Add a bulkhead when:
 
 - **Multi-dependency systems** - your application calls several external services
 - **Resource contention** - high concurrency (> 1,000 RPS) where one slow dependency could monopolize your resources
@@ -71,7 +71,7 @@ Add a bulkhead when you have:
 
 ## When you don't need bulkheads
 
-You can skip bulkheads if you have:
+Skip bulkheads if:
 
 - **Single dependency** - your application only calls one backend
 - **Low concurrency** - fewer than 100 requests per second
@@ -80,9 +80,9 @@ You can skip bulkheads if you have:
 
 ## Size a local limit for a fleet
 
-A bulkhead bounds concurrency inside one process. The limit you configure is per pod, not per fleet. When your deployment scales horizontally, the aggregate concurrency against an external dependency is the per-pod limit multiplied by the replica count.
+A bulkhead bounds concurrency inside one process, so the limit you configure is per pod, not per fleet. Scale horizontally and the aggregate concurrency against a dependency is the per-pod limit times the replica count.
 
-The per-process design is deliberate: a local limit needs no coordination, so it stays fast. The trade-off is that the library cannot see the fleet, which means sizing the local limit for the fleet is your responsibility, not the library's.
+The per-process design is deliberate: a local limit needs no coordination, so it stays fast. The trade-off is that the library cannot see the fleet - sizing the local limit for the fleet is your job.
 
 To size the limit, start from the external dependency's capacity and divide by the number of replicas you run:
 
@@ -96,16 +96,16 @@ Suppose a payment provider allows 1,000 concurrent connections. You expect to ru
 floor(1000 / 50) = 20 concurrent calls per pod
 ```
 
-A limit of 1,000 per pod feels safe in a local test, but at 50 pods it is 50,000 concurrent connections against a provider that caps at 1,000 - the provider rejects the overflow with rate-limit errors, and the local bulkhead never tripped once.
+A limit of 1,000 per pod feels safe in a local test, but at 50 pods it is 50,000 concurrent connections against a provider that caps at 1,000. The provider rejects the overflow with rate-limit errors, and the local bulkhead never tripped once.
 
-Work backwards from the external cap, not forwards from a number that looks right on one machine. If the replica count changes, the local limit must change with it. A horizontal pod autoscaler can make a fixed limit wrong within an hour of deploying it.
+Work backwards from the external cap, not forwards from a number that looks right on one machine. If the replica count changes, the local limit must change with it - a horizontal pod autoscaler can make a fixed limit wrong within an hour of deploying it.
 
 > [!IMPORTANT]
 > A local bulkhead protects the process; it does not orchestrate the fleet. For a hard ceiling across a cluster, use a service mesh or an external rate limiter that the dependency provider enforces, and keep the in-process bulkhead as a second line of defense.
 
 ## Implement a bulkhead for HTTP
 
-For HTTP clients registered via dependency injection, the handler can scope a limiter per host automatically:
+For HTTP clients registered through DI, the handler can scope a limiter per host automatically:
 
 ```csharp
 services
@@ -135,7 +135,7 @@ services
 
 ## Implement a bulkhead for non-HTTP calls
 
-For database queries, queues, or other dependencies, place the limiter inside the policy callback:
+For database queries, queues, and other dependencies, put the limiter inside the policy callback:
 
 ```csharp
 using var queryLimiter = Limit.Concurrency(20);
@@ -149,11 +149,11 @@ var result = await policy.RunAsync(async ct =>
 
 The `using` block releases the permit when the attempt completes, whether it succeeds or fails. Placing the limiter *inside* the callback means:
 
-- ✅ Retries acquire a fresh permit for each attempt (not cached across retries)
-- ✅ The wait is bounded by the deadline (no separate timeout to configure)
-- ✅ Refusals are classified correctly (see [verdict integration](#verdict-integration) below)
+- Retries acquire a fresh permit for each attempt (not cached across retries)
+- The wait is bounded by the deadline (no separate timeout to configure)
+- Refusals are classified correctly (see [verdict integration](#verdict-integration-why-refusals-dont-open-breakers) below)
 
-## Verdict integration: Why refusals don't open breakers
+## Verdict integration: why refusals don't open breakers
 
 When a limiter denies a call, the outcome is classified as `Verdict.Throttled(SelfImposed: true)`:
 
@@ -173,7 +173,7 @@ if (!result.IsSuccess && result.Attempts[0].Verdict.SelfImposed)
 }
 ```
 
-This verdict carries three implications:
+Three things follow from that verdict:
 
 | Aspect | Effect | Why |
 | :--- | :--- | :--- |
@@ -181,7 +181,7 @@ This verdict carries three implications:
 | Circuit breaker | Not recorded | Only `Transient` is evidence; refusals are self-imposed |
 | Retry budget | Not charged | The call never left this process; no amplification cost |
 
-## Real-world example: Tiered concurrency limits
+## Real-world example: tiered concurrency limits
 
 A microservice talks to a database (with 20 connection pool slots) and runs three different queries:
 
@@ -232,7 +232,7 @@ public async Task UpdateUserAsync(int id, string name, CancellationToken ct)
 
 ## Shared bulkheads across multiple policies
 
-If multiple policies must respect the same limit (e.g., a global rate limit across a feature), share the limiter instance:
+If multiple policies must respect the same limit (a global rate limit across a feature, say), share the limiter instance:
 
 ```csharp
 // One limiter shared across all OAuth operations
@@ -257,9 +257,9 @@ public async Task<Token> RefreshTokenAsync(string refreshToken, CancellationToke
 }
 ```
 
-Both operations share the same 5-call limit, so 3 concurrent `GetTokenAsync` calls and 2 concurrent `RefreshTokenAsync` calls would saturate the limiter.
+Both operations share the same 5-call limit, so 3 concurrent `GetTokenAsync` calls plus 2 concurrent `RefreshTokenAsync` calls saturate the limiter.
 
-## Monitoring and observability
+## Monitoring
 
 The rate limiter reports two metrics on the same meter as other resilience events:
 
@@ -277,7 +277,7 @@ var limiterLeases = meter.CreateObservableCounter<long>(
     () => /* read from instrumentation */);
 ```
 
-Additionally, when refusals occur, `CallEvent` is raised:
+Refusals also raise a `CallEvent`:
 
 ```csharp
 var policy = Resilience.Http with
@@ -294,16 +294,16 @@ var policy = Resilience.Http with
 
 ## Tuning concurrency limits
 
-**Start conservative**: Begin with a limit that seems low, then increase it based on observed latency and error rates.
+Start conservative: pick a limit that seems low, then raise it based on observed latency and error rates.
 
 | Scenario | Starting point |
 | :--- | :--- |
-| Database queries (20-connection pool) | 10–15 concurrent |
-| HTTP APIs (unlimited connections) | 20–50 concurrent |
-| OAuth token service (limited quota) | 5–10 concurrent |
-| Microservice (high throughput) | 50–100 concurrent |
+| Database queries (20-connection pool) | 10-15 concurrent |
+| HTTP APIs (unlimited connections) | 20-50 concurrent |
+| OAuth token service (limited quota) | 5-10 concurrent |
+| Microservice (high throughput) | 50-100 concurrent |
 
-Monitor these metrics to decide if your limit is right:
+Use these signals to decide whether your limit is right:
 
 - **Permit deny rate**: If > 5% of attempts are denied, the limit may be too low
 - **Dependency latency**: If latency is stable, the limit is probably good
@@ -322,7 +322,7 @@ Bulkheads work alongside the other resilience patterns:
 | **Budget** | Retries as fraction of traffic | 10% of requests may retry |
 | **Bulkhead** | Concurrent calls per dependency | At most 10 calling at once |
 
-All five are defensive. Use them together:
+All five are defensive. Together:
 
 1. **Timeout** prevents hung calls
 2. **Retry** recovers from transient failures
@@ -334,16 +334,16 @@ All five are defensive. Use them together:
 
 **Q: Should I set a bulkhead limit equal to my database connection pool size?**
 
-A: Not exactly. If your pool has 20 connections, a limit of 20 means *all* queries could acquire a connection. But consider:
+A: Not exactly. If your pool has 20 connections, a limit of 20 means *all* queries could acquire a connection. But:
 - Aggregate queries might hold a connection for 5 seconds
 - Fast queries release in 10 ms
 - If you allow 20 concurrent aggregate queries, you use all 20 connections for 5 seconds
 
-A better approach: limit expensive queries to 3–5 concurrent calls, fast queries to 15, and writes to the remainder.
+Better: limit expensive queries to 3-5 concurrent calls, fast queries to 15, and writes to the remainder.
 
 **Q: What's the difference between a bulkhead and the retry budget?**
 
-A: **Bulkhead** bounds absolute concurrency. **Retry budget** bounds retries as a fraction of traffic.
+A: A **bulkhead** bounds absolute concurrency. The **retry budget** bounds retries as a fraction of traffic.
 
 - Budget prevents retry storms: 10% of requests can retry, so max 1.1× amplification
 - Bulkhead prevents thread starvation: at most 10 concurrent calls, period
@@ -352,7 +352,7 @@ Use both. The budget prevents storms; the bulkhead prevents starvation.
 
 **Q: Can I use a bulkhead on the policy instead of in the callback?**
 
-A: No, and here's why:
+A: Not usefully. With the limiter outside the retry loop, one operation holds one permit across all of its attempts:
 
 ```csharp
 // ❌ Wrong: bulkhead outside the callback
@@ -374,17 +374,17 @@ services.AddHttpClient("api")
 // without waiting for the first permit to release.
 ```
 
-The handler registration order is validated at startup: if you get it backwards, you'll get a clear error.
+With the limiter inside the retry loop, each attempt acquires its own permit, so a retry does not wait for the first permit to release.
 
 **Q: Does my bulkhead limit need to account for retries?**
 
-A: No. If you set `Limit.Concurrency(10)` and one call retries twice, it still counts as occupying one slot (one in-flight operation, three attempts).
+A: No. If you set `Limit.Concurrency(10)` and one call retries twice, it still counts as occupying one slot: one in-flight operation, three attempts.
 
 The limit bounds what's *in flight*, not how many attempts happen.
 
 **Q: What happens if a call acquires a permit, then times out?**
 
-A: The permit is released when the attempt times out. The `using` block ensures this happens automatically, even on timeout.
+A: The `using` block releases the permit automatically when the attempt times out.
 
 ```csharp
 using var lease = await limiter.AcquireAsync(ct);

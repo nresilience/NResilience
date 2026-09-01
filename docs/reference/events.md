@@ -6,7 +6,7 @@ order: 7
 
 # `CallEvent`
 
-`CallEvent` is a `readonly struct` passed to the `Resilience.OnEvent` listener. Raising an event is allocation-free, although the `Result` member boxes value-type results. The `Result` member is only populated if a listener is attached.
+`CallEvent` is a `readonly struct` passed to the `Resilience.OnEvent` listener. Raising an event is allocation-free, though the `Result` member boxes value-type results. `Result` is populated only when a listener is attached.
 
 | Member | Description |
 | :--- | :--- |
@@ -26,7 +26,7 @@ order: 7
 
 ## `CallEventKind`
 
-The `CallEventKind` enum defines the types of events emitted during a call.
+The `CallEventKind` enum defines the event types raised during a call.
 
 | Kind | Terminal | `Delay` Populated | `Reason` Populated |
 | :--- | :--- | :--- | :--- |
@@ -49,26 +49,26 @@ The `CallEventKind` enum defines the types of events emitted during a call.
 
 ### Event invariants and behavior
 
-- **Terminal Events**: Every call ends with exactly one terminal event. This invariant ensures that logical operations can be counted reliably. The `IsTerminal` property identifies these events.
-- **Rejections**: A refusal names the guard that made it: `RejectedByBreaker` indicates the dependency is unavailable, and `RejectedByBudget` indicates the client is retrying too hard. `IsRejection` covers both.
-- **Attempt Events**: Exactly one `Attempt` event fires per attempt.
-- **Retrying Events**: `Retrying` events fire **before** the backoff delay is served, allowing listeners to report the expected idle time.
-- **Orphaned Work**: `OrphanedWork` fires when an attempt exceeds its time ceiling by more than one second. This event is raised retrospectively the moment the work finally returns.
-- **Nested Retries**: `NestedRetry` events are raised exclusively by the HTTP handler.
-- **Hedging**: `HedgeStarted` carries the live latency quantile that triggered it on `Delay`. `HedgeDiscarded` fires when a leg is cancelled because a sibling answered first, and its `Duration` is how long that leg had been running. A discarded leg raises no `Attempt` event, because nothing classified it. See [Hedging](../features/hedging.md).
-- **Breaker Transitions**: Breaker state transitions are raised on the call that triggered the transition, outside of the breaker's internal lock.
+- **Terminal events**: Every call ends with exactly one terminal event, which is what makes logical operations countable. The `IsTerminal` property identifies them.
+- **Rejections**: A refusal names the guard that made it: `RejectedByBreaker` indicates that the dependency is unavailable; `RejectedByBudget` indicates that the client is retrying too hard. `IsRejection` covers both.
+- **Attempt events**: Exactly one `Attempt` event fires per attempt.
+- **Retrying events**: `Retrying` fires **before** the backoff delay is served, so listeners can report the expected idle time.
+- **Orphaned work**: `OrphanedWork` fires when an attempt exceeds its ceiling by more than one second, raised retrospectively the moment the work finally returns.
+- **Nested retries**: `NestedRetry` events are raised only by the HTTP handler.
+- **Hedging**: `HedgeStarted` carries the live latency quantile that triggered it on `Delay`. `HedgeDiscarded` fires when a leg is cancelled because a sibling answered first; its `Duration` is how long that leg ran. A discarded leg raises no `Attempt` event, because nothing classified it. See [Hedging](../features/hedging.md).
+- **Breaker transitions**: Breaker state transitions are raised on the call that triggered the transition, outside the breaker's internal lock.
 
 ## Listener contract
 
-The `OnEvent` listener is executed synchronously on the [executor's](index.md) thread. 
+The `OnEvent` listener runs synchronously on the [executor's](index.md) thread. 
 
-- **Blocking**: If a listener blocks, it blocks the entire call.
-- **Exceptions**: Any exception thrown by a listener is swallowed by the library to prevent telemetry from crashing the application.
-- **Multiple Listeners**: To use multiple listeners, chain them together: `OnEvent = first + second`.
+- **Blocking**: A listener that blocks blocks the whole call.
+- **Exceptions**: Any exception a listener throws is swallowed, so telemetry cannot crash the application.
+- **Multiple listeners**: Chain them: `OnEvent = first + second`.
 
 ## Log event IDs
 
-The `ILogger` records a registered policy writes. An event ID is a contract the moment an alert is built on it, so the numbers below are stable and gated by a test. See [Logging in DI](../di/logging.md) for how to filter them.
+These are the `ILogger` records a registered policy writes. An event ID is a contract the moment an alert is built on it, so the numbers below are stable and gated by a test. See [Logging in DI](../di/logging.md) for how to filter them.
 
 | ID | Name | `Default` | `Verbose` | Message |
 | :--- | :--- | :--- | :--- | :--- |

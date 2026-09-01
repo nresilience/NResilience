@@ -17,7 +17,7 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 ```
 <!-- endsnippet -->
 
-That client now makes three attempts with exponential backoff, retries an `Unavailable` but not a `NotFound`, opens a circuit breaker per gRPC service, and tells the server how long each attempt has. For more information about status codes, see [Classification](classification.md).
+That client now makes three attempts with exponential backoff, retries an `Unavailable` but not a `NotFound`, opens a circuit breaker per gRPC service, and tells the server how long each attempt has. See [Classification](classification.md) for status codes.
 
 > [!IMPORTANT]
 > `AddResilience()` also compiles on a gRPC client builder, and it does nothing useful. Every gRPC call is an HTTP `POST`, which the resilience handler refuses to retry by default, and a gRPC failure travels in the `grpc-status` trailer on an HTTP `200`, which the HTTP classifier reads as a success. Use `AddGrpcResilience()`.
@@ -28,7 +28,7 @@ That client now makes three attempts with exponential backoff, retries an `Unava
 dotnet add package NResilience.Grpc
 ```
 
-The package depends on `NResilience`, `NResilience.Extensions`, `Grpc.Core.Api`, and `Grpc.Net.ClientFactory`. A gRPC client's dependency graph already contains most of that weight.
+The package depends on `NResilience`, `NResilience.Extensions`, `Grpc.Core.Api`, and `Grpc.Net.ClientFactory`. A gRPC client's dependency graph already pulls in most of that weight.
 
 ## Interceptor capabilities
 
@@ -76,17 +76,17 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 
 ## Register the interceptor first
 
-Register `AddGrpcResilience()` before any other interceptor. Interceptors registered after it run **per attempt**, which is where an interceptor that refreshes a token wants to be - a token fetched once outside the retry loop can expire during it.
+Register `AddGrpcResilience()` before any other interceptor. Interceptors registered after it run **per attempt**, which is where an interceptor that refreshes a token belongs - a token fetched once outside the retry loop can expire during it.
 
-The gRPC client factory does not expose the registrations already made, so the order is a rule rather than something the library can enforce.
+The gRPC client factory does not expose registrations already made, so the order is a rule rather than something the library can enforce.
 
 ## Which calls are wrapped
 
-Server-streaming calls are wrapped on the core library's [streaming](../features/streaming.md) semantic: retried until their first message, and never after it. The one thing that differs from a unary call is the deadline on the wire, which for a stream is the whole call's remaining budget. See [Streaming](streaming.md).
+Server-streaming calls are wrapped on the core library's [streaming](../features/streaming.md) semantic: retried until their first message, never after. The one difference from a unary call is the deadline on the wire - for a stream, it is the whole call's remaining budget. See [Streaming](streaming.md).
 
-Client-streaming and duplex calls pass through untouched. The request stream is a source you drive interactively, and repeating one means re-enumerating something the failed attempt has already partially consumed, which produces duplicates or requires buffering everything. Neither outcome is a resilience feature. Wrap the *setup* call instead, the way any other callback is wrapped.
+Client-streaming and duplex calls pass through untouched. The request stream is a source you drive interactively, and repeating one means re-enumerating something the failed attempt has already partially consumed - which produces duplicates or requires buffering everything. Neither is a resilience feature. Wrap the *setup* call instead, the way any other callback is wrapped.
 
-The synchronous `BlockingUnaryCall` throws a `NotSupportedException`. Passing it through silently would leave one call in the client with no retry, no breaker, and no deadline. Use the generated client's `Async` overload.
+The synchronous `BlockingUnaryCall` throws `NotSupportedException`: passing it through silently would leave one call in the client with no retry, no breaker, and no deadline. Use the generated client's `Async` overload.
 
 ## Read what it holds
 

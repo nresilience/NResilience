@@ -6,7 +6,7 @@ order: 2
 
 # Guides
 
-These guides provide complete, step-by-step scenarios for common resilience tasks. Each guide takes you from the initial problem to a working implementation.
+Complete, step-by-step scenarios for common resilience tasks. Each guide takes you from the problem to a working implementation.
 
 If you are new to NResilience, see [Key concepts](../getting-started/key-concepts.md) to learn about policies, verdicts, and the library's core vocabulary.
 

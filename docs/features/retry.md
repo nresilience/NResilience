@@ -6,11 +6,11 @@ order: 1
 
 # Retry
 
-Retry is enabled by default. For example, `Resilience.Default` and `Resilience.Http` make up to three attempts using exponential backoff and full jitter. Exponential backoff increases the delay between each attempt, and full jitter randomizes the delay to prevent multiple clients from retrying simultaneously. The [classifier](classification.md) determines whether an outcome is retried.
+Retry is on by default: `Resilience.Default` and `Resilience.Http` make up to three attempts using exponential backoff with full jitter. Exponential backoff grows the delay after each attempt, and jitter randomizes it so many clients don't retry simultaneously. The [classifier](classification.md) decides which outcomes get retried.
 
 ## Configure attempts
 
-The `Attempts` property specifies the total number of attempts, including the first call. For example, `Attempts = 1` means no retries occur. Attempt numbers in the attempt log, events, and `NextAttempt` are 1-based.
+The `Attempts` property is the total number of attempts, including the first call: `Attempts = 1` means no retries. Attempt numbers in the attempt log, events, and `NextAttempt` are 1-based.
 
 <!-- snippet: retry-attempts -->
 ```csharp
@@ -23,7 +23,7 @@ var value = await api.RunAsync(attempt => calls.NextAsync(cancellationToken: att
 
 ## Configure backoff
 
-NResilience provides two base delays to handle throttling and transient failures differently. A delay tuned for connection resets might be too aggressive for a rate limiter.
+There are two base delays because throttling and transient failures want different pacing. A delay tuned for connection resets is likely too aggressive for a rate limiter.
 
 | Setting | Default | Description |
 | :--- | :--- | :--- |
@@ -45,13 +45,13 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-Server pushback overrides the backoff curve. If a verdict contains a `RetryAfter` value - which `Classifier.Http` extracts from the `Retry-After` header on 429 or 503 responses - NResilience honors that value exactly. The only limits are the `max` setting and the remaining time on the deadline; no jitter is applied.
+Server pushback overrides the backoff curve. If a verdict carries a `RetryAfter` value - which `Classifier.Http` extracts from the `Retry-After` header on 429 or 503 responses - NResilience uses it exactly. The only limits are the `max` setting and the remaining deadline; no jitter is applied.
 
-You can also use `Backoff.Constant(delay)` or `Backoff.None`. Use `Backoff.None` only if you know the dependency is not shared.
+`Backoff.Constant(delay)` and `Backoff.None` are also available. Use `Backoff.None` only if you know the dependency is not shared.
 
 ## Configure jitter
 
-When many clients retry simultaneously - for example, after a brief outage - they can create a second spike of traffic. Jitter prevents this by adding a random component to each delay.
+When many clients retry at the same time - right after a brief outage, say - they create a second traffic spike. Jitter prevents that by adding a random component to each delay.
 
 <!-- snippet: retry-jitter -->
 ```csharp
@@ -63,11 +63,11 @@ var deterministic = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-`Jitter.Full` is the default. It calculates a random value between 0 and the computed delay, which effectively removes correlation between clients. `Jitter.Equal` maintains a minimum delay, and `Jitter.None` results in synchronized retries.
+`Jitter.Full` is the default: it picks a random value between 0 and the computed delay, which removes correlation between clients. `Jitter.Equal` keeps a minimum delay, and `Jitter.None` produces synchronized retries.
 
 ## Compute custom delays
 
-Use `Backoff.Custom` to define your own delay logic.
+`Backoff.Custom` defines your own delay logic.
 
 <!-- snippet: retry-custom-backoff -->
 ```csharp
@@ -80,11 +80,11 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-The `Backoff.Custom` function receives the details of the next attempt, including its number, the previous verdict and exception, the remaining deadline time, and the cancellation token. Custom curves ignore the `max` setting and jitter.
+The `Backoff.Custom` function receives the next attempt's details: its number, the previous verdict and exception, the remaining deadline time, and the cancellation token. Custom curves ignore the `max` setting and jitter.
 
 ## Rebuild work between attempts
 
-A retry re-invokes your callback from the beginning, so you must rebuild any single-use objects inside the callback. Use the `BeforeAttempt` hook to perform setup work.
+A retry re-invokes your callback from the beginning, so rebuild any single-use objects inside the callback. The `BeforeAttempt` hook is the place for setup work.
 
 <!-- snippet: retry-before-attempt -->
 ```csharp
@@ -97,10 +97,10 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-The `BeforeAttempt` hook runs before every attempt, including the first, and its execution time counts toward the deadline. This is the same principle the HTTP handler uses internally to clone requests, as an `HttpRequestMessage` can only be sent once.
+The `BeforeAttempt` hook runs before every attempt, including the first, and its execution time counts toward the deadline. The HTTP policy uses the same principle internally to clone requests, because an `HttpRequestMessage` can only be sent once.
 
 ## Analyze retry results
 
-Every retry triggers a `Retrying` event that includes the delay. You can also find every attempt in the [attempt log](../reference/call-result.md#attemptlog).
+Every retry raises a `Retrying` event that includes the delay. The [attempt log](../reference/call-result.md#attemptlog) records every attempt.
 
-For a more detailed explanation of the architecture, see [Why one flat executor](../deep-dives/one-executor.md).
+For the architecture behind this, see [Why one flat executor](../deep-dives/one-executor.md).

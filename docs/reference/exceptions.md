@@ -6,7 +6,7 @@ order: 8
 
 # Exceptions
 
-When a resilience operation fails, NResilience rethrows the original exception unchanged using `ExceptionDispatchInfo`. This preserves the original stack trace, ensuring that standard catch blocks - such as `catch (HttpRequestException)` or `catch (SqlException)` - continue to work as expected.
+When a resilience operation fails, NResilience rethrows the original exception unchanged with `ExceptionDispatchInfo`. The original stack trace survives, so standard catch blocks - `catch (HttpRequestException)`, `catch (SqlException)` - keep working.
 
 The library only introduces new exception types for failures it generates, such as deadlines it enforces or calls it refuses to make.
 
@@ -31,7 +31,7 @@ Because a guard's rejected call was never made, the exception reports the reject
 
 ## `DeadlineExceededException`
 
-A `DeadlineExceededException` occurs when the overall wall-clock budget for the entire call expires. This exception derives from `TimeoutException`.
+A `DeadlineExceededException` is thrown when the whole call's wall-clock budget expires. It derives from `TimeoutException`.
 
 | Member | Description |
 | :--- | :--- |
@@ -40,7 +40,7 @@ A `DeadlineExceededException` occurs when the overall wall-clock budget for the 
 
 ## `AttemptTimeoutException`
 
-An `AttemptTimeoutException` is thrown when a single attempt exceeds its specific time ceiling. This exception derives from `TimeoutException`.
+An `AttemptTimeoutException` is thrown when a single attempt exceeds its ceiling. It derives from `TimeoutException`.
 
 | Member | Description |
 | :--- | :--- |
@@ -70,12 +70,12 @@ A `ResilienceConfigurationException` is thrown when a policy, breaker setting, o
 | :--- | :--- |
 | `Problems` | A collection of all configuration problems found. |
 
-This exception is thrown by `Resilience.Validate()`, `BreakerSettings.Validate()`, and the `RetryBudget` factories. It may also be thrown during DI registration or lazily during the first execution of a policy instance.
+This exception comes from `Resilience.Validate()`, `BreakerSettings.Validate()`, and the `RetryBudget` factories. It can also be thrown during DI registration or lazily on a policy instance's first execution.
 
 ## Caller cancellation
 
-If the `CancellationToken` you provided is cancelled, an `OperationCanceledException` is thrown. This exception is never retried, counted as an attempt, converted into a timeout, or suppressed - even when using `TryRunAsync`.
+If the `CancellationToken` you provided is cancelled, an `OperationCanceledException` is thrown. It is never retried, counted as an attempt, converted into a timeout, or suppressed - even with `TryRunAsync`.
 
 ## Mapping to HTTP responses
 
-In an ASP.NET Core app, the four exceptions the library invents map to the HTTP responses they mean - 504 for the timeouts, 503 with `Retry-After` for the refusals - via one registration, with no try/catch per endpoint. For the mapping table, the problem-document body, and the status code options, see [Error responses](../http/error-responses.md).
+In an ASP.NET Core app, one registration maps the four exceptions the library invents to the HTTP responses they mean - 504 for the timeouts, 503 with `Retry-After` for the refusals - with no try/catch per endpoint. See [Error responses](../http/error-responses.md) for the mapping table, the problem-document body, and the status code options.

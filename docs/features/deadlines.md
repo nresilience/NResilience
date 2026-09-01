@@ -6,11 +6,11 @@ order: 2
 
 # Deadlines and attempt timeouts
 
-A retried call requires two different time bounds to avoid common timeout bugs. For example, a 30-second per-attempt timeout with three retries could result in a total call duration of 90 seconds.
+A retried call needs two different time bounds - mixing them up causes common timeout bugs. A 30-second per-attempt timeout with three retries could run for 90 seconds in total.
 
 The **deadline** is the ceiling for the entire operation, including every attempt and backoff delay. The **attempt timeout** is the ceiling for a single attempt.
 
-Both are enabled by default:
+Both are on by default:
 - **Deadline**: 30 seconds for the whole call.
 - **Attempt timeout**: 10 seconds for any single attempt.
 
@@ -39,13 +39,13 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-`Deadline` is measured as wall-clock time from the moment you call `RunAsync`. It covers every attempt, every backoff delay, and every `BeforeAttempt` hook.
+`Deadline` is wall-clock time from the moment you call `RunAsync`. It covers every attempt, every backoff delay, and every `BeforeAttempt` hook.
 
-`AttemptTimeout` covers a single attempt. If no time remains on the deadline, a retry is never started; the call fails immediately with a deadline exception rather than sleeping through a backoff delay.
+`AttemptTimeout` covers one attempt. If no time remains on the deadline, a retry never starts; the call fails immediately with a deadline exception rather than sleeping through a backoff delay.
 
 ## Propagate the deadline across a hop
 
-A deadline stops at the process edge unless something carries it. A service with 200 ms left that sends a request the peer works on for 10 seconds has already produced garbage, and neither side can tell. Two halves fix that, and each is useful without the other.
+A deadline stops at the process edge unless something carries it across. A service with 200 ms left that sends a request the peer works on for 10 seconds has already produced garbage, and neither side can tell. Two halves fix that, and each is useful without the other.
 
 ### Send the deadline
 
@@ -71,7 +71,7 @@ using var response = await client.GetAsync(requestUri: uri, cancellationToken: c
 ```
 <!-- endsnippet -->
 
-The value is the attempt's own ceiling - `min(AttemptTimeout, time left on the deadline)` - in whole milliseconds, and it is recomputed for every attempt and every hedged leg. `DeadlineHeader` changes the header name, which defaults to `X-Deadline-Ms`.
+The value is the attempt's own ceiling - `min(AttemptTimeout, time left on the deadline)` - in whole milliseconds, recomputed for every attempt and every hedged leg. `DeadlineHeader` changes the header name, which defaults to `X-Deadline-Ms`.
 
 > [!NOTE]
 > `grpc-timeout` is not a drop-in name for it. gRPC's value carries a unit suffix rather than a bare count of milliseconds, and the gRPC client stack already propagates its own deadlines from `CallOptions.Deadline`.
@@ -93,7 +93,7 @@ using var inbound = ResilienceDeadline.Begin(remaining: TimeSpan.FromMillisecond
 ```
 <!-- endsnippet -->
 
-Nothing else in the model changes. `AttemptTimeout` is already `min(configured, time left)`, so a shorter deadline shortens the attempts with it, and a call whose inherited deadline has already expired fails immediately with `DeadlineExceededException` without contacting the dependency at all.
+Nothing else in the model changes. `AttemptTimeout` is already `min(configured, time left)`, so a shorter deadline shortens the attempts with it, and a call whose inherited deadline has already expired fails immediately with `DeadlineExceededException` without contacting the dependency.
 
 In an ASP.NET Core app, install `NResilience.AspNetCore` and read the header with one line:
 
@@ -101,13 +101,13 @@ In an ASP.NET Core app, install `NResilience.AspNetCore` and read the header wit
 app.UseResilienceDeadline();
 ```
 
-Register it before anything that makes an outbound call. `UseResilienceDeadline` also takes a callback: `Header` changes the header it reads, `Maximum` caps what it will believe from a caller, and `Reserve` keeps part of the deadline back for this service's own work.
+Register it before anything that makes an outbound call. `UseResilienceDeadline` also takes a callback: `Header` changes the header it reads, `Maximum` caps what it believes from a caller, and `Reserve` keeps part of the deadline back for this service's own work.
 
 `UseAmbientDeadline` is off by default and stays off in every preset, because reading the ambient value costs an `AsyncLocal<T>` read on calls that mostly have no inbound deadline to read. For what that costs and why the read happens once per call rather than once per attempt, see [the cancellation contract](../deep-dives/cancellation.md).
 
 ## Handle timeout exceptions
 
-Both `DeadlineExceededException` and `AttemptTimeoutException` derive from `TimeoutException`. You can catch them together or separately. Both exceptions include the attempt log.
+Both `DeadlineExceededException` and `AttemptTimeoutException` derive from `TimeoutException`, so you can catch them together or separately. Both include the attempt log.
 
 <!-- snippet: deadline-handle-exception -->
 ```csharp
@@ -128,11 +128,11 @@ catch (TimeoutException attempt)
 ```
 <!-- endsnippet -->
 
-The executor classifies attempt timeouts as `Transient`. This classification happens internally rather than through your classifier, allowing the executor to distinguish its own timeout from caller cancellation.
+The executor classifies attempt timeouts as `Transient` internally rather than through your classifier, so it can tell its own timeout apart from caller cancellation.
 
 ## Caller cancellation
 
-Cancelling the token you provide to the call aborts the operation immediately. Caller cancellation is not treated as a failure:
+Cancelling the token you passed to the call aborts it immediately. Caller cancellation is not a failure:
 - It is never retried.
 - It is not counted against a breaker or a budget.
 - It is never converted into a timeout.
@@ -140,10 +140,10 @@ Cancelling the token you provide to the call aborts the operation immediately. C
 
 The call returns an `OperationCanceledException`, even when using `TryRunAsync`.
 
-If a token is cancelled while an attempt is already succeeding, NResilience does not discard the completed work. The post-attempt check prevents the loop from starting *another* attempt.
+If a token is cancelled while an attempt is already succeeding, NResilience does not throw away the completed work. The post-attempt check only prevents the loop from starting *another* attempt.
 
 ## Work that ignores the token
 
-Because timeouts rely on the cancellation token, callbacks must observe it to be terminated. The requirement for a `CancellationToken` in every execution overload, combined with the analyzer and the `OrphanedWork` event, provides safeguards against callbacks that ignore cancellation.
+Timeouts work through the cancellation token, so callbacks must observe it to be terminated. The required `CancellationToken` parameter on every execution overload, the analyzers, and the `OrphanedWork` event are the safeguards against callbacks that ignore cancellation.
 
-For more information, see [The cancellation contract](../deep-dives/cancellation.md).
+For the full picture, see [The cancellation contract](../deep-dives/cancellation.md).

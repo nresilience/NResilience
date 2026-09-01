@@ -14,11 +14,11 @@ A limiter refusal is the only outcome in the library that the dependency had no 
 
 That is the argument against the obvious implementation, which is to add a fifth member and be done. It fails twice.
 
-It fails on meaning. `VerdictKind` is the input to three separate decisions - the breaker's evidence rule, the choice of backoff curve, and the telemetry tag set - and a fifth member would need an answer in each. Two of those answers do not exist: there is no natural curve for a non-outcome, and no useful evidence in one.
+It fails on meaning. `VerdictKind` is the input to three separate decisions - the breaker's evidence rule, the choice of backoff curve, and the telemetry tag set - and a fifth member would need an answer in each. Two of those answers do not exist: no natural curve for a non-outcome, and no useful evidence in one.
 
-It fails on blast radius. `VerdictKind` is public, and `Classifier.On<T>(Func<T, Verdict>)` exists so that users can switch on it. A fifth member makes every exhaustive switch expression in every consumer stop compiling, in exchange for a value that behaves exactly like `Throttled` almost everywhere.
+It fails on blast radius. `VerdictKind` is public, and `Classifier.On<T>(Func<T, Verdict>)` exists so users can switch on it. A fifth member breaks every exhaustive switch expression in every consumer, in exchange for a value that behaves exactly like `Throttled` almost everywhere.
 
-So the kind stays `Throttled`, which is the honest reading anyway - something is defending a dependency from load - and the fact that *this process* is the thing doing the defending is one bit alongside it:
+So the kind stays `Throttled` - the honest reading anyway: something is defending a dependency from load. That *this process* is the one defending is one bit alongside it:
 
 ```csharp
 public bool SelfImposed { get; }
@@ -30,7 +30,7 @@ Everything that already handles throttling therefore handles a refusal, unchange
 
 ### The polarity is not arbitrary
 
-`SelfImposed` rather than the negation-free `ReachedDependency`, because `default(Verdict)` has to be safe. A default-constructed verdict reports `false`, which reads as "this reached the dependency" - the conservative answer, and the one that keeps it subject to the retry budget. Spelled the other way round, every default verdict would silently claim exemption.
+`SelfImposed` rather than the negation-free `ReachedDependency`, because `default(Verdict)` must be safe. A default-constructed verdict reports `false`, which reads as "this reached the dependency" - the conservative answer, and the one that keeps it subject to the retry budget. Spelled the other way round, every default verdict would silently claim exemption.
 
 ## The retry budget is exempt, and nothing else is
 
@@ -46,7 +46,7 @@ if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
 
 Deposits are untouched: `budget.Deposit()` fires only on `Ok`, so a refusal neither spends nor funds. It is not evidence in either direction.
 
-The breaker needed no change, but one thing about it is worth recording, because the tempting simplification breaks it. `Breaker.Record` is still called for a self-imposed refusal. It records nothing - the early return handles that - but it also decrements the in-flight probe count, and skipping the call to save the work would leak the probe slot the refused call occupied and wedge the breaker half-open forever. A probe consumed by a refused call is wasted; a probe slot never returned is a breaker that never recovers.
+The breaker needed no change, but one thing about it is worth recording, because the tempting simplification breaks it. `Breaker.Record` is still called for a self-imposed refusal. It records nothing - the early return handles that - but it also decrements the in-flight probe count. Skipping the call to save the work would leak the probe slot the refused call occupied and wedge the breaker half-open forever. A probe consumed by a refused call is wasted; a probe slot never returned is a breaker that never recovers.
 
 ## One bit, zero bytes
 
@@ -185,8 +185,8 @@ One consequence is worth stating plainly: `Classifier.ClassifyException(new Rate
 
 ## Queueing is off by default
 
-A refusal becomes a retry on the throttled curve, honoring the limiter's hint, capped by `Backoff.Max` and by the deadline, and visible in telemetry as a retry.
+A refusal becomes a retry on the throttled curve, honoring the limiter's hint, capped by `Backoff.Max` and the deadline, and visible in telemetry as a retry.
 
-Queue time is none of those things. It is charged against `AttemptTimeout`, where it is indistinguishable from a slow dependency, and a `SlowCallThreshold` breaker will count it against a service that is answering perfectly well. The library has one mechanism for waiting between attempts and it is already tuned; a second one hidden inside the limiter would compete with it.
+Queue time is none of those. It counts against `AttemptTimeout`, where it is indistinguishable from a slow dependency, and a `SlowCallThreshold` breaker would count it against a service answering perfectly well. The library has one mechanism for waiting between attempts, already tuned; a second one hidden inside the limiter would compete with it.
 
-Queueing is available for the cases that want it. It is not what you get by not thinking about it.
+Queueing is there for the cases that want it. It is not what you get by not thinking about it.

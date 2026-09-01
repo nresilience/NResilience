@@ -6,7 +6,7 @@ order: 3
 
 # Logging in DI
 
-A policy registered in a DI container writes log records through `ILogger`. No calls or lambdas are required; the library understands each event and emits the corresponding record.
+A policy registered in a DI container writes log records through `ILogger` with no calls or lambdas from you: the library understands each event and emits the matching record.
 
 <!-- snippet: logging-registered -->
 ```csharp
@@ -38,7 +38,7 @@ Each policy logs under its own category: `NResilience` for a policy with no name
 ```
 <!-- endsnippet -->
 
-The category is fixed when the listener attaches. Because an HTTP client derives a policy per host, the category does not include the host; otherwise, a client talking to fifty hosts would create fifty categories. The host-scoped name is still included in the `Policy` field of every record for structured output queries.
+The category is fixed when the listener attaches. Because an HTTP client derives a policy per host, the category does not include the host - otherwise a client talking to fifty hosts would create fifty categories. The host-scoped name still appears in the `Policy` field of every record for structured output queries.
 
 Use `ResilienceLogging.CategoryFor(name)` to get the category in code.
 
@@ -69,7 +69,7 @@ An explicit `WithLogging` call in a `configure` callback overrides the automatic
 
 Binding a configuration section is silently partial. Event 1020 reports the effective policy once per resolution at `Debug`; a reload produces a new entry, showing exactly what changed.
 
-Event 1021 is a `Trace` companion that dumps the classifier's state. This allows you to determine what the policy will retry without reading the source code. It is guarded to ensure it costs nothing when `Trace` is disabled.
+Event 1021 is a `Trace` companion that dumps the classifier's state, so you can see what the policy will retry without reading the source. It is guarded to cost nothing when `Trace` is disabled.
 
 ## Next steps
 

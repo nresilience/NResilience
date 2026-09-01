@@ -8,9 +8,9 @@ order: 2
 
 ## What is a policy?
 
-A network call can fail, hang, or encounter a struggling dependency. A **policy** defines how to handle these situations: whether to retry, the total time limit, the per-attempt time limit, and when to stop calling the dependency entirely.
+Network calls can fail, hang, or hit a struggling dependency. A **policy** defines how to handle these failures: whether to retry, the total time limit, the per-attempt time limit, and when to stop calling the dependency entirely.
 
-In NResilience, a policy is a value, not a built pipeline. Store a policy in a field, compare two policies for equality, and derive variants without using a builder. Start with a preset and use the `with` expression to create variants; `with` copies all settings you don't explicitly change.
+A policy is a value, not a built pipeline. Store one in a field, compare two with `==`, and derive variants with the `with` expression - no builder needed. Start from a preset and change only the settings you need; `with` copies all others.
 
 <!-- snippet: key-concepts-policy-value -->
 ```csharp
@@ -25,7 +25,7 @@ Console.WriteLine(value: once.Deadline); // 00:01:00 - `with` copies the rest
 
 A single policy works for any return type because the result type is a property of the call, not the policy.
 
-Policies are ideal for `static readonly` fields. Name your policies where their lifetime is obvious and derive variants as needed:
+Use `static readonly` fields for policies. Name them where their lifetime is obvious and derive variants as needed:
 
 <!-- snippet: quick-start-house-policy -->
 ```csharp
@@ -46,15 +46,15 @@ public static class Policies
 ```
 <!-- endsnippet -->
 
-The `Realtime` policy keeps the deadline and classifier from the `Api` policy.
+The `Realtime` policy inherits the deadline and classifier from the `Api` policy.
 
 For more information, see the [`Resilience` reference](../reference/resilience.md).
 
 ## Deadline and attempt timeout
 
-A retried call requires two distinct time bounds. Mixing these bounds is a common source of bugs. For example, a 30-second per-attempt timeout with three retries can run for 90 seconds.
+Retried calls need two separate time bounds. Confusing them often leads to bugs: a 30-second attempt timeout with three retries can run for 90 seconds.
 
-- **Deadline**: The ceiling for the entire operation, including all retries and backoff time.
+- **Deadline**: The ceiling for the entire call, including retries and backoff.
 - **Attempt timeout**: The ceiling for a single attempt.
 
 <!-- snippet: key-concepts-two-bounds -->
@@ -73,7 +73,7 @@ For more information, see [Deadlines and attempt timeouts](../features/deadlines
 
 ## Verdicts
 
-A call returns a value or throws an exception. The library then decides whether to retry, give up, or treat the failure as permanent. A **classifier** maps the outcome to a **verdict**.
+Calls return a value or throw. The library then decides whether to retry, give up, or treat the failure as permanent. A **classifier** maps each outcome to a **verdict**.
 
 | Verdict | Meaning | Action |
 | --- | --- | --- |
@@ -93,32 +93,26 @@ var api = Resilience.Http with { Classify = classify };
 ```
 <!-- endsnippet -->
 
-`Classifier.Default` treats unrecognized exception types as `Permanent`. This prevents programming errors from becoming slow, confusing failures.
+`Classifier.Default` treats unrecognized exception types as `Permanent` so programming errors fail fast.
 
 For more information, see [Classification](../features/classification.md).
 
 ## Why a call stopped
 
-A retried call stops when it succeeds, hits a non-retryable failure, runs out of attempts, or runs out of time. The `StopReason` property identifies why the call stopped. It takes one of six values:
-- `Succeeded`
-- `Permanent`
-- `AttemptsExhausted`
-- `DeadlineExceeded`
-- `BudgetExhausted`
-- `DependencyUnavailable`
+Retried calls stop when they succeed, hit a non-retryable failure, exhaust attempts, or exceed the deadline. The `StopReason` property identifies why the call stopped.
 
-`TryRunAsync` returns this reason within a `CallResult<T>` along with the value, the exception, and the attempt log. `RunAsync` rethrows the original exception unchanged so that existing `catch` blocks continue to work.
+`TryRunAsync` returns this reason in a `CallResult<T>` along with the value, the exception, and the attempt log. `RunAsync` rethrows the original exception so existing `catch` blocks continue to work.
 
 For more information, see [`CallResult<T>`](../reference/call-result.md) and [exceptions](../reference/exceptions.md).
 
 ## The three guards
 
-To prevent a fleet of clients from overwhelming a struggling dependency, NResilience provides three guards:
+Prevent a fleet of clients from overwhelming a struggling dependency using these three guards:
 
 - **Circuit breaker**: Stops calling a dependency that is failing.
 - **Retry budget**: Limits retries as a fraction of total traffic.
 - **Limiter**: Limits the absolute rate, or the concurrency, of what leaves this process.
 
-The retry budget is enabled by default. The circuit breaker is an object that you construct and share across the scope of the dependency, and a limiter is opt-in.
+The retry budget is on by default. Construct the circuit breaker and share it across a dependency's scope; the limiter is opt-in.
 
 For more information, see [Circuit breaker](../features/circuit-breaker.md), [retry budget](../features/retry-budget.md) and [rate limiting](../features/rate-limiting.md).

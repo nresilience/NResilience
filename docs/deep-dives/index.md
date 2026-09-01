@@ -6,7 +6,7 @@ order: 9
 
 # Deep dives
 
-These guides provide the technical reasoning and measurements behind the design of NResilience. While you do not need to read these to use the library, they offer insight into why the system is built this way.
+These pages give the technical reasoning and measurements behind NResilience's design. You don't need them to use the library, but they explain why the system is built this way.
 
 | Topic | Key question answered |
 | :--- | :--- |

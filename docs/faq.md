@@ -9,28 +9,28 @@ order: 13
 ## Design decisions
 
 ### Why is there no builder?
-A policy is a record, so `with` expressions serve as the configuration language. A builder would provide a validation hook at `Build()` but would require a mutable-to-immutable transition, introduce an ordering dependency, and prevent the use of `static readonly` fields. 
+A policy is a record, so `with` expressions are the configuration language. A builder would add a validation hook at `Build()`, but at the cost of a mutable-to-immutable transition, an ordering dependency, and no `static readonly` fields.
 
-Validation occurs when you call `Validate()`, eagerly during dependency injection registration, or lazily on the first execution of each policy instance.
+Validation runs when you call `Validate()`, eagerly during DI registration, or lazily on a policy instance's first execution.
 
 ### Why is `Resilience` not generic?
 The result type is a property of the call, not the policy. A single policy can handle `HttpResponseMessage`, `int`, `Stream`, or `void`. Result classification is resolved per result type and cached, so the policy does not need to be generic.
 
 ### Why is `Attempts` the total count rather than the retry count?
-Using total attempts removes ambiguity. `Attempts = 1` means no retry occurs, eliminating off-by-one errors common in retry count configurations.
+Total attempts removes ambiguity: `Attempts = 1` means no retry, which eliminates the off-by-one errors common in retry-count configurations.
 
 ### Is there a synchronous API?
-No. A retry loop that blocks holds a thread through every backoff delay. Offering both synchronous and asynchronous APIs would either duplicate the engine or risk deadlocks. For this reason, `ResilienceHandler.Send` and `ResilienceInterceptor.BlockingUnaryCall` both throw a `NotSupportedException` rather than passing the call through unprotected.
+No. A retry loop that blocks holds a thread through every backoff delay, and offering both sync and async APIs would either duplicate the engine or risk deadlocks. So `ResilienceHandler.Send` and `ResilienceInterceptor.BlockingUnaryCall` throw `NotSupportedException` rather than passing the call through unprotected.
 
 ### Where is gRPC?
 In the separate `NResilience.Grpc` package: `AddGrpcResilience()` on the builder that `AddGrpcClient<T>()` returns. See [gRPC](grpc/index.md).
 
-It is a separate package and a separate registration, not an overload of `AddResilience()`, because a gRPC call is the wrong shape for the HTTP handler. Every gRPC call is an HTTP `POST`, which the handler refuses to retry by default, and a gRPC failure travels in the `grpc-status` trailer on an HTTP `200`, which the HTTP classifier reads as a success. On a gRPC client, `AddResilience()` is an inert handler that adds overhead and retries nothing.
+It is a separate package and a separate registration, not an overload of `AddResilience()`, because a gRPC call is the wrong shape for the HTTP handler: every gRPC call is an HTTP `POST`, which the handler refuses to retry by default, and a gRPC failure travels in the `grpc-status` trailer on an HTTP `200`, which the HTTP classifier reads as a success. On a gRPC client, `AddResilience()` is an inert handler that adds overhead and retries nothing.
 
 Unary and server-streaming calls are covered: a stream is retried until its first message and never after it. Client-streaming and duplex calls are passed through untouched and always will be, for the same reason a partially consumed stream cannot be retried. See [gRPC streaming](grpc/streaming.md).
 
 ### Can I retry a stream?
-Yes, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. The retry stops at the first element, because once the caller has received one, a retry would duplicate or drop work they have already acted on. Everything after the first element is handed to the caller untouched. For the core primitive, see [Streaming](features/streaming.md); for the server-streaming calls the interceptor wraps on the same semantic, see [gRPC streaming](grpc/streaming.md).
+Yes, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry stops at the first element: once the caller has received one, a retry would duplicate or drop work they have already acted on. Everything after the first element goes to the caller untouched. See [Streaming](features/streaming.md) for the core primitive and [gRPC streaming](grpc/streaming.md) for the server-streaming calls the interceptor wraps on the same semantic.
 
 ### Where is hedging?
 It is here, and it is opt-in: set `Hedge = Hedge.At(0.95)`. See [Hedging](features/hedging.md).
@@ -57,14 +57,14 @@ var result = await policy.RunAsync(async ct =>
 }, cancellationToken);
 ```
 
-This approach is correct for several reasons:
+This approach works because:
 
-1. **Zero allocation when unused** - no limiter object means no overhead
+1. **Zero allocation when unused** - no limiter object, no overhead
 2. **Per-attempt permits** - each retry acquires its own permit, so retries don't reuse the same slot
-3. **Deadline-aware** - the acquire respects the remaining time on the deadline; no separate timeout to configure
-4. **Correct verdict** - refusals are classified as `Verdict.Throttled(SelfImposed: true)`:
+3. **Deadline-aware** - the acquire respects the remaining deadline; no separate timeout to configure
+4. **Correct verdict** - refusals are classified `Verdict.Throttled(SelfImposed: true)`:
    - Retried on the long backoff curve (1 second base, not 100 ms) to defend the dependency
-   - Never opens the circuit breaker (this is your own throttling, not evidence the dependency is broken)
+   - Never opens the circuit breaker (your own throttling, not evidence the dependency is broken)
    - Never charged to the retry budget (the call never left this process; no amplification)
 
 **For HTTP via dependency injection**, the handler scopes limiters per host automatically:
@@ -75,10 +75,10 @@ services.AddHttpClient("api")
     .AddRateLimit(options => options.Concurrency = 10);  // Per-host
 ```
 
-The callback-based approach respects NResilience's design philosophy: explicit insertion point, zero cost when unused, and integration with the verdict system. A hand-rolled `SemaphoreSlim` requires manual handling of the deadline, exception flow on timeout, and outcome classification. The limiter handles these for you.
+The callback-based approach fits NResilience's design: an explicit insertion point, zero cost when unused, and integration with the verdict system. A hand-rolled `SemaphoreSlim` needs manual handling of the deadline, exception flow on timeout, and outcome classification. The limiter handles all three.
 
 ### Can I add my own policy layer?
-You cannot add layers through composition because the engine is [one flat method](./deep-dives/one-executor.md). Extension points include the [classifier](./features/classification.md), `Backoff.Custom`, `BeforeAttempt`, `Admit`, and `OnEvent`. This restricted surface ensures long-term API stability.
+Not through composition - the engine is [one flat method](./deep-dives/one-executor.md). The extension points are the [classifier](./features/classification.md), `Backoff.Custom`, `BeforeAttempt`, `Admit`, and `OnEvent`. The restricted surface is what keeps the API stable long-term.
 
 A custom admission-control guard - a distributed lock, a hand-rolled limiter, anything that should
 refuse a call before it reaches the dependency - is not a sixth item on that list. It composes
@@ -90,24 +90,24 @@ for the value-returning one. Do not build this with `BeforeAttempt`: it runs out
 region, so an exception it throws is never turned into a verdict.
 
 ### Is a `Breaker` thread-safe? Can I share one across policies?
-Yes. Sharing a breaker allows you to treat multiple different calls as the same dependency. The breaker is guarded by an uncontended lock. Using `with` copies the reference to the breaker, not its internal state.
+Yes, and sharing one treats multiple calls as the same dependency. The breaker is guarded by an uncontended lock. `with` copies the reference to the breaker, not its internal state.
 
 ### Does the breaker see attempts or whole operations?
-The breaker always samples individual attempts. This provides a consistent behavior regardless of how the policy is configured.
+The breaker always samples individual attempts, so behavior is consistent however the policy is configured.
 
 ### Why does refusing a call take 100 milliseconds?
-A free rejection inside a polling loop creates a CPU spin, turning a load-shedding guard into a load generator. For more details, see [Guarded rejection](./deep-dives/guarded-rejection.md).
+A free rejection inside a polling loop becomes a CPU spin, turning a load-shedding guard into a load generator. See [Guarded rejection](./deep-dives/guarded-rejection.md).
 
 ### Why is telemetry off for hand-built policies but on for registered ones?
-Setting `OnEvent = null` ensures that telemetry is "free when unused." Since policies registered via dependency injection are typically used in production environments, the registration automatically attaches a listener. You can disable this using `telemetry: false` or `ResilienceOptions.Telemetry = false`. Logging works the same way and for the same reason: a registered policy logs, a hand-built one opts in with `WithLogging`, and `ResilienceOptions.Logging = "Off"` turns it off. See [Logging](features/logging.md).
+`OnEvent = null` keeps telemetry free when unused. Policies registered through DI are typically production policies, so the registration attaches a listener automatically. Disable it with `telemetry: false` or `ResilienceOptions.Telemetry = false`. Logging works the same way for the same reason: a registered policy logs, a hand-built one opts in with `WithLogging`, and `ResilienceOptions.Logging = "Off"` turns it off. See [Logging](features/logging.md).
 
 ## Compatibility and performance
 
 ### Is it AOT and trimming safe?
-Yes. Both ahead-of-time (AOT) compilation and trimming are enforced in CI. The build process runs `dotnet publish -p:PublishAot=true` with warnings treated as errors and verifies that the resulting binary executes a policy - including dependency injection, configuration binding, and the meter - while respecting allocation budgets. The core contains no reflection.
+Yes. Both ahead-of-time (AOT) compilation and trimming are enforced in CI: the build runs `dotnet publish -p:PublishAot=true` with warnings treated as errors, then executes the published binary through a policy - DI, configuration binding, and the meter included - while respecting allocation budgets. The core contains no reflection.
 
 ### Which frameworks are supported?
-NResilience supports `net8.0` and `net10.0`. Both frameworks are tested and gated; specifically, the library ensures there is no "allocation cliff" on `net8.0`.
+`net8.0` and `net10.0`. Both are tested and gated, and the gates confirm there is no "allocation cliff" on `net8.0`.
 
 ### Does it work with `IHttpClientFactory`?
-Yes. You can use `.AddResilience()` on the client builder. For more information about the two-minute handler rotation for configuration reloads, see [Dependency injection](./di/index.md).
+Yes: `.AddResilience()` on the client builder. For the two-minute handler rotation that affects configuration reloads, see [Dependency injection](./di/index.md).

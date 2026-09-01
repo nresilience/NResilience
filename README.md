@@ -11,11 +11,11 @@
 Prevent cascading failures in your .NET applications.
 
 A struggling dependency can hang your requests, tie up your threads, and crash your application. Blind retries often make the problem worse by overwhelming the
-failing service. NResilience wraps your calls in retries, timeouts, and circuit breakers so your app degrades gracefully instead of crashing.
+failing service. NResilience wraps your calls in retries, deadlines, attempt timeouts, and circuit breakers so your app degrades gracefully instead of crashing.
 
 ## Why NResilience?
 
-NResilience replaces complex fluent builders, confusing strategy ordering, and mandatory `Build()` calls with simple values and C# `with` expressions.
+NResilience replaces complex fluent builders, confusing policy ordering, and mandatory `Build()` calls with simple values and C# `with` expressions.
 
 - **No fluent builders.** Configure policies using `with` expressions to change one setting while keeping the rest.
 - **Sensible defaults.** Get a working, retried HTTP call with one line of code.
@@ -63,7 +63,7 @@ var api = Resilience.Default;
 string name = await api.RunAsync(attempt => db.ReadNameAsync(id, attempt), cancellationToken);
 ```
 
-The `attempt` token is cancelled when the specific attempt hits its timeout, while the `cancellationToken` cancels the entire operation.
+The `attempt` token is cancelled when the specific attempt hits its timeout, while the `cancellationToken` cancels the entire call.
 
 ## Handle failures without exceptions
 

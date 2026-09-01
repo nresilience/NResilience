@@ -6,7 +6,7 @@ order: 12
 
 # Analyzers
 
-Installing `NResilience` automatically includes seven diagnostics. These analyzers are shipped within the package to catch common reliability and performance issues - such as failures to propagate cancellation tokens - that might otherwise be invisible during code review.
+Installing `NResilience` gives you seven diagnostics automatically. They ship inside the package to catch common reliability and performance issues - failures to propagate cancellation tokens, for example - that are invisible in code review.
 
 | Rule | Description | Category | Default Severity |
 | :--- | :--- | :--- | :--- |
@@ -22,7 +22,7 @@ Rules `NRES001` and `NRES002` include automated code fixes.
 
 ## NRES001: Token not passed to work
 
-This rule is reported when a resilience callback fails to pass its `CancellationToken` parameter to an internal call that accepts one. Without this token, the [executor](index.md) cannot stop the work when an attempt timeout occurs.
+Reported when a resilience callback fails to pass its `CancellationToken` parameter to an internal call that accepts one. Without that token, the [executor](index.md) cannot stop the work when an attempt timeout hits.
 
 ```csharp
 // Reported: GetFromJsonAsync takes a token, but none is provided.
@@ -32,11 +32,11 @@ await api.RunAsync(attempt => client.GetFromJsonAsync<User>(url), cancellationTo
 await api.RunAsync(attempt => Task.FromResult(cached), cancellationToken);
 ```
 
-The analyzer is quiet if the token is used anywhere within the callback. A body that threads it into one call and forgets a second is [CA2016](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2016)'s subject, and guessing which of the two omissions was meant is how a rule earns a `NoWarn`. For comprehensive token propagation, see CA2016.
+The analyzer stays quiet if the token is used anywhere in the callback. A body that threads it into one call and forgets a second is [CA2016](https://learn.microsoft.com/dotnet/fundamentals/code-analysis/quality-rules/ca2016)'s subject - guessing which of two omissions was meant is how a rule earns a `NoWarn`. See CA2016 for comprehensive token propagation.
 
 ## NRES002: Incorrect token passed
 
-This rule is reported when a callback ignores its own token and instead passes a different token - such as the caller's token, `CancellationToken.None`, or `default` - to an internal call. This renders the attempt timeout ineffective.
+Reported when a callback ignores its own token and passes a different one - the caller's token, `CancellationToken.None`, or `default` - to an internal call. That makes the attempt timeout ineffective.
 
 ```csharp
 // Reported: the attempt timeout has no effect on this call.
@@ -46,24 +46,24 @@ await api.RunAsync(attempt => client.GetAsync(url, cancellationToken), cancellat
 await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 ```
 
-Where the parameter was written as `_`, the fix names it first, because a token you cannot refer to cannot be passed.
+Where the parameter was written as `_`, the fix names it first - a token you cannot refer to cannot be passed.
 
-Both `NRES001` and `NRES002` analyze lambdas passed to `RunAsync` or `TryRunAsync`. Method groups (e.g., `api.RunAsync(FetchAsync, cancellationToken)`) are ignored because the analyzer cannot guarantee visibility of the method body. For more information, see the [cancellation contract](../deep-dives/cancellation.md).
+Both `NRES001` and `NRES002` analyze lambdas passed to `RunAsync` or `TryRunAsync`. Method groups (`api.RunAsync(FetchAsync, cancellationToken)`) are ignored, because the analyzer cannot guarantee visibility of the method body. See the [cancellation contract](../deep-dives/cancellation.md).
 
 ## NRES003: Validation failure
 
-This rule performs a build-time check for the same logic used in [`Validate()`](resilience.md). It reports policies with `Attempts` below 1, or a `Deadline` or `AttemptTimeout` that is neither positive nor `Timeout.InfiniteTimeSpan`.
+A build-time check running the same logic as [`Validate()`](resilience.md). It reports policies with `Attempts` below 1, or a `Deadline` or `AttemptTimeout` that is neither positive nor `Timeout.InfiniteTimeSpan`.
 
 ```csharp
 // Reported: Attempts must be at least 1, and Deadline must be positive.
 var api = Resilience.Default with { Attempts = 0, Deadline = TimeSpan.FromSeconds(-1) };
 ```
 
-The analyzer folds constants like `TimeSpan.FromSeconds(2)`, `new TimeSpan(0, 0, 30)`, `TimeSpan.Zero`, and `Timeout.InfiniteTimeSpan`. Values the compiler cannot resolve are left to the runtime `Validate()` method.
+The analyzer folds constants like `TimeSpan.FromSeconds(2)`, `new TimeSpan(0, 0, 30)`, `TimeSpan.Zero`, and `Timeout.InfiniteTimeSpan`. Values the compiler cannot resolve are left to the runtime `Validate()`.
 
 ## NRES004: Attempt timeout exceeds deadline
 
-This rule is reported when `AttemptTimeout` is longer than `Deadline`. While this is technically legal and passes validation, it is misleading: the overall deadline caps every single attempt, meaning an attempt timeout larger than the deadline can never be reached.
+Reported when `AttemptTimeout` is longer than `Deadline`. Legal, and it passes validation, but misleading: the overall deadline caps every attempt, so an attempt timeout larger than the deadline can never be reached.
 
 ```csharp
 // Reported: the attempt is effectively capped at 5 seconds, not 10.
@@ -107,7 +107,7 @@ This is reported only for `using` forms where the client provably does not outli
 
 ## NRES007: Redundant async callback
 
-This rule reports when a callback is marked `async` but only contains a single `await` whose task the callback can return directly. Removing the `async` keyword avoids the allocation of an unnecessary state machine.
+Reported when a callback is marked `async` but contains only a single `await` whose task the callback could return directly. Dropping `async` avoids the state-machine allocation.
 
 ```csharp
 // Reported: unnecessary state machine for a single await.
@@ -117,7 +117,7 @@ await api.RunAsync(async attempt => await client.GetAsync(url, attempt), cancell
 await api.RunAsync(attempt => client.GetAsync(url, attempt), cancellationToken);
 ```
 
-This rule also reports callbacks that await a `ValueTask`, providing additional savings. Removing `async` re-binds the call to the [`ValueTask` overloads](resilience.md#methods), eliminating both the state machine and the task allocation for synchronously completing calls:
+This rule also reports callbacks that await a `ValueTask`, which saves more: dropping `async` re-binds the call to the [`ValueTask` overloads](resilience.md#methods), eliminating both the state machine and the task allocation for synchronously completing calls:
 
 ```csharp
 // Reported: the state machine, plus a task built for a buffered read.
@@ -127,16 +127,16 @@ await api.RunAsync(async attempt => await reader.ReadAsync(attempt), cancellatio
 await api.RunAsync(attempt => reader.ReadAsync(attempt), cancellationToken);
 ```
 
-Two patterns are ignored to avoid changing the program's behavior:
+Two patterns are ignored to avoid changing behavior:
 
-- A callback whose return type is **written down**, such as `async Task<int> (attempt) => await reader.ReadAsync(attempt)`. The explicit return type prevents the compiler from re-resolving the call, so a `ValueTask` body would not compile.
-- A callback that **discards** a `ValueTask<T>` result, such as `async attempt => { await reader.ReadAsync(attempt); }`. While this rewrite compiles, it moves the call from the void overload to the generic one, causing the result to be passed to the [classifier](classifier.md).
+- A callback whose return type is **written down**, such as `async Task<int> (attempt) => await reader.ReadAsync(attempt)`. The explicit return type stops the compiler from re-resolving the call, so a `ValueTask` body would not compile.
+- A callback that **discards** a `ValueTask<T>` result, such as `async attempt => { await reader.ReadAsync(attempt); }`. The rewrite compiles, but it moves the call from the void overload to the generic one, which sends the result to the [classifier](classifier.md).
 
-For details on allocations, see [where the allocations are](../deep-dives/allocations.md).
+For the allocation details, see [where the allocations are](../deep-dives/allocations.md).
 
 ## Manage analyzer severity
 
-You can control analyzer severity using a `.editorconfig` file:
+Control severity with a `.editorconfig` file:
 
 ```ini
 [*.cs]
@@ -144,7 +144,7 @@ dotnet_diagnostic.NRES006.severity = none
 dotnet_diagnostic.NRES001.severity = error
 ```
 
-Alternatively, you can disable a rule at a specific site using `#pragma` directives:
+Alternatively, disable a rule at a specific site with `#pragma` directives:
 
 ```csharp
 #pragma warning disable NRES003 // invalid on purpose for test assertion

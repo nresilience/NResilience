@@ -29,11 +29,11 @@ var options = new GrpcResilienceOptions
 ```
 <!-- endsnippet -->
 
-With the shipped preset, a gRPC call gets a 10-second per-attempt ceiling that the server can see, inside a 30-second overall deadline.
+With the shipped preset, a gRPC call gets a 10-second per-attempt ceiling the server can see, inside a 30-second overall deadline.
 
 ## Why the slack is not zero
 
-The HTTP integration's deadline header is advisory: the peer reads it or ignores it, and it is never a bound on this side. `CallOptions.Deadline` is different. The local gRPC client enforces it with a timer of its own.
+The HTTP integration's deadline header is advisory: the peer reads it or ignores it, and it never bounds this side. `CallOptions.Deadline` is different - the local gRPC client enforces it with a timer of its own.
 
 Writing the bare attempt ceiling into it therefore arms **two timers for the same instant** - NResilience's and grpc-dotnet's - and whichever the runtime notices first decides what the call looks like. When grpc-dotnet's wins, you get an `RpcException(DeadlineExceeded)` instead of an `AttemptTimeoutException`, the deadline accounting is off by one attempt, and no `OrphanedWork` event is raised.
 
@@ -66,7 +66,7 @@ Three things want to bound a gRPC call, and only one of them should:
 | `Resilience.AttemptTimeout` | One attempt | Keep it. This is what reaches the wire as `grpc-timeout`. |
 | `HttpClient.Timeout` on the channel | The whole call, invisibly | Removed, unless you turn `OwnTransportTimeout` off. |
 
-The transport timeout covers the entire retry sequence rather than one attempt, so it silently caps any policy with a longer deadline. `AddGrpcResilience()` sets it to `Timeout.InfiniteTimeSpan` for you. This is usually a no-op - gRPC's own client factory already does it - and the option exists for a caller who supplies their own handler.
+The transport timeout covers the entire retry sequence rather than one attempt, so it silently caps any policy with a longer deadline. `AddGrpcResilience()` sets it to `Timeout.InfiniteTimeSpan` for you - usually a no-op, since gRPC's own client factory already does it, but the option exists for a caller who supplies their own handler.
 
 An interceptor cannot reach the channel in front of it, so setting `OwnTransportTimeout` on an interceptor you construct yourself has no effect.
 

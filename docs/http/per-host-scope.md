@@ -6,13 +6,13 @@ order: 2
 
 # Per-host scope
 
-When a single `HttpClient` communicates with multiple hosts, a shared circuit breaker can create a "blast radius" problem: if one host fails, the breaker trips and blocks requests to all other healthy hosts. 
+When one `HttpClient` talks to multiple hosts, a shared circuit breaker creates a "blast radius" problem: one host fails, the breaker trips, and requests to every other healthy host are blocked.
 
-The NResilience handler prevents this by maintaining a separate circuit breaker and retry budget for every host it encounters. This ensures that a failure at one endpoint only affects requests sent to that specific host.
+The NResilience handler prevents that by keeping a separate circuit breaker and retry budget for every host it sees, so a failure at one endpoint only affects requests to that endpoint.
 
 ## Default behavior
 
-`BreakerPerHost` and `BudgetPerHost` are enabled by default. The handler automatically creates a breaker and a retry budget for each authority it sees upon the first request to that host.
+`BreakerPerHost` and `BudgetPerHost` are on by default. The handler creates a breaker and a retry budget for each authority the first time a request goes to it.
 
 ## Bound the host registry
  
@@ -24,7 +24,7 @@ var handler = new ResilienceHandler(options: new HttpResilienceOptions { MaxHost
 ```
 <!-- endsnippet -->
  
-The set of hosts a client communicates with is typically a property of the application rather than its traffic, so the cap is usually invisible. For a proxy, a crawler, or a webhook dispatcher that reaches the cap, the least-recently-seen hosts are dropped.
+The set of hosts a client talks to is usually a property of the application, not its traffic, so the cap is usually invisible. For a proxy, a crawler, or a webhook dispatcher that reaches it, the least-recently-seen hosts are dropped.
  
 Eviction is approximate: a host seen since the last sweep survives the next one, and the registry can briefly exceed its cap while a sweep catches up. The cap bounds growth, and no request ever waits on a sweep.
  
@@ -37,7 +37,7 @@ Per-host scoping is one instance of a general mechanism. To key a policy by a te
 
 ## Monitor host state
 
-You can inspect the state of breakers and budgets for all hosts seen by the handler. This is useful for implementing health endpoints or monitoring dashboards.
+Inspect breaker and budget state for every host the handler has seen - useful for health endpoints or dashboards.
 
 <!-- snippet: http-per-host -->
 ```csharp
@@ -52,15 +52,15 @@ foreach (var (host, breaker) in breakers)
 ```
 <!-- endsnippet -->
 
-These methods return a snapshot of the hosts currently tracked. The dictionaries are empty until the first request is made to a host, and remain empty if the per-host switches are disabled and the policy does not provide its own breaker or budget. Hosts evicted by `MaxHosts` are removed from the snapshot.
+These methods return a snapshot of the hosts currently tracked. The dictionaries are empty until the first request to a host, and stay empty if the per-host switches are off and the policy provides no breaker or budget of its own. Hosts evicted by `MaxHosts` are removed from the snapshot.
 
 ## Configure a different scope
 
-If you provide an explicit [`Breaker`](../features/circuit-breaker.md) or `Budget` on your policy, the handler respects that decision and does not apply per-host scoping to those guards.
+If you set an explicit [`Breaker`](../features/circuit-breaker.md) or `Budget` on your policy, the handler respects that and does not apply per-host scoping to those guards.
 
-`RetryBudget.Automatic` does not specify a scope, so `BudgetPerHost` scopes it to the host. To share a single budget across all hosts, provide a named instance: `Resilience.Http with { Budget = RetryBudget.Of() }`.
+`RetryBudget.Automatic` does not specify a scope, so `BudgetPerHost` scopes it to the host. To share one budget across all hosts, provide a named instance: `Resilience.Http with { Budget = RetryBudget.Of() }`.
 
-Depending on your requirements, you can achieve the following scopes:
+The achievable scopes:
 
 | Desired Scope | Configuration |
 | :--- | :--- |
@@ -77,10 +77,10 @@ Depending on your requirements, you can achieve the following scopes:
 To allow dashboards to separate hosts, the handler renames the policy for the specific request. For example, a policy named `orders` will appear as `orders:orders.example` in events and telemetry tags. The breaker itself is also named after the host.
 
 ### Non-repeatable requests
-When a request is marked as non-repeatable, the handler still runs the resilience policy but limits it to a single attempt. This ensures that the circuit breaker still observes the outcome and the retry budget still receives its deposit, but the request is never sent twice.
+When a request is marked non-repeatable, the handler still runs the resilience policy but limits it to one attempt. The breaker still observes the outcome and the budget still gets its deposit; the request is simply never sent twice.
 
 ### State lifetime
-The lifetime of the host state is tied to the handler's lifetime or to eviction, whichever comes first:
+Host state lives as long as the handler does, or until eviction, whichever comes first:
 - **`IHttpClientFactory`**: Rotates handler chains every two minutes by default. Per-host state is reset when the handler is rotated.
 - **`ResilienceHttp.CreateClient`**: Per-host state persists for the lifetime of the process if the client is maintained.
 - **Eviction**: A host dropped by a `MaxHosts` sweep resets to a closed breaker and a full budget the next time it is seen.

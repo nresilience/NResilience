@@ -6,7 +6,7 @@ order: 6
 
 # Translate a layered pipeline to the flat model
 
-A traditional resilience stack wraps the call in middleware: an outer layer refreshes an auth token, the next checks a cache, a retry layer re-invokes the call on failure, and an outer fallback layer serves a default if everything fails. NResilience has no chain, so none of these are layers. Each concern moves to a targeted insertion point, and the fallback becomes a branch at the call site.
+A traditional resilience stack wraps the call in middleware: an outer layer refreshes an auth token, the next checks a cache, a retry layer re-invokes the call on failure, and an outer fallback layer serves a default if everything fails. NResilience has no chain, so none of these are layers here. Each concern moves to a targeted insertion point, and the fallback becomes a branch at the call site.
 
 ## Scenario
 
@@ -21,7 +21,7 @@ In a layered library, that is four middleware wrappers stacked around the call. 
 
 ## Complete example
 
-The following example maps the four concerns onto the flat executor. The auth refresh runs in `BeforeAttempt`, the cache check is the first thing the callback does, retry and the deadline come from the preset, and the fallback is a branch on the `CallResult<T>`.
+This example maps the four concerns onto the flat model: the auth refresh runs in `BeforeAttempt`, the cache check is the first thing the callback does, retry and the deadline come from the preset, and the fallback is a branch on the `CallResult<T>`.
 
 <!-- snippet: guide-translating-a-layered-pipeline -->
 ```csharp
@@ -78,11 +78,11 @@ Each concern in the original pipeline maps to one place in the flat model. None 
 
 ### Why the cache check is not in `Admit`
 
-`Admit` is `Func<NextAttempt, Task<Verdict>>?`. It returns a verdict - `Ok` to admit the attempt, or `Refused`/`Limited` to refuse it. A cache hit is a value, not a verdict, so it does not fit `Admit`'s contract. Checking the cache at the top of the callback serves the hit without calling the dependency, and a miss falls through to the real call. For the full reasoning, see [the callback is the seam](../deep-dives/admission-control.md#the-callback-is-the-seam).
+`Admit` is `Func<NextAttempt, Task<Verdict>>?`. It returns a verdict: `Ok` to admit the attempt, or `Refused`/`Limited` to refuse it. A cache hit is a value, not a verdict, so it does not fit `Admit`'s contract. Checking the cache at the top of the callback serves the hit without calling the dependency, and a miss falls through to the real call. See [the callback is the seam](../deep-dives/admission-control.md#the-callback-is-the-seam) for the full reasoning.
 
 ### Why the auth refresh is not in the callback
 
-`BeforeAttempt` runs before every attempt, including the first, but outside the classified region. If the auth server is down, the exception it throws escapes the executor entirely instead of being classified and retried. That is the behavior an outer middleware layer gives you, without the state machine that layer would allocate. For more information, see the `BeforeAttempt` reference in [retry](../features/retry.md#before-each-attempt).
+`BeforeAttempt` runs before every attempt, including the first, but outside the classified region. If the auth server is down, the exception it throws escapes the executor entirely instead of being classified and retried. That is the behavior an outer middleware layer gives you, without the state machine that layer would allocate. See the `BeforeAttempt` reference in [retry](../features/retry.md#before-each-attempt).
 
 ## Handle the outcome
 
@@ -92,7 +92,7 @@ Each concern in the original pipeline maps to one place in the flat model. None 
 return result.TryGetValue(out var user) ? user : cache.LastKnownGood;
 ```
 
-If the call succeeded, `TryGetValue` returns the value. If it failed, `result.StopReason` tells you why - `Permanent`, `AttemptsExhausted`, `DeadlineExceeded`, `BudgetExhausted`, or `DependencyUnavailable` - and you serve the fallback. For the full list, see [`CallResult<T>`](../reference/call-result.md).
+If the call succeeded, `TryGetValue` returns the value. If it failed, `result.StopReason` tells you why - `Permanent`, `AttemptsExhausted`, `DeadlineExceeded`, `BudgetExhausted`, or `DependencyUnavailable` - and you serve the fallback. The full list is in [`CallResult<T>`](../reference/call-result.md).
 
 ## When to go deeper
 

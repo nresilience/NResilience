@@ -6,11 +6,11 @@ order: 1
 
 # Configuration
 
-NResilience supports binding policy settings directly from configuration providers, such as `appsettings.json`. This allows you to tune parameters like deadlines, attempt counts, and circuit breaker thresholds without redeploying your application.
+NResilience binds policy settings directly from configuration providers such as `appsettings.json`, so you can tune deadlines, attempt counts, and breaker thresholds without redeploying.
 
-While most settings are bindable, logic that requires code - such as custom classifiers or shared circuit breaker instances - is managed via configuration callbacks.
+Most settings are bindable. Logic that requires code - custom classifiers, shared breaker instances - goes through configuration callbacks instead.
 
-To bind policies from configuration, use the `AddResilience` method with a configuration section.
+Bind policies from a configuration section with `AddResilience`:
 
 <!-- snippet: di-register-section -->
 ```csharp
@@ -18,7 +18,7 @@ services.AddResilience(section: configuration.GetSection(key: "Resilience"));
 ```
 <!-- endsnippet -->
 
-Every child of the specified section is treated as a policy, with the key serving as the policy name.
+Every child of the section becomes a policy, named by its key.
 
 <!-- snippet: appsettings.resilience.json -->
 ```json
@@ -49,7 +49,7 @@ Every child of the specified section is treated as a policy, with the key servin
 ```
 <!-- endsnippet -->
 
-All properties are nullable. A `null` value means the property remains unchanged from the base policy rather than reverting to a default. For example, if a section only specifies `Attempts`, only the attempt count is modified.
+All properties are nullable. A `null` leaves the property as it is on the base policy rather than reverting to a default: a section that only specifies `Attempts` changes only the attempt count.
 
 ## Bindable properties
 
@@ -64,18 +64,18 @@ All properties are nullable. A `null` value means the property remains unchanged
 | `Breaker` | A `BreakerOptions` section. Omit this to disable the circuit breaker. |
 | `Telemetry` | Set to `false` to opt this policy out of the telemetry meter. |
 
-The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md), supporting properties such as `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`.
+The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`.
 
 `Breaker:SlowCalls` is a nested section rather than a flat property, and its presence arms the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number). Every setting has a default, so `"SlowCalls": {}` is complete; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. Set this or `SlowCallThreshold`, not both - a section that sets both is rejected when the breaker is built.
 
 ## Projection via ResilienceOptions
 
-NResilience uses `ResilienceOptions` as a flat, mutable Data Transfer Object (DTO) to handle configuration binding. The `ToPolicy` method then projects this DTO into a `Resilience` policy.
+NResilience binds configuration onto `ResilienceOptions`, a flat, mutable Data Transfer Object (DTO), and the `ToPolicy` method projects that DTO into a `Resilience` policy.
 
 > [!NOTE]
 > Avoid binding a configuration section directly onto a `Resilience` instance. Direct binding is silently partial: properties like `Attempts` bind correctly, but computed properties (such as backoff caps) or complex objects (such as classifiers and circuit breakers) are ignored or incorrectly initialized. For example, `Backoff:Max` is dropped because the cap is a computed property; `Classify: "Http"` is ignored, leaving a policy that does not retry a 503; and `Breaker:ConsecutiveFailures` constructs a live circuit breaker with default settings, ignoring the value you set.
 
-The middle case is the dangerous one, because the half that worked is the evidence people use to conclude the other half did too. Using a DTO ensures that the final policy exactly matches the configuration provided in the section. All three failures are gated by a test.
+The middle case is the dangerous one, because the half that worked is the evidence people use to conclude the other half did too. The DTO ensures the final policy matches the section exactly. All three failures are gated by a test.
 
 ### Backoff settings patch the base policy's curve
 
@@ -93,9 +93,9 @@ modifier rather than a backoff knob, so it does not trigger this and leaves the 
 
 ## Use the configuration callback for complex logic
 
-JSON cannot store lambdas or live objects. To configure classifiers, `BeforeAttempt` hooks, `OnEvent` listeners, or shared circuit breakers, use the configuration callback.
+JSON cannot hold lambdas or live objects. For classifiers, `BeforeAttempt` hooks, `OnEvent` listeners, or shared circuit breakers, use the configuration callback.
 
-The callback runs last - after the configuration section is applied and live objects are re-attached - ensuring the callback's settings always take precedence.
+The callback runs last - after the section is applied and live objects are re-attached - so its settings always win.
 
 <!-- snippet: di-configure-callback -->
 ```csharp

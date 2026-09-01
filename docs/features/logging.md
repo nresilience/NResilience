@@ -6,7 +6,7 @@ order: 10
 
 # Logging
 
-A policy writes log records through `ILogger`, with each record saying what an event means rather than dumping the event fields. Logging is **on by default** for policies registered in a container and **opt-in** for policies you build yourself.
+A policy writes log records through `ILogger`, each saying what an event means rather than dumping raw event fields. Logging is **on by default** for policies registered in a container and **opt-in** for policies you build yourself.
 
 A healthy process writes nothing above the `Trace` level. A `Warning` indicates a circuit breaker opened, a retry budget was exhausted, a callback outlived its timeout, a nested retry was detected, or an exception type was not retried for the first time.
 
@@ -42,19 +42,19 @@ dbug: NResilience.payments[1020] payments resolved: 4 attempts, deadline 20s, at
 | **Profile** | The level at which each record is emitted. | The library (usually). Three values. |
 | **Category filter** | Which records are kept. | The user, via `appsettings.json` (no redeploy required). |
 
-These knobs are orthogonal, and the category filter is a platform feature rather than a library one. For example, adding one line to `appsettings.json` can enable retry logs in production or silence a noisy client.
+These knobs are independent, and the category filter is a platform feature rather than a library one: one line in `appsettings.json` can turn retry logs on in production or silence a noisy client.
 
 ## Profiles
 
 | Profile | What it does |
 | :--- | :--- |
-| `Off` | Attaches no listener, eliminating the cost of suppressed calls. |
-| `Default` | Uses the tabled levels. Healthy traffic is `Trace`, retried-then-successful calls are `Debug`, and incidents are `Warning`. |
-| `Verbose` | Raises every traffic-proportional record to `Information` and leaves the incident records where they are. |
+| `Off` | Attaches no listener, so suppressed calls cost nothing. |
+| `Default` | Uses the tabled levels. Healthy traffic is `Trace`, retried-then-successful calls are `Debug`, incidents are `Warning`. |
+| `Verbose` | Raises every traffic-proportional record to `Information` and leaves incident records where they are. |
 
-`Verbose` allows you to raise records above a threshold enforced by a logging sink. For example, a platform that only ingests `Information` and above will never show `Debug` retry records, regardless of the filter settings.
+`Verbose` exists for sinks that enforce a minimum level. A platform that only ingests `Information` and above will never show `Debug` retry records, whatever the filter says.
 
-A value that is not `Off`, `Default` or `Verbose` fails at registration with a message naming the valid ones.
+A value that is not `Off`, `Default` or `Verbose` fails at registration with a message naming the valid values.
 
 To retune a specific record in code, set the `Level` property. Return `null` to keep the profile's level, a specific level to override it, or `LogLevel.None` to drop the record.
 
@@ -96,7 +96,7 @@ var payments = (Resilience.Http with { Name = "payments" })
 ```
 <!-- endsnippet -->
 
-`WithLogging` chains the listener after any existing `OnEvent` handler rather than replacing it. At most one log listener attaches per policy, and the first listener attached takes precedence.
+`WithLogging` chains the listener after any existing `OnEvent` handler rather than replacing it. At most one log listener attaches per policy, and the first one attached wins.
 
 ## Flood control
 
@@ -108,7 +108,7 @@ The feature exists to handle pathological states; three noise types use three di
 
 ## Correlate interleaved records
 
-A busy process interleaves `Debug` records from many concurrent calls of the same policy. Because these records carry no call identity, use trace and span IDs to correlate them.
+A busy process interleaves `Debug` records from many concurrent calls of the same policy. The records carry no call identity, so use trace and span IDs to line them up.
 
 <!-- snippet: logging-correlation -->
 ```csharp
@@ -120,11 +120,11 @@ services.AddLogging(b => b.Configure(o => o.ActivityTrackingOptions =
 ```
 <!-- endsnippet -->
 
-For HTTP clients, this is sufficient because the telemetry handler starts one activity per logical operation. Every record from one retry sequence shares the same span ID, aligning it with the `System.Net.Http.HttpClient` records for the same request.
+For HTTP clients, this alone is enough because the telemetry handler starts one activity per logical operation. Every record from one retry sequence shares the same span ID, lining up with the `System.Net.Http.HttpClient` records for the same request.
 
 ## Assert on what a policy logged
 
-Use `FakeLogger` from `Microsoft.Extensions.Diagnostics.Testing` to assert on what a policy logged. This is the standard ecosystem approach and requires no library-specific tools.
+Use `FakeLogger` from `Microsoft.Extensions.Diagnostics.Testing` to assert on what a policy logged. It is the standard ecosystem tool; nothing library-specific is needed.
 
 <!-- snippet: logging-assert -->
 ```csharp

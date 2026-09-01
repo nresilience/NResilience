@@ -6,11 +6,11 @@ order: 9
 
 # HTTP reference
 
-The HTTP components are located in the `NResilience.Http` namespace within the `NResilience` package.
+The HTTP components live in the `NResilience.Http` namespace in the `NResilience` package.
 
 ## `ResilienceHandler`
 
-`ResilienceHandler` is a `sealed class` that inherits from `DelegatingHandler`. It manages the execution of resilience policies specifically for HTTP requests.
+`ResilienceHandler` is a `sealed class` deriving from `DelegatingHandler`. It runs resilience policies around HTTP requests.
 
 | Member | Description |
 | :--- | :--- |
@@ -20,7 +20,7 @@ The HTTP components are located in the `NResilience.Http` namespace within the `
 | `Options` | The `HttpResilienceOptions` used to configure the handler. |
 | `BreakersByHost()` | Returns a snapshot of the circuit breakers currently managed by the handler, keyed by host. |
 | `BudgetsByHost()` | Returns a snapshot of the retry budgets currently managed by the handler, keyed by host. |
-| `WillRetry(HttpRequestMessage)` | Determines if a request would be retried based on whether the policy allows multiple attempts and whether the request is repeatable. |
+| `WillRetry(HttpRequestMessage)` | Says whether a request would be retried, based on whether the policy allows multiple attempts and whether the request is repeatable. |
 
 Both constructors validate the provided policy. The synchronous `Send` method is not supported and throws a `NotSupportedException`.
 
@@ -30,14 +30,14 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
-| `RetryUnsafeMethods` | `false` | Determines whether `POST` and `PATCH` methods are retried. |
+| `RetryUnsafeMethods` | `false` | Whether `POST` and `PATCH` methods are retried. |
 | `OwnTransportTimeout` | `true` | Whether the client's `Timeout` is set to `Timeout.InfiniteTimeSpan`. Honored by whoever builds the client. |
 | `BreakerPerHost` | `true` | Enables per-host circuit breakers. If the policy already carries an explicit `Breaker`, that breaker is used instead. |
 | `BreakerSettings` | `null` | The settings used to create per-host breakers. |
 | `BudgetPerHost` | `true` | Enables per-host retry budgets. An explicit `Budget` (including `RetryBudget.None`) takes precedence. `RetryBudget.Automatic` does not specify a scope, so per-host scoping applies. |
 | `MaxHosts` | `1024` | The number of hosts the per-host registry keeps. `null` is unbounded; the least-recently-seen hosts are dropped past the cap. |
-| `DetectNestedRetries` | `true` | Determines whether the nested-retry header is added to requests and whether nesting is reported. |
-| `PropagateDeadline` | `false` | Determines whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. |
+| `DetectNestedRetries` | `true` | Whether the nested-retry header is added to requests and whether nesting is reported. |
+| `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. |
 | `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `ResilienceDeadline.Header` is the same value, and is what the inbound middleware reads. |
 
 ## `ResilienceHttp`

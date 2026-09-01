@@ -6,11 +6,11 @@ order: 1
 
 # Retry an HTTP call
 
-When you call an HTTP API, transient failures - such as a 503 Service Unavailable response or a dropped connection - can cause your application to fail. To make your application more resilient, you can implement a retry policy that automatically attempts the call again before giving up.
+When you call an HTTP API, transient failures - a 503 response, a dropped connection - can break your application. A retry policy handles them automatically: it attempts the call again before giving up.
 
 ## Implementation example
 
-The following example shows how to wrap an HTTP call in a resilience policy using `TryRunAsync`.
+This example wraps an HTTP call in a resilience policy using `TryRunAsync`.
 
 <!-- snippet: guide-retry-an-http-call -->
 ```csharp
@@ -36,17 +36,17 @@ private static async Task<Order?> ReadOrderAsync(HttpClient client, string id, C
 
 ### Key implementation details
 
-- **HTTP Classification**: `Resilience.Http` uses [`Classifier.Http`](../features/classification.md) to determine if a failure is worth retrying. It treats 503 responses as transient failures and 429 responses as throttling events, while treating 404 responses as permanent failures.
-- **Backoff and Jitter**: By default, the policy makes three attempts with exponential backoff and full jitter (see [`Backoff.Default`](../features/retry.md#backoff)). Backoff introduces a short delay before each retry, and jitter randomizes that delay to prevent multiple clients from retrying at the exact same time. If the server provides a `Retry-After` header, NResilience respects that value over the backoff curve.
-- **Deadlines**: The `Deadline` property bounds the total time for the operation, including all retries and backoff delays. This prevents the call from hanging indefinitely. The attempt ceiling stays at its default of 10 seconds, capped by whatever is left of the deadline. See [Deadlines](../features/deadlines.md) for more details.
-- **Retry Budget**: A private [retry budget](../features/retry-budget.md) is automatically enabled. This caps retries as a fraction of total traffic, preventing the client from becoming a "load generator" that overwhelms a struggling dependency during a broad outage.
-- **Outcome Reporting**: `TryRunAsync` returns a `CallResult` instead of throwing exceptions for expected resilience failures. This provides a clean way to inspect the outcome and the attempt log.
+- **HTTP classification**: `Resilience.Http` uses [`Classifier.Http`](../features/classification.md) to decide which failures are worth retrying: 503 responses are transient, 429 responses are throttling, and 404 responses are permanent.
+- **Backoff and jitter**: By default, the policy makes three attempts with exponential backoff and full jitter (see [`Backoff.Default`](../features/retry.md#backoff)). Backoff delays each retry; jitter randomizes that delay so many clients do not all retry at the same instant. If the server sends a `Retry-After` header, NResilience uses that value instead of the backoff curve.
+- **Deadlines**: The `Deadline` property bounds the total time for the operation, including all retries and backoff delays, so the call cannot hang indefinitely. The attempt ceiling stays at its default of 10 seconds, capped by whatever is left of the deadline. See [Deadlines](../features/deadlines.md).
+- **Retry budget**: A private [retry budget](../features/retry-budget.md) is on automatically. It caps retries as a fraction of total traffic so the client does not become a load generator that pours fuel on a broad outage.
+- **Outcome reporting**: `TryRunAsync` returns a `CallResult` instead of throwing for expected resilience failures, which makes the outcome and the attempt log easy to inspect.
 
 ## Use a handler for shared clients
 
-If multiple parts of your application share a single `HttpClient`, it is more efficient to attach the policy to the client using a handler rather than wrapping every individual call site.
+If multiple parts of your application share one `HttpClient`, attach the policy to the client with a handler instead of wrapping every call site.
 
-The [resilience handler](../http/index.md) clones each request to allow retries, ensures that `POST` requests are handled according to idempotency rules, and scopes circuit breakers per host.
+The [resilience handler](../http/index.md) clones each request so it can be retried, keeps `POST` requests out of the retry path unless you say otherwise, and scopes circuit breakers per host.
 
 <!-- snippet: http-create-client -->
 ```csharp
@@ -64,22 +64,22 @@ private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cance
 ```
 <!-- endsnippet -->
 
-In applications using a dependency injection container, you can achieve this by calling [`AddResilience()`](../di/index.md).
+In an application with a DI container, call [`AddResilience()`](../di/index.md) instead.
 
 ## Handle the outcome
 
-Use `result.TryGetValue(out var order)` to determine if the call succeeded. If the call fails, `result.StopReason` explains why the operation stopped:
+Use `result.TryGetValue(out var order)` to check whether the call succeeded. If it failed, `result.StopReason` says why:
 
 - `AttemptsExhausted`: All retry attempts were used.
 - `DeadlineExceeded`: The overall time limit was reached.
 - `DependencyUnavailable`: The [circuit breaker](../features/circuit-breaker.md) is refusing calls.
 - `BudgetExhausted`: The [retry budget](../features/retry-budget.md) was spent.
-- `Permanent`: The classifier determined that the failure would not change upon retrying.
+- `Permanent`: The classifier decided retrying would not change the outcome.
 
 The `result.Attempts` property provides a log of every attempt, including the verdict and the delay before that attempt.
 
 ## For more information
 
-- [Classification](../features/classification.md): Learn how to add your own status codes or exceptions to the classifier.
-- [Idempotency](../http/idempotency.md): Learn when it is safe to retry `POST` requests.
-- [Why one flat executor](../deep-dives/one-executor.md): Understand the performance cost of a resilience call.
+- [Classification](../features/classification.md): Add your own status codes or exceptions to the classifier.
+- [Idempotency](../http/idempotency.md): When it is safe to retry `POST` requests.
+- [Why one flat executor](../deep-dives/one-executor.md): The performance cost of a resilience call.

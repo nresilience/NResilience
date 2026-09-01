@@ -6,22 +6,22 @@ order: 11
 
 # Testing reference
 
-The testing utilities are located in the `NResilience.Testing` namespace within the `NResilience.Testing` package.
+The testing utilities live in the `NResilience.Testing` namespace in the `NResilience.Testing` package.
 
 ## `Sequence`
 
-The `Sequence` class is a factory for creating scripted call sequences that return pre-defined results or throw exceptions.
+The `Sequence` class is a factory for scripted call sequences that return pre-defined results or throw exceptions.
 
 | Member | Description |
 | :--- | :--- |
 | `Sequence.For<T>(TimeProvider? time = null)` | Creates a scripted sequence that returns values of type `T`. |
 | `Sequence.ForVoid(TimeProvider? time = null)` | Creates a scripted sequence for void execution overloads, returning a `Sequence<Void>`. |
 
-To ensure that scripted delays are handled deterministically and do not introduce real-time sleeps, pass the same `TimeProvider` to the `Sequence` that you provided to the resilience policy.
+Pass the same `TimeProvider` to the `Sequence` that you gave the resilience policy, so scripted delays stay deterministic and never become real sleeps.
 
 ## `Sequence<T>`
 
-`Sequence<T>` allows you to define a series of outcomes to be served to the policy during a test.
+`Sequence<T>` defines a series of outcomes served to the policy during a test.
 
 | Member | Description |
 | :--- | :--- |
@@ -72,7 +72,7 @@ To ensure that scripted delays are handled deterministically and do not introduc
 
 ## `EventRecorder`
 
-`EventRecorder` is a utility for capturing and asserting on the events emitted by a resilience policy.
+`EventRecorder` captures and asserts on the events a resilience policy emits.
 
 | Member | Description |
 | :--- | :--- |
@@ -103,7 +103,7 @@ To ensure that scripted delays are handled deterministically and do not introduc
 
 ## `ScriptedHttpHandler`
 
-`ScriptedHttpHandler` is an `HttpMessageHandler` that serves a scripted sequence of responses, so the HTTP layer can be tested without a transport. The last step repeats, so a script does not have to predict how many attempts the policy will make.
+`ScriptedHttpHandler` is an `HttpMessageHandler` serving a scripted sequence of responses, so the HTTP layer can be tested without a transport. The last step repeats, so a script does not have to predict how many attempts the policy will make.
 
 | Member | Description |
 | :--- | :--- |

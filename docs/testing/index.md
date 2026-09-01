@@ -6,19 +6,19 @@ order: 7
 
 # Testing
 
-Testing resilience logic - such as retries and timeouts - can be slow and flaky if you rely on real-time delays. A test that waits 30 seconds for a timeout takes 30 seconds to run, and timing variations across different machines can cause intermittent failures.
+Testing resilience logic - retries, timeouts - is slow and flaky if you use real time. A test that waits 30 seconds for a timeout takes 30 seconds to run, and timing differences between machines cause intermittent failures.
 
-The `NResilience.Testing` package addresses these issues by providing tools to make your tests deterministic and fast. It allows you to script dependency behavior, capture policy events for assertion, and manipulate time to run long-duration tests in microseconds.
+The `NResilience.Testing` package makes tests deterministic and fast: script dependency behavior, capture policy events for assertion, and control the clock so a long-duration test runs in microseconds.
 
 ```bash
 dotnet add package NResilience.Testing
 ```
 
-The testing package is a separate dependency and does not impact the performance of the core library in production.
+The testing package is a separate dependency and has no effect on the core library's production performance.
 
 ## Script the callback
 
-Use the `Sequence<T>` class to create a script of outcomes (returns, throws, or delays) that are served one by one as the policy makes attempts.
+`Sequence<T>` is a script of outcomes - returns, throws, or delays - served one by one as the policy makes attempts.
 
 <!-- snippet: testing-sequence -->
 ```csharp
@@ -36,17 +36,17 @@ Assert.Equal(expected: 3, actual: result.Attempts.Count);
 ```
 <!-- endsnippet -->
 
-`Sequence.For<T>()` allows you to chain `Returns`, `Throws`, and `Delays` steps. For void execution overloads, use `Sequence.ForVoid()`. 
+`Sequence.For<T>()` chains `Returns`, `Throws`, and `Delays` steps. For void execution overloads, use `Sequence.ForVoid()`. 
 
 ### Sequence behavior
-- **Deterministic Outcomes**: Every call to `NextAsync` serves the next step in the script.
-- **Synchronous Completion**: A step with no delay completes synchronously, allowing you to test synchronous paths.
-- **Async Delays**: A step with a delay suspends execution and observes the provided cancellation token, making it possible to test attempt timeouts and deadlines.
-- **Bounds**: If the script is exhausted, the sequence throws an `InvalidOperationException` specifying the script length and the call number.
+- **Deterministic outcomes**: Every call to `NextAsync` serves the next step in the script.
+- **Synchronous completion**: A step with no delay completes synchronously, so you can test synchronous paths.
+- **Async delays**: A step with a delay suspends and observes the provided cancellation token, which is what lets you test attempt timeouts and deadlines.
+- **Bounds**: An exhausted script throws `InvalidOperationException`, naming the script length and the call number.
 
 ## Control the clock
 
-To test timeouts or deadlines without actually waiting for the clock, provide a `FakeTimeProvider` to both the policy and the sequence. This allows you to "advance" time manually.
+To test timeouts or deadlines without waiting for the real clock, give a `FakeTimeProvider` to both the policy and the sequence. You then advance time by hand.
 
 <!-- snippet: testing-fake-time -->
 ```csharp
@@ -75,11 +75,11 @@ Assert.IsType<AttemptTimeoutException>(@object: result.Exception);
 <!-- endsnippet -->
 
 > [!IMPORTANT]
-> You must pass the same `TimeProvider` instance to both the policy and the sequence. If the sequence uses the system clock while the policy uses a fake clock, the scripted delay becomes a real sleep, making your tests slow and flaky.
+> Pass the same `TimeProvider` instance to both the policy and the sequence. If the sequence uses the system clock while the policy uses a fake clock, the scripted delay becomes a real sleep and your tests are slow and flaky again.
 
 ### Guards the library builds for you
  
-The policy's `Time` also drives the breakers and retry budgets the library constructs, including [per-host](../http/per-host-scope.md) guards and those defined in a [configuration section](../di/configuration.md). A single `FakeTimeProvider` on the policy manages a per-host breaker's break duration and a configured budget's refill.
+The policy's `Time` also drives the breakers and retry budgets the library constructs, including [per-host](../http/per-host-scope.md) guards and those from a [configuration section](../di/configuration.md). One `FakeTimeProvider` on the policy manages a per-host breaker's break duration and a configured budget's refill.
  
 <!-- snippet: testing-library-clock -->
 ```csharp
@@ -120,10 +120,10 @@ Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
 ```
 <!-- endsnippet -->
  
-A `Breaker` you construct yourself is the exception; it uses the clock specified in its settings. To align it with a policy, provide the same `TimeProvider` instance. See [the breaker's clock](../features/circuit-breaker.md#the-breakers-clock).
- 
+A `Breaker` you construct yourself is the exception: it uses the clock in its settings. To align it with a policy, give both the same `TimeProvider` instance. See [the breaker's clock](../features/circuit-breaker.md#the-breakers-clock).
+
 > [!CAUTION]
-> A guard that refuses a call pauses briefly on the policy's clock. Under a fake clock, this pause never ends unless the test advances time. Tests expecting a rejection must advance the clock or disable the guard (e.g., set `BreakerPerHost = false`).
+> A guard that refuses a call pauses briefly on the policy's clock. Under a fake clock, that pause never ends unless the test advances time. Tests expecting a rejection must advance the clock or disable the guard (set `BreakerPerHost = false`, for example).
 
 ## Reach for a ready-made policy
 
@@ -137,7 +137,7 @@ var api = TestPolicy.Instant;
 
 `TestPolicy.InstantHttp` is the same shape with `Classify = Classifier.Http`, for a test that scripts HTTP status codes rather than a custom classifier.
 
-To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.On(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker and its budget all advance together - the same pairing the [Control the clock](#control-the-clock) section makes by hand with `Time = time`:
+To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.On(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker, and its budget all advance together - the same pairing the [Control the clock](#control-the-clock) section makes by hand with `Time = time`:
 
 ```csharp
 var time = new FakeTimeProvider();
@@ -146,7 +146,7 @@ var api = TestPolicy.On(time);
 
 ## Verify policy behavior
 
-You can verify that a policy is emitting the correct events in the correct order by using an `EventRecorder`. This is more reliable than asserting on elapsed time.
+An `EventRecorder` verifies that a policy raises the right events in the right order - more reliable than asserting on elapsed time.
 
 <!-- snippet: testing-event-recorder -->
 ```csharp
@@ -169,11 +169,11 @@ Assert.Equal(expected: 42, actual: events.Single(kind: CallEventKind.Succeeded).
 ```
 <!-- endsnippet -->
 
-The `EventRecorder` captures every [`CallEvent`](../reference/events.md) in order. While you can use methods like `CountOf(kind)` or `Contains(kind)` for simple checks, asserting on the entire `Kinds` sequence is recommended to ensure that telemetry is reported in the correct order.
+The `EventRecorder` captures every [`CallEvent`](../reference/events.md) in order. `CountOf(kind)` and `Contains(kind)` work for simple checks, but asserting on the whole `Kinds` sequence is the better habit: it proves telemetry is reported in order, not just present.
 
 ## Test a custom listener
- 
-An `EventRecorder` proves the policy raised the right events. To prove a listener behaves correctly, you can use `CallEvent.Create` to build events without the executor. Since most parameters are defaulted, you only need to specify the fields your listener asserts on.
+
+An `EventRecorder` proves the policy raised the right events. To prove a *listener* behaves correctly, build events with `CallEvent.Create` without running the executor. Most parameters are defaulted, so you only specify the fields your listener asserts on.
  
 <!-- snippet: testing-call-event-create -->
 ```csharp
@@ -204,11 +204,11 @@ Assert.Equal(expected: 1, actual: overRetried);
 ```
 <!-- endsnippet -->
  
-This allows you to cover kinds that are difficult to provoke in a test - such as `RejectedByBudget`, `OrphanedWork`, and `NestedRetry` - without constructing a complex scenario for each.
+This covers kinds that are hard to provoke in a test - `RejectedByBudget`, `OrphanedWork`, `NestedRetry` - without constructing a scenario for each.
 
 ## Test an HTTP client
 
-You can test resilient `HttpClient` configurations by providing a scripted `HttpMessageHandler` as the inner handler.
+Test resilient `HttpClient` configurations by providing a scripted `HttpMessageHandler` as the inner handler.
 
 <!-- snippet: testing-http-handler -->
 ```csharp
@@ -227,10 +227,10 @@ Assert.Equal(expected: 2, actual: transport.CallCount);
 ```
 <!-- endsnippet -->
 
-`ScriptedHttpHandler` serves the script you give it, then repeats the last step for every attempt after that, so it does not need to know in advance how many attempts the policy will make. `Respond` and `Throw` both return the handler, so a multi-step script reads as one chain:
+`ScriptedHttpHandler` serves the script you give it, then repeats the last step for every attempt after that, so it does not need to know how many attempts the policy will make. `Respond` and `Throw` both return the handler, so a multi-step script reads as one chain:
 
 - `Respond(status)` and `Respond(status, times)` serve a fixed status code, once or for a run of attempts.
-- `Respond(response)` and `Respond(response, times)` build a fresh `HttpResponseMessage` from the given function on every attempt that consumes the step - use this over the status overload when a response carries content that a test reads.
+- `Respond(response)` and `Respond(response, times)` build a fresh `HttpResponseMessage` from the given function on every attempt that consumes the step - prefer this over the status overload when a response carries content a test reads.
 - `Throw(exception)` and `Throw(exception, times)` throw instead, for the transport failures a classifier has to see.
 
 `CallCount` is how many attempts reached the handler. `Requests` is a snapshot of what each attempt sent, in order: the method, the URI, the headers, and - only when `CaptureBodies` is `true` - the body. `CaptureBodies` defaults to `false` because reading a body buffers it; turn it on only when a test asserts on what was sent.
@@ -239,8 +239,8 @@ Assert.Equal(expected: 2, actual: transport.CallCount);
 
 To keep your tests fast and deterministic, follow these practices:
 
-- **Disable backoff or fake the clock**. Use `Backoff = Backoff.None` to make retry tests instantaneous. If your test specifically asserts on timing or delays, use `FakeTimeProvider`.
-- **Assert on the attempt log**. Instead of using a stopwatch to verify retries, inspect `result.Attempts`. This log provides a deterministic record of how many attempts ran, their classifications, and the delays that preceded them.
+- **Disable backoff or fake the clock.** Use `Backoff = Backoff.None` to make retry tests instantaneous. If the test specifically asserts on timing or delays, use `FakeTimeProvider`.
+- **Assert on the attempt log.** Instead of a stopwatch, inspect `result.Attempts`: a deterministic record of how many attempts ran, their classifications, and the delays that preceded them.
 
 ## Inject faults on purpose
 

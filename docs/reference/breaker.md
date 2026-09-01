@@ -6,7 +6,7 @@ order: 5
 
 # `Breaker`
 
-The `Breaker` is a `sealed class` that implements the circuit breaker pattern. It is a live object; create it and share it across the calls you intend to protect.
+The `Breaker` is a `sealed class` implementing the circuit breaker pattern. It is a live object: create it and share it across the calls you want to protect.
 
 | Member | Description |
 | :--- | :--- |
@@ -19,11 +19,11 @@ The `Breaker` is a `sealed class` that implements the circuit breaker pattern. I
 | `Isolate()` | Forces the breaker into the `Isolated` state. An isolated breaker does not self-heal. |
 | `Reset()` | Closes the breaker and clears its failure history. `NormalLatency` survives, because it is a measurement of the dependency rather than a decision about it. |
 
-`Isolate` and `Reset` do not raise events because they are administrative actions and not triggered by a specific call.
+`Isolate` and `Reset` raise no events: they are administrative actions, not triggered by a call.
 
 ## `BreakerState`
 
-The `BreakerState` enum defines the possible states of the circuit breaker:
+The `BreakerState` enum defines the breaker's states:
 
 | Value | Description |
 | :--- | :--- |
@@ -42,13 +42,13 @@ The `BreakerState` enum defines the possible states of the circuit breaker:
 | `FailureRatio` | `null` | An optional rate-based trip threshold in the range (0, 1]. This is evaluated alongside the consecutive failure counter. |
 | `MinimumCalls` | 20 | The minimum number of sampled calls in the window before a rate-based trip is evaluated. |
 | `Window` | 30 s | The sliding window duration over which rates are measured. |
-| `SlowCallThreshold` | `null` | A constant duration above which an attempt is considered "slow," even if it succeeded. |
+| `SlowCallThreshold` | `null` | A constant duration above which an attempt counts as "slow", even if it succeeded. |
 | `SlowCalls` | `null` | The same trip, expressed as a multiple of measured normal latency. Set this or `SlowCallThreshold`, not both. See [`SlowCalls`](#slowcalls). |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that will trip the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
-| `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set this equal to `BreakDuration` to disable growth. |
-| `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while in the `HalfOpen` state. |
-| `ProbeSuccesses` | 2 | The number of successful probes required to return the breaker to the `Closed` state. |
+| `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set it equal to `BreakDuration` to disable growth. |
+| `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while `HalfOpen`. |
+| `ProbeSuccesses` | 2 | The number of successful probes needed to return the breaker to `Closed`. |
 | `Time` | `TimeProvider.System` | The clock used for timing. The breaker maintains its own clock so its state can be read by health endpoints without a policy. When the library builds the breaker (per-host or from configuration), it uses the policy's `Time` if no other clock is specified. See [the breaker's clock](../features/circuit-breaker.md#the-breakers-clock). |
 | `Validate()` | N/A | Validates the settings and throws a `ResilienceConfigurationException` listing all found problems. |
 

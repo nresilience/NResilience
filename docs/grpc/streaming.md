@@ -26,9 +26,9 @@ Nothing about the registration changes: a stream uses the same policy, the same 
 | Before the first message | Classifies it and retries it like any call. A fresh attempt is a fresh gRPC call. |
 | After the first message | Nothing. The `RpcException` reaches your `await foreach` unchanged. |
 
-The line is not a limitation to work around - it is the only honest semantic a stream has. Once you hold a message, you have acted on it: a retry would either duplicate the messages you have already seen or drop the ones you have not, and there is no third option that does not buffer the whole stream.
+The line is not a limitation to work around - it is the only honest semantic a stream has. Once you hold a message you have acted on it: a retry would either duplicate the messages you have already seen or drop the ones you have not, and there is no third option that does not buffer the whole stream.
 
-Before the first message, a stream is indistinguishable from a call. A connection reset, an `Unavailable`, a throttling reply, and a deadline all arrive in that window, which is exactly what the classifier already judges. For more information, see [Classification](classification.md).
+Before the first message, a stream is indistinguishable from a call. A connection reset, an `Unavailable`, a throttling reply, and a deadline all arrive in that window, which is exactly what the classifier already judges. See [Classification](classification.md).
 
 ## The one place the wire deadline differs
 
@@ -46,7 +46,7 @@ Everything else on the [Deadlines](deadlines.md) page applies unchanged, includi
 
 ## Ending a stream early
 
-Dispose the call. `IAsyncStreamReader<T>` is not disposable, so disposing the call object is how you say you have read enough - and it is what cancels the enumeration and releases the underlying gRPC call. A `using` on the call is enough: `using var call = client.Watch(request);`, which is what a generated client's own samples show. Reading the stream after that throws `ObjectDisposedException`.
+Dispose the call. `IAsyncStreamReader<T>` is not disposable, so disposing the call object is how you say you have read enough - and it cancels the enumeration and releases the underlying gRPC call. A `using` on the call is enough: `using var call = client.Watch(request);`, which is what a generated client's own samples show. Reading the stream after that throws `ObjectDisposedException`.
 
 ## Repeatability applies here too
 

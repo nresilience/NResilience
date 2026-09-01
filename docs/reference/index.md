@@ -6,7 +6,7 @@ order: 8
 
 # Reference
 
-The **executor** is the internal loop that manages the execution of each attempt. It applies deadlines and attempt timeouts, handles backoff delays, and determines whether a call should be retried. To maintain simplicity and performance, the executor uses a flat execution pass rather than a strategy pipeline.
+The **executor** is the internal loop that runs each attempt: it applies deadlines and attempt timeouts, serves backoff delays, and decides whether a call should be retried. For simplicity and performance, it uses one flat execution pass rather than a strategy pipeline.
 
 | Topic | Types and Members |
 | :--- | :--- |

@@ -6,11 +6,11 @@ order: 10
 
 # Options and registration
 
-Registration methods are located in the `NResilience.Extensions` package and are provided as extension methods for `IServiceCollection` and `IHttpClientBuilder`.
+Registration methods live in the `NResilience.Extensions` package as extension methods for `IServiceCollection` and `IHttpClientBuilder`.
 
 ## `AddResilience` on `IServiceCollection`
 
-Use these methods to register resilience policies within the dependency injection container.
+Register resilience policies in the DI container with these methods.
 
 | Overload | Description |
 | :--- | :--- |
@@ -25,7 +25,7 @@ The optional `configure` parameter is a `Func<Resilience, Resilience>` that runs
 
 ## `AddResilience` on `IHttpClientBuilder`
 
-Use these methods to add the `ResilienceHandler` to an `HttpClient` pipeline.
+Add the `ResilienceHandler` to an `HttpClient` pipeline with these methods.
 
 | Overload | Description |
 | :--- | :--- |
@@ -34,11 +34,11 @@ Use these methods to add the `ResilienceHandler` to an `HttpClient` pipeline.
 
 If `logging` is `null`, the process default is used. Registered policies log under their registration's own profile, so this parameter only affects policies that the registration left unlogged.
 
-If the policy does not have its own name, it is named after the client. This prevents multiple clients using `Resilience.Http` from all reporting under the same name in telemetry.
+If the policy has no name of its own, it is named after the client. That keeps multiple clients using `Resilience.Http` from all reporting under the same name in telemetry.
 
 ## `UseResilienceDeadline` on `IApplicationBuilder`
 
-`UseResilienceDeadline` is in the `NResilience.AspNetCore` package, which is separate because it is the only part of NResilience that requires ASP.NET Core. It reads the deadline a caller sent and publishes it for the rest of the request, so every policy with `UseAmbientDeadline` set is bounded by `min(its own deadline, the time the caller is still waiting)`.
+`UseResilienceDeadline` is in the `NResilience.AspNetCore` package, kept separate because it is the only part of NResilience that requires ASP.NET Core. It reads the deadline a caller sent and publishes it for the rest of the request, so every policy with `UseAmbientDeadline` set is bounded by `min(its own deadline, the time the caller is still waiting)`.
 
 | Overload | Description |
 | :--- | :--- |
@@ -52,7 +52,7 @@ If the policy does not have its own name, it is named after the client. This pre
 | `Maximum` | `null` | The longest inbound deadline this service believes. A header above it is ignored. `null` believes any of them. |
 | `Reserve` | `TimeSpan.Zero` | How much of the inbound deadline is kept back for this service's own work, and therefore withheld from outbound calls. |
 
-The clock is `TimeProvider` from the container when one is registered, and `TimeProvider.System` otherwise. An expired inbound deadline does not fail the request; it fails the outbound calls, which is the distinction [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) explains.
+The clock is `TimeProvider` from the container when one is registered, `TimeProvider.System` otherwise. An expired inbound deadline does not fail the request; it fails the outbound calls. [Deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) explains that distinction.
 
 ## `UseResilienceNestedRetry` on `IApplicationBuilder`
 
@@ -91,7 +91,7 @@ Status codes are validated at startup; a value outside 100-599 fails registratio
 
 ## `IResiliencePolicies`
 
-The `IResiliencePolicies` service provides access to registered policies.
+The `IResiliencePolicies` service gives access to registered policies.
 
 | Member | Description |
 | :--- | :--- |
@@ -99,18 +99,18 @@ The `IResiliencePolicies` service provides access to registered policies.
 | `Names` | A collection of all registered policy names. |
 | `TryGet(name, out policy)` | A non-throwing method to retrieve a policy. Returns `Resilience.Default` if no policy is found. |
 
-**Recommendation**: Resolve policies per call. Capturing a policy at construction creates a snapshot that will not reflect configuration reloads.
+**Recommendation**: Resolve policies per call. Capturing one at construction creates a snapshot that misses configuration reloads.
 
 ## `ResilienceOptions`
 
-`ResilienceOptions` is a `sealed class` used for binding configuration to a policy. All properties are nullable; a `null` value indicates that the property should not be overridden.
+`ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone".
 
 **Properties**:
 `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Hedge`, `Telemetry`, `Logging`.
 
-- **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. This method does not perform validation; validation occurs at registration or execution.
-- **Budget Disabling**: Setting `BudgetFraction = 0` disables the retry budget.
-- **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string is used instead of an enum so that typos name the valid values (similar to `Preset`). Values outside this set fail at registration.
+- **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
+- **Budget disabling**: Setting `BudgetFraction = 0` disables the retry budget.
+- **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
 
 For more information on the configuration structure, see [Configuration](../di/configuration.md).
 
@@ -132,7 +132,7 @@ There is deliberately no fixed-delay setting. A constant threshold is the failur
 
 `BreakerOptions` provides the bindable shape of [`BreakerSettings`](breaker.md) with nullable properties.
 
-- **`ToBreaker(string? name = null)`**: Builds a live `Breaker` instance. A configured breaker is created once per policy and persists through configuration reloads to maintain its state.
+- **`ToBreaker(string? name = null)`**: Builds a live `Breaker` instance. A configured breaker is created once per policy and survives configuration reloads, keeping its state.
 
 ## `AddRateLimit` on `IHttpClientBuilder`
 
@@ -226,7 +226,7 @@ A `RateLimiter`, so it composes everywhere the other three do. These members exi
 
 ## `ResilienceTelemetry`
 
-`ResilienceTelemetry` is a `static class` that provides access to the library's instrumentation.
+`ResilienceTelemetry` is a `static class` exposing the library's instrumentation.
 
 | Member | Description |
 | :--- | :--- |
@@ -235,7 +235,7 @@ A `RateLimiter`, so it composes everywhere the other three do. These members exi
 | `Meter` | The `Meter` instance used to create all instruments. |
 | `ActivitySource` | The `ActivitySource` used to provide spans for HTTP operations. |
 | `Listener` | An `Action<CallEvent>` that records data to instruments. It is stateless and allocation-free. |
-| `WithTelemetry(this Resilience policy)` | An extension method that chains the `Listener` to the policy's `OnEvent` handler. This operation is idempotent. |
+| `WithTelemetry(this Resilience policy)` | An extension method that chains the `Listener` onto the policy's `OnEvent` handler. This operation is idempotent. |
 
 For a list of available instruments, see [Telemetry](../features/telemetry.md).
 
@@ -246,12 +246,12 @@ The `ResilienceLogging` static class holds the log listener and category derivat
 | Member | Description |
 | :--- | :--- |
 | `CategoryPrefix` | The prefix every category starts with: `"NResilience"`. |
-| `CategoryFor(string? policyName)` | The category a policy logs under based on its name. If the name is null or empty, it uses `NResilience`; otherwise, it uses `NResilience.<name>`. |
-| `Listener(ILogger logger, ResilienceLoggingOptions? options = null, TimeProvider? time = null)` | An `Action<CallEvent>` that writes to the logger. This listener is stateful due to rejection suppression, so create one per policy. |
+| `CategoryFor(string? policyName)` | The category a policy logs under, based on its name: `NResilience` when the name is null or empty, otherwise `NResilience.<name>`. |
+| `Listener(ILogger logger, ResilienceLoggingOptions? options = null, TimeProvider? time = null)` | An `Action<CallEvent>` that writes to the logger. Stateful due to rejection suppression, so create one per policy. |
 | `WithLogging(this Resilience policy, ILogger logger, ResilienceLoggingOptions? options = null)` | Chains a listener onto the policy, or returns it unchanged when one is already attached. |
 | `WithLogging(this Resilience policy, ILoggerFactory loggerFactory, ResilienceLoggingOptions? options = null)` | The same, but creates the logger under the policy's own category. |
 
-At most one log listener attaches per policy. The first listener attached takes precedence.
+At most one log listener attaches per policy; the first one attached wins.
 
 ## `ResilienceLoggingOptions`
 

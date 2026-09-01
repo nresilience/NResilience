@@ -6,11 +6,11 @@ order: 3
 
 # Configure from appsettings
 
-In production environments, you often need to tune resilience parameters - such as deadlines or attempt counts - without redeploying your entire application. NResilience allows you to bind these settings to a configuration section (like `appsettings.json`) while keeping complex logic, such as classifiers and shared circuit breakers, in the application code.
+In production you often need to tune resilience settings - deadlines, attempt counts - without redeploying. NResilience binds these settings to a configuration section (like `appsettings.json`) while classifiers, shared circuit breakers, and other live objects stay in code.
 
 ## Implementation example
 
-The following example demonstrates how to register policies from a configuration section and attach a named policy to an `HttpClient`.
+This example registers policies from a configuration section and attaches a named policy to an `HttpClient`.
 
 <!-- snippet: guide-configure-from-configuration -->
 ```csharp
@@ -58,14 +58,14 @@ The `AddResilience` method expects a configuration section structured as follows
 
 ### Key implementation details
 
-- **Named Policies**: Every child of the configuration section becomes a policy named by its key (e.g., `"api"` and `"reports"`). The `Preset` property defines the starting settings, and all other properties override those defaults.
-- **Eager Validation**: Policy registration is validated at startup. If a value is invalid (for example, a negative deadline), the application fails immediately rather than failing during the first request.
-- **Hot Reload**: When the configuration file changes, NResilience updates the policies. However, the set of registered policy names is read only once at startup; adding a new name to the JSON file after the application has started will not result in a new injectable policy.
-- **Telemetry**: Using `AddResilience("api")` on a client ensures that the policy name is preserved in the telemetry tags, making it easy to distinguish between different policies in your monitoring tools.
+- **Named policies**: Every child of the section becomes a policy named by its key (`"api"`, `"reports"`). `Preset` sets the starting settings; every other property overrides those defaults.
+- **Eager validation**: Policy registration is validated at startup. An invalid value (a negative deadline, for example) fails the application immediately rather than on the first request.
+- **Hot reload**: When the configuration file changes, NResilience updates the policies. The set of policy names is read once at startup, though - a name added to the JSON after startup does not become a new injectable policy.
+- **Telemetry**: `AddResilience("api")` keeps the policy name in the telemetry tags, so you can tell policies apart in your monitoring tools.
 
 ## Use reloaded policies
 
-To ensure your application picks up configuration changes, inject `IResiliencePolicies` and resolve the policy by name on every call.
+To pick up configuration changes, inject `IResiliencePolicies` and resolve the policy by name on every call.
 
 <!-- snippet: di-inject -->
 ```csharp
@@ -82,14 +82,12 @@ public sealed class Orders(IResiliencePolicies policies)
 ```
 <!-- endsnippet -->
 
-### Persistence and Timing
-
-- **State Persistence**: When a policy is reloaded, it preserves its live circuit breaker state and its accumulated retry budget.
-- **HttpClient Rotation**: An `HttpClient` observes a reloaded policy at the next handler rotation. By default, `IHttpClientFactory` rebuilds handler chains every two minutes.
+- **State persistence**: When a policy reloads, it keeps its live circuit breaker state and accumulated retry budget.
+- **HttpClient rotation**: An `HttpClient` observes a reloaded policy at the next handler rotation. `IHttpClientFactory` rebuilds handler chains every two minutes by default.
 
 ## Add complex logic via callbacks
 
-JSON cannot store lambdas or live objects. To configure classifiers, hooks, or shared circuit breakers, use the configuration callback. This callback runs last, ensuring it overrides any settings provided in the JSON section.
+JSON cannot hold lambdas or live objects. For classifiers, hooks, or shared circuit breakers, use the configuration callback. It runs last, so it overrides anything from the JSON section.
 
 <!-- snippet: di-configure-callback -->
 ```csharp
@@ -109,5 +107,5 @@ services.AddResilience(
 
 ## For more information
 
-- [Configuration](../di/configuration.md): Learn about all bindable properties and why NResilience uses a DTO for binding.
-- [`ResilienceOptions` reference](../reference/options.md): Detailed reference for the options object.
+- [Configuration](../di/configuration.md): All bindable properties, and why NResilience binds through a DTO.
+- [`ResilienceOptions` reference](../reference/options.md): The options object in detail.

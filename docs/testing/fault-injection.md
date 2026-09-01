@@ -6,7 +6,7 @@ order: 1
 
 # Fault injection
 
-A policy is a set of claims about what happens when a dependency misbehaves. Fault injection is how you check the claims. `Chaos` fails or slows a chosen fraction of calls, so a test - or a game day against a real environment - exercises the retry curve, the breaker and the budget on the path you actually ship.
+A policy is a set of claims about what happens when a dependency misbehaves. Fault injection checks those claims. `Chaos` fails or slows a chosen fraction of calls, so a test - or a game day against a real environment - exercises the retry curve, the breaker, and the budget on the path you actually ship.
 
 Fault injection is opt-in and off by default. `Chaos.Enabled` starts `false`, so a profile bound from a configuration section that does not mention it is inert.
 
@@ -37,7 +37,7 @@ var result = await policy.TryRunAsync(
 
 `Chaos` wraps the **callback**, not the policy, and that placement is the whole design. An injected fault travels through the classifier, the retry loop, the circuit breaker, the retry budget, and the attempt log exactly as a real one would, so what a game day exercises is the machinery you deploy rather than a parallel path that only exists under test.
 
-The two rates are rolled independently, so a call can be both slowed and failed - which is the shape most real degradations take.
+The two rates are rolled independently, so a call can be both slowed and failed - the shape most real degradations take.
 
 | Member | What it does |
 | :--- | :--- |
@@ -54,13 +54,13 @@ The two rates are rolled independently, so a call can be both slowed and failed 
 
 ## Why the default fault is an `IOException`
 
-Because `Classifier.Default` treats an exception type it does not recognize as `Permanent`. A chaos profile injecting some exception of its own would produce a run in which nothing is ever retried - the feature silently testing none of the machinery it exists to test. `IOException` is `Transient` under both `Classifier.Default` and `Classifier.Http`, so injected faults are retried out of the box.
+Because `Classifier.Default` treats an unrecognized exception type as `Permanent`. A chaos profile injecting an exception of its own would produce a run in which nothing is ever retried - the feature silently testing none of the machinery it exists to test. `IOException` is `Transient` under both `Classifier.Default` and `Classifier.Http`, so injected faults are retried out of the box.
 
 Set `Fault` when you want a different one, and check that your classifier has an opinion about it.
 
 ## Inject a result instead of an exception
 
-Some failures are not exceptions. A 503, an empty page, a stale record: these are results, and the rules that judge them are the ones you want to exercise. Pass an `outcome` to `Inject`, and a failing call returns it rather than throwing.
+Some failures are not exceptions. A 503, an empty page, a stale record: these are results, and the rules that judge them are the ones you want to exercise. Pass an `outcome` to `Inject` and a failing call returns it rather than throwing.
 
 ```csharp
 var work = chaos.Inject(
@@ -68,7 +68,7 @@ var work = chaos.Inject(
     outcome: () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
 ```
 
-The `outcome` function is called once per injected failure, so it must produce a fresh value each time when that value owns something disposable - as an `HttpResponseMessage` does.
+The `outcome` function is called once per injected failure, so it must produce a fresh value each time when that value owns something disposable, as an `HttpResponseMessage` does.
 
 ## Make a run repeatable
 
@@ -115,12 +115,12 @@ services.AddHttpClient(name: "orders")
 > [!IMPORTANT]
 > Add `ChaosHandler` **after** `AddResilience()`. `IHttpClientFactory` runs handlers in registration order, outermost first, so this puts the chaos handler inner to the resilience handler and the policy sees the injected faults. Registered the other way round, the faults sit outside the policy and nothing retries them.
 
-`ChaosHandler` counts what it did, which is the thing to assert on rather than inferring it from a retry count:
+`ChaosHandler` counts what it did - the thing to assert on, rather than inferring it from a retry count:
 
 - `Injected` - how many requests were failed.
 - `Slowed` - how many requests were slowed.
 
-Chaos is applied on the asynchronous path only. That is not a gap in practice: `ResilienceHandler.Send` throws `NotSupportedException`, so a pipeline with a policy in it has no synchronous path to inject into.
+Chaos applies on the asynchronous path only. That is not a gap in practice: `ResilienceHandler.Send` throws `NotSupportedException`, so a pipeline with a policy in it has no synchronous path to inject into.
 
 ## Test an attempt timeout with injected latency
 
@@ -142,7 +142,7 @@ This is a legitimate thing to want, and it means taking a package named `Testing
 - `Enabled` is `false` by default, so nothing is injected until something explicitly says otherwise.
 - `Gate` is asked on every call, so the exposure can be scoped to a tenant, a region, or a time window rather than to the whole fleet.
 
-A disabled profile hands your callback straight back, unwrapped, so leaving `Inject` at the call site costs one branch at composition time and nothing per call. The switch does not have to be a code change.
+A disabled profile hands your callback straight back, unwrapped, so leaving `Inject` at the call site costs one branch at composition time and nothing per call. The switch does not need to be a code change.
 
 ## Go deeper
 

@@ -6,11 +6,11 @@ order: 3
 
 # Classification
 
-When a call fails, NResilience must decide whether to retry, give up, or treat the failure as permanent. This decision is called a **verdict**, and a **classifier** is the rule that turns an outcome into a verdict.
+When a call fails, NResilience decides whether to retry, give up, or treat the failure as permanent. That decision is a **verdict**, and a **classifier** is the rule that turns an outcome into a verdict.
 
-Classification is enabled by default. `Resilience.Default` uses `Classifier.Default`, and `Resilience.Http` uses `Classifier.Http`.
+Classification is on by default: `Resilience.Default` uses `Classifier.Default`, and `Resilience.Http` uses `Classifier.Http`.
 
-By using a single classifier, NResilience ensures that retry logic, backoff curves, the attempt log, the circuit breaker, and the retry budget all agree on whether a failure occurred. If a classifier does not recognize an exception type, it treats it as `Permanent` by default. This prevents the library from retrying programming errors (such as null references or validation failures), which would turn a fast failure into a slow, confusing one.
+One classifier serves everything - retry logic, backoff curves, the attempt log, the circuit breaker, and the retry budget all read it, so they always agree on whether a failure happened. Unrecognized exception types count as `Permanent`, so a programming error (a null reference, a validation failure) fails fast instead of being retried into a slow, confusing failure.
 
 ## Built-in classifiers
 
@@ -21,7 +21,7 @@ By using a single classifier, NResilience ensures that retry logic, backoff curv
 | `Classifier.Data` | The above, plus any `DbException` the provider calls transient | `Permanent` |
 | `Classifier.RetryEverything` | Every exception | `Transient` |
 
-`Classifier.Http` classifies HTTP status codes according to standard semantics:
+`Classifier.Http` classifies HTTP status codes by their standard meanings:
 
 <!-- snippet: classifier-http-table -->
 ```csharp
@@ -40,7 +40,7 @@ var answer = http.ClassifyResult(value: new HttpResponseMessage(statusCode: Http
 | Other 5xx or 408 | `Transient` |
 | 404 and other 4xx | `Ok` (treated as a valid answer, not a failure) |
 
-A 404 is considered an answer and is not retried. If a specific status is transient for your API, you can add a custom rule for it. For more information, see [migrating a predicate](../migrating-from-polly.md#configure-predicates).
+A 404 is an answer, not a failure, so it is not retried. If a status is transient for your API, add a custom rule for it - see [migrating a predicate](../migrating-from-polly.md#configure-predicates).
 
 ## Classify database failures
 
@@ -60,9 +60,9 @@ var db = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-The judgment comes from `DbException.IsTransient`, which is part of the base class library rather than any particular driver. Microsoft.Data.SqlClient, Npgsql, and MySqlConnector all implement it, so this classifier needs no package reference and carries no list of error numbers to go stale.
+The judgment comes from `DbException.IsTransient`, which is part of the base class library, not any one driver. Microsoft.Data.SqlClient, Npgsql, and MySqlConnector all implement it, so this classifier needs no driver package reference and carries no list of error numbers to go stale.
 
-A provider that never overrode `IsTransient` reports `false` for everything, which makes `Classifier.Data` behave exactly like `Classifier.Default`. That is the property worth knowing before you reach for it: it is never worse than the default, so you do not have to audit your driver first.
+A provider that never overrides `IsTransient` reports `false` for everything, which makes `Classifier.Data` behave exactly like `Classifier.Default`. That is the property to know before you reach for it: it is never worse than the default, so you don't have to audit your driver first.
 
 What the provider cannot tell you is that a failure was the dependency *defending itself* rather than breaking. A resource-limit error is reported as transient like any other, so it takes the short backoff curve and counts as evidence against the dependency. If your provider distinguishes them, one rule of your own does too:
 
@@ -82,7 +82,7 @@ var db = Resilience.Default with { Classify = classify };
 
 ## Add custom exception rules
 
-You can teach a classifier about your specific exception types using the `On` method.
+Teach a classifier about your exception types with `On`.
 
 <!-- snippet: classifier-custom-exception -->
 ```csharp
@@ -97,9 +97,9 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-Rules are evaluated in reverse order of addition (most recently added first), so your custom rules override derived ones. Exception type matching includes subclasses. Every call to `On` or `OnResult` returns a **new** classifier, ensuring that the built-in static classifiers remain immutable.
+Rules run in reverse order of addition (most recently added first), so custom rules override derived ones. Exception type matching includes subclasses. Every call to `On` or `OnResult` returns a **new** classifier, so the built-in static classifiers stay immutable.
 
-You can also use a predicate to inspect the exception for more granular control:
+A predicate can inspect the exception for finer control:
 
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
@@ -117,8 +117,8 @@ var api = Resilience.Http with { Classify = classify };
 `Verdict.Throttled` above is for pushback the dependency itself sent - a quota response, a 429. A
 different case is a refusal that never reached the dependency at all: your own admission-control
 check, a distributed lock, a hand-rolled limiter. Classify that to `Verdict.Refused` instead. The
-retry budget and the circuit breaker then treat it correctly - neither is evidence about the
-dependency, so neither charges the refusal against it:
+retry budget and the circuit breaker then treat it correctly - neither counts the refusal as
+evidence about the dependency:
 
 ```csharp
 public sealed class ConsensusRefusedException(TimeSpan? retryAfter = null) : Exception
@@ -133,11 +133,11 @@ var api = Resilience.Default with
 ```
 
 `Verdict.Refused` is an alias of `Verdict.Limited` - the same verdict, named for a guard that is not
-a rate limiter. This is the general form of what the shipped rate limiter does. See [Building a custom guard](../deep-dives/admission-control.md#building-a-custom-guard) for the full recipe, including where to throw the exception from.
+a rate limiter. This is the general form of what the shipped rate limiter does. See [Building a custom guard](../deep-dives/admission-control.md#building-a-custom-guard) for the full recipe, including where to throw the exception.
 
 ## Classify returned results
 
-Some dependencies report failures in a response envelope rather than by throwing exceptions. You can create rules to classify these results.
+Some dependencies report failures in a response envelope instead of throwing. Add rules for those results.
 
 <!-- snippet: classifier-result-rule -->
 ```csharp
@@ -155,13 +155,13 @@ var api = Resilience.Default with
 ```
 <!-- endsnippet -->
 
-Result rules match the static result type of the call exactly, not by assignability. Any type without a registered rule is treated as a success.
+Result rules match the static result type of the call exactly, not by assignability. Any type without a registered rule counts as a success.
 
-Note that an exception cannot be converted into a value. If a classifier marks an exception as `Ok`, the library treats it as "stop, do not retry" rather than a successful result.
+An exception cannot be turned into a value: if a classifier marks an exception `Ok`, the library treats it as "stop, do not retry" rather than as a successful result.
 
 ## Inspect classifier rules
 
-You can print a classifier to see all active rules and their evaluation order.
+Print a classifier to see every active rule and its evaluation order.
 
 <!-- snippet: classifier-print -->
 ```csharp
@@ -170,4 +170,4 @@ Console.WriteLine(value: Classifier.Http);
 ```
 <!-- endsnippet -->
 
-The `ToString` method lists every rule in evaluation order, including the default behavior for unrecognized exceptions.
+`ToString` lists every rule in evaluation order, including the default behavior for unrecognized exceptions.
