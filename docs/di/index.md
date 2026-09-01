@@ -1,7 +1,7 @@
 ---
 title: Dependency injection
 description: Integrate NResilience with DI containers using named policies and hot reload.
-order: 5
+order: 6
 ---
 
 # Dependency injection

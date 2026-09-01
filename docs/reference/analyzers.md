@@ -14,7 +14,7 @@ Installing `NResilience` automatically includes seven diagnostics. These analyze
 | [NRES002](#nres002) | A different cancellation token is passed inside the callback. | Reliability | Warning |
 | [NRES003](#nres003) | The policy will not pass validation. | Usage | Warning |
 | [NRES004](#nres004) | `AttemptTimeout` is longer than `Deadline`. | Usage | Warning |
-| [NRES005](#nres005) | A breaker, retry budget, or policy scope is created per call. | Reliability | Warning |
+| [NRES005](#nres005) | A breaker, retry budget, policy scope, or gRPC interceptor is created per call. | Reliability | Warning |
 | [NRES006](#nres006) | A resilient `HttpClient` is created per call. | Reliability | Info |
 | [NRES007](#nres007) | The callback does not need to be `async`. | Performance | Info |
 
@@ -74,7 +74,7 @@ This is only reported when both properties are set within the same expression.
 
 ## NRES005: Guard created per call
 
-Circuit breakers, retry budgets, and policy scopes must outlive the call they protect. A breaker created inside a method body never sees a prior failure and never opens. A [`PolicyScope<TKey>`](../features/policy-scope.md) created inside a method body similarly fails because every call receives a fresh set of guards.
+Circuit breakers, retry budgets, policy scopes, and the gRPC [`ResilienceInterceptor`](../grpc/per-service-scope.md) must outlive the call they protect. A breaker created inside a method body never sees a prior failure and never opens. A [`PolicyScope<TKey>`](../features/policy-scope.md) or a `ResilienceInterceptor` created inside a method body fails the same way one level up, because every call receives a fresh set of guards - `AddGrpcResilience()` registers the interceptor at channel scope for exactly this reason.
 
 ```csharp
 // Reported: a new breaker is created every time the method is called.

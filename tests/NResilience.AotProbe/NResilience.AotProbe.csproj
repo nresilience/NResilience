@@ -37,6 +37,13 @@
     <ProjectReference Include="../../bench/NResilience.Probes/NResilience.Probes.csproj"/>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
     <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+
+    <!--
+      The gRPC package sets IsAotCompatible, and this is what makes that a tested claim rather than
+      a hope: the interceptor is driven over a scripted continuation, so the probe exercises what
+      NResilience adds rather than re-proving grpc-dotnet's own transport.
+    -->
+    <ProjectReference Include="../../src/NResilience.Grpc/NResilience.Grpc.csproj"/>
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj"/>
   </ItemGroup>
 

@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+option csharp_namespace = "Samples.Grpc";
+
+package orders;
+
+// Deliberately small: the sample is about the interceptor, not about protobuf.
+service Orders {
+  // A read. Repeatable, and the interceptor retries it by default.
+  rpc Get (GetRequest) returns (GetReply);
+
+  // A write. Marked non-repeatable by the registration, so it gets one attempt.
+  rpc ChargeCard (ChargeRequest) returns (ChargeReply);
+}
+
+message GetRequest {
+  string id = 1;
+}
+
+message GetReply {
+  string status = 1;
+
+  // Whatever the server saw in the grpc-timeout header, so the sample can show that the
+  // per-attempt deadline reached the wire.
+  string deadline = 2;
+}
+
+message ChargeRequest {
+  string id = 1;
+}
+
+message ChargeReply {
+  int32 attempts = 1;
+}

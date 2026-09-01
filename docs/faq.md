@@ -1,7 +1,7 @@
 ---
 title: FAQ
 description: Technical reasoning behind design decisions in NResilience.
-order: 12
+order: 13
 ---
 
 # FAQ
@@ -20,7 +20,14 @@ The result type is a property of the call, not the policy. A single policy can h
 Using total attempts removes ambiguity. `Attempts = 1` means no retry occurs, eliminating off-by-one errors common in retry count configurations.
 
 ### Is there a synchronous API?
-No. A retry loop that blocks holds a thread through every backoff delay. Offering both synchronous and asynchronous APIs would either duplicate the engine or risk deadlocks. For this reason, `ResilienceHandler.Send` throws a `NotSupportedException`.
+No. A retry loop that blocks holds a thread through every backoff delay. Offering both synchronous and asynchronous APIs would either duplicate the engine or risk deadlocks. For this reason, `ResilienceHandler.Send` and `ResilienceInterceptor.BlockingUnaryCall` both throw a `NotSupportedException` rather than passing the call through unprotected.
+
+### Where is gRPC?
+`NResilience.Grpc` provides it: `AddGrpcResilience()` on the builder that `AddGrpcClient<T>()` returns. See [gRPC](grpc/index.md).
+
+It is a separate package and a separate registration, not an overload of `AddResilience()`, because a gRPC call is the wrong shape for the HTTP handler. Every gRPC call is an HTTP `POST`, which the handler refuses to retry by default, and a gRPC failure travels in the `grpc-status` trailer on an HTTP `200`, which the HTTP classifier reads as a success. `AddResilience()` on a gRPC client is not merely unhelpful - it is an inert handler that adds overhead and retries nothing.
+
+Unary calls are covered. Server-streaming gRPC is not wrapped yet; client-streaming and duplex calls are passed through untouched and always will be, for the same reason a partially consumed stream cannot be retried.
 
 ### Can I retry a stream?
 Yes, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. The retry stops at the first element, because once the caller has received one, a retry would duplicate or drop work they have already acted on. Everything after the first element is handed to the caller untouched. See [Streaming](features/streaming.md).

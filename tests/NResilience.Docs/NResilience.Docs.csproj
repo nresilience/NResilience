@@ -31,12 +31,17 @@
     <PackageReference Include="Microsoft.Extensions.Logging"/>
     <PackageReference Include="Microsoft.Extensions.Logging.Console"/>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing"/>
+
+    <!-- The gRPC page's snippets are driven over a scripted continuation, so they run without a channel. -->
+    <PackageReference Include="Grpc.Core.Api"/>
+    <PackageReference Include="Grpc.Net.ClientFactory"/>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
     <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all"/>
     <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Grpc/NResilience.Grpc.csproj"/>
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj"/>
   </ItemGroup>
 

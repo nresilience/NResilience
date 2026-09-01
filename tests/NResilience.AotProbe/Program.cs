@@ -9,7 +9,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
+using Grpc.Core;
+using Grpc.Core.Interceptors;
 using NResilience.Extensions;
+using NResilience.Grpc;
 using NResilience.Http;
 using NResilience.Probes;
 using NResilience.Testing;
@@ -39,6 +42,7 @@ internal static class Program
         failures += await CorrectnessAsync().ConfigureAwait(false);
         failures += await ShippingLibraryAsync().ConfigureAwait(false);
         failures += await ExtensionsAsync().ConfigureAwait(false);
+        failures += await GrpcAsync().ConfigureAwait(false);
         failures += await BudgetsAsync().ConfigureAwait(false);
 
         Console.WriteLine();
@@ -595,6 +599,103 @@ internal static class Program
         failures += Check("a refusal is retried to exhaustion under AOT", limited.Attempts.Count == 3);
         failures += Check("a refusal is self-imposed throttling under AOT", limited.Attempts[0].Verdict is { Kind: VerdictKind.Throttled, SelfImposed: true });
         failures += Check("a refusal does not spend retry budget under AOT", budget.Utilization == 0);
+
+        return failures;
+    }
+
+    /// <summary>
+    ///     The gRPC package, published Native AOT.
+    ///     <para>
+    ///         Driven over a scripted continuation rather than a channel: no sockets, no codegen, and
+    ///         no protobuf, so what this proves is that <i>our</i> interceptor survives whole-program
+    ///         compilation rather than that grpc-dotnet does. The call object it hands back is built
+    ///         from delegates and a generic <see cref="TaskCompletionSource{TResult}" />, which is the
+    ///         shape an implementation that reached for reflection would break on.
+    ///     </para>
+    /// </summary>
+    private static async Task<int> GrpcAsync()
+    {
+        Console.WriteLine();
+        var failures = 0;
+
+        var unavailable = new RpcException(new Status(StatusCode.Unavailable, "probe"));
+        var notFound = new RpcException(new Status(StatusCode.NotFound, "probe"));
+        var exhausted = new RpcException(new Status(StatusCode.ResourceExhausted, "probe"));
+
+        failures += Check("the gRPC classifier resolves under AOT", GrpcResilience.Classifier.ClassifyException(unavailable).Kind == VerdictKind.Transient);
+        failures += Check("a gRPC answer is permanent under AOT", GrpcResilience.Classifier.ClassifyException(notFound).Kind == VerdictKind.Permanent);
+        failures += Check("gRPC resource exhaustion is throttling under AOT", GrpcResilience.Classifier.ClassifyException(exhausted).Kind == VerdictKind.Throttled);
+        failures += Check("the gRPC preset validates under AOT", GrpcResilience.Default.Classify.Equals(GrpcResilience.Classifier));
+
+        var method = new Method<string, string>(
+            MethodType.Unary, "probe.Probe", "Get", Marshallers.StringMarshaller, Marshallers.StringMarshaller);
+
+        var interceptor = new ResilienceInterceptor(
+            GrpcResilience.Default with { Backoff = Backoff.None },
+            new GrpcResilienceOptions { DeadlineSlack = TimeSpan.FromMilliseconds(50) },
+            "probe");
+
+        var attempts = 0;
+        DateTime? deadline = null;
+
+        AsyncUnaryCall<string> Continuation(string request, ClientInterceptorContext<string, string> context)
+        {
+            attempts++;
+            deadline = context.Options.Deadline;
+
+            var response = attempts < 3
+                ? Task.FromException<string>(new RpcException(new Status(StatusCode.Unavailable, "probe")))
+                : Task.FromResult("ok");
+
+            return new AsyncUnaryCall<string>(
+                response,
+                Task.FromResult(new Metadata()),
+                static () => Status.DefaultSuccess,
+                static () => [],
+                static () => { });
+        }
+
+        using var call = interceptor.AsyncUnaryCall(
+            "request", new ClientInterceptorContext<string, string>(method, null, default), Continuation);
+
+        var value = await call.ResponseAsync.ConfigureAwait(false);
+
+        failures += Check("a gRPC call is retried to success under AOT", value == "ok" && attempts == 3);
+        failures += Check("the winning attempt's status is readable under AOT", call.GetStatus().StatusCode == StatusCode.OK);
+        failures += Check("the attempt deadline reaches the wire under AOT", deadline is not null);
+        failures += Check("the breaker is scoped per service under AOT", interceptor.Breakers().ContainsKey("probe.Probe"));
+        failures += Check("the budget is scoped per service under AOT", interceptor.Budgets().ContainsKey("probe.Probe"));
+
+        var single = 0;
+
+        AsyncUnaryCall<string> Once(string request, ClientInterceptorContext<string, string> context)
+        {
+            single++;
+
+            return new AsyncUnaryCall<string>(
+                Task.FromException<string>(new RpcException(new Status(StatusCode.Unavailable, "probe"))),
+                Task.FromException<Metadata>(new RpcException(new Status(StatusCode.Unavailable, "probe"))),
+                static () => new Status(StatusCode.Unavailable, "probe"),
+                static () => [],
+                static () => { });
+        }
+
+        using (GrpcResilience.SingleShot())
+        {
+            using var shot = interceptor.AsyncUnaryCall(
+                "request", new ClientInterceptorContext<string, string>(method, null, default), Once);
+
+            try
+            {
+                await shot.ResponseAsync.ConfigureAwait(false);
+            }
+            catch (RpcException)
+            {
+                // The point is the attempt count, not the exception.
+            }
+        }
+
+        failures += Check("the single-shot scope holds under AOT", single == 1);
 
         return failures;
     }
