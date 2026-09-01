@@ -99,5 +99,5 @@ For more information, see these resources:
 | `NResilience`            | The core library, HTTP handler, and analyzers.                            |
 | `NResilience.Extensions` | Dependency injection, configuration binding, metrics, and health checks. |
 | `NResilience.Testing`    | Helpers for testing your policies, and fault injection.                  |
-| `NResilience.Grpc`       | The gRPC client interceptor: status classification, `grpc-timeout` propagation, per-service scoping, and server streaming retried to its first message. The HTTP handler does nothing for gRPC. |
+| `NResilience.Grpc`       | A gRPC client interceptor with status classification and `grpc-timeout` propagation. |
 | `NResilience.AspNetCore` | Middleware that reads the deadline and nested-retry marker a caller sent, so outbound calls inherit both, and an exception handler that maps NResilience exceptions to HTTP responses. |

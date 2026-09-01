@@ -127,7 +127,7 @@ See [the testing reference](../reference/testing.md) for the full surface.
 
 ## gRPC server streaming
 
-A gRPC server-streaming call is this feature with the plumbing already done: `AddGrpcResilience()` wraps one for you, on the same first-message semantic. See [gRPC streaming](../grpc/streaming.md).
+A gRPC server-streaming call is this feature with the plumbing already done: `AddGrpcResilience()` wraps it for you on the same first-message semantic. See [gRPC streaming](../grpc/streaming.md).
 
 ## Go deeper
 

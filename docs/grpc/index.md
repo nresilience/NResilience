@@ -78,11 +78,11 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 
 Register `AddGrpcResilience()` before any other interceptor. Interceptors registered after it run **per attempt**, which is where an interceptor that refreshes a token wants to be - a token fetched once outside the retry loop can expire during it.
 
-gRPC's client factory does not expose the registrations already made, so the order is a rule rather than something the library can enforce.
+The gRPC client factory does not expose the registrations already made, so the order is a rule rather than something the library can enforce.
 
-## Streams, and the calls that pass through
+## Which calls are wrapped
 
-Server-streaming calls are wrapped, on the core library's [streaming](../features/streaming.md) semantic: retried until their first message, and never after it. The one thing that differs from a unary call is the deadline on the wire, which for a stream is the whole call's remaining budget. See [Streaming](streaming.md).
+Server-streaming calls are wrapped on the core library's [streaming](../features/streaming.md) semantic: retried until their first message, and never after it. The one thing that differs from a unary call is the deadline on the wire, which for a stream is the whole call's remaining budget. See [Streaming](streaming.md).
 
 Client-streaming and duplex calls pass through untouched. The request stream is a source you drive interactively, and repeating one means re-enumerating something the failed attempt has already partially consumed, which produces duplicates or requires buffering everything. Neither outcome is a resilience feature. Wrap the *setup* call instead, the way any other callback is wrapped.
 

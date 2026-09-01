@@ -23,16 +23,16 @@ Nothing about the registration changes: a stream uses the same policy, the same 
 
 | When the failure happens | What the interceptor does |
 | :--- | :--- |
-| Before the first message | Classifies it, and retries it like any call. A fresh attempt is a fresh gRPC call. |
+| Before the first message | Classifies it and retries it like any call. A fresh attempt is a fresh gRPC call. |
 | After the first message | Nothing. The `RpcException` reaches your `await foreach` unchanged. |
 
-The line is not a limitation to work around - it is the only honest semantic a stream has. Once your consumer holds a message, it has acted on it: a retry would either duplicate the messages it has already seen, or drop the ones it has not, and there is no third option that does not buffer the whole stream.
+The line is not a limitation to work around - it is the only honest semantic a stream has. Once you hold a message, you have acted on it: a retry would either duplicate the messages you have already seen or drop the ones you have not, and there is no third option that does not buffer the whole stream.
 
-Before the first message, a stream is indistinguishable from a call. A connection reset, a `Unavailable`, a throttling reply and a deadline all arrive in that window, which is exactly what the classifier already judges. See [Classification](classification.md).
+Before the first message, a stream is indistinguishable from a call. A connection reset, an `Unavailable`, a throttling reply, and a deadline all arrive in that window, which is exactly what the classifier already judges. For more information, see [Classification](classification.md).
 
 ## The one place the wire deadline differs
 
-For a unary call, the deadline on the wire is the **attempt's** ceiling: `min(AttemptTimeout, time left on the Deadline)`. For a stream it is the **whole call's remaining budget**.
+For a unary call, the deadline on the wire is the **attempt's** ceiling: `min(AttemptTimeout, time left on the Deadline)`. For a stream, it is the **whole call's remaining budget**.
 
 `CallOptions.Deadline` is fixed when the call starts and cannot be moved afterwards, and `AttemptTimeout` bounds only the time to the first message. Writing the attempt ceiling onto a stream would tell the server to hang up on a perfectly healthy stream the moment the ceiling passed - which is the opposite of what an attempt ceiling means here.
 
@@ -46,7 +46,7 @@ Everything else on the [Deadlines](deadlines.md) page applies unchanged, includi
 
 ## Ending a stream early
 
-Dispose the call. `IAsyncStreamReader<T>` is not disposable, so disposing the call object is how a consumer says it has read enough - and it is what cancels the enumeration and releases the underlying gRPC call. A `using` on the call - `using var call = client.Watch(request);`, which is what a generated client's own samples show - is enough. Reading the stream after that throws `ObjectDisposedException`.
+Dispose the call. `IAsyncStreamReader<T>` is not disposable, so disposing the call object is how you say you have read enough - and it is what cancels the enumeration and releases the underlying gRPC call. A `using` on the call is enough: `using var call = client.Watch(request);`, which is what a generated client's own samples show. Reading the stream after that throws `ObjectDisposedException`.
 
 ## Repeatability applies here too
 
