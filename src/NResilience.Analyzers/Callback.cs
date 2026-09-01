@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.Operations;
 
 namespace NResilience.Analyzers;
 
-/// <summary>The <c>work</c> argument of an execution overload, once it is known to be a lambda.</summary>
+/// <summary>The callback argument of an execution overload, once it is known to be a lambda.</summary>
 internal sealed class Callback
 {
     private Callback(IAnonymousFunctionOperation function, IParameterSymbol attemptToken)
@@ -22,6 +22,12 @@ internal sealed class Callback
     ///     parameter. Method groups and delegate-valued locals are deliberately not resolved: the body
     ///     may be in another assembly, and a diagnostic that depends on whether the source happens to
     ///     be visible is worse than one that is quiet.
+    ///     <para>
+    ///         Two parameter names, because the streaming overloads call theirs <c>source</c> rather
+    ///         than <c>work</c> - it is a cold source the policy re-invokes per attempt rather than the
+    ///         work itself. The rules over it are the same rules, so this is the only place the
+    ///         difference is spelled.
+    ///     </para>
     /// </summary>
     internal static bool TryGet(IInvocationOperation invocation, KnownSymbols known, out Callback callback)
     {
@@ -31,7 +37,7 @@ internal sealed class Callback
             return false;
 
         var work = invocation.Arguments
-            .FirstOrDefault(argument => argument.Parameter?.Name == "work");
+            .FirstOrDefault(argument => argument.Parameter?.Name is "work" or "source");
 
         if (work?.Value is not IDelegateCreationOperation creation
             || creation.Target is not IAnonymousFunctionOperation function)

@@ -1,13 +1,30 @@
 namespace NResilience;
 
 /// <summary>
-///     A call that was never attempted, or that a guard stopped part-way through: a tripped
-///     <see cref="NResilience.Breaker" /> (<see cref="StopReason.DependencyUnavailable" />) or an
-///     exhausted <see cref="RetryBudget" /> (<see cref="StopReason.BudgetExhausted" />).
+///     An operation that produced no answer anything threw, and no answer the policy would accept.
+///     Two shapes, told apart by <see cref="Reason" />:
+///     <list type="bullet">
+///         <item>
+///             <b>A guard refused it</b> - a tripped <see cref="NResilience.Breaker" />
+///             (<see cref="StopReason.DependencyUnavailable" />) or an exhausted
+///             <see cref="RetryBudget" /> (<see cref="StopReason.BudgetExhausted" />). The call was
+///             never attempted, or was stopped part-way through.
+///         </item>
+///         <item>
+///             <b>A verdict stopped it</b> - the classifier or an <see cref="Resilience.Admit" />
+///             hook refused every result, and nothing threw
+///             (<see cref="StopReason.Permanent" />, <see cref="StopReason.AttemptsExhausted" />).
+///             The dependency was reached; what came back was not acceptable. A streaming call
+///             whose first element the classifier refused arrives here rather than yielding that
+///             element, because an element carries no status of its own and a truncated stream
+///             would be indistinguishable from a short successful one.
+///         </item>
+///     </list>
 ///     <para>
-///         It arrives no sooner than the guarded-rejection pause, which is deliberate: a cheap rejection
-///         inside a caller's polling loop is a CPU spin. <see cref="RetryAfter" /> is there so a caller that
-///         schedules its own polling does not have to guess.
+///         A guard's refusal arrives no sooner than the guarded-rejection pause, which is deliberate: a
+///         cheap rejection inside a caller's polling loop is a CPU spin. <see cref="RetryAfter" /> is
+///         there so a caller that schedules its own polling does not have to guess. A verdict-driven
+///         stop waits for neither, and carries no hint - there is nothing to come back to.
 ///     </para>
 /// </summary>
 public sealed class CallRejectedException : Exception
@@ -27,6 +44,23 @@ public sealed class CallRejectedException : Exception
         Reason = reason;
         Attempts = attempts;
         RetryAfter = retryAfter;
+    }
+
+    /// <summary>
+    ///     Creates the verdict-driven rejection: nothing refused the call and nothing threw - what
+    ///     came back was simply not acceptable. It takes its message rather than composing one,
+    ///     because the useful sentence differs by <see cref="StopReason" /> and the caller is what
+    ///     knows which. No <see cref="RetryAfter" />: a hint answers "when should I come back",
+    ///     and a result the policy refuses is not a question about timing.
+    /// </summary>
+    /// <param name="reason">Why the operation stopped.</param>
+    /// <param name="attempts">Whatever had already happened.</param>
+    /// <param name="message">What was refused, in the shape that fits <paramref name="reason" />.</param>
+    internal CallRejectedException(StopReason reason, AttemptLog attempts, string message)
+        : base(message)
+    {
+        Reason = reason;
+        Attempts = attempts;
     }
 
     /// <summary>Creates a rejection with a message.</summary>
@@ -54,10 +88,10 @@ public sealed class CallRejectedException : Exception
     {
     }
 
-    /// <summary>Why the call was refused.</summary>
+    /// <summary>Why the operation stopped: which guard refused it, or which verdict ended it.</summary>
     public StopReason Reason { get; }
 
-    /// <summary>Whatever had already happened when the call was refused.</summary>
+    /// <summary>Whatever had already happened when the operation stopped.</summary>
     public AttemptLog Attempts { get; }
 
     /// <summary>When to come back, when the refusal carried a hint.</summary>

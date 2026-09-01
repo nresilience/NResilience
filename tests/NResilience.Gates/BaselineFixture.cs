@@ -41,6 +41,14 @@ public sealed class BaselineFixture : IAsyncLifetime
     ///     <c>Task</c>-returning one every other arm shares.
     /// </summary>
     public double SyncOverheadVersus(string arm, string raw) => SyncBytes(arm) - SyncBytes(raw);
+
+    /// <summary>
+    ///     Bytes above a named raw baseline on the suspending path, for arms whose operation shape is
+    ///     not the single-callback one the shared <see cref="SuspendingOverhead" /> subtracts. The
+    ///     streaming arms run a whole enumeration per operation, so their floor is a whole
+    ///     enumeration too.
+    /// </summary>
+    public double SuspendingOverheadVersus(string arm, string raw) => SuspendingBytes(arm) - SuspendingBytes(raw);
 }
 
 /// <summary>Arm names, in one place, so a rename cannot silently turn a gate into a lookup failure.</summary>
@@ -74,6 +82,15 @@ public static class Baseline
     public const string LibRetry = "lib: retry x2 -> success";
 
     public const string LibLimited = "lib: limited x2 -> success";
+
+    /// <summary>
+    ///     The streaming path under <c>Resilience.Default</c>. A different shape from every other
+    ///     suspending arm - the operation is a full enumeration, not one callback - so it carries
+    ///     its own raw baseline and never compares against <see cref="RawSuspending" />.
+    /// </summary>
+    public const string RawStream = "raw stream (baseline)";
+
+    public const string LibDefaultStream = "lib: Default, streaming";
 
     // The stand-in, kept as reference rows.
     public const string NonePassthrough = "fused: None (passthrough)";

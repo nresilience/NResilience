@@ -51,6 +51,18 @@ NResilience.Testing.ScriptedHttpHandler.Respond(System.Net.HttpStatusCode status
 NResilience.Testing.ScriptedHttpHandler.ScriptedHttpHandler() -> void
 NResilience.Testing.ScriptedHttpHandler.Throw(System.Func<System.Exception!>! exception) -> NResilience.Testing.ScriptedHttpHandler!
 NResilience.Testing.ScriptedHttpHandler.Throw(System.Func<System.Exception!>! exception, int times) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedStream
+NResilience.Testing.ScriptedStream<T>
+NResilience.Testing.ScriptedStream<T>.Delay(System.TimeSpan delay) -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.DisposedEnumerators.get -> int
+NResilience.Testing.ScriptedStream<T>.Empty() -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.FaultsAfter(System.Exception! exception, params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.LiveEnumerators.get -> int
+NResilience.Testing.ScriptedStream<T>.Next(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T>!
+NResilience.Testing.ScriptedStream<T>.Starts.get -> int
+NResilience.Testing.ScriptedStream<T>.Throws(System.Exception! exception) -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.Yields(params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.YieldsAfter(System.TimeSpan delay, params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.SentRequest
 NResilience.Testing.SentRequest.<Clone>$() -> NResilience.Testing.SentRequest!
 NResilience.Testing.SentRequest.Body.get -> string?
@@ -94,6 +106,7 @@ static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Ch
 static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Func<T>! outcome) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>!
 static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>!
 static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work, System.Func<T>! outcome) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>!
+static NResilience.Testing.ScriptedStream.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.ScriptedStream<T>!
 static NResilience.Testing.SentRequest.operator !=(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.SentRequest.operator ==(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.Sequence.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<T>!

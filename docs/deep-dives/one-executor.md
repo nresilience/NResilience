@@ -70,4 +70,20 @@ path with one extra hoisted field, paid only by callers who configure it. See
 
 This restricted surface is a deliberate choice. A smaller public API is more likely to remain stable over time, reducing the need for breaking changes and making the library more reliable for long-term adoption.
 
+## The streaming path
+
+The executor has a fourth loop, and it exists for one reason: **the attempt source must outlive the attempt.**
+
+A call's attempt owns nothing that outlives it, so the executor tears everything down when the attempt ends - the linked attempt source disposed, the pooled ceiling source returned. That contract is wrong for a stream. A streaming attempt that produces its first element hands a live enumerator and its token to the caller, who finishes the enumeration arbitrarily later and on another thread. If the executor disposed the attempt source at attempt end, the surviving enumerator would hold a token whose registrations start throwing `ObjectDisposedException` mid-enumeration.
+
+So the streaming loop keeps the same shell - admission, deadline, `BeforeAttempt`, the two-source timeout arrangement, `AfterAttempt` - and changes only which exit owns teardown:
+
+- **Losing attempts** tear down exactly like a call's: enumerator disposed (which runs the source's own `finally` blocks, so a transport cleans up a losing call), linked source disposed, timer returned to the pool. An empty source is a success that tears down the same way, because nothing survived.
+- **The winning attempt** hands its enumerator, linked source and timer to a handover block past the loop, and the **consumer's** enumeration drives the epilogue: the `finally` around the yields disposes the enumerator, then the linked source, then the timer - **disposed, never returned to the pool**. This last rule is the one whose violation is silent: `CtsPool.TryReset` preserves token identity, so a source returned while a surviving stream still holds a registration on its token lets the *next* tenant's `CancelAfter` cancel that stream, arbitrarily later and on another thread. The winning attempt's pooled timer is a one-shot cost, paid deliberately and recorded in the gate's budget ledger.
+- **The disarm race** is closed with one bool read. The timer is disarmed the moment an element is in hand (`CancelAfter(Timeout.InfiniteTimeSpan)`), and then tested - because the timer can fire in the window between `MoveNextAsync` returning `true` and the disarm landing. If it fired, the attempt overran its ceiling before the element was in hand: the element is dropped, the attempt is judged a timeout like any other, and the consumer never receives an element whose attempt was already dead.
+
+Two C# restrictions do real work in this design. `yield return` cannot appear inside a `try` that has a `catch`, which is why the classified region - the only part of the loop that judges outcomes - contains no yields, and the compiler enforces the "post-start faults belong to the consumer" rule for free. And a lambda cannot be an iterator, which is why the public entry points take a source *factory* and the loop itself is the only iterator.
+
+`Admit` composes inside this one path rather than forking a fifth, and that decision is a measurement rather than doctrine: the "one bit, zero bytes" argument that split the call paths is about fields every caller pays for. This path's floor is already an iterator box plus a surviving token source, so one more hoisted awaiter field is below its own noise. The same reasoning runs the other way for the hedge: two interleaved enumerables is a buffering problem, not a hedge, so the streaming overloads refuse a hedged policy at the call rather than pretend.
+
 For more details on memory management, see [Where the allocations are](allocations.md).

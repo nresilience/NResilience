@@ -21,6 +21,7 @@ internal static class Harness
     /// <summary>The usings a consumer would have; the snippets are about the calls, not the header.</summary>
     private const string Header = """
                                   using System;
+                                  using System.Collections.Generic;
                                   using System.Net.Http;
                                   using System.Net.Http.Json;
                                   using System.Threading;
@@ -78,6 +79,14 @@ internal static class Harness
                                                                    internal static ValueTask<int> Buffered(CancellationToken cancellationToken = default) => new(1);
 
                                                                    internal static ValueTask Drain(CancellationToken cancellationToken = default) => default;
+
+                                                                   internal static IAsyncEnumerable<int> Listed(CancellationToken cancellationToken = default) => Items(cancellationToken);
+
+                                                                   private static async IAsyncEnumerable<int> Items(CancellationToken cancellationToken)
+                                                                   {
+                                                                       await Task.CompletedTask;
+                                                                       yield break;
+                                                                   }
                                                                }
                                                                """;
 
