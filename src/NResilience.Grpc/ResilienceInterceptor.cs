@@ -23,6 +23,10 @@ namespace NResilience.Grpc;
 ///     level up; <c>AddGrpcResilience()</c> registers it at
 ///     <c>InterceptorScope.Channel</c> for that reason.
 ///     <para>
+///         Server-streaming calls are retried until their first message and never after it; see
+///         <see cref="AsyncServerStreamingCall{TRequest,TResponse}" />.
+///     </para>
+///     <para>
 ///         Client-streaming and duplex calls pass through untouched. The request stream is a source
 ///         the caller drives interactively, and a retry would have to re-enumerate something the
 ///         failed attempt has already partially consumed - which is the duplicates-or-buffering
@@ -133,6 +137,40 @@ public sealed class ResilienceInterceptor : Interceptor
         }
 
         return call.ToCall(call.RunAsync(InsideRetryingClient));
+    }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Retried until the first message and never after it, which is the only honest semantic a
+    ///     stream has: a retry once the consumer holds a message would duplicate work they have
+    ///     already acted on. The wire deadline is the whole call's remaining budget rather than the
+    ///     attempt ceiling, because a deadline is fixed when the call starts and
+    ///     <see cref="Resilience.AttemptTimeout" /> bounds only the time to that first message.
+    /// </remarks>
+    public override AsyncServerStreamingCall<TResponse> AsyncServerStreamingCall<TRequest, TResponse>(
+        TRequest request,
+        ClientInterceptorContext<TRequest, TResponse> context,
+        AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation)
+    {
+        ArgumentNullException.ThrowIfNull(continuation);
+
+        var retrying = ShouldRetry(context.Method);
+        var scoped = _scopes.Retrying(context.Method);
+        var policy = retrying ? scoped : _scopes.Single(scoped);
+
+        var call = new ServerStreamingCall<TRequest, TResponse>(request, context, continuation, policy, Options, retrying);
+
+        if (retrying && Options.DetectNestedRetries && policy.OnEvent is { } listener)
+        {
+            // The same three ways this call can already be inside a retry loop as for a unary call.
+            // What is not done here is publishing the ambient flag for the duration: a stream's
+            // duration is the consumer's enumeration, on whatever context they enumerate from, and
+            // an AsyncLocal cannot describe that. The metadata marker still travels on every attempt.
+            if (InsideRetryingClient.Value || call.CarriesRetryMarker || ResilienceNestedRetry.IsCallerRetrying)
+                listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
+        }
+
+        return call.ToCall();
     }
 
     /// <summary>Not supported. The library is async-only, by design and throughout.</summary>

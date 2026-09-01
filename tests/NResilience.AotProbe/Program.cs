@@ -697,7 +697,58 @@ internal static class Program
 
         failures += Check("the single-shot scope holds under AOT", single == 1);
 
+        var streamMethod = new Method<string, string>(
+            MethodType.ServerStreaming, "probe.Probe", "Watch", Marshallers.StringMarshaller, Marshallers.StringMarshaller);
+
+        var streams = 0;
+
+        AsyncServerStreamingCall<string> StreamContinuation(string request, ClientInterceptorContext<string, string> context)
+        {
+            streams++;
+
+            return new AsyncServerStreamingCall<string>(
+                new ProbeStream(streams < 2 ? null : ["a", "b"]),
+                Task.FromResult(new Metadata()),
+                static () => Status.DefaultSuccess,
+                static () => [],
+                static () => { });
+        }
+
+        var received = 0;
+
+        using (var stream = interceptor.AsyncServerStreamingCall(
+                   "request", new ClientInterceptorContext<string, string>(streamMethod, null, default), StreamContinuation))
+        {
+            while (await stream.ResponseStream.MoveNext(CancellationToken.None).ConfigureAwait(false))
+                received++;
+        }
+
+        // The streaming path is the one that hands a live enumerator across the boundary, and the
+        // adapter that carries it is generic over the response type - which is what an implementation
+        // reaching for reflection would break on.
+        failures += Check("a gRPC server stream is retried to its first message under AOT", streams == 2 && received == 2);
+
         return failures;
+    }
+
+    /// <summary>A scripted response stream for the probe: fails before its first message, or streams.</summary>
+    private sealed class ProbeStream(string[]? messages) : IAsyncStreamReader<string>
+    {
+        private int _index = -1;
+
+        public string Current => messages![_index];
+
+        public Task<bool> MoveNext(CancellationToken cancellationToken)
+        {
+            if (messages is null)
+                return Task.FromException<bool>(new RpcException(new Status(StatusCode.Unavailable, "probe")));
+
+            if (_index + 1 >= messages.Length)
+                return Task.FromResult(false);
+
+            _index++;
+            return Task.FromResult(true);
+        }
     }
 
     private static async Task<int> BudgetsAsync()

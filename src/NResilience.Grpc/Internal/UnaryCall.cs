@@ -21,13 +21,6 @@ internal sealed class UnaryCall<TRequest, TResponse>
     where TRequest : class
     where TResponse : class
 {
-    /// <summary>
-    ///     The metadata key the retry marker travels under: the HTTP header's name, lowercased,
-    ///     because gRPC metadata keys are lowercase ASCII and <see cref="Metadata" /> normalizes them.
-    ///     Same fact, same name, two transports.
-    /// </summary>
-    internal const string NestedRetryKey = "x-nresilience-retrying";
-
     private readonly CallOptions _callerOptions;
     private readonly Interceptor.AsyncUnaryCallContinuation<TRequest, TResponse> _continuation;
 
@@ -86,7 +79,7 @@ internal sealed class UnaryCall<TRequest, TResponse>
         // The same clamp the executor is about to apply, taken here as well because the wire deadline
         // has to be computed before the executor has started. ResilienceDeadline.Remaining is the
         // public half of what the executor reads.
-        _deadline = policy.UseAmbientDeadline ? Clamp(policy.Deadline) : policy.Deadline;
+        _deadline = GrpcCall.DeadlineFor(policy);
 
         _start = _time.GetTimestamp();
 
@@ -98,26 +91,7 @@ internal sealed class UnaryCall<TRequest, TResponse>
     internal Resilience Policy { get; }
 
     /// <summary>Whether the caller's own metadata already carries the marker, so it is not stamped twice.</summary>
-    internal bool CarriesRetryMarker
-    {
-        get
-        {
-            if (_callerOptions.Headers is not { } headers)
-                return false;
-
-            // A loop rather than LINQ: this runs on every retrying call.
-            foreach (var entry in headers)
-            {
-                if (!entry.IsBinary && string.Equals(entry.Key, NestedRetryKey, StringComparison.Ordinal)
-                    && ResilienceNestedRetry.IsMarker(entry.Value))
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-    }
+    internal bool CarriesRetryMarker => GrpcCall.CarriesRetryMarker(_callerOptions);
 
     /// <summary>
     ///     The call object handed back to the generated client, built from the five things it needs
@@ -251,22 +225,7 @@ internal sealed class UnaryCall<TRequest, TResponse>
         var options = _callerOptions.WithCancellationToken(attemptToken);
 
         if (_stamping && !CarriesRetryMarker)
-        {
-            // A new Metadata per attempt, never the caller's own. The caller's object is theirs and
-            // may be reused across calls; stamping into it accumulates one duplicate entry per
-            // attempt per call, and gRPC sends every entry. One small allocation buys a bug that
-            // only appears under retry - the only condition this code runs under.
-            var headers = new Metadata();
-
-            if (_callerOptions.Headers is { } caller)
-            {
-                foreach (var entry in caller)
-                    headers.Add(entry);
-            }
-
-            headers.Add(NestedRetryKey, ResilienceNestedRetry.Marker);
-            options = options.WithHeaders(headers);
-        }
+            options = GrpcCall.Stamp(options);
 
         ours = false;
         ceiling = Timeout.InfiniteTimeSpan;
@@ -274,7 +233,7 @@ internal sealed class UnaryCall<TRequest, TResponse>
         if (!_options.PropagateAttemptDeadline)
             return options;
 
-        ceiling = Tighter(Policy.AttemptTimeout, Remaining());
+        ceiling = GrpcCall.Tighter(Policy.AttemptTimeout, Remaining());
 
         if (ceiling == Timeout.InfiniteTimeSpan)
             return options;
@@ -434,36 +393,5 @@ internal sealed class UnaryCall<TRequest, TResponse>
     }
 
     /// <summary>How much of the call's deadline is left, or <see cref="Timeout.InfiniteTimeSpan" /> when it has none.</summary>
-    private TimeSpan Remaining()
-    {
-        if (_deadline == Timeout.InfiniteTimeSpan)
-            return Timeout.InfiniteTimeSpan;
-
-        var left = _deadline - _time.GetElapsedTime(_start);
-        return left > TimeSpan.Zero ? left : TimeSpan.Zero;
-    }
-
-    /// <summary>Whichever of two spans is the tighter bound, reading <see cref="Timeout.InfiniteTimeSpan" /> as no bound at all.</summary>
-    private static TimeSpan Tighter(TimeSpan left, TimeSpan right)
-    {
-        if (left == Timeout.InfiniteTimeSpan)
-            return right;
-
-        if (right == Timeout.InfiniteTimeSpan)
-            return left;
-
-        return left < right ? left : right;
-    }
-
-    /// <summary>The executor's ambient-deadline clamp, over the public half of <see cref="ResilienceDeadline" />.</summary>
-    private static TimeSpan Clamp(TimeSpan configured)
-    {
-        if (ResilienceDeadline.Remaining is not { } left)
-            return configured;
-
-        if (configured == Timeout.InfiniteTimeSpan)
-            return left;
-
-        return left < configured ? left : configured;
-    }
+    private TimeSpan Remaining() => GrpcCall.Remaining(_time, _start, _deadline);
 }

@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+option csharp_namespace = "NResilience.IntegrationTests.Grpc";
+
+package watch;
+
+// The one shape G3 wraps: a server stream, retried until its first message.
+service Watcher {
+  rpc Watch (WatchRequest) returns (stream WatchReply);
+}
+
+message WatchRequest {
+  // Isolates one test's server-side state from another's.
+  string scenario = 1;
+
+  // How many messages to stream once the call gets past its failing attempts.
+  int32 messages = 2;
+
+  // How many attempts fail before the first message is written.
+  int32 failures = 3;
+
+  // Whether the stream faults after its first message - the failure that belongs to the consumer.
+  bool fault_after_first = 4;
+
+  // Milliseconds between messages, so a test can cancel mid-stream.
+  int32 delay_ms = 5;
+}
+
+message WatchReply {
+  string message = 1;
+
+  // Whatever the server saw in the grpc-timeout header, in milliseconds, or -1 for no deadline.
+  int64 deadline_ms = 2;
+}

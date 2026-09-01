@@ -31,6 +31,7 @@ The Polly snippets below are illustrative. All NResilience snippets are compiled
 | A hand-rolled retrying gRPC `Interceptor` | [`.AddGrpcResilience()`](grpc/index.md) |
 | `ShouldHandle` over `RpcException.StatusCode` | [`GrpcResilience.Classifier`](grpc/classification.md), overridable one line at a time |
 | A `CallOptions.Deadline` you compute per call | `Deadline` and `AttemptTimeout` on the policy; the interceptor puts the attempt's ceiling on the wire as `grpc-timeout` |
+| A server stream you re-open by hand when it fails to start | [`AddGrpcResilience()`](grpc/streaming.md) retries until the first message, and never after it |
 | `OnRetry`, `OnTimeout`, `OnOpened`, etc. | One [`OnEvent`](features/telemetry.md) listener |
 | `resilience.polly.*` metrics | `nresilience.*` metrics |
 | Simmy chaos strategies (`AddChaosFault`, `AddChaosLatency`, `AddChaosOutcome`) | [`Chaos`](testing/fault-injection.md) in `NResilience.Testing`, which wraps the callback rather than adding a strategy |
