@@ -110,6 +110,46 @@ public static class Limit
         });
     }
 
+    /// <summary>
+    ///     A concurrency limit the process discovers from latency instead of one an operator configures.
+    ///     <para>
+    ///         <see cref="Concurrency" /> asks for a number that is correct on one pod and wrong on a
+    ///         hundred, and the arithmetic that makes it right - the dependency's ceiling divided by the
+    ///         expected pod count - goes stale on the next scaling change. This measures instead: latency
+    ///         under load reveals queueing, so when a round of calls is slower than this dependency
+    ///         normally is, the limit shrinks, and when it is not, the limit probes upward by one.
+    ///     </para>
+    /// </summary>
+    /// <param name="options">
+    ///     The bounds and the gains. <see cref="AdaptiveLimitOptions.Minimum" /> and
+    ///     <see cref="AdaptiveLimitOptions.Maximum" /> are the two worth setting per dependency; they are
+    ///     what the loop cannot leave when the signal is wrong.
+    /// </param>
+    /// <param name="queueLimit">How many callers may wait for a permit. Zero refuses immediately; see <see cref="PerSecond" />.</param>
+    /// <param name="name">
+    ///     The limiter's name, reported on the <c>nresilience.limiter.limit</c> metric. This is the only
+    ///     limiter that emits telemetry of its own - the discovered limit is a number nothing else can
+    ///     report - which is why it is the only one that has to know what it is called.
+    /// </param>
+    /// <param name="time">The clock, for tests. Defaults to <see cref="TimeProvider.System" />.</param>
+    /// <returns>
+    ///     The limiter, typed as itself rather than as <see cref="RateLimiter" /> so a dashboard can read
+    ///     <see cref="AdaptiveLimiter.CurrentLimit" />. The caller owns it and should dispose it.
+    /// </returns>
+    /// <exception cref="ArgumentNullException"><paramref name="options" /> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="queueLimit" /> is negative.</exception>
+    /// <exception cref="ResilienceConfigurationException">The options do not describe a limit the loop can move within.</exception>
+    public static AdaptiveLimiter Adaptive(AdaptiveLimitOptions options, int queueLimit = 0, string? name = null, TimeProvider? time = null)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        options.Validate();
+
+        if (queueLimit < 0)
+            throw new ArgumentOutOfRangeException(nameof(queueLimit), queueLimit, "The queue limit cannot be negative.");
+
+        return new AdaptiveLimiter(options, queueLimit, name, time ?? TimeProvider.System);
+    }
+
     private static void Check(int permits, int queueLimit)
     {
         if (permits < 1)

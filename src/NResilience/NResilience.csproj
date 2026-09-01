@@ -58,6 +58,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!--
+      LatencyWindow. The adaptive concurrency limiter needs the same decaying quantile estimate
+      that hedging and SlowCalls read, and the alternative was a second copy of it in a package
+      that ships in lockstep with this one. The type stays internal because it is a primitive
+      rather than a contract - nothing about its shape is promised to anybody outside these two
+      assemblies.
+    -->
+    <InternalsVisibleTo Include="NResilience.Extensions"/>
+
     <!-- The behavioral suite constructs NextAttempt and reads the inline log directly. -->
     <InternalsVisibleTo Include="NResilience.Tests"/>
     <InternalsVisibleTo Include="NResilience.IntegrationTests"/>

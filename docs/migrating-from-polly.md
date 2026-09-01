@@ -20,7 +20,7 @@ The Polly snippets below are illustrative. All NResilience snippets are compiled
 | `AddTimeout` (per attempt) | [`AttemptTimeout`](features/deadlines.md) |
 | `AddTimeout` (outer) | `Deadline` |
 | `AddCircuitBreaker` | [`Breaker`](features/circuit-breaker.md) (an object you maintain) |
-| `AddBulkhead` | [`Limit.Concurrency`](features/rate-limiting.md) (bulkhead pattern) |
+| `AddBulkhead` | [`Limit.Concurrency`](features/rate-limiting.md) (bulkhead pattern), or [`Limit.Adaptive`](features/rate-limiting.md#let-it-find-its-own-concurrency) to discover the number instead of picking it |
 | `AddFallback` | `if` logic on a [`CallResult<T>`](reference/call-result.md) |
 | `AddHedging` | [`Hedge`](features/hedging.md), against a live latency quantile rather than a fixed delay |
 | `ShouldHandle` predicates | One [`Classifier`](features/classification.md) used by all strategies |

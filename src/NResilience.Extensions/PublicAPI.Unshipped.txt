@@ -3,6 +3,23 @@ Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions
 Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExtensions
 Microsoft.Extensions.DependencyInjection.ResilienceHttpClientBuilderExtensions
 Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions
+NResilience.Extensions.AdaptiveLimitOptions
+NResilience.Extensions.AdaptiveLimitOptions.AdaptiveLimitOptions() -> void
+NResilience.Extensions.AdaptiveLimitOptions.DecreaseFactor.get -> double
+NResilience.Extensions.AdaptiveLimitOptions.DecreaseFactor.set -> void
+NResilience.Extensions.AdaptiveLimitOptions.Initial.get -> int
+NResilience.Extensions.AdaptiveLimitOptions.Initial.set -> void
+NResilience.Extensions.AdaptiveLimitOptions.Maximum.get -> int
+NResilience.Extensions.AdaptiveLimitOptions.Maximum.set -> void
+NResilience.Extensions.AdaptiveLimitOptions.Minimum.get -> int
+NResilience.Extensions.AdaptiveLimitOptions.Minimum.set -> void
+NResilience.Extensions.AdaptiveLimitOptions.Threshold.get -> double
+NResilience.Extensions.AdaptiveLimitOptions.Threshold.set -> void
+NResilience.Extensions.AdaptiveLimitOptions.Validate() -> void
+NResilience.Extensions.AdaptiveLimiter
+NResilience.Extensions.AdaptiveLimiter.Baseline.get -> System.TimeSpan?
+NResilience.Extensions.AdaptiveLimiter.CurrentLimit.get -> int
+NResilience.Extensions.AdaptiveLimiter.InFlight.get -> int
 NResilience.Extensions.BreakerOptions
 NResilience.Extensions.BreakerOptions.BreakDuration.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.BreakDuration.set -> void
@@ -47,6 +64,8 @@ NResilience.Extensions.IResiliencePolicies.TryGet(string! name, out NResilience.
 NResilience.Extensions.IResiliencePolicies.this[string! name].get -> NResilience.Resilience!
 NResilience.Extensions.Limit
 NResilience.Extensions.RateLimitOptions
+NResilience.Extensions.RateLimitOptions.Adaptive.get -> NResilience.Extensions.AdaptiveLimitOptions?
+NResilience.Extensions.RateLimitOptions.Adaptive.set -> void
 NResilience.Extensions.RateLimitOptions.Concurrency.get -> int?
 NResilience.Extensions.RateLimitOptions.Concurrency.set -> void
 NResilience.Extensions.RateLimitOptions.Name.get -> string?
@@ -148,6 +167,8 @@ const Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExte
 const NResilience.Extensions.ResilienceLogging.CategoryPrefix = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.ActivitySourceName = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.MeterName = "NResilience" -> string!
+override NResilience.Extensions.AdaptiveLimiter.GetStatistics() -> System.Threading.RateLimiting.RateLimiterStatistics!
+override NResilience.Extensions.AdaptiveLimiter.IdleDuration.get -> System.TimeSpan?
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! section) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Action<NResilience.Extensions.RateLimitOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Threading.RateLimiting.RateLimiter! limiter, string? name = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
@@ -160,6 +181,7 @@ static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExten
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, NResilience.Resilience! policy, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<NResilience.Extensions.ResilienceOptions!>! configureOptions, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilienceLogging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<NResilience.Extensions.ResilienceLoggingOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static NResilience.Extensions.Limit.Adaptive(NResilience.Extensions.AdaptiveLimitOptions! options, int queueLimit = 0, string? name = null, System.TimeProvider? time = null) -> NResilience.Extensions.AdaptiveLimiter!
 static NResilience.Extensions.Limit.Concurrency(int permits, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
 static NResilience.Extensions.Limit.PerSecond(int permits, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
 static NResilience.Extensions.Limit.PerWindow(int permits, System.TimeSpan window, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!

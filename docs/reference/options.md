@@ -146,7 +146,7 @@ Adds the rate limit handler. Call it **after** `AddResilience` on the same clien
 
 ## `RateLimitOptions`
 
-Set exactly one of `PermitsPerSecond`, `Permits` with `Window`, or `Concurrency`. Anything else is a `ResilienceConfigurationException` listing every problem at once.
+Set exactly one of `PermitsPerSecond`, `Permits` with `Window`, `Concurrency`, or `Adaptive`. Anything else is a `ResilienceConfigurationException` listing every problem at once.
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
@@ -154,6 +154,7 @@ Set exactly one of `PermitsPerSecond`, `Permits` with `Window`, or `Concurrency`
 | `Permits` | `null` | Calls allowed per `Window`. |
 | `Window` | `null` | The window `Permits` applies to. Slides in eight segments. |
 | `Concurrency` | `null` | Calls allowed in flight at once - the bulkhead. |
+| `Adaptive` | `null` | A concurrency limit discovered from latency. The section's presence turns it on; every property inside has a default. |
 | `QueueLimit` | `0` | How many callers may wait for a permit. Zero refuses immediately. |
 | `PerHost` | `true` | Whether each host gets its own quota, scoped by the same `host:port` key the breakers and budgets use. |
 | `Name` | `null` | Reported on `RateLimitedException.Limiter` and in the metrics. Defaults to the client's name. |
@@ -170,10 +171,38 @@ Set exactly one of `PermitsPerSecond`, `Permits` with `Window`, or `Concurrency`
 | `Limit.PerSecond(int, int)` | A token bucket: permits per second, with one second of burst. |
 | `Limit.PerWindow(int, TimeSpan, int)` | A sliding window in eight segments. |
 | `Limit.Concurrency(int, int)` | A concurrency limit - the bulkhead. |
+| `Limit.Adaptive(AdaptiveLimitOptions, int, string?, TimeProvider?)` | A concurrency limit discovered from latency. Returns an `AdaptiveLimiter`. |
 | `RateLimiter.AcquireOrThrowAsync(...)` | Acquires one permit, or throws `RateLimitedException` carrying the limiter's own hint. |
 | `PartitionedRateLimiter<TKey>.AcquireOrThrowAsync(...)` | The same, for one partition. |
 
 Call `AcquireOrThrowAsync` inside the callback you hand to `RunAsync`, so the permit is taken once per attempt.
+
+## `AdaptiveLimitOptions`
+
+The range an [adaptive concurrency limit](../features/rate-limiting.md) may move within, and how fast it may move. Every property has a working default.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Initial` | `20` | Where the limit starts, before there is anything to measure. |
+| `Minimum` | `4` | The floor. A liveness guarantee: without one, a persistently slow dependency drives the limit to zero and the recovery is never sampled. |
+| `Maximum` | `200` | The ceiling. What bounds the damage when the baseline is measured wrong. |
+| `Threshold` | `2.0` | How many times the baseline latency counts as queueing. Must be greater than 1. |
+| `DecreaseFactor` | `0.9` | What the limit is multiplied by on a congested round. Strictly between 0 and 1. |
+
+| Member | Description |
+| :--- | :--- |
+| `Validate()` | Throws `ResilienceConfigurationException` listing every problem at once. |
+
+## `AdaptiveLimiter`
+
+A `RateLimiter`, so it composes everywhere the other three do. These members exist so a dashboard can read what was discovered.
+
+| Member | Description |
+| :--- | :--- |
+| `CurrentLimit` | The permit count the loop has settled on. |
+| `Baseline` | What a fast call to this dependency recently looked like, or `null` while the estimate is cold. |
+| `InFlight` | Permits currently held. |
+| `GetStatistics()` | Available permits, queued count, and the running lease totals. |
 
 ## `AddResilience` on `IHealthChecksBuilder`
 

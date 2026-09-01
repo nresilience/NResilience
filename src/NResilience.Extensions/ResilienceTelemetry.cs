@@ -97,6 +97,21 @@ public static class ResilienceTelemetry
         "s",
         "The latency quantile a hedge fired at, recorded when it fired.");
 
+    /// <summary>
+    ///     The limit an <see cref="AdaptiveLimiter" /> has discovered, recorded at the moments it moved.
+    ///     <para>
+    ///         A histogram rather than the observable gauge this obviously wants to be, for the reason
+    ///         <see cref="HedgeThreshold" /> gives: a gauge would need a registry of live limiters that
+    ///         outlives them, and a limiter belongs to whoever built it. Recording on change needs no
+    ///         registry and loses nothing, because a limit that is not moving is a limit the previous
+    ///         sample already reported.
+    ///     </para>
+    /// </summary>
+    private static readonly Histogram<int> LimiterLimit = Meter.CreateHistogram<int>(
+        "nresilience.limiter.limit",
+        "{permit}",
+        "The concurrency limit an adaptive limiter has settled on, recorded when it changes. Watching this fall is watching the dependency tell you it is queueing.");
+
     private static readonly Histogram<double> LeaseWait = Meter.CreateHistogram<double>(
         "nresilience.limiter.wait.duration",
         unit: "s",
@@ -166,6 +181,10 @@ public static class ResilienceTelemetry
         LeaseCounter.Add(1, limiterTag, outcome);
         LeaseWait.Record(waited.TotalSeconds, limiterTag, outcome);
     }
+
+    /// <summary>Records an adaptive limiter's new limit, at the moment the control loop moved it.</summary>
+    internal static void RecordLimit(string limiter, int limit) =>
+        LimiterLimit.Record(limit, new KeyValuePair<string, object?>("nresilience.limiter", limiter));
 
     private static void Record(CallEvent e)
     {

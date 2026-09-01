@@ -48,6 +48,9 @@ var result = await policy.RunAsync(async ct =>
 }, cancellationToken);
 ```
 
+> [!TIP]
+> `10` is a number you have to keep right as your pod count and the dependency's capacity change. `Limit.Adaptive` measures it instead - see [Let it find its own concurrency](../features/rate-limiting.md#let-it-find-its-own-concurrency).
+
 Now:
 
 1. First 10 requests for Payment acquire permits and run

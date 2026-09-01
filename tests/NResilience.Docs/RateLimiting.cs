@@ -34,7 +34,7 @@ public sealed class RateLimiting
     }
 
     [Fact]
-    public void A_limiter_is_one_of_three_shapes()
+    public void A_limiter_is_one_of_four_shapes()
     {
         // <snippet:limit-shapes>
         // A published per-second quota.
@@ -47,11 +47,47 @@ public sealed class RateLimiting
         // The bulkhead: at most 20 calls in flight at once, whatever their rate.
         using var inFlight = Limit.Concurrency(permits: 20);
 
+        // The bulkhead you do not have to size. Set the range it may move within; the number
+        // inside it is measured from how the dependency responds under load.
+        using var adaptive = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 });
+
         // </snippet:limit-shapes>
 
         Assert.NotNull(@object: perSecond);
         Assert.NotNull(@object: perMinute);
         Assert.NotNull(@object: inFlight);
+        Assert.NotNull(@object: adaptive);
+    }
+
+    [Fact]
+    public async Task An_adaptive_limit_is_discovered_rather_than_configured()
+    {
+        // <snippet:limit-adaptive>
+        // No permit count. Minimum and Maximum are guardrails - what the loop may never leave -
+        // and the limit between them is read from latency: a round of calls slower than this
+        // dependency normally is means a queue downstream, and the limit backs off.
+        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 }, name: "payments");
+
+        var api = Resilience.Http;
+
+        var value = await api.RunAsync(async ct =>
+        {
+            // The lease is the measurement: how long the permit is held is the round-trip time
+            // the control loop reads. `using` is what frees the slot *and* reports the sample.
+            using var lease = await limiter.AcquireOrThrowAsync(name: "payments", cancellationToken: ct);
+            return await FetchAsync(cancellationToken: ct);
+        });
+
+        // What it has settled on, for a dashboard. Null until it has seen enough calls to have
+        // an opinion, at which point it holds at Initial rather than guessing.
+        int discovered = limiter.CurrentLimit;
+        TimeSpan? normal = limiter.Baseline;
+
+        // </snippet:limit-adaptive>
+
+        Assert.Equal(expected: 42, actual: value);
+        Assert.Equal(expected: 20, actual: discovered);
+        Assert.Null(@object: normal);
     }
 
     [Fact]
@@ -94,7 +130,7 @@ public sealed class RateLimiting
             .AddResilience() // outer: makes the attempts
             .AddRateLimit(o =>
             {
-                o.PermitsPerSecond = 100; // one of three shapes; set exactly one
+                o.PermitsPerSecond = 100; // one of four shapes; set exactly one
                 o.PerHost = true; // the default, scoped like the breakers
             });
 
@@ -132,13 +168,42 @@ public sealed class RateLimiting
     public void Two_limits_at_once_are_refused_rather_than_resolved()
     {
         // <snippet:limit-validate>
-        // Three different guards, and a section that asks for two of them is a section whose
+        // Four different guards, and a section that asks for two of them is a section whose
         // author expected one to win. Every problem is listed at once.
         var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitOptions { PermitsPerSecond = 100, Concurrency = 20 }.Validate());
 
         // </snippet:limit-validate>
 
         Assert.Single(collection: error.Problems);
+    }
+
+    [Fact]
+    public async Task An_adaptive_limit_is_reachable_from_configuration()
+    {
+        var services = new ServiceCollection();
+
+        // <snippet:limit-adaptive-http>
+        services.AddHttpClient(name: "api")
+            .AddResilience()
+            .AddRateLimit(o =>
+            {
+                // The presence of the section is what turns it on - every property inside has a
+                // working default, so this is a complete configuration. Per host, like the
+                // breakers, because each host queues on its own.
+                o.Adaptive = new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 };
+                o.Name = "api";
+            });
+
+        // </snippet:limit-adaptive-http>
+
+        services.ConfigureAll<HttpClientFactoryOptions>(o =>
+            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Respond(HttpStatusCode.OK)));
+
+        using var provider = services.BuildServiceProvider();
+        using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "api");
+        using var response = await client.GetAsync(requestUri: new Uri(uriString: "https://api.test/thing"));
+
+        Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
     }
 
     private static Task<int> FetchAsync(CancellationToken cancellationToken) => Task.FromResult(result: 42);

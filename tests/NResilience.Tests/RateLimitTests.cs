@@ -386,7 +386,7 @@ public sealed class RateLimitTests
     {
         var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitOptions { PermitsPerSecond = 10, Concurrency = 2 }.Validate());
 
-        Assert.Contains("three different guards", Assert.Single(error.Problems), StringComparison.Ordinal);
+        Assert.Contains("four different guards", Assert.Single(error.Problems), StringComparison.Ordinal);
     }
 
     [Fact]

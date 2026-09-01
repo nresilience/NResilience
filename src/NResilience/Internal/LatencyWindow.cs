@@ -179,13 +179,6 @@ internal sealed class LatencyWindow
     /// </remarks>
     internal TimeSpan? Threshold(int minimumSamples) => ThresholdAt(Epoch(), minimumSamples);
 
-    /// <summary>
-    ///     The bucket a duration falls in: a linear region below <see cref="SubBuckets" /> microseconds,
-    ///     then <see cref="SubBuckets" /> buckets per octave. The layout HdrHistogram uses, at the
-    ///     smallest precision that answers this question.
-    /// </summary>
-    private static int IndexOfPlaceholder(TimeSpan duration) => 0;
-
     private void RecordAt(long epoch, TimeSpan duration)
     {
         if (duration < TimeSpan.Zero)

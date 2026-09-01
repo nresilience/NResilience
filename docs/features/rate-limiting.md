@@ -18,7 +18,7 @@ services.AddHttpClient(name: "api")
     .AddResilience() // outer: makes the attempts
     .AddRateLimit(o =>
     {
-        o.PermitsPerSecond = 100; // one of three shapes; set exactly one
+        o.PermitsPerSecond = 100; // one of four shapes; set exactly one
         o.PerHost = true; // the default, scoped like the breakers
     });
 ```
@@ -78,6 +78,10 @@ using var perMinute = Limit.PerWindow(permits: 1_000, window: TimeSpan.FromMinut
 
 // The bulkhead: at most 20 calls in flight at once, whatever their rate.
 using var inFlight = Limit.Concurrency(permits: 20);
+
+// The bulkhead you do not have to size. Set the range it may move within; the number
+// inside it is measured from how the dependency responds under load.
+using var adaptive = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 });
 ```
 <!-- endsnippet -->
 
@@ -85,11 +89,87 @@ Set exactly one of them in `RateLimitOptions`. Asking for two is a configuration
 
 <!-- snippet: limit-validate -->
 ```csharp
-// Three different guards, and a section that asks for two of them is a section whose
+// Four different guards, and a section that asks for two of them is a section whose
 // author expected one to win. Every problem is listed at once.
 var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitOptions { PermitsPerSecond = 100, Concurrency = 20 }.Validate());
 ```
 <!-- endsnippet -->
+
+## Let it find its own concurrency
+
+`Limit.Concurrency(50)` is correct on one pod and wrong on a hundred. The arithmetic that makes it right - the dependency's ceiling divided by the expected pod count - goes stale on the next scaling change, and nobody revisits it.
+
+`Limit.Adaptive` measures instead. Latency under load reveals queueing, which is the only observable difference between a dependency that is keeping up and one that is not.
+
+<!-- snippet: limit-adaptive -->
+```csharp
+// No permit count. Minimum and Maximum are guardrails - what the loop may never leave -
+// and the limit between them is read from latency: a round of calls slower than this
+// dependency normally is means a queue downstream, and the limit backs off.
+using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 }, name: "payments");
+
+var api = Resilience.Http;
+
+var value = await api.RunAsync(async ct =>
+{
+    // The lease is the measurement: how long the permit is held is the round-trip time
+    // the control loop reads. `using` is what frees the slot *and* reports the sample.
+    using var lease = await limiter.AcquireOrThrowAsync(name: "payments", cancellationToken: ct);
+    return await FetchAsync(cancellationToken: ct);
+});
+
+// What it has settled on, for a dashboard. Null until it has seen enough calls to have
+// an opinion, at which point it holds at Initial rather than guessing.
+int discovered = limiter.CurrentLimit;
+TimeSpan? normal = limiter.Baseline;
+```
+<!-- endsnippet -->
+
+You set the range and the loop finds the number inside it:
+
+| Option | Default | What it is |
+| :--- | :--- | :--- |
+| `Minimum` | 4 | The floor. A liveness guarantee: without one, a dependency that is slow for reasons unrelated to your concurrency drives the limit to zero and the recovery is never sampled. |
+| `Maximum` | 200 | The ceiling. The one worth setting per dependency, because it is what bounds the damage when the measurement is wrong. |
+| `Initial` | 20 | Where it starts, before there is anything to measure. |
+| `Threshold` | 2.0 | How many times the baseline latency counts as queueing. Dimensionless, like [`SlowCalls.Above`](circuit-breaker.md). |
+| `DecreaseFactor` | 0.9 | What the limit is multiplied by when a round says there is queueing. |
+
+### How it decides
+
+A **round** is one limit's worth of calls - so the loop reacts at the pace the dependency is actually being driven at, not on a timer. At the end of each round:
+
+- The round's **fastest** call is compared against a **baseline**: the 10th percentile of the last five minutes. One slow call among many is a tail; even the fastest call being slow is a queue.
+- Fastest above `Threshold` x baseline, and the limit is multiplied by `DecreaseFactor`.
+- Otherwise, if the limit was what was actually constraining you during the round, it grows by one.
+
+Multiplicative decrease against additive increase, in that pairing, for the reason TCP uses it: the cost of being too high is paid by the dependency and the cost of being too low is paid by you, so the two directions must not move at the same speed.
+
+The growth condition matters as much as the shrink one. A limiter that grew while idle would ratchet to `Maximum` during a quiet period, and the first burst afterwards would meet no limit at all.
+
+> [!NOTE]
+> The baseline is measured, so it can be measured wrong. A process that starts *while the dependency is already queueing* learns the queued latency as normal and grows to `Maximum`. That is what the ceiling is for: make it a number the dependency can survive, not one you expect never to reach.
+
+It reads its own state for a dashboard - `CurrentLimit` is the number it settled on, and `Baseline` is what it thinks a fast call looks like. It also records `nresilience.limiter.limit` whenever the limit moves.
+
+### From configuration
+
+<!-- snippet: limit-adaptive-http -->
+```csharp
+services.AddHttpClient(name: "api")
+    .AddResilience()
+    .AddRateLimit(o =>
+    {
+        // The presence of the section is what turns it on - every property inside has a
+        // working default, so this is a complete configuration. Per host, like the
+        // breakers, because each host queues on its own.
+        o.Adaptive = new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 };
+        o.Name = "api";
+    });
+```
+<!-- endsnippet -->
+
+`Adaptive` is a nested section, and its presence is what turns it on - every property inside has a working default, so `"Adaptive": {}` is a complete configuration.
 
 ## Read what a refusal does
 
@@ -133,12 +213,13 @@ That is deliberate, because the library is already good at waiting. A refusal be
 
 ## What it reports
 
-Two instruments, on the same meter as everything else. See [Telemetry](telemetry.md).
+Three instruments, on the same meter as everything else. See [Telemetry](telemetry.md).
 
 | Instrument | What it is |
 | :--- | :--- |
 | `nresilience.limiter.leases` | Permits asked for, tagged `nresilience.outcome` = `acquired` or `denied`. |
 | `nresilience.limiter.wait.duration` | How long a caller waited. Zero unless queueing is enabled. |
+| `nresilience.limiter.limit` | The limit an adaptive limiter has settled on, recorded when it changes. Watching this fall is watching the dependency tell you it is queueing. |
 
 The limiter records these itself rather than deriving them from a `CallEvent`, because it is the only thing that knows how long a caller waited, and because a refusal the policy then retries successfully raises no distinguishable event.
 

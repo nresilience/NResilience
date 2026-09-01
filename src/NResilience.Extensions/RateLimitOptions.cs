@@ -7,9 +7,9 @@ namespace NResilience.Extensions;
 ///     <see cref="TimeSpan" />, for the same reason <see cref="ResilienceOptions" /> is.
 ///     <para>
 ///         Exactly one of <see cref="PermitsPerSecond" />, <see cref="Permits" /> (with
-///         <see cref="Window" />) and <see cref="Concurrency" /> may be set. They are three different guards
-///         and a section that asks for two of them is a section whose author expected one of them to win;
-///         <see cref="Validate" /> says so instead of picking.
+///         <see cref="Window" />), <see cref="Concurrency" /> and <see cref="Adaptive" /> may be set. They
+///         are four different guards and a section that asks for two of them is a section whose author
+///         expected one of them to win; <see cref="Validate" /> says so instead of picking.
 ///     </para>
 /// </summary>
 /// <example>
@@ -35,6 +35,17 @@ public sealed class RateLimitOptions
 
     /// <summary>Calls allowed in flight at once - the bulkhead. See <see cref="Limit.Concurrency" />.</summary>
     public int? Concurrency { get; set; }
+
+    /// <summary>
+    ///     A concurrency limit discovered from latency rather than configured. See
+    ///     <see cref="Limit.Adaptive" />.
+    ///     <para>
+    ///         The presence of the section is what turns it on, so <c>"Adaptive": {}</c> is a complete
+    ///         configuration - every property inside has a working default. Per-host by default like the
+    ///         others, and that is the reading you want: each host queues on its own.
+    ///     </para>
+    /// </summary>
+    public AdaptiveLimitOptions? Adaptive { get; set; }
 
     /// <summary>
     ///     How many callers may wait for a permit. Zero - the default - refuses immediately.
@@ -85,10 +96,13 @@ public sealed class RateLimitOptions
         if (Concurrency is not null)
             kindsConfigured++;
 
+        if (Adaptive is not null)
+            kindsConfigured++;
+
         if (kindsConfigured == 0)
-            problems.Add("Set one of PermitsPerSecond, Permits with Window, or Concurrency.");
+            problems.Add("Set one of PermitsPerSecond, Permits with Window, Concurrency, or Adaptive.");
         else if (kindsConfigured > 1)
-            problems.Add("Set only one of PermitsPerSecond, Permits with Window, or Concurrency; they are three different guards.");
+            problems.Add("Set only one of PermitsPerSecond, Permits with Window, Concurrency, or Adaptive; they are four different guards.");
 
         Positive(PermitsPerSecond, nameof(PermitsPerSecond), problems);
         Positive(Permits, nameof(Permits), problems);
@@ -99,6 +113,20 @@ public sealed class RateLimitOptions
 
         if (QueueLimit < 0)
             problems.Add($"QueueLimit cannot be negative; it is {QueueLimit}.");
+
+        // Reported together with this section's own problems rather than thrown separately, so a
+        // section that is wrong in two places says so once.
+        if (Adaptive is not null)
+        {
+            try
+            {
+                Adaptive.Validate();
+            }
+            catch (ResilienceConfigurationException nested)
+            {
+                problems.AddRange(nested.Problems);
+            }
+        }
 
         if (problems.Count > 0)
             throw new ResilienceConfigurationException(problems);
@@ -116,6 +144,9 @@ public sealed class RateLimitOptions
 
         if (Permits is { } permits && Window is { } window)
             return Limit.PerWindow(permits, window, QueueLimit);
+
+        if (Adaptive is { } adaptive)
+            return Limit.Adaptive(adaptive, QueueLimit, Name);
 
         return Limit.Concurrency(Concurrency!.Value, QueueLimit);
     }
