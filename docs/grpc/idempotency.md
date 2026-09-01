@@ -8,9 +8,9 @@ order: 3
 
 The HTTP integration refuses to retry a `POST`, because a repeated `POST` is a duplicate order or a duplicate charge. The gRPC default is the opposite: **every unary method is repeatable unless you say otherwise.**
 
-That is not an inconsistency. Every gRPC call is a `POST` at the transport and most of them are reads at the application, so carrying the HTTP rule across would make the interceptor inert - which is a different way of shipping nothing.
+This is not an inconsistency. Every gRPC call is a `POST` at the transport, and most of them are reads at the application, so carrying the HTTP rule across would make the interceptor inert.
 
-So the direction of the declaration flips. In HTTP you name the writes that *are* safe to repeat; in gRPC you name the ones that are not.
+The direction of the declaration flips instead. In HTTP you name the writes that *are* safe to repeat; in gRPC you name the ones that are not.
 
 ## Per client: `IsRepeatable`
 
@@ -32,7 +32,7 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 ```
 <!-- endsnippet -->
 
-A method that is not repeatable gets exactly one attempt. The breaker still sees the outcome and the [retry budget](../features/retry-budget.md) still receives its deposit - nothing is sent twice, and nothing is hidden from the guards.
+A method that is not repeatable gets exactly one attempt. The breaker still sees the outcome and the [retry budget](../features/retry-budget.md) still receives its deposit - nothing is sent twice, and the guards see everything.
 
 `ResilienceInterceptor.WillRetry(IMethod)` answers the same question without making a call, which is what a test asserts on.
 
@@ -52,7 +52,7 @@ using (GrpcResilience.SingleShot())
 
 `GrpcResilience.SingleShot()` is an ambient scope, on the same pattern as [`ResilienceDeadline.Begin`](../features/deadlines.md#propagate-the-deadline-across-a-hop) and `ResilienceNestedRetry.Begin`. It applies to every gRPC call made inside it, including calls made by code you did not write, and it restores the previous value when disposed.
 
-It is deliberately **not** a metadata entry. A header would travel to the server, making this library's internal plumbing part of your wire contract, and it would be unreachable from a generated client that never exposes `CallOptions` in the first place. The scope reaches every client.
+It is deliberately **not** a metadata entry. A header would travel to the server, making this library's internal plumbing part of your wire contract, and it would be unreachable from a generated client that never exposes `CallOptions`. The scope reaches every client.
 
 ## Which one to use
 
@@ -61,7 +61,7 @@ It is deliberately **not** a metadata entry. A header would travel to the server
 | A method is never safe to repeat | `IsRepeatable` on the registration |
 | Only reads should be retried on this client | `IsRepeatable = static m => m.Type == MethodType.Unary` plus your own naming rule |
 | One call site is the exception | `GrpcResilience.SingleShot()` |
-| The server deduplicates on a key you send | Neither - the call is safe to repeat, so leave the default alone |
+| The server deduplicates on a key you send | Neither - the call is safe to repeat, so leave the default as is |
 
 ## Hedging
 

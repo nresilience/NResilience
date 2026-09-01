@@ -6,9 +6,9 @@ order: 2
 
 # Deadlines
 
-gRPC has propagated deadlines built in, and the interceptor uses them. Each attempt's ceiling - `min(AttemptTimeout, time left on the Deadline)` - is written into `CallOptions.Deadline`, and grpc-dotnet converts that into the standard `grpc-timeout` header. The server learns how long it has, with no new header, no new format, and nothing to parse.
+gRPC has deadline propagation built in, and the interceptor uses it. Each attempt's ceiling - `min(AttemptTimeout, time left on the Deadline)` - is written into `CallOptions.Deadline`, and grpc-dotnet converts that into the standard `grpc-timeout` header. The server learns how long it has, with no new header and nothing to parse.
 
-That is [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) for gRPC, and it costs nothing:
+That is [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) for gRPC, at no extra cost:
 
 <!-- snippet: grpc-deadlines -->
 ```csharp
@@ -33,17 +33,17 @@ With the shipped preset, a gRPC call gets a 10-second per-attempt ceiling that t
 
 ## Why the slack is not zero
 
-The HTTP integration's deadline header is advisory: the peer reads it or ignores it, and it is never a bound on this side. `CallOptions.Deadline` is not that. The local gRPC client enforces it with a timer of its own.
+The HTTP integration's deadline header is advisory: the peer reads it or ignores it, and it is never a bound on this side. `CallOptions.Deadline` is different. The local gRPC client enforces it with a timer of its own.
 
-So writing the bare attempt ceiling into it arms **two timers for the same instant** - NResilience's and grpc-dotnet's - and whichever the runtime notices first decides what the call looks like. When grpc-dotnet's wins, you get an `RpcException(DeadlineExceeded)` instead of an `AttemptTimeoutException`, the deadline accounting is off by one attempt, and no `OrphanedWork` event is raised.
+Writing the bare attempt ceiling into it therefore arms **two timers for the same instant** - NResilience's and grpc-dotnet's - and whichever the runtime notices first decides what the call looks like. When grpc-dotnet's wins, you get an `RpcException(DeadlineExceeded)` instead of an `AttemptTimeoutException`, the deadline accounting is off by one attempt, and no `OrphanedWork` event is raised.
 
 `DeadlineSlack` resolves that: the wire deadline is the ceiling **plus** the slack, so NResilience's timer fires first in the ordinary case and the wire deadline is the backstop it is meant to be. The peer still learns a number that is honest to the millisecond it matters at.
 
 The case slack cannot cover - clock granularity, a scheduling stall - is handled inside the interceptor rather than left to chance. A `DeadlineExceeded` on a deadline the interceptor wrote is translated into the timeout shape the executor already knows how to judge, so the outcome is the same either way.
 
-The rule, stated once: **the wire deadline is a hint to the peer; the local attempt token is authoritative.**
+The rule: **the wire deadline is a hint to the peer; the local attempt token is authoritative.**
 
-## What produces what
+## Which timer produces which outcome
 
 | What fired | What the caller gets |
 | :--- | :--- |
@@ -54,7 +54,7 @@ The rule, stated once: **the wire deadline is a hint to the peer; the local atte
 
 ## A deadline you set yourself
 
-A `CallOptions.Deadline` you set on a call is never overwritten. The effective deadline is whichever of the two is tighter, and when it is yours the interceptor stops treating a `DeadlineExceeded` as its own - it reaches the classifier as the transient status it is.
+A `CallOptions.Deadline` you set on a call is never overwritten. The effective deadline is the tighter of the two, and when it is yours the interceptor stops treating a `DeadlineExceeded` as its own - it reaches the classifier as the transient status it is.
 
 ## Who bounds what
 
@@ -66,9 +66,9 @@ Three things want to bound a gRPC call, and only one of them should:
 | `Resilience.AttemptTimeout` | One attempt | Keep it. This is what reaches the wire as `grpc-timeout`. |
 | `HttpClient.Timeout` on the channel | The whole call, invisibly | Removed, unless you turn `OwnTransportTimeout` off. |
 
-The transport timeout covers the entire retry sequence rather than one attempt, so it silently caps any policy with a longer deadline. `AddGrpcResilience()` sets it to `Timeout.InfiniteTimeSpan` for you. This is usually a no-op - gRPC's own client factory already does it - and the option exists for a caller who supplies a handler of their own.
+The transport timeout covers the entire retry sequence rather than one attempt, so it silently caps any policy with a longer deadline. `AddGrpcResilience()` sets it to `Timeout.InfiniteTimeSpan` for you. This is usually a no-op - gRPC's own client factory already does it - and the option exists for a caller who supplies their own handler.
 
-An interceptor cannot reach the channel in front of it, so setting `OwnTransportTimeout` on an interceptor you construct yourself does nothing at all.
+An interceptor cannot reach the channel in front of it, so setting `OwnTransportTimeout` on an interceptor you construct yourself has no effect.
 
 ## Inherit a caller's deadline
 

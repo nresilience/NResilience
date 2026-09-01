@@ -17,7 +17,7 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 ```
 <!-- endsnippet -->
 
-That client now makes three attempts with exponential backoff, retries an `Unavailable` but not a `NotFound`, opens a circuit breaker per gRPC service, and tells the server how long each attempt has. Next: [Classification](classification.md).
+That client now makes three attempts with exponential backoff, retries an `Unavailable` but not a `NotFound`, opens a circuit breaker per gRPC service, and tells the server how long each attempt has. For more information about status codes, see [Classification](classification.md).
 
 > [!IMPORTANT]
 > `AddResilience()` also compiles on a gRPC client builder, and it does nothing useful. Every gRPC call is an HTTP `POST`, which the resilience handler refuses to retry by default, and a gRPC failure travels in the `grpc-status` trailer on an HTTP `200`, which the HTTP classifier reads as a success. Use `AddGrpcResilience()`.
@@ -28,14 +28,14 @@ That client now makes three attempts with exponential backoff, retries an `Unava
 dotnet add package NResilience.Grpc
 ```
 
-The package depends on `NResilience`, `NResilience.Extensions`, `Grpc.Core.Api`, and `Grpc.Net.ClientFactory`. Most of that weight is already in a gRPC client's dependency graph.
+The package depends on `NResilience`, `NResilience.Extensions`, `Grpc.Core.Api`, and `Grpc.Net.ClientFactory`. A gRPC client's dependency graph already contains most of that weight.
 
 ## Interceptor capabilities
 
-`ResilienceInterceptor` runs a [policy](../reference/resilience.md) around each gRPC call and provides the following capabilities:
+`ResilienceInterceptor` runs a [policy](../reference/resilience.md) around each gRPC call:
 
-- **Status classification**: Reads the `StatusCode` on an `RpcException`, which is where a gRPC failure actually lives. See [Classification](classification.md).
-- **Repeatable by default**: Retries unary calls unless you say otherwise - the opposite of the HTTP default, and for a reason. See [Idempotency](idempotency.md).
+- **Status classification**: Reads the `StatusCode` on an `RpcException`, which is where a gRPC failure lives. See [Classification](classification.md).
+- **Repeatable by default**: Retries unary calls unless you say otherwise - the opposite of the HTTP default. See [Idempotency](idempotency.md).
 - **Attempt deadline propagation**: Writes each attempt's ceiling into `CallOptions.Deadline`, which grpc-dotnet sends as the standard `grpc-timeout` header. See [Deadlines](deadlines.md).
 - **Per-service scoping**: Scopes the circuit breaker, the retry budget, and the hedging latency estimate to the gRPC service. See [Per-service scope](per-service-scope.md).
 - **Nested retry detection**: Reports when retries are happening in layers, under the same marker the HTTP handler uses. See [Nested retries](../http/nested-retries.md#grpc-carries-the-same-marker).
@@ -73,19 +73,19 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 | `OwnTransportTimeout` | `true` | Sets `HttpClient.Timeout` to infinite so it stops competing with the deadline. | [Deadlines](deadlines.md#who-bounds-what) |
 | `DetectNestedRetries` | `true` | Stamps and reads the nested-retry marker. | [Nested retries](../http/nested-retries.md) |
 
-## Register it first
+## Register the interceptor first
 
-Register `AddGrpcResilience()` before any other interceptor. Interceptors registered after it run **per attempt**, which is where an interceptor that refreshes a token wants to be - a token fetched once outside the retry loop is a token that can expire during it.
+Register `AddGrpcResilience()` before any other interceptor. Interceptors registered after it run **per attempt**, which is where an interceptor that refreshes a token wants to be - a token fetched once outside the retry loop can expire during it.
 
-gRPC's client factory does not expose the registrations already made, so this is a rule rather than something the library can enforce.
+gRPC's client factory does not expose the registrations already made, so the order is a rule rather than something the library can enforce.
 
-## What is not wrapped
+## Calls that pass through
 
-Client-streaming and duplex calls pass through untouched. The request stream is a source you drive interactively, and repeating one means re-enumerating something the failed attempt has already partially consumed - which produces duplicates or requires buffering everything, and neither is a resilience feature. Wrap the *setup* call instead, the way any other callback is wrapped.
+Client-streaming and duplex calls pass through untouched. The request stream is a source you drive interactively, and repeating one means re-enumerating something the failed attempt has already partially consumed, which produces duplicates or requires buffering everything. Neither outcome is a resilience feature. Wrap the *setup* call instead, the way any other callback is wrapped.
 
 Server-streaming calls also pass through today. The core library already has the [streaming](../features/streaming.md) semantic they need, and wiring it to the interceptor is the next piece of work.
 
-The synchronous `BlockingUnaryCall` throws a `NotSupportedException`. Passing it through silently would leave one call in the client with no retry, no breaker, and no deadline, and nothing on the surface would say so. Use the generated client's `Async` overload.
+The synchronous `BlockingUnaryCall` throws a `NotSupportedException`. Passing it through silently would leave one call in the client with no retry, no breaker, and no deadline. Use the generated client's `Async` overload.
 
 ## Read what it holds
 

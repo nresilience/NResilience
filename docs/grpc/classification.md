@@ -6,7 +6,7 @@ order: 1
 
 # Classification
 
-A gRPC failure does not live where the HTTP classifier looks. Application errors travel in the `grpc-status` trailer on an HTTP `200`, and transport failures surface as an `RpcException` after the HTTP classifier has already judged that `200` a success.
+A gRPC failure does not live where the HTTP classifier looks. Application errors travel in the `grpc-status` trailer on an HTTP `200`, and transport failures surface as an `RpcException` after the HTTP classifier has judged that `200` a success.
 
 `GrpcResilience.Classifier` is [`Classifier.Default`](../features/classification.md) plus one rule: read the `StatusCode` on an `RpcException`.
 
@@ -25,7 +25,7 @@ Console.WriteLine(exhausted.Kind); // Throttled - the dependency is defending it
 ```
 <!-- endsnippet -->
 
-`GrpcResilience.Default` is `Resilience.Default` with that classifier already on it, so `AddGrpcResilience()` needs no classifier argument. See [Classification](../features/classification.md) for what a [verdict](../features/classification.md) means.
+`GrpcResilience.Default` is `Resilience.Default` with that classifier already on it, so `AddGrpcResilience()` needs no classifier argument. For more information about verdicts, see [Classification](../features/classification.md).
 
 ## The shipped table
 
@@ -37,7 +37,7 @@ Console.WriteLine(exhausted.Kind); // Throttled - the dependency is defending it
 | `Internal` | Permanent | The server's own bug. Retrying multiplies load against something that is already broken. |
 | `Unauthenticated`, `PermissionDenied` | Permanent | Credentials do not fix themselves on a retry. Refresh them in `BeforeAttempt`, which runs before each attempt. |
 | `InvalidArgument`, `NotFound`, `AlreadyExists`, `FailedPrecondition`, `OutOfRange`, `Unimplemented`, `DataLoss` | Permanent | Answers, not failures - the same line the HTTP classifier takes with a `404`. |
-| `Aborted` | Permanent | A transaction conflict. Whether repeating one is safe depends on the store, so the conservative verdict ships. See below. |
+| `Aborted` | Permanent | A transaction conflict. Whether repeating one is safe depends on the store, so the conservative verdict ships. For an example of changing it, see the following section. |
 | `Cancelled` | Permanent | The interceptor translates *your* cancellations before the classifier sees them, so an `RpcException(Cancelled)` that reaches it is a peer that hung up. Repeating a call the other end abandoned is a guess. |
 | Anything else | Permanent | `Classifier.Default` does not retry what it does not recognize. Retrying a programming error converts a fast, clear failure into a slow, confusing one. |
 
@@ -61,7 +61,7 @@ var policy = GrpcResilience.Default with
 
 `Aborted` is the row most often worth changing. A transactional store that reports write conflicts as `Aborted` and expects the client to retry them is a real shape - it is just not the only one, and repeating a conflicting write against a store that does not expect it is worse than failing.
 
-## What is not classified
+## What the classifier does not see
 
 Two things reach the caller without passing the classifier at all, and both are deliberate:
 
@@ -72,4 +72,4 @@ Two things reach the caller without passing the classifier at all, and both are 
 
 gRPC carries retry pushback as a `google.rpc.RetryInfo` message inside the `grpc-status-details-bin` trailer. NResilience does not read it: doing so means taking a dependency on `Google.Rpc` and base64-decoding a details field, and the `Throttled` verdict already produces the long backoff curve without it.
 
-If your dependency sends one and you want to honor it, a classifier rule that returns `Verdict.Throttled(retryAfter)` is where it goes.
+If your dependency sends one and you want to honor it, write a classifier rule that returns `Verdict.Throttled(retryAfter)`.

@@ -37,9 +37,9 @@ The [gRPC interceptor](../grpc/index.md) reports nesting the same way, under the
 x-nresilience-retrying: 1
 ```
 
-Same fact, same value, two transports - which matters, because the chain that amplifies is rarely all one protocol. An HTTP frontend calling a gRPC backend that calls an HTTP dependency is exactly the shape where the middle hop cannot see what it is part of, and the marker crosses both hops unchanged.
+The marker means the same thing on both transports, which matters because the chain that amplifies is rarely all one protocol. An HTTP frontend calling a gRPC backend that calls an HTTP dependency is exactly the shape where the middle hop cannot see what it is part of, and the marker crosses both hops unchanged.
 
-The in-process half crosses as well: a gRPC call made inside a retrying HTTP handler's attempt is detected without any header at all, and so is the reverse. Turn it off per client with `DetectNestedRetries` on `GrpcResilienceOptions`.
+The in-process half crosses as well: a gRPC call made inside a retrying HTTP handler's attempt is detected without any header, and so is the reverse. To turn this off per client, set `DetectNestedRetries` on `GrpcResilienceOptions`.
 
 ## Handle nested retries on the inbound side
 

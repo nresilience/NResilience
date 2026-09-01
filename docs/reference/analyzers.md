@@ -74,7 +74,7 @@ This is only reported when both properties are set within the same expression.
 
 ## NRES005: Guard created per call
 
-Circuit breakers, retry budgets, policy scopes, and the gRPC [`ResilienceInterceptor`](../grpc/per-service-scope.md) must outlive the call they protect. A breaker created inside a method body never sees a prior failure and never opens. A [`PolicyScope<TKey>`](../features/policy-scope.md) or a `ResilienceInterceptor` created inside a method body fails the same way one level up, because every call receives a fresh set of guards - `AddGrpcResilience()` registers the interceptor at channel scope for exactly this reason.
+Circuit breakers, retry budgets, policy scopes, and the gRPC [`ResilienceInterceptor`](../grpc/per-service-scope.md) must outlive the call they protect. A breaker created inside a method body never sees a prior failure and never opens. A [`PolicyScope<TKey>`](../features/policy-scope.md) or a `ResilienceInterceptor` created inside a method body fails the same way, one level up: every call receives a fresh set of guards. `AddGrpcResilience()` registers the interceptor at channel scope for exactly this reason.
 
 ```csharp
 // Reported: a new breaker is created every time the method is called.

@@ -23,14 +23,14 @@ dotnet add package NResilience.AspNetCore   # Middleware that reads an inbound d
 | `NResilience` | Always. This contains the full API, including HTTP support. | None |
 | `NResilience.Extensions` | Use this for projects with a DI container, configuration, or OpenTelemetry. | `NResilience`, `Microsoft.Extensions.*` |
 | `NResilience.Testing` | Use this in test projects. | `NResilience` |
-| `NResilience.Grpc` | Use this for a gRPC client. The HTTP handler does nothing for gRPC - see [gRPC](../grpc/index.md). | `NResilience`, `NResilience.Extensions`, `Grpc.*` |
+| `NResilience.Grpc` | Use this for a gRPC client. The HTTP handler does nothing for gRPC. See [gRPC](../grpc/index.md). | `NResilience`, `NResilience.Extensions`, `Grpc.*` |
 | `NResilience.AspNetCore` | Use this in a service that should inherit its callers' deadlines. | `NResilience`, ASP.NET Core |
 
 `NResilience` has no external dependencies, targets `net8.0` and `net10.0`, and is compatible with Native AOT and trimming. The `HttpClient` handler is included in the core package to simplify installation.
 
 `NResilience.AspNetCore` is one middleware and nothing else. It is a separate package because it is the only part of NResilience that requires the ASP.NET Core shared framework, which a worker or a console app should not be made to carry - see [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop).
 
-`NResilience.Grpc` is separate because it depends on `Grpc.Core.Api` and `Grpc.Net.ClientFactory`, and the core package makes a "no package dependencies" claim it intends to keep. Most of that weight is already in a gRPC client's dependency graph.
+`NResilience.Grpc` is separate because it depends on `Grpc.Core.Api` and `Grpc.Net.ClientFactory`, and the core package keeps its no-package-dependencies claim. A gRPC client's dependency graph already contains most of that weight.
 
 `NResilience.Extensions` is kept separate because it depends on the `Microsoft.Extensions.*` family. Use the core package for libraries to avoid imposing a specific hosting model on your consumers. Use the extensions package for applications with a DI container.
 
