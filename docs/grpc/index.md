@@ -39,6 +39,7 @@ The package depends on `NResilience`, `NResilience.Extensions`, `Grpc.Core.Api`,
 - **Attempt deadline propagation**: Writes each attempt's ceiling into `CallOptions.Deadline`, which grpc-dotnet sends as the standard `grpc-timeout` header. See [Deadlines](deadlines.md).
 - **Per-service scoping**: Scopes the circuit breaker, the retry budget, and the hedging latency estimate to the gRPC service. See [Per-service scope](per-service-scope.md).
 - **Nested retry detection**: Reports when retries are happening in layers, under the same marker the HTTP handler uses. See [Nested retries](../http/nested-retries.md#grpc-carries-the-same-marker).
+- **Server streaming**: Retries a server stream until its first message, and hands the rest of the enumeration over untouched. See [Streaming](streaming.md).
 - **Call management**: Disposes the gRPC calls that a retry supersedes.
 
 ## Configure the interceptor
@@ -77,13 +78,13 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 
 Register `AddGrpcResilience()` before any other interceptor. Interceptors registered after it run **per attempt**, which is where an interceptor that refreshes a token wants to be - a token fetched once outside the retry loop can expire during it.
 
-gRPC's client factory does not expose the registrations already made, so the order is a rule rather than something the library can enforce.
+The gRPC client factory does not expose the registrations already made, so the order is a rule rather than something the library can enforce.
 
-## Calls that pass through
+## Which calls are wrapped
+
+Server-streaming calls are wrapped on the core library's [streaming](../features/streaming.md) semantic: retried until their first message, and never after it. The one thing that differs from a unary call is the deadline on the wire, which for a stream is the whole call's remaining budget. See [Streaming](streaming.md).
 
 Client-streaming and duplex calls pass through untouched. The request stream is a source you drive interactively, and repeating one means re-enumerating something the failed attempt has already partially consumed, which produces duplicates or requires buffering everything. Neither outcome is a resilience feature. Wrap the *setup* call instead, the way any other callback is wrapped.
-
-Server-streaming calls also pass through today. The core library already has the [streaming](../features/streaming.md) semantic they need, and wiring it to the interceptor is the next piece of work.
 
 The synchronous `BlockingUnaryCall` throws a `NotSupportedException`. Passing it through silently would leave one call in the client with no retry, no breaker, and no deadline. Use the generated client's `Async` overload.
 

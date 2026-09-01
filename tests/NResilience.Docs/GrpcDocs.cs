@@ -8,6 +8,9 @@ namespace NResilience.Docs;
 /// <summary>The gRPC integration: the registration, the classifier, the wire deadline, and repeatability.</summary>
 public sealed class GrpcDocs
 {
+    private static readonly Method<string, string> Watch =
+        new(MethodType.ServerStreaming, "orders.Orders", "Watch", Marshallers.StringMarshaller, Marshallers.StringMarshaller);
+
     private static readonly Method<string, string> Get =
         new(MethodType.Unary, "orders.Orders", "Get", Marshallers.StringMarshaller, Marshallers.StringMarshaller);
 
@@ -164,6 +167,31 @@ public sealed class GrpcDocs
         Assert.Equal(["orders.Orders"], interceptor.Breakers().Keys);
     }
 
+    [Fact]
+    public async Task A_server_stream_is_retried_until_its_first_message()
+    {
+        var interceptor = new ResilienceInterceptor(GrpcResilience.Default with { Backoff = Backoff.None });
+        var script = new StreamScript().Fail(StatusCode.Unavailable).Stream("shipped", "delivered");
+
+        using var call = Stream(interceptor, script);
+
+        var received = new List<string>();
+
+        // <snippet:grpc-streaming-consume>
+        // Retried until the first message arrives. Everything after it is the enumeration
+        // the server is writing, handed over untouched.
+        await foreach (var update in call.ResponseStream.ReadAllAsync())
+            Console.WriteLine(update);
+        // </snippet:grpc-streaming-consume>
+        received.Add("read");
+
+        Assert.Equal(2, script.Calls);
+        Assert.Single(received);
+    }
+
+    private static AsyncServerStreamingCall<string> Stream(ResilienceInterceptor interceptor, StreamScript script) =>
+        interceptor.AsyncServerStreamingCall("request", new ClientInterceptorContext<string, string>(Watch, null, default), script.Invoke);
+
     private static AsyncUnaryCall<string> Call(ResilienceInterceptor interceptor, Script script) =>
         interceptor.AsyncUnaryCall("request", new ClientInterceptorContext<string, string>(Get, null, default), script.Invoke);
 
@@ -208,6 +236,65 @@ public sealed class GrpcDocs
         {
             Calls++;
             return _step!();
+        }
+    }
+
+    /// <summary>A scripted server-streaming continuation, on the same terms as <see cref="Script" />.</summary>
+    private sealed class StreamScript
+    {
+        private readonly List<Func<AsyncServerStreamingCall<string>>> _steps = [];
+
+        internal int Calls { get; private set; }
+
+        internal StreamScript Fail(StatusCode status)
+        {
+            _steps.Add(() => new AsyncServerStreamingCall<string>(
+                new Reader([], new Status(status, string.Empty)),
+                Task.FromException<Metadata>(new RpcException(new Status(status, string.Empty))),
+                () => new Status(status, string.Empty),
+                static () => [],
+                static () => { }));
+
+            return this;
+        }
+
+        internal StreamScript Stream(params string[] messages)
+        {
+            _steps.Add(() => new AsyncServerStreamingCall<string>(
+                new Reader(messages, null),
+                Task.FromResult(new Metadata()),
+                static () => Status.DefaultSuccess,
+                static () => [],
+                static () => { }));
+
+            return this;
+        }
+
+        internal AsyncServerStreamingCall<string> Invoke(string request, ClientInterceptorContext<string, string> context)
+        {
+            var step = _steps[Math.Min(Calls, _steps.Count - 1)];
+            Calls++;
+
+            return step();
+        }
+
+        private sealed class Reader(string[] messages, Status? fault) : IAsyncStreamReader<string>
+        {
+            private int _index = -1;
+
+            public string Current => messages[_index];
+
+            public Task<bool> MoveNext(CancellationToken cancellationToken)
+            {
+                if (fault is { } status)
+                    return Task.FromException<bool>(new RpcException(status));
+
+                if (_index + 1 >= messages.Length)
+                    return Task.FromResult(false);
+
+                _index++;
+                return Task.FromResult(true);
+            }
         }
     }
 }

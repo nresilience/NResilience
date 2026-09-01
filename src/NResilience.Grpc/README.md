@@ -32,6 +32,7 @@ being confused at a call site.
 | **Repeats unary calls by default** | The opposite of the HTTP default, because every gRPC call is a `POST` at the transport and most are reads at the application. Mark the ones that must not repeat with `IsRepeatable`, or wrap a call site in `GrpcResilience.SingleShot()`. |
 | **Propagates the attempt deadline** | Each attempt's ceiling is written into `CallOptions.Deadline`, which grpc-dotnet sends as the standard `grpc-timeout` header. The peer learns the bound; nothing new to parse. |
 | **Scopes guards per service** | One breaker, one retry budget, and one latency window per gRPC service by default. `ScopeBy` makes that per method or one per client. |
+| **Retries a server stream to its first message** | A server-streaming call is retried while it is still indistinguishable from a call (before anything is yielded) and never after. Its wire deadline is the whole call's remaining budget rather than the attempt ceiling. |
 | **Reports nested retries** | Under the same `x-nresilience-retrying` marker the HTTP handler uses, so the fact crosses transports. |
 
 Client-streaming and duplex calls pass through untouched: the request stream is a source the caller

@@ -11,6 +11,9 @@ service Orders {
 
   // A write. Marked non-repeatable by the registration, so it gets one attempt.
   rpc ChargeCard (ChargeRequest) returns (ChargeReply);
+
+  // A server stream. Retried until its first message, and never after it.
+  rpc Watch (GetRequest) returns (stream WatchReply);
 }
 
 message GetRequest {
@@ -31,4 +34,8 @@ message ChargeRequest {
 
 message ChargeReply {
   int32 attempts = 1;
+}
+
+message WatchReply {
+  string event = 1;
 }

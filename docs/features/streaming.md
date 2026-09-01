@@ -125,6 +125,10 @@ await foreach (var item in policy.RunAsync(ct => streams.Next(ct)))
 
 See [the testing reference](../reference/testing.md) for the full surface.
 
+## gRPC server streaming
+
+A gRPC server-streaming call is this feature with the plumbing already done: `AddGrpcResilience()` wraps it for you on the same first-message semantic. See [gRPC streaming](../grpc/streaming.md).
+
 ## Go deeper
 
 [The streaming path](../deep-dives/one-executor.md#the-streaming-path) in the executor deep dive covers the one design point that makes streaming different: the surviving attempt's enumerator and token outlive the loop that produced them, and the timer that armed its ceiling is never returned to the pool.

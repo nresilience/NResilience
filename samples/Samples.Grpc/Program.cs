@@ -76,6 +76,17 @@ catch (RpcException failure)
 }
 
 Console.WriteLine();
+Console.WriteLine("A server stream is retried until its first message, and never after it:");
+
+using (var watch = client.Watch(new GetRequest { Id = "1" }))
+{
+    await foreach (var update in watch.ResponseStream.ReadAllAsync())
+        Console.WriteLine($"  -> {update.Event}");
+}
+
+Console.WriteLine($"  the stream took {FlakyOrders.Watches} attempt(s) to start, and none after it");
+Console.WriteLine();
+
 Console.WriteLine("And a read can be made single-shot at the call site, without touching the wire:");
 FlakyOrders.Reset();
 
@@ -99,10 +110,13 @@ internal sealed class FlakyOrders : Orders.OrdersBase
 {
     private static int _reads;
     private static int _charges;
+    private static int _watches;
 
     internal static int Reads => _reads;
 
     internal static int Charges => _charges;
+
+    internal static int Watches => _watches;
 
     internal static void Reset() => Interlocked.Exchange(ref _reads, 0);
 
@@ -119,6 +133,19 @@ internal sealed class FlakyOrders : Orders.OrdersBase
             : $"{(context.Deadline - DateTime.UtcNow).TotalMilliseconds:0} ms left";
 
         return Task.FromResult(new GetReply { Status = "shipped", Deadline = deadline });
+    }
+
+    /// <summary>
+    ///     The stream fails to start once, which is the window a stream is retried in, and then
+    ///     writes three events. A failure after the first event would reach the consumer untouched.
+    /// </summary>
+    public override async Task Watch(GetRequest request, IServerStreamWriter<WatchReply> responseStream, ServerCallContext context)
+    {
+        if (Interlocked.Increment(ref _watches) < 2)
+            throw new RpcException(new Status(StatusCode.Unavailable, "the watch stream is not ready"));
+
+        foreach (var name in new[] { "picked", "packed", "shipped" })
+            await responseStream.WriteAsync(new WatchReply { Event = name }, context.CancellationToken);
     }
 
     public override Task<ChargeReply> ChargeCard(ChargeRequest request, ServerCallContext context)

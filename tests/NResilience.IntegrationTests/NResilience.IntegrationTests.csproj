@@ -16,7 +16,18 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!--
+      The gRPC server half, and the codegen for the one proto this suite hosts. Grpc.Tools brings
+      its own protoc, so the suite needs no new infrastructure - the same arrangement Samples.Grpc
+      uses. Test-only: no shipping library references either.
+    -->
+    <Protobuf Include="Protos/watch.proto" GrpcServices="Both"/>
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="xunit.v3"/>
+    <PackageReference Include="Grpc.AspNetCore"/>
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all"/>
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
     <PackageReference Include="Microsoft.Extensions.Diagnostics.Testing"/>
   </ItemGroup>
@@ -35,6 +46,7 @@
     <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
     <ProjectReference Include="../../src/NResilience.AspNetCore/NResilience.AspNetCore.csproj"/>
     <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Grpc/NResilience.Grpc.csproj"/>
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj"/>
   </ItemGroup>
 

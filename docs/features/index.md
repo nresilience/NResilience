@@ -23,6 +23,6 @@ NResilience provides several features to improve the resilience of your applicat
 | Telemetry | Enabled for registered policies; disabled for hand-built policies | [Telemetry](telemetry.md) |
 | Logging | Enabled for registered policies; opt-in for hand-built policies | [Logging](logging.md) |
 
-The two transport integrations add what a policy alone cannot decide: [HTTP](../http/index.md) for request reuse, idempotency, and per-host scoping, and [gRPC](../grpc/index.md) for status classification, the `grpc-timeout` deadline, and per-service scoping.
+The two transport integrations add what a policy alone cannot decide: [HTTP](../http/index.md) for request reuse, idempotency, and per-host scoping, and [gRPC](../grpc/index.md) for status classification, the `grpc-timeout` deadline, per-service scoping, and [server streaming](../grpc/streaming.md) on the streaming semantic in the preceding table.
 
 Fallback is handled as a conditional check on a [`CallResult<T>`](../reference/call-result.md).

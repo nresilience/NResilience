@@ -23,7 +23,7 @@ dotnet add package NResilience.AspNetCore   # Middleware that reads an inbound d
 | `NResilience` | Always. This contains the full API, including HTTP support. | None |
 | `NResilience.Extensions` | Use this for projects with a DI container, configuration, or OpenTelemetry. | `NResilience`, `Microsoft.Extensions.*` |
 | `NResilience.Testing` | Use this in test projects. | `NResilience` |
-| `NResilience.Grpc` | Use this for a gRPC client. The HTTP handler does nothing for gRPC. See [gRPC](../grpc/index.md). | `NResilience`, `NResilience.Extensions`, `Grpc.*` |
+| `NResilience.Grpc` | Use this for a gRPC client. See [gRPC](../grpc/index.md). | `NResilience`, `NResilience.Extensions`, `Grpc.*` |
 | `NResilience.AspNetCore` | Use this in a service that should inherit its callers' deadlines. | `NResilience`, ASP.NET Core |
 
 `NResilience` has no external dependencies, targets `net8.0` and `net10.0`, and is compatible with Native AOT and trimming. The `HttpClient` handler is included in the core package to simplify installation.
