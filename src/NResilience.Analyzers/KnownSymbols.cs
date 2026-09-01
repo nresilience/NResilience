@@ -23,6 +23,7 @@ internal sealed class KnownSymbols
         INamedTypeSymbol? breaker,
         INamedTypeSymbol? retryBudget,
         INamedTypeSymbol? policyScope,
+        INamedTypeSymbol? resilienceInterceptor,
         INamedTypeSymbol? timeSpan,
         INamedTypeSymbol? timeout,
         Compilation compilation)
@@ -34,6 +35,7 @@ internal sealed class KnownSymbols
         Breaker = breaker;
         RetryBudget = retryBudget;
         PolicyScope = policyScope;
+        ResilienceInterceptor = resilienceInterceptor;
         TimeSpan = timeSpan;
         Timeout = timeout;
 
@@ -68,6 +70,13 @@ internal sealed class KnownSymbols
     /// </summary>
     internal INamedTypeSymbol? PolicyScope { get; }
 
+    /// <summary>
+    ///     <c>NResilience.Grpc.ResilienceInterceptor</c>, from the gRPC package. Nullable like every
+    ///     other optional symbol here: a consumer who never references that package resolves null and
+    ///     pays nothing, which is the rule this whole assembly is built to.
+    /// </summary>
+    internal INamedTypeSymbol? ResilienceInterceptor { get; }
+
     internal INamedTypeSymbol? TimeSpan { get; }
 
     internal INamedTypeSymbol? Timeout { get; }
@@ -98,6 +107,7 @@ internal sealed class KnownSymbols
             compilation.GetTypeByMetadataName("NResilience.Breaker"),
             compilation.GetTypeByMetadataName("NResilience.RetryBudget"),
             compilation.GetTypeByMetadataName("NResilience.PolicyScope`1"),
+            compilation.GetTypeByMetadataName("NResilience.Grpc.ResilienceInterceptor"),
             compilation.GetTypeByMetadataName("System.TimeSpan"),
             compilation.GetTypeByMetadataName("System.Threading.Timeout"),
             compilation);
@@ -123,6 +133,9 @@ internal sealed class KnownSymbols
 
     /// <summary>True for any construction of <c>PolicyScope&lt;TKey&gt;</c>, whatever the key type.</summary>
     internal bool IsPolicyScope(ITypeSymbol? type) => Is((type as INamedTypeSymbol)?.OriginalDefinition, PolicyScope);
+
+    /// <summary>True for the gRPC resilience interceptor, which holds one breaker and budget per scope key.</summary>
+    internal bool IsResilienceInterceptor(ITypeSymbol? type) => Is(type, ResilienceInterceptor);
 
     /// <summary>True when the method is the compilation's entry point.</summary>
     internal bool IsEntryPoint(IMethodSymbol method) => SymbolEqualityComparer.Default.Equals(method, EntryPoint);

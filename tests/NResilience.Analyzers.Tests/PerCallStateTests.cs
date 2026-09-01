@@ -154,6 +154,65 @@ public sealed class PerCallStateTests
     }
 
     [Fact]
+    public void A_grpc_interceptor_built_per_call_is_the_same_bug_one_level_up()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Orders
+                                                                {
+                                                                    internal static IReadOnlyDictionary<string, Breaker> Breakers() =>
+                                                                        new ResilienceInterceptor().Breakers();
+                                                                }
+                                                                """)));
+
+        Assert.Equal("NRES005", reported.Id);
+        Assert.Contains("gRPC resilience interceptor", reported.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("'Breakers'", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_grpc_interceptor_held_in_a_local_that_never_leaves_the_method_is_reported()
+    {
+        Assert.Equal(["NRES005"], Harness.Ids(Harness.InFile("""
+                                                             internal static class Orders
+                                                             {
+                                                                 internal static bool WillRetry(Grpc.Core.IMethod method)
+                                                                 {
+                                                                     var interceptor = new ResilienceInterceptor();
+                                                                     return interceptor.WillRetry(method);
+                                                                 }
+                                                             }
+                                                             """)));
+    }
+
+    [Fact]
+    public void A_grpc_interceptor_in_a_static_field_is_the_shape_the_docs_teach()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Orders
+                                                    {
+                                                        private static readonly ResilienceInterceptor Interceptor = new();
+
+                                                        internal static bool WillRetry(Grpc.Core.IMethod method) => Interceptor.WillRetry(method);
+                                                    }
+                                                    """)));
+    }
+
+    [Fact]
+    public void A_grpc_interceptor_handed_to_a_registration_is_not_followed_there()
+    {
+        // AddGrpcResilience() builds one per channel from a factory, and channel.Intercept(new ...)
+        // hands it to something whose own lifetime is the question. Both are the same syntax as a
+        // registration that keeps it forever, so neither is reported.
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Orders
+                                                    {
+                                                        internal static Grpc.Core.CallInvoker Wrap(Grpc.Core.CallInvoker invoker) =>
+                                                            Grpc.Core.Interceptors.CallInvokerExtensions.Intercept(invoker, new ResilienceInterceptor());
+                                                    }
+                                                    """)));
+    }
+
+    [Fact]
     public void A_client_created_and_disposed_inside_a_method_keeps_no_per_host_state()
     {
         var reported = Assert.Single(Harness.Run(Harness.InFile("""

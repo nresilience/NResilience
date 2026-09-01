@@ -26,6 +26,9 @@
     <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
     <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj"/>
     <ProjectReference Include="../../src/NResilience.CodeFixes/NResilience.CodeFixes.csproj"/>
+
+    <!-- NRES005 recognizes the gRPC interceptor, so the snippets have to be able to name it. -->
+    <ProjectReference Include="../../src/NResilience.Grpc/NResilience.Grpc.csproj"/>
   </ItemGroup>
 
 </Project>

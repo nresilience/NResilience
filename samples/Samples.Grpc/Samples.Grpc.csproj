@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>Samples.Grpc</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Both halves: the sample hosts the service it calls, so nothing here needs a network. -->
+    <Protobuf Include="Protos/orders.proto" GrpcServices="Both"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore"/>
+    <PackageReference Include="Grpc.Tools" PrivateAssets="all"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Analyzers/NResilience.Analyzers.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all"/>
+    <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Grpc/NResilience.Grpc.csproj"/>
+  </ItemGroup>
+
+</Project>

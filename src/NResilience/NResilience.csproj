@@ -67,6 +67,13 @@
     -->
     <InternalsVisibleTo Include="NResilience.Extensions"/>
 
+    <!--
+      CallEvent's constructor is internal, so that the vocabulary of events is the library's rather
+      than anybody's. The gRPC interceptor raises CallEventKind.NestedRetry for the same reason and
+      under the same marker as the HTTP handler beside it, and that is the whole of what it needs.
+    -->
+    <InternalsVisibleTo Include="NResilience.Grpc"/>
+
     <!-- The behavioral suite constructs NextAttempt and reads the inline log directly. -->
     <InternalsVisibleTo Include="NResilience.Tests"/>
     <InternalsVisibleTo Include="NResilience.IntegrationTests"/>

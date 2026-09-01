@@ -9,6 +9,7 @@
     <Project Path="bench/NResilience.Probes/NResilience.Probes.csproj" />
   </Folder>
   <Folder Name="/Samples/">
+    <Project Path="samples/Samples.Grpc/Samples.Grpc.csproj" />
     <Project Path="samples/Samples.Http/Samples.Http.csproj" />
     <Project Path="samples/Samples.QuickStart/Samples.QuickStart.csproj" />
     <Project Path="samples/Samples.Worker/Samples.Worker.csproj" />
@@ -26,6 +27,7 @@
   </Folder>
   <Project Path="src/NResilience.AspNetCore/NResilience.AspNetCore.csproj" />
   <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj" />
+  <Project Path="src/NResilience.Grpc/NResilience.Grpc.csproj" />
   <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
   <Project Path="src/NResilience/NResilience.csproj" />
 </Solution>

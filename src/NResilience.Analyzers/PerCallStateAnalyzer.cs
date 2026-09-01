@@ -9,8 +9,9 @@ namespace NResilience.Analyzers;
 /// <summary>
 ///     NRES005 and NRES006: the guards are mutable state whose whole purpose is to outlive the call.
 ///     A breaker that is rebuilt per call has never seen a failure, a budget that is rebuilt per call
-///     has never seen a deposit, and a client that is rebuilt per call has no per-host anything. All
-///     three read as configured resilience and provide none.
+///     has never seen a deposit, a policy scope or gRPC interceptor that is rebuilt per call has one
+///     of each per key and keeps none of them, and a client that is rebuilt per call has no per-host
+///     anything. All of them read as configured resilience and provide none.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
@@ -45,7 +46,9 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         if (known.IsBreaker(creation.Type))
             ReportGuardIfPerCall(context, creation, known, "breaker", "open");
         else if (known.IsPolicyScope(creation.Type))
-            ReportScopeIfPerCall(context, creation, known);
+            ReportContainerIfPerCall(context, creation, known, "policy scope");
+        else if (known.IsResilienceInterceptor(creation.Type))
+            ReportContainerIfPerCall(context, creation, known, "gRPC resilience interceptor");
     }
 
     private static void AnalyzeInvocation(OperationAnalysisContext context, KnownSymbols known)
@@ -89,25 +92,35 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    ///     A <c>PolicyScope</c> is a dictionary of breakers and budgets, so building one per call is
-    ///     NRES005 one level up: every key starts again with a closed breaker and an empty budget.
+    ///     A policy container - a <c>PolicyScope</c>, a gRPC <c>ResilienceInterceptor</c> - is a
+    ///     dictionary of breakers and budgets, so building one per call is NRES005 one level up: every
+    ///     key starts again with a closed breaker and an empty budget.
     /// </summary>
     /// <remarks>
-    ///     Reported only for a scope that provably dies with the call - one used straight away as a
-    ///     receiver, or one held in a local that never leaves the method. A scope handed to something
-    ///     else may well be handed to something that keeps it, and a diagnostic on a shape that is
-    ///     often correct is a diagnostic people turn off.
+    ///     Reported only for a container that provably dies with the call - one used straight away as
+    ///     a receiver, or one held in a local that never leaves the method. A container handed to
+    ///     something else is not followed there: <c>channel.Intercept(new ResilienceInterceptor())</c>
+    ///     and <c>services.AddSingleton(new PolicyScope&lt;string&gt;(t))</c> are the same syntax and
+    ///     opposite verdicts, and a diagnostic on a shape that is often correct is a diagnostic people
+    ///     turn off.
+    ///     <para>
+    ///         <c>ResilienceHandler</c> is deliberately not in this set, and the reason is worth
+    ///         recording rather than leaving as an accident of which type came up first. It is built by
+    ///         the client factory from a registration callback, never by the caller per request, and a
+    ///         hand-built one is always an argument to an <c>HttpClient</c> whose own lifetime is what
+    ///         actually matters - which is NRES006's question, not this one.
+    ///     </para>
     /// </remarks>
-    private static void ReportScopeIfPerCall(OperationAnalysisContext context, IOperation scope, KnownSymbols known)
+    private static void ReportContainerIfPerCall(OperationAnalysisContext context, IOperation container, KnownSymbols known, string kind)
     {
-        if (!DiesWithTheCall(scope) || !InsideSomethingCalledRepeatedly(context, known, out var container))
+        if (!DiesWithTheCall(container) || !InsideSomethingCalledRepeatedly(context, known, out var method))
             return;
 
         context.ReportDiagnostic(Diagnostic.Create(
             Diagnostics.PerCallGuardState,
-            scope.Syntax.GetLocation(),
-            "policy scope",
-            container,
+            container.Syntax.GetLocation(),
+            kind,
+            method,
             "open a breaker or throttle a retry storm"));
     }
 

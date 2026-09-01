@@ -1,7 +1,7 @@
 ---
 title: Reference
 description: A comprehensive reference of the NResilience public API, organized by type family.
-order: 7
+order: 8
 ---
 
 # Reference

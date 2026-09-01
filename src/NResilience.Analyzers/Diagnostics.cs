@@ -68,14 +68,15 @@ internal static class Diagnostics
     /// <summary>NRES005: per-call breaker, budget or policy scope state.</summary>
     internal static readonly DiagnosticDescriptor PerCallGuardState = Rule(
         PerCallGuardStateId,
-        "A breaker, retry budget or policy scope created per call keeps no state",
+        "A breaker, retry budget, policy scope or interceptor created per call keeps no state",
         "This {0} is created inside '{1}', so every call gets a new one; a {0} whose state is discarded each call can never {2}",
         Reliability,
         DiagnosticSeverity.Warning,
         "A breaker counts consecutive failures, a budget counts deposits over a window, and a policy " +
-        "scope holds one of each per key. All three are mutable state whose whole purpose is to outlive " +
-        "the call. Hold one in a static readonly field, in a container-managed singleton, or on the " +
-        "long-lived object it protects.");
+        "scope or a gRPC resilience interceptor holds one of each per key. All of them are mutable state " +
+        "whose whole purpose is to outlive the call. Hold one in a static readonly field, in a " +
+        "container-managed singleton, or on the long-lived object it protects - AddGrpcResilience() " +
+        "registers the interceptor at channel scope for exactly this reason.");
 
     /// <summary>NRES006: per-call resilient client.</summary>
     internal static readonly DiagnosticDescriptor PerCallClient = Rule(

@@ -92,6 +92,7 @@ NResilience is built for high-performance .NET applications:
 | Worked scenarios for common patterns | [Guides](guides/index.md) |
 | Detailed configuration options | [Features](features/index.md) |
 | `AddResilience()` on a client | [Dependency injection](di/index.md) |
+| A retried gRPC client | [gRPC](grpc/index.md) |
 | Every member, in order | [Reference](reference/index.md) |
 | Architecture and design decisions | [Deep dives](deep-dives/index.md) |
 | To move off Polly | [Migrating from Polly](migrating-from-polly.md) |

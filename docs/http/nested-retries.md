@@ -29,6 +29,18 @@ The header means the sender has retries enabled for this request - not that this
 
 When the handler detects nesting, it fires a `NestedRetry` [event](../features/telemetry.md) and then proceeds with the call. The library reports the nesting but does not intervene; silently dropping configured retries would be an unexpected behavior that could lead to difficult-to-debug failures.
 
+## gRPC carries the same marker
+
+The [gRPC interceptor](../grpc/index.md) reports nesting the same way, under the same name. gRPC metadata keys are lowercase ASCII, so the marker travels as:
+
+```
+x-nresilience-retrying: 1
+```
+
+The marker means the same thing on both transports, which matters because the chain that amplifies is rarely all one protocol. An HTTP frontend calling a gRPC backend that calls an HTTP dependency is exactly the shape where the middle hop cannot see what it is part of, and the marker crosses both hops unchanged.
+
+The in-process half crosses as well: a gRPC call made inside a retrying HTTP handler's attempt is detected without any header, and so is the reverse. To turn this off per client, set `DetectNestedRetries` on `GrpcResilienceOptions`.
+
 ## Handle nested retries on the inbound side
 
 If you are building a service that receives requests, you can check for the nested retry header to determine if the caller will retry the operation. Check the value, not just the header's presence: an intermediary that forwards unknown headers can add an empty one, and `1` is the only value a retrying handler writes.

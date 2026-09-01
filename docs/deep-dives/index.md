@@ -1,7 +1,7 @@
 ---
 title: Deep dives
 description: Explore the design decisions, measurements, and technical reasoning behind NResilience.
-order: 8
+order: 9
 ---
 
 # Deep dives

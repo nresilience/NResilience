@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting
 description: Common symptoms, their solutions, and the technical reasoning behind them.
-order: 11
+order: 12
 ---
 
 # Troubleshooting
