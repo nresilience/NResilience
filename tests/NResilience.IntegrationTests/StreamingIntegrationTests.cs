@@ -129,10 +129,17 @@ public sealed class LoopbackStreamServer : IAsyncDisposable
             // the client's first read return zero bytes, which is an empty source - a success, by
             // the streaming contract - and no retry would follow. A reset makes the read throw,
             // which is the transient failure this whole library exists to classify.
+            //
+            // The close is on the underlying Socket with a zero timeout, never TcpClient.Close():
+            // when GetStream() was never called, TcpClient.Dispose issues a graceful
+            // InternalShutdown(Both) - a FIN - before closing, and on Linux the client's pending
+            // read usually completes on that FIN instead of the reset, which turns the drop into
+            // an empty source. Socket.Close(0) is the abortive path: no shutdown, a forced
+            // linger-0 close, and an unambiguous RST on every OS.
             if (connection <= _dropFirst)
             {
-                client.LingerState = new LingerOption(true, 0);
-                client.Close();
+                client.Client.LingerState = new LingerOption(true, 0);
+                client.Client.Close(0);
                 Interlocked.Increment(ref _dropped);
                 continue;
             }

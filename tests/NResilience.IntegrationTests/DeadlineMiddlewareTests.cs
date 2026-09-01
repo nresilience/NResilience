@@ -118,6 +118,13 @@ public sealed class DeadlineMiddlewareTests
 
             pipeline.Run(async context =>
             {
+                // Let the one-millisecond deadline expire for certain: a request that routes in under
+                // a millisecond starts its attempt with time still on the clock, and the request hits
+                // the wire before the deadline stops it - which is a bounded attempt, not a refused
+                // one. The claim under test is the refused one, so the deadline has to be spent
+                // before the outbound call begins.
+                await Task.Delay(20);
+
                 using var client = new HttpClient(new ResilienceHandler(new SocketsHttpHandler(), policy))
                 {
                     Timeout = Timeout.InfiniteTimeSpan,
@@ -138,8 +145,8 @@ public sealed class DeadlineMiddlewareTests
         using var caller = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
 
-        // One millisecond, spent by the time the request is routed - and if it somehow is not, the
-        // 1 ms deadline stops the call on the first check anyway.
+        // One millisecond, spent by the handler's delay before the outbound call begins, so the
+        // deadline refuses the call rather than merely bounding it.
         request.Headers.TryAddWithoutValidation(ResilienceDeadline.Header, "1");
 
         using var response = await caller.SendAsync(request);

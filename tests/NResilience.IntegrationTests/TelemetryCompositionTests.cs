@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Net;
@@ -31,14 +32,16 @@ public sealed class TelemetryCompositionTests
             new LoopbackResponse(HttpStatusCode.OK, "ok"u8.ToArray()));
 
         var events = new EventRecorder();
-        var spans = new List<Activity>();
+        var spans = new ConcurrentQueue<Activity>();
         var logger = new FakeLogger();
 
         using var activityListener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == ResilienceTelemetry.ActivitySourceName,
             Sample = (ref _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = spans.Add,
+            // Concurrent: the listener is process-wide and ActivityStopped fires on whichever
+            // thread stops the activity, so a parallel test class's spans land here too.
+            ActivityStopped = spans.Enqueue,
         };
 
         ActivitySource.AddActivityListener(activityListener);
@@ -99,13 +102,15 @@ public sealed class TelemetryCompositionTests
         await using var server = await LoopbackHttp.StartAsync(
             new LoopbackResponse(HttpStatusCode.OK, "ok"u8.ToArray()));
 
-        var spans = new List<Activity>();
+        var spans = new ConcurrentQueue<Activity>();
 
         using var activityListener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == ResilienceTelemetry.ActivitySourceName,
             Sample = (ref _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = spans.Add,
+            // Concurrent: see the first test. This bag also receives spans from other test
+            // classes running in parallel, so the assertions below filter rather than count.
+            ActivityStopped = spans.Enqueue,
         };
 
         ActivitySource.AddActivityListener(activityListener);
@@ -123,7 +128,10 @@ public sealed class TelemetryCompositionTests
         using var response = await client.GetAsync(server.BaseUri);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Empty(spans);
+
+        // No span named for this call. The listener is process-wide, so the bag may hold a
+        // parallel test's span; what this call must not have produced is one of its own.
+        Assert.DoesNotContain(spans, s => s.DisplayName == "resilience test");
         Assert.Equal(0, recording.CallsForPrefix(HostScopedName(server)));
     }
 
@@ -138,13 +146,14 @@ public sealed class TelemetryCompositionTests
             new LoopbackResponse(HttpStatusCode.ServiceUnavailable));
 
         var events = new EventRecorder();
-        var spans = new List<Activity>();
+        var spans = new ConcurrentQueue<Activity>();
 
         using var activityListener = new ActivityListener
         {
             ShouldListenTo = source => source.Name == ResilienceTelemetry.ActivitySourceName,
             Sample = (ref _) => ActivitySamplingResult.AllDataAndRecorded,
-            ActivityStopped = spans.Add,
+            // Concurrent: see the first test.
+            ActivityStopped = spans.Enqueue,
         };
 
         ActivitySource.AddActivityListener(activityListener);
