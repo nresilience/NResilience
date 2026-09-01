@@ -26,6 +26,7 @@
   </Folder>
   <Project Path="src/NResilience.AspNetCore/NResilience.AspNetCore.csproj" />
   <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj" />
+  <Project Path="src/NResilience.Grpc/NResilience.Grpc.csproj" />
   <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
   <Project Path="src/NResilience/NResilience.csproj" />
 </Solution>

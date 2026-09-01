@@ -23,11 +23,18 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
     <PackageReference Include="Microsoft.Extensions.Configuration"/>
     <PackageReference Include="Microsoft.Extensions.Configuration.Json"/>
+
+    <!-- The gRPC suite drives the interceptor through a scripted continuation: no channel, no
+         sockets, no codegen. Marshallers.StringMarshaller is the request and response type, so the
+         behavioral tests need no protobuf either. -->
+    <PackageReference Include="Grpc.Core.Api"/>
+    <PackageReference Include="Grpc.Net.ClientFactory"/>
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
     <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+    <ProjectReference Include="../../src/NResilience.Grpc/NResilience.Grpc.csproj"/>
     <ProjectReference Include="../../src/NResilience.Testing/NResilience.Testing.csproj"/>
   </ItemGroup>
 

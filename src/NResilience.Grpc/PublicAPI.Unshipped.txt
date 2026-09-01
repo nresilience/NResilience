@@ -1,0 +1,41 @@
+#nullable enable
+Microsoft.Extensions.DependencyInjection.ResilienceGrpcClientBuilderExtensions
+NResilience.Grpc.GrpcResilience
+NResilience.Grpc.GrpcResilience.SingleShotScopeHandle
+NResilience.Grpc.GrpcResilience.SingleShotScopeHandle.Dispose() -> void
+NResilience.Grpc.GrpcResilience.SingleShotScopeHandle.SingleShotScopeHandle() -> void
+NResilience.Grpc.GrpcResilienceOptions
+NResilience.Grpc.GrpcResilienceOptions.BreakerPerScope.get -> bool
+NResilience.Grpc.GrpcResilienceOptions.BreakerPerScope.set -> void
+NResilience.Grpc.GrpcResilienceOptions.BreakerSettings.get -> NResilience.BreakerSettings?
+NResilience.Grpc.GrpcResilienceOptions.BreakerSettings.set -> void
+NResilience.Grpc.GrpcResilienceOptions.DeadlineSlack.get -> System.TimeSpan
+NResilience.Grpc.GrpcResilienceOptions.DeadlineSlack.set -> void
+NResilience.Grpc.GrpcResilienceOptions.DetectNestedRetries.get -> bool
+NResilience.Grpc.GrpcResilienceOptions.DetectNestedRetries.set -> void
+NResilience.Grpc.GrpcResilienceOptions.GrpcResilienceOptions() -> void
+NResilience.Grpc.GrpcResilienceOptions.IsRepeatable.get -> System.Func<Grpc.Core.IMethod!, bool>!
+NResilience.Grpc.GrpcResilienceOptions.IsRepeatable.set -> void
+NResilience.Grpc.GrpcResilienceOptions.MaxScopes.get -> int
+NResilience.Grpc.GrpcResilienceOptions.MaxScopes.set -> void
+NResilience.Grpc.GrpcResilienceOptions.OwnTransportTimeout.get -> bool
+NResilience.Grpc.GrpcResilienceOptions.OwnTransportTimeout.set -> void
+NResilience.Grpc.GrpcResilienceOptions.PropagateAttemptDeadline.get -> bool
+NResilience.Grpc.GrpcResilienceOptions.PropagateAttemptDeadline.set -> void
+NResilience.Grpc.GrpcResilienceOptions.ScopeBy.get -> System.Func<Grpc.Core.IMethod!, string!>?
+NResilience.Grpc.GrpcResilienceOptions.ScopeBy.set -> void
+NResilience.Grpc.GrpcResilienceOptions.Validate() -> void
+NResilience.Grpc.ResilienceInterceptor
+NResilience.Grpc.ResilienceInterceptor.Breakers() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.Breaker!>!
+NResilience.Grpc.ResilienceInterceptor.Budgets() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.RetryBudget!>!
+NResilience.Grpc.ResilienceInterceptor.Options.get -> NResilience.Grpc.GrpcResilienceOptions!
+NResilience.Grpc.ResilienceInterceptor.Policy.get -> NResilience.Resilience!
+NResilience.Grpc.ResilienceInterceptor.ResilienceInterceptor(NResilience.Resilience? policy = null, NResilience.Grpc.GrpcResilienceOptions? options = null, string? name = null) -> void
+NResilience.Grpc.ResilienceInterceptor.WillRetry(Grpc.Core.IMethod! method) -> bool
+override NResilience.Grpc.ResilienceInterceptor.AsyncUnaryCall<TRequest, TResponse>(TRequest! request, Grpc.Core.Interceptors.ClientInterceptorContext<TRequest!, TResponse!> context, Grpc.Core.Interceptors.Interceptor.AsyncUnaryCallContinuation<TRequest!, TResponse!>! continuation) -> Grpc.Core.AsyncUnaryCall<TResponse!>!
+override NResilience.Grpc.ResilienceInterceptor.BlockingUnaryCall<TRequest, TResponse>(TRequest! request, Grpc.Core.Interceptors.ClientInterceptorContext<TRequest!, TResponse!> context, Grpc.Core.Interceptors.Interceptor.BlockingUnaryCallContinuation<TRequest!, TResponse!>! continuation) -> TResponse!
+static Microsoft.Extensions.DependencyInjection.ResilienceGrpcClientBuilderExtensions.AddGrpcResilience(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, NResilience.Resilience? policy = null, System.Action<NResilience.Grpc.GrpcResilienceOptions!>? configureOptions = null, bool telemetry = true, NResilience.Extensions.ResilienceLogProfile? logging = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
+static NResilience.Grpc.GrpcResilience.Classifier.get -> NResilience.Classifier!
+static NResilience.Grpc.GrpcResilience.Default.get -> NResilience.Resilience!
+static NResilience.Grpc.GrpcResilience.IsSingleShot.get -> bool
+static NResilience.Grpc.GrpcResilience.SingleShot() -> NResilience.Grpc.GrpcResilience.SingleShotScopeHandle

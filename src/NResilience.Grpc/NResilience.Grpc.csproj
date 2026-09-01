@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <RootNamespace>NResilience.Grpc</RootNamespace>
+
+    <IsShippingLibrary>true</IsShippingLibrary>
+
+    <IsPackable>true</IsPackable>
+    <IsAotCompatible>true</IsAotCompatible>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+
+    <PackageId>NResilience.Grpc</PackageId>
+    <Description>The gRPC integration for NResilience: a client interceptor that runs a resilience policy around each call, classifies gRPC status codes, writes a per-attempt deadline the peer can read, scopes breakers and budgets per service, and reports nested retries. Retrying a gRPC client through the HTTP handler does nothing - every gRPC call is a POST - which is what this package exists to fix.</Description>
+    <PackageTags>resilience;retry;timeout;circuit-breaker;grpc;grpc-dotnet;polly</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!-- The nuget.org package page shows this package's own README, not the root one. -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!--
+      RS0026 forbids overload sets that each carry an optional parameter. AddGrpcResilience is
+      exactly that shape, for the same reason the HTTP registration is; the public API manifest is
+      what protects source compatibility, and it is reviewed.
+    -->
+    <NoWarn>$(NoWarn);RS0026</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience/NResilience.csproj"/>
+
+    <!--
+      Not optional. AddGrpcResilience's signature uses ResilienceLogProfile and its body uses
+      WithLogging and WithTelemetry, all three of which live in Extensions - dropping the reference
+      would make gRPC the one integration where telemetry and logging have to be wired by hand. The
+      weight is smaller than it looks: Grpc.Net.ClientFactory already brings
+      Microsoft.Extensions.Http, which is the bulk of what Extensions adds.
+    -->
+    <ProjectReference Include="../NResilience.Extensions/NResilience.Extensions.csproj"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The interceptor base class and the call types. netstandard2.0; the smallest gRPC surface. -->
+    <PackageReference Include="Grpc.Core.Api"/>
+
+    <!-- AddGrpcClient / AddInterceptor / InterceptorScope - the DI seam the registration extends. -->
+    <PackageReference Include="Grpc.Net.ClientFactory"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="NResilience.Tests"/>
+    <InternalsVisibleTo Include="NResilience.IntegrationTests"/>
+  </ItemGroup>
+
+  <!-- Shared package metadata: authors, repository URL, source link, symbols, readme. -->
+  <Import Project="../../Release.props"/>
+
+</Project>

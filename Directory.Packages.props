@@ -58,6 +58,21 @@
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
 
+    <!--
+      gRPC. Pinned in lockstep - grpc-dotnet releases its packages together and a mixed-version
+      reference set is a support incident waiting to happen. Pinned rather than floated for the
+      same reason Polly.Core is: NResilience.Grpc's cancellation ladder is written against
+      grpc-dotnet's exception-mapping behavior, which is behavior and not contract, so a bump is a
+      deliberate, re-tested change.
+
+      Grpc.Core.Api is the interceptor base class and the call types; Grpc.Net.ClientFactory is the
+      AddGrpcClient / AddInterceptor DI seam the registration extends, and brings Grpc.Net.Client
+      and Microsoft.Extensions.Http transitively.
+    -->
+    <PackageVersion Include="Grpc.Core.Api" Version="2.83.0" />
+    <PackageVersion Include="Grpc.Net.Client" Version="2.83.0" />
+    <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.83.0" />
+
     <!-- Declared here so the version is decided once. -->
     <PackageVersion Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" />
 
