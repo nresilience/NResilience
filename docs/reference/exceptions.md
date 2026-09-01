@@ -15,15 +15,19 @@ For any exception thrown by the library, the attempt log is stored in `Exception
 
 ## `CallRejectedException`
 
-A `CallRejectedException` is thrown when a guard refuses to execute a call.
+A `CallRejectedException` covers two shapes, told apart by `Reason`.
+
+**A guard refused the call.** An open circuit breaker or a depleted retry budget stopped it, and it arrives no sooner than the [rejection pause](../deep-dives/guarded-rejection.md). `RetryAfter` carries a hint when the guard supplied one.
+
+**A verdict stopped it.** Nothing threw and no guard intervened - the classifier or an `Admit` hook refused what came back. The dependency was reached; the answer was not acceptable. A streaming call whose first element the classifier refused arrives here rather than yielding that element, because an element carries no status of its own and a truncated stream would be indistinguishable from a short successful one. There is no `RetryAfter` on this shape: a refused result is not a question about timing.
 
 | Member | Description |
 | :--- | :--- |
-| `Reason` | The reason for the refusal: `DependencyUnavailable` for an open circuit breaker, or `BudgetExhausted` for a depleted retry budget. |
-| `Attempts` | The history of attempts that occurred before the call was rejected. |
-| `RetryAfter` | A hint indicating when the caller should retry the operation, if provided. |
+| `Reason` | Why the operation stopped: `DependencyUnavailable` for an open circuit breaker, `BudgetExhausted` for a depleted retry budget, `Permanent` when the result was classified permanent and so was not retried, or `AttemptsExhausted` when the attempts ran out on results the policy kept refusing. |
+| `Attempts` | The history of attempts that occurred before the operation stopped. |
+| `RetryAfter` | A hint indicating when the caller should retry the operation, when a guard supplied one. Always null for a verdict-driven stop. |
 
-This exception is thrown no sooner than the [rejection pause](../deep-dives/guarded-rejection.md). Because the rejected call was never made, this exception reports the rejection itself; the exception from the previous attempt is contained as the inner exception.
+Because a guard's rejected call was never made, the exception reports the rejection itself; the exception from the previous attempt, if there was one, is contained as the inner exception.
 
 ## `DeadlineExceededException`
 

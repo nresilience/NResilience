@@ -160,4 +160,54 @@ public sealed class AttemptTokenTests
                                                                   cancellationToken);
                                                       """)));
     }
+
+    /// <summary>
+    ///     The streaming execution overloads name their callback parameter <c>source</c> rather than
+    ///     <c>work</c>, because it is a cold source the policy re-invokes per attempt rather than the
+    ///     work itself. These are the same rules over the new parameter name.
+    /// </summary>
+    [Fact]
+    public void The_streaming_overloads_are_clean_when_the_token_is_threaded()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InMethod(
+            "        await foreach (var item in api.RunAsync(attempt => Listed(attempt), cancellationToken)) { }")));
+    }
+
+    [Fact]
+    public void The_wrong_token_in_a_streaming_callback_is_the_same_bug()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InMethod(
+            "        await foreach (var item in api.RunAsync(attempt => Listed(cancellationToken), cancellationToken)) { }")));
+
+        Assert.Equal("NRES002", reported.Id);
+        Assert.Contains("attempt", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_omitted_token_in_a_streaming_callback_is_a_stream_the_attempt_ceiling_cannot_stop()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InMethod(
+            "        await foreach (var item in api.RunAsync(attempt => Listed(), cancellationToken)) { }")));
+
+        Assert.Equal("NRES001", reported.Id);
+        Assert.Contains("'Listed' takes a cancellation token", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_stateful_streaming_overload_is_clean_when_the_token_is_threaded()
+    {
+        // `Client` here is a stand-in for any state a caller threads to its source factory.
+        Assert.Equal([], Harness.Ids(Harness.InMethod(
+            "        await foreach (var item in api.RunAsync(static (client, attempt) => Target.Listed(attempt), Client, cancellationToken)) { }")));
+    }
+
+    [Fact]
+    public void A_streaming_method_group_is_left_alone()
+    {
+        // A method group binds to the streaming overload without ever naming the token, and the
+        // rule is deliberately quiet about bodies it cannot see - the same contract as the call
+        // overloads.
+        Assert.Equal([], Harness.Ids(Harness.InMethod(
+            "        await foreach (var item in api.RunAsync(Listed, cancellationToken)) { }")));
+    }
 }

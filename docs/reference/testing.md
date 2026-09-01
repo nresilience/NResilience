@@ -39,6 +39,37 @@ To ensure that scripted delays are handled deterministically and do not introduc
 - **Bounds**: If a call is made after the script has been exhausted, the sequence throws an `InvalidOperationException` specifying the script length and the call number.
 - **Thread Safety**: Building the script is not thread-safe, but serving the script via `NextAsync` is thread-safe.
 
+## `ScriptedStream`
+
+`ScriptedStream` is a factory for creating scripted cold streams, used with the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source.
+
+| Member | Description |
+| :--- | :--- |
+| `ScriptedStream.For<T>(TimeProvider? time = null)` | Creates a scripted stream of `T` elements. Pass the same `TimeProvider` the policy was given, so scripted delays are served on the test clock. |
+
+## `ScriptedStream<T>`
+
+`ScriptedStream<T>` defines a series of stream-shaped outcomes, served one per attempt, in order.
+
+| Member | Description |
+| :--- | :--- |
+| `Yields(params ReadOnlySpan<T> elements)` | Appends a step that yields the specified elements. |
+| `YieldsAfter(TimeSpan delay, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements after waiting the delay before the first one. |
+| `Empty()` | Appends a step that yields nothing, which the streaming path treats as a success. |
+| `Throws(Exception)` | Appends a step that throws the exception from its first pull, after any pending delay. |
+| `FaultsAfter(Exception, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements and then throws the exception mid-stream, from the pull after the last element - the fault a source produces after the streaming path has stopped watching. |
+| `Delay(TimeSpan)` | Makes the next step wait the delay before its outcome. Multiple calls accumulate. |
+| `Next(CancellationToken)` | Serves the next step as a cold source. This is the method typically bound to the streaming `RunAsync` overloads, as a method group or a static lambda. |
+| `Starts` | How many attempts have started, whether or not their source was ever pulled from. |
+| `LiveEnumerators` | How many served enumerators are still undisposed - one while the caller is still enumerating, zero once done. |
+| `DisposedEnumerators` | How many served enumerators have been disposed - abandoned by the policy, or finished by the consumer. A retried stream that leaks its losing attempts reads here. |
+
+### Execution behavior
+
+- **Timing**: The delay is served against the `TimeProvider` the stream was given, but observes the token the enumerator was handed - the attempt's token, so attempt ceilings are testable against a fake clock.
+- **Bounds**: If the policy starts an attempt after the script has been exhausted, `Next` throws an `InvalidOperationException` specifying the script length and the attempt number.
+- **Thread Safety**: Building the script is not thread-safe, but serving is.
+
 ## `EventRecorder`
 
 `EventRecorder` is a utility for capturing and asserting on the events emitted by a resilience policy.

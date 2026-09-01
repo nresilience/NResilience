@@ -283,4 +283,16 @@ public static class ShippingScenarios
 
         public ValueTask<int> RunAsync() => _policy.RunAsync(_callback, _counter);
     }
+
+    // ---- Streaming. ----
+
+    /// <summary>
+    ///     The streaming shape under the shipping policy: a cold source that suspends before every
+    ///     element, pulled once to the first element and then handed to the consumer, under
+    ///     <see cref="Lib.Resilience.Default" />. Measured against
+    ///     <see cref="StreamGate.RawSuspending" />, the identical enumeration with no policy in the
+    ///     middle, so the difference is the streaming path's own cost and nothing else.
+    /// </summary>
+    public static ValueTask<int> DefaultStreamSuspending() =>
+        StreamGate.DrainAsync(Resilience.Default.RunAsync(static ct => StreamGate.SuspendAsync(ct)));
 }

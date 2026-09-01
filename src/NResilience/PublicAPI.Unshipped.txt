@@ -248,7 +248,9 @@ NResilience.Resilience.OnEvent.get -> System.Action<NResilience.CallEvent>?
 NResilience.Resilience.OnEvent.init -> void
 NResilience.Resilience.Resilience() -> void
 NResilience.Resilience.RunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NResilience.Resilience.RunAsync<T>(System.Func<System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T>!
 NResilience.Resilience.RunAsync<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+NResilience.Resilience.RunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T>!
 NResilience.Resilience.RunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
 NResilience.Resilience.RunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 NResilience.Resilience.Time.get -> System.TimeProvider!

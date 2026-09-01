@@ -79,6 +79,12 @@ public static class Arms
             Arm.Of("lib: limited x2 -> success", shippingLimited.RunAsync, AllocationCounter.ProcessWide,
                 shippingLimited.Reset),
 
+            // The streaming path. Measured against its own raw baseline - the identical enumeration
+            // with no policy in the middle - because its operation is a whole enumeration rather
+            // than one callback, so the shared raw row would compare unlike things.
+            Arm.Of("raw stream (baseline)", StreamGate.RawSuspending, AllocationCounter.ProcessWide),
+            Arm.Of("lib: Default, streaming", ShippingScenarios.DefaultStreamSuspending, AllocationCounter.ProcessWide),
+
             // Stand-in: reference rows for the stand-in-versus-shipping delta.
             Arm.Of("fused: None (passthrough)", Scenarios.NoneSuspending, AllocationCounter.ProcessWide),
             Arm.Of("fused: lean loop", Scenarios.LeanSuspending, AllocationCounter.ProcessWide),

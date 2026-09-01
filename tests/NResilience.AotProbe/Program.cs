@@ -172,6 +172,43 @@ internal static class Program
 
         failures += Check("library: caller cancellation propagates untouched", cancelledCorrectly);
 
+        // The streaming path: an async iterator over the suspending gate, retried nothing, drained
+        // in full. It is the one execution path whose frame the AOT toolchain could treat
+        // differently - iterators are the runtime's own state machines - so it is executed here
+        // rather than merely published past.
+        var streamSum = 0;
+        var streamed = Resilience.Default.RunAsync(static ct => StreamGate.SuspendAsync(ct));
+
+        await foreach (var item in streamed.ConfigureAwait(false))
+            streamSum += item;
+
+        failures += Check("library: the streaming path runs under AOT", streamSum == StreamGate.Items * StreamGate.Value);
+
+        // A first element the classifier refuses on the final attempt throws rather than yields: the
+        // fall-through constructor in Failures.Build is load-bearing for streaming, so it executes
+        // here rather than being merely compiled past.
+        var rejecting = Resilience.Default with
+        {
+            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Permanent : Verdict.Ok),
+        };
+
+        var refused = false;
+        var refusedCorrectly = false;
+
+        try
+        {
+            await foreach (var _ in rejecting.RunAsync(StreamGate.RejectedAsync).ConfigureAwait(false))
+            {
+            }
+        }
+        catch (CallRejectedException rejected)
+        {
+            refused = true;
+            refusedCorrectly = rejected.Reason == StopReason.Permanent;
+        }
+
+        failures += Check("library: a refused first element throws rather than yields under AOT", refused && refusedCorrectly);
+
         failures += await GuardsAsync().ConfigureAwait(false);
         failures += await TelemetryAsync().ConfigureAwait(false);
         failures += await TestingPackageAsync().ConfigureAwait(false);
@@ -573,6 +610,7 @@ internal static class Program
         const double DefaultSuspendingBudget = 448; // measured 393 (384 before the breaker and budget)
         const double TryRunSuspendingBudget = 640; // measured 561 (553 before the breaker and budget)
         const double ListenerAllowance = 72; // measured 48: two boxed int results
+        const double DefaultStreamingBudget = 1000; // measured 848 B/op above the raw enumeration under the JIT
 
         var rawSync = await MeasureAsync("raw callback (sync)", Scenarios.RawSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
         var noneSync = await MeasureAsync("None (sync)", ShippingScenarios.NoneSync, AllocationCounter.ThreadLocal).ConfigureAwait(false);
@@ -652,6 +690,20 @@ internal static class Program
         failures += Check(
             "no AOT cliff: a listener costs only the results it asked to be boxed",
             listenerSuspending - defaultSuspending <= ListenerAllowance);
+
+        // The streaming path, measured against the identical enumeration with no policy in the
+        // middle. Polly boxes state per layer per execution under Native AOT; an async iterator is
+        // the shape whose AOT cost would diverge from its JIT cost, so the streaming arm is what
+        // makes "IsAotCompatible" a tested claim for the fourth path rather than a hope.
+        var rawStreamSuspending = await MeasureAsync("raw stream (suspending)", StreamGate.RawSuspending, AllocationCounter.ProcessWide)
+            .ConfigureAwait(false);
+
+        var defaultStreamSuspending = await MeasureAsync("Default, streaming (suspending)", ShippingScenarios.DefaultStreamSuspending,
+            AllocationCounter.ProcessWide).ConfigureAwait(false);
+
+        failures += Check(
+            "no AOT cliff: the streaming path stays within its suspending budget",
+            defaultStreamSuspending - rawStreamSuspending <= DefaultStreamingBudget + NoiseFloor);
 
         return failures;
     }

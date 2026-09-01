@@ -50,6 +50,8 @@ The `Resilience` record provides methods to execute calls with the defined resil
 | `TryRunAsync(…)` | `ValueTask<CallResult>` |
 | `TryRunAsync<TState, T>(…)` | `ValueTask<CallResult<T>>` |
 | `TryRunAsync<TState>(…)` | `ValueTask<CallResult>` |
+| `RunAsync<T>(Func<CancellationToken, IAsyncEnumerable<T>>, CancellationToken)` | `IAsyncEnumerable<T>` |
+| `RunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `IAsyncEnumerable<T>` |
 | `Validate()` | `void` |
 | `Validated()` | `Resilience` |
 
@@ -83,6 +85,8 @@ var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationTo
 <!-- endsnippet -->
 
 To use the `ValueTask` path with an `async` lambda, provide an explicit return type: `async ValueTask<int> (ct) => …`. This is rarely necessary because an `async` lambda allocates its own state machine regardless of the return type. See [where the allocations are](../deep-dives/allocations.md) for what the overloads save and why they are shaped this way.
+
+The two streaming overloads take a **cold source** - a callback returning `IAsyncEnumerable<T>` - rather than a task, so a lambda binds to them by its return type alone. Each attempt re-invokes the source, retrying until the first element is yielded and then handing the rest of the enumeration to the caller untouched. A policy with `Hedge` configured is refused by these overloads at the call. See [streaming](../features/streaming.md) for the semantics.
 
 ### Execution behavior
 

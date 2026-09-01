@@ -169,6 +169,35 @@ public static class Budgets
     public const double HedgeConfiguredOverhead = 1500;
 
     /// <summary>
+    ///     The streaming path under <c>Resilience.Default</c>, measured over a full enumeration of a
+    ///     suspending source and compared against the identical enumeration with no policy in the
+    ///     middle. The budget is itemized rather than totalled, because every line is a thing the
+    ///     design chose to buy and a reviewer is entitled to see which one moved:
+    ///     <list type="bullet">
+    ///         <item>one iterator box - <c>ExecuteStreamAsync</c>'s own state machine, the analog of
+    ///         the call paths' box;</item>
+    ///         <item>one linked <c>attemptSource</c> - which a call pays too, for the same reason: the
+    ///         surviving enumerator's token has to reach the source;</item>
+    ///         <item>one pooled timer CTS, returned on every attempt except the winner, whose
+    ///         <b>disposal</b> is the streaming-only delta - the one rule whose violation is silent
+    ///         (a returned-while-linked source lets the next tenant's CancelAfter cancel a live
+    ///         stream), so its cost is paid deliberately and itemized here;</item>
+    ///         <item>the first-element pull and the per-element passthrough loop, which are the
+    ///         source's own enumerator costs above the raw arm's identical pulls.</item>
+    ///     </list>
+    ///     The <c>[EnumeratorCancellation]</c> merge allocates one further linked CTS only when the
+    ///     caller supplies both a call-time and an enumeration-time token, which this arm does not -
+    ///     the arm binds the caller's token at <c>RunAsync</c>, so the count here is the one-token
+    ///     shape.
+    ///     Measured: 848 B/op on .NET 10 and 849 B/op on .NET 8, against the raw enumeration's
+    ///     1,216 B/op total - roughly twice the call path's Default overhead, which is the honest
+    ///     reading: a stream pays for everything a call pays (the box, the linked source, the pooled
+    ///     timer) plus the enumerator itself and the surviving sources a call tears down at attempt
+    ///     end. Budgeted with roughly 15% headroom over the measured figure, as the call budgets are.
+    /// </summary>
+    public const double DefaultStreamingOverhead = 1000;
+
+    /// <summary>
     ///     The pay-for-play gate, expressed as the thing it actually claims: what a listener adds must
     ///     be accounted for by the boxes it asked for, and nothing else.
     ///     Two events on a successful call carry a result - <c>Attempt</c> and <c>Succeeded</c> - and a

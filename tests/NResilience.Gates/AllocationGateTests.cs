@@ -306,6 +306,29 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSuspendingOverhead(Baseline.LibDefaultHedge, Budgets.HedgeConfiguredOverhead);
 
     /// <summary>
+    ///     The streaming path's own budget, measured over a full enumeration and compared against the
+    ///     identical enumeration with no policy in the middle. Every existing budget in this file is
+    ///     per-callback, and a stream is not one callback, so this gate exists to publish the honest
+    ///     per-enumeration figure rather than to squeeze it - the itemized ledger is in
+    ///     <see cref="Budgets.DefaultStreamingOverhead" />.
+    /// </summary>
+    [Fact]
+    public void The_streaming_path_stays_within_its_own_budget()
+    {
+        var actual = baseline.SuspendingOverheadVersus(Baseline.LibDefaultStream, Baseline.RawStream);
+        var ceiling = Budgets.DefaultStreamingOverhead + Budgets.SuspendingNoiseFloor;
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"streaming: {baseline.SuspendingBytes(Baseline.LibDefaultStream):0.0} B/op total, {actual:0.0} B/op above '{Baseline.RawStream}'; budget {Budgets.DefaultStreamingOverhead:0} B (+{Budgets.SuspendingNoiseFloor:0} B instrument floor)"));
+
+        Assert.True(
+            actual <= ceiling,
+            string.Create(CultureInfo.InvariantCulture,
+                $"The streaming path now allocates {actual:0.0} B/op above the raw enumeration, against a budget of {Budgets.DefaultStreamingOverhead:0} B/op."));
+    }
+
+    /// <summary>
     ///     Verifies that the <see cref="ValueTask" /> callback shape adds no overhead to the 
     ///     state-machine box. Awaiting a <see cref="ValueTask" /> directly in the executor would 
     ///     add a hoisted awaiter field to the state-machine type, increasing the cost of every 

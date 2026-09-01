@@ -22,6 +22,9 @@ Using total attempts removes ambiguity. `Attempts = 1` means no retry occurs, el
 ### Is there a synchronous API?
 No. A retry loop that blocks holds a thread through every backoff delay. Offering both synchronous and asynchronous APIs would either duplicate the engine or risk deadlocks. For this reason, `ResilienceHandler.Send` throws a `NotSupportedException`.
 
+### Can I retry a stream?
+Yes, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. The retry stops at the first element, because once the caller has received one, a retry would duplicate or drop work they have already acted on. Everything after the first element is handed to the caller untouched. See [Streaming](features/streaming.md).
+
 ### Where is hedging?
 It is here, and it is opt-in: set `Hedge = Hedge.At(0.95)`. See [Hedging](features/hedging.md).
 

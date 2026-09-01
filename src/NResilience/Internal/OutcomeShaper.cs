@@ -130,6 +130,24 @@ internal static class Failures
             return error;
         }
 
-        return new CallRejectedException(reason, attempts);
+        // Nothing threw and no guard refused - the operation stopped on a verdict. Reached when a
+        // classifier or an Admit hook refused a result: for a call, only an Admit refusal lands
+        // here (a throwing call returns its final failed value instead of stopping); for a stream,
+        // a first element the classifier rejected lands here too. A bare "rejected: {reason}"
+        // sends the reader hunting for a guard that never ran, so the message says what was
+        // refused - and says it differently for the two reasons that reach here, because one of
+        // them stopped after a single attempt and the other after all of them.
+        //
+        // "The policy refused" rather than "the classifier refused": Admit produces the verdict on
+        // the branch a call reaches this by, and the two are indistinguishable from here.
+        var refusal = reason switch
+        {
+            StopReason.Permanent =>
+                "The call was rejected: the policy refused the result with a permanent verdict, so it was not retried.",
+            _ =>
+                $"The call was rejected: every attempt produced a result the policy refused ({reason}).",
+        };
+
+        return new CallRejectedException(reason, attempts, refusal);
     }
 }
