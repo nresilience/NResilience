@@ -156,9 +156,17 @@ public sealed class LoopbackStreamServer : IAsyncDisposable
             var stream = client.GetStream();
             var buffer = new byte[1];
 
-            // The client's request byte. Read it before writing, so the write loop starts only
-            // once the client has actually asked.
-            await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            // The client's request, read fully through its newline before writing, so the write
+            // loop starts only once the client has actually asked. Fully matters: a close with
+            // request bytes still unread in the receive buffer is a reset on Windows rather than a
+            // graceful FIN, and the winning attempt's next read would throw instead of completing
+            // the stream. Draining to the newline leaves nothing behind on every OS.
+            int read;
+
+            do
+            {
+                read = await stream.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            } while (read > 0 && buffer[0] != (byte)'\n');
 
             for (var i = 0; i < _lines; i++)
             {
