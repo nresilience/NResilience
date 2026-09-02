@@ -69,6 +69,18 @@ The loop runs in rounds. A round starts a leg, waits `min(threshold, remaining d
 
 The budget is charged when a hedge actually starts, not when its timer is armed - so a call that came back on its own is never charged for a hedge it did not need. Hedges and retries draw on one bucket because both are amplification, and the aggregate is what the budget exists to bound. The arithmetic is comfortable rather than tight: hedging at the p95 spends about 5% of traffic, leaving about 5% of the default budget for retries, and a policy already retrying hard stops hedging on its own.
 
+## Closed is not healthy
+
+Gate 3 of the hedged loop is "the breaker is closed", and for a long time that was the whole health check. It is a weak one. A breaker's default trip is five *consecutive* failures, and a dependency erroring on 40% of its calls almost never produces five in a row - so it sits closed indefinitely while this process hedges every slow call against it and adds 5% load to a service that fails 40% of its calls. Envoy suppresses hedging under elevated errors for exactly this reason.
+
+The gap needed a number, and the library already had one. The breaker measures its own error rate to decide when to trip, and `Failures` turns that into a trip point relative to the dependency's own baseline. `SuppressAt` is a fraction of *that* point, not a rate of its own - so the second gate inherits the first's guardrails whole: the measured baseline, the absolute floor that keeps a near-zero baseline from suppressing on one unlucky call, and `FailureRatio` as the ceiling when it is set. Operators don't need to estimate or guess new values.
+
+Two rules keep it from firing on noise. The trip window has to hold `MinimumCalls` outcomes, which is the same evidence the breaker demands before it will judge a rate at all; and at least two of them have to be failures, because one failure is an event rather than a rate - the same rule the relative trip applies, for the same reason.
+
+The second rule reaches slightly further here than it does in the breaker, and deliberately. The breaker exempts its absolute `FailureRatio` from the two-failure floor, because a caller who wrote `FailureRatio = 0.05` against `MinimumCalls = 20` asked for exactly that reading and the library does not get to second-guess a number they named. Suppression is not a number they named - it is a fraction the library derives - so it holds to the floor whatever the trip point was derived from. The only effect is that a single failure never suppresses hedging; the breaker still opens on it if that is what the caller configured.
+
+The failure mode is real and stated rather than engineered around. A dependency with one bad shard both fails often and is precisely the case hedging routes around, and this gate turns hedging off for it. That is the deliberate trade: the cost of hedging a dependency that cannot use it is borne by the dependency, and the cost of not hedging one that could is borne by this process's tail. `SuppressAt = 1` puts the decision back where it was, suppressing only at the rate that opens the breaker anyway.
+
 ## What this does not fix
 
 Hedging shortens a tail caused by variance - a slow node, an unlucky GC pause, a connection that picked the wrong path. It does nothing for a dependency that is uniformly slow, and it should not: a distribution with no tail has a p95 that nothing exceeds, so nothing is hedged. If every call takes 400 ms, hedging will correctly do nothing at all, and the number to look at is the dependency's.

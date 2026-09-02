@@ -501,6 +501,7 @@ public sealed class ResilienceOptionsTests
                 MinimumSamples = 5,
                 MinimumDelay = TimeSpan.FromMilliseconds(25),
                 Window = TimeSpan.FromSeconds(10),
+                SuppressAt = 0.25,
             },
         }.ToPolicy();
 
@@ -511,6 +512,24 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(5, hedge.MinimumSamples);
         Assert.Equal(TimeSpan.FromMilliseconds(25), hedge.MinimumDelay);
         Assert.Equal(TimeSpan.FromSeconds(10), hedge.Window);
+        Assert.Equal(0.25, hedge.SuppressAt);
+    }
+
+    /// <summary>
+    ///     The error-rate suppression is on for a section that says nothing about it, and
+    ///     <c>"SuppressAt": 1</c> is how a section turns it off.
+    /// </summary>
+    [Fact]
+    public void A_hedge_section_suppresses_on_an_elevated_error_rate_unless_it_says_otherwise()
+    {
+        var options = new ResilienceOptions();
+        Config(("Hedge:Quantile", "0.99")).Bind(options);
+
+        Assert.Equal(0.5, options.ToPolicy().Hedge!.Value.SuppressAt);
+
+        Config(("Hedge:SuppressAt", "1")).Bind(options);
+
+        Assert.Equal(1, options.ToPolicy().Hedge!.Value.SuppressAt);
     }
 
     /// <summary>

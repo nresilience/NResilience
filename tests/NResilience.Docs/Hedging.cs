@@ -50,6 +50,28 @@ public sealed class Hedging
     }
 
     /// <summary>
+    ///     Closed is not the same as healthy, and the gap between them is where a dependency that is
+    ///     failing on a third of its calls gets hedged anyway. The suppression point is the line.
+    /// </summary>
+    [Fact]
+    public void Hedging_steps_aside_while_the_dependency_is_failing()
+    {
+        // <snippet:hedging-suppression>
+        // Hedging costs about 5% extra load, and a dependency that is already failing is the last one
+        // that needs it. The policy's breaker measures the error rate anyway, so hedging stops once
+        // that rate reaches a fraction of the rate that would open the breaker - long before the
+        // breaker does. The default fraction is half; this one gives up on hedging sooner.
+        var hedge = Hedge.At(quantile: 0.95) with
+        {
+            SuppressAt = 0.25, // stop hedging a quarter of the way to the trip point
+        };
+
+        // </snippet:hedging-suppression>
+
+        Assert.Equal(expected: 0.25, actual: hedge.SuppressAt);
+    }
+
+    /// <summary>
     ///     The estimate belongs to the policy instance, so the policy has to outlive the call. Exactly
     ///     the rule the automatic retry budget already follows, and the failure mode is the same: a
     ///     policy rebuilt per call never learns anything and therefore never hedges.

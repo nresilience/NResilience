@@ -191,6 +191,8 @@ NResilience.Hedge.MinimumSamples.get -> int
 NResilience.Hedge.MinimumSamples.init -> void
 NResilience.Hedge.Quantile.get -> double
 NResilience.Hedge.Quantile.init -> void
+NResilience.Hedge.SuppressAt.get -> double
+NResilience.Hedge.SuppressAt.init -> void
 NResilience.Hedge.Window.get -> System.TimeSpan
 NResilience.Hedge.Window.init -> void
 NResilience.Http.HttpResilienceOptions

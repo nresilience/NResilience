@@ -50,9 +50,17 @@ public readonly record struct Hedge
     /// <summary>How many attempts may be in flight at once, when <see cref="MaxConcurrent" /> was not set.</summary>
     private const int DefaultMaxConcurrent = 2;
 
+    /// <summary>
+    ///     How far towards the breaker's own trip point the error rate may climb before hedging stops,
+    ///     when <see cref="SuppressAt" /> was not set. Half way: a dependency failing at half the rate
+    ///     that would open the breaker is one this process should not be sending extra load to.
+    /// </summary>
+    private const double DefaultSuppressAt = 0.5;
+
     private readonly int? _maxConcurrent;
     private readonly int? _minimumSamples;
     private readonly TimeSpan? _minimumDelay;
+    private readonly double? _suppressAt;
     private readonly TimeSpan? _window;
 
     /// <summary>
@@ -124,6 +132,37 @@ public readonly record struct Hedge
     }
 
     /// <summary>
+    ///     How far towards the breaker's trip point the error rate may climb before hedging is
+    ///     suppressed, as a fraction of that trip point. Default <c>0.5</c>.
+    ///     <para>
+    ///         Gate 3 of hedging is "the breaker is closed", and the gap between closed and healthy is
+    ///         enormous: a breaker's default trip is five consecutive failures, so a dependency returning
+    ///         errors on 40% of calls sits closed while this process hedges every slow one. Hedging costs
+    ///         about <c>1 - Quantile</c> extra load, and load is the last thing a dependency failing that
+    ///         often needs. This is the line between "closed" and "healthy enough to hedge".
+    ///     </para>
+    ///     <para>
+    ///         The trip point is the breaker's own, so this number inherits its guardrails: the measured
+    ///         baseline that <see cref="BreakerSettings.Failures" /> multiplies, the absolute floor under
+    ///         it, and <see cref="BreakerSettings.FailureRatio" /> as the ceiling when it is set. Must be
+    ///         in <c>(0, 1]</c>; <c>1</c> suppresses only at the rate that opens the breaker anyway,
+    ///         which is how you turn this off.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     Needs a <see cref="Resilience.Breaker" /> - it is the object that measures the error rate.
+    ///     Without one, nothing is suppressed. The failure mode is stated on the feature page: a
+    ///     dependency with one bad shard is both failing and exactly the case hedging routes around, and
+    ///     this gate turns hedging off for it. Raise the number, or set it to <c>1</c>, when the errors
+    ///     you see are the kind a second attempt answers.
+    /// </remarks>
+    public double SuppressAt
+    {
+        get => _suppressAt ?? DefaultSuppressAt;
+        init => _suppressAt = value;
+    }
+
+    /// <summary>
     ///     The way to configure hedging. There is deliberately no fixed-delay form - see the type's own
     ///     documentation for why that omission is the feature.
     /// </summary>
@@ -147,14 +186,18 @@ public readonly record struct Hedge
         && MaxConcurrent == other.MaxConcurrent
         && MinimumSamples == other.MinimumSamples
         && MinimumDelay == other.MinimumDelay
-        && Window == other.Window;
+        && Window == other.Window
+        && SuppressAt.Equals(other.SuppressAt);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(Quantile, MaxConcurrent, MinimumSamples, MinimumDelay, Window);
+    public override int GetHashCode() =>
+        HashCode.Combine(Quantile, MaxConcurrent, MinimumSamples, MinimumDelay, Window, SuppressAt);
 
     /// <inheritdoc />
     public override string ToString() =>
-        $"p{Quantile * 100:0.##} (max {MaxConcurrent} in flight, min {MinimumSamples} samples, floor {MinimumDelay.TotalMilliseconds:0.#}ms, window {Window.TotalSeconds:0.#}s)";
+        $"p{Quantile * 100:0.##} (max {MaxConcurrent} in flight, min {MinimumSamples} samples, " +
+        $"floor {MinimumDelay.TotalMilliseconds:0.#}ms, window {Window.TotalSeconds:0.#}s, " +
+        $"suppressed at {SuppressAt:0.##} of the trip point)";
 
     /// <summary>
     ///     Collects everything wrong with this configuration, in the shape
@@ -181,5 +224,12 @@ public readonly record struct Hedge
 
         if (Window <= TimeSpan.Zero)
             problems.Add($"Hedge.Window must be positive; it is {Window}.");
+
+        if (double.IsNaN(SuppressAt) || SuppressAt <= 0 || SuppressAt > 1)
+        {
+            problems.Add(
+                $"Hedge.SuppressAt must be in (0, 1]; it is {SuppressAt}. " +
+                "It is a fraction of the breaker's trip point, and 1 is how you turn the suppression off.");
+        }
     }
 }

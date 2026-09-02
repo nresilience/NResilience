@@ -83,6 +83,8 @@ NResilience.Extensions.HedgeOptions.MinimumSamples.get -> int?
 NResilience.Extensions.HedgeOptions.MinimumSamples.set -> void
 NResilience.Extensions.HedgeOptions.Quantile.get -> double?
 NResilience.Extensions.HedgeOptions.Quantile.set -> void
+NResilience.Extensions.HedgeOptions.SuppressAt.get -> double?
+NResilience.Extensions.HedgeOptions.SuppressAt.set -> void
 NResilience.Extensions.HedgeOptions.ToHedge() -> NResilience.Hedge
 NResilience.Extensions.HedgeOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.HedgeOptions.Window.set -> void

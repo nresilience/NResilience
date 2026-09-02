@@ -319,7 +319,11 @@ public sealed partial record Resilience
 
             // A dependency that is failing does not need a second copy of every slow request. Half-open
             // counts as not closed: those attempts are probes, and a probe that is raced is not a probe.
-            if (Breaker is not null && Breaker.State != BreakerState.Closed)
+            // Closed is not the same as healthy, though - a breaker's default trip is five consecutive
+            // failures, so a dependency erroring on 40% of calls is closed - and the second gate is the
+            // difference: once the error rate has climbed to SuppressAt of the rate that would open the
+            // breaker, hedging stops rather than adding load to a dependency already in trouble.
+            if (Breaker is { } gate && (gate.State != BreakerState.Closed || gate.IsErrorRateElevated(hedge.SuppressAt)))
                 return null;
 
             if (latency.Threshold(hedge.MinimumSamples) is not { } threshold)

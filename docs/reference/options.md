@@ -125,6 +125,7 @@ For more information on the configuration structure, see [Configuration](../di/c
 | `MinimumSamples` | `20` | How many recent calls the latency estimate needs before any hedge fires. |
 | `MinimumDelay` | `10 ms` | A floor under the hedge delay. |
 | `Window` | `30 s` | How much history the latency estimate covers. |
+| `SuppressAt` | `0.5` | The fraction of the breaker's trip point at which hedging stops. Set to `1` to disable suppression. |
 
 There is deliberately no fixed-delay setting. A constant threshold is the failure mode the adaptive one exists to avoid, and it would be one JSON key away if it existed at all.
 

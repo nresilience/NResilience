@@ -1013,17 +1013,62 @@ public sealed class Breaker
         if (failures < MinimumRelativeFailures)
             return false;
 
-        var relative = _relative!.Value;
+        return TripRatio() is { } trip && failures >= trip * calls;
+    }
 
-        if (_rate.Ratio(relative.MinimumSamples) is not { } baseline)
-            return false;
+    /// <summary>
+    ///     The proportion of the trip window that has to fail to open this breaker, or null while
+    ///     nothing rate-based is armed - no <see cref="BreakerSettings.FailureRatio" />, and no baseline
+    ///     for <see cref="BreakerSettings.Failures" /> to multiply yet. Always called with the lock held.
+    /// </summary>
+    /// <returns>The effective trip ratio.</returns>
+    /// <remarks>
+    ///     When both trips are configured the relative one can only fire sooner, so the effective ratio
+    ///     is the lower of the two.
+    /// </remarks>
+    private double? TripRatio()
+    {
+        var trip = Settings.FailureRatio;
 
-        var trip = relative.ThresholdFor(baseline);
+        if (_rate?.Ratio(_relative!.Value.MinimumSamples) is { } baseline)
+        {
+            var relative = _relative.Value.ThresholdFor(baseline);
+            trip = trip is { } ceiling ? Math.Min(ceiling, relative) : relative;
+        }
 
-        if (Settings.FailureRatio is { } ceiling)
-            trip = Math.Min(ceiling, trip);
+        return trip;
+    }
 
-        return failures >= trip * calls;
+    /// <summary>
+    ///     Whether the trip window's error rate has reached <paramref name="fraction" /> of the rate that
+    ///     would open this breaker - the "closed but not healthy" reading that suppresses hedging.
+    /// </summary>
+    /// <param name="fraction">How far towards the trip point counts as elevated.</param>
+    /// <returns>True when the dependency is failing often enough that it should not be sent extra load.</returns>
+    /// <remarks>
+    ///     Disarmed until there is something to be a fraction of: the window needs
+    ///     <see cref="BreakerSettings.MinimumCalls" /> outcomes, a rate-based trip has to be armed, and -
+    ///     for the same reason the relative trip does - two failures have to have happened, because one
+    ///     failure is an event rather than a rate.
+    /// </remarks>
+    internal bool IsErrorRateElevated(double fraction)
+    {
+        lock (_gate)
+        {
+            if (_calls is null)
+                return false;
+
+            var calls = Sum(_calls);
+
+            if (calls < Settings.MinimumCalls)
+                return false;
+
+            var failures = Sum(_failures!);
+
+            return failures >= MinimumRelativeFailures
+                && TripRatio() is { } trip
+                && failures >= fraction * trip * calls;
+        }
     }
 
     private void OpenCore(long now)

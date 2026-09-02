@@ -54,8 +54,33 @@ var api = Resilience.Http with
 | `MinimumSamples` | `20` | How many recent calls the estimate needs before any hedge fires. |
 | `MinimumDelay` | `10 ms` | A floor under the delay, so a dependency with a sub-millisecond p95 does not hedge everything. |
 | `Window` | `30 s` | How much history the estimate covers. |
+| `SuppressAt` | `0.5` | How far towards the breaker's trip point the error rate may climb before hedging stops. |
 
 Pick `Quantile` by the load you are willing to add. Everything else has a working default, so `Hedge.At(0.95)` is a complete configuration.
+
+## Stop hedging a dependency that is failing
+
+A closed breaker does not mean a healthy dependency. The default trip requires five consecutive failures, so a dependency returning errors on 40% of its calls may never hit this limit, keeping the breaker closed while hedging adds 5% extra load to a service that is already failing.
+
+`SuppressAt` is the line between closed and healthy. It is a fraction of the breaker's trip point. By default, hedging stops when the error rate reaches half the trip point. This gate inherits all trip point guardrails: the measured baseline (via `Failures`), the absolute floor, and the `FailureRatio` ceiling.
+
+<!-- snippet: hedging-suppression -->
+```csharp
+// Hedging costs about 5% extra load, and a dependency that is already failing is the last one
+// that needs it. The policy's breaker measures the error rate anyway, so hedging stops once
+// that rate reaches a fraction of the rate that would open the breaker - long before the
+// breaker does. The default fraction is half; this one gives up on hedging sooner.
+var hedge = Hedge.At(quantile: 0.95) with
+{
+    SuppressAt = 0.25, // stop hedging a quarter of the way to the trip point
+};
+```
+<!-- endsnippet -->
+
+The gate requires a `Breaker` to measure the error rate. It remains disarmed until the breaker's window contains `MinimumCalls` outcomes, at least two of which are failures. A single failure is an event rather than a rate.
+
+> [!NOTE]
+> A dependency with one bad shard often fails but is also the case hedging routes around best; this gate turns hedging off for such dependencies. If a second attempt often resolves your errors, increase `SuppressAt` or set it to `1` to suppress hedging only when the breaker opens.
 
 ## Hold the policy
 
@@ -154,13 +179,14 @@ The [attempt log](../reference/call-result.md) shows both legs, and a discarded 
 
 ## When a hedge does not fire
 
-All five conditions must hold. If any fails, the call waits exactly as it would without hedging:
+All six conditions must hold. If any fails, the call waits exactly as it would without hedging:
 
 1. `Hedge` is set on the policy.
 2. The call is repeatable. For HTTP, the same gate retry uses.
 3. The circuit breaker is closed. A failing dependency does not need a second copy of every slow request.
-4. The estimate has at least `MinimumSamples` samples. A cold process does not guess a threshold.
-5. The [retry budget](retry-budget.md) funds it. Hedges and retries draw on one bucket, so a policy already retrying at its limit stops hedging - a retry is evidence that something failed, a hedge only a guess that something is slow.
+4. The error rate is below `SuppressAt` of the breaker's trip point. Closed is not the same as healthy.
+5. The estimate has at least `MinimumSamples` samples. A cold process does not guess a threshold.
+6. The [retry budget](retry-budget.md) funds it. Hedges and retries draw on one bucket, so a policy already retrying at its limit stops hedging - a retry is evidence that something failed, a hedge only a guess that something is slow.
 
 ## Go deeper
 

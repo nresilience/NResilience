@@ -281,6 +281,12 @@ public sealed class HedgeOptions
     /// <summary><see cref="NResilience.Hedge.Window" />.</summary>
     public TimeSpan? Window { get; set; }
 
+    /// <summary>
+    ///     <see cref="NResilience.Hedge.SuppressAt" />. Defaults to 0.5; <c>"SuppressAt": 1</c> is how a
+    ///     section turns the error-rate suppression off.
+    /// </summary>
+    public double? SuppressAt { get; set; }
+
     /// <summary>Projects onto the value the policy carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
     public Hedge ToHedge()
@@ -298,6 +304,9 @@ public sealed class HedgeOptions
 
         if (Window is { } window)
             hedge = hedge with { Window = window };
+
+        if (SuppressAt is { } suppressAt)
+            hedge = hedge with { SuppressAt = suppressAt };
 
         return hedge;
     }
