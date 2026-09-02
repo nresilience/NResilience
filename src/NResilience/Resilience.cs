@@ -26,6 +26,15 @@ namespace NResilience;
 public sealed partial record Resilience
 {
     /// <summary>
+    ///     The multiple the default measured attempt ceiling uses: three times the dependency's own
+    ///     recent p95.
+    /// </summary>
+    private const double DefaultTimeoutMultiple = 3.0;
+
+    private readonly AttemptTimeouts? _timeouts;
+    private readonly bool _timeoutsSet;
+
+    /// <summary>
     ///     Passthrough. Every bound is off, so the executor returns the callback's own task and the
     ///     call allocates nothing at all - the only genuinely free configuration in the library.
     /// </summary>
@@ -35,6 +44,10 @@ public sealed partial record Resilience
         Deadline = Timeout.InfiniteTimeSpan,
         AttemptTimeout = Timeout.InfiniteTimeSpan,
         Backoff = Backoff.None,
+
+        // Passthrough means every bound is off, and a measured ceiling is a bound - the one bound
+        // that is on by default everywhere else.
+        Timeouts = null,
 
         // Redundant against Attempts = 1, and stated anyway: passthrough means *every* bound is
         // off, and a reader should not have to derive "so no budget either" from the attempt count.
@@ -80,9 +93,12 @@ public sealed partial record Resilience
     public TimeSpan AttemptTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
     /// <summary>
-    ///     Null (the default) means <see cref="AttemptTimeout" /> is the only per-attempt ceiling. When set,
-    ///     the ceiling is the minimum of <see cref="AttemptTimeout" />, the time remaining on the deadline,
-    ///     and a multiple of recent latency.
+    ///     The per-attempt ceiling measured from the dependency's own recent latency, on by default at
+    ///     <c>AttemptTimeouts.Above(3)</c>: the effective ceiling is the minimum of
+    ///     <see cref="AttemptTimeout" />, the time remaining on the deadline, and a multiple of recent
+    ///     latency. Set it to <c>null</c> to leave <see cref="AttemptTimeout" /> as the only per-attempt
+    ///     ceiling. A policy whose <see cref="AttemptTimeout" /> is <see cref="Timeout.InfiniteTimeSpan" />
+    ///     gets no default: see the remarks.
     ///     <para>
     ///         The measured term only lowers the ceiling, making the feature safe to leave on: <see cref="AttemptTimeout" />
     ///         remains the absolute ceiling, and a dependency slow enough that the measurement exceeds it
@@ -100,7 +116,24 @@ public sealed partial record Resilience
     ///         See <c>ExecutionState.TimeoutsFor</c> for details.
     ///     </para>
     /// </summary>
-    public AttemptTimeouts? Timeouts { get; init; }
+    /// <remarks>
+    ///     Defaulted on because the measured term can only tighten: <see cref="AttemptTimeout" /> stays
+    ///     the ceiling, the estimate is cold until it has
+    ///     <see cref="NResilience.AttemptTimeouts.MinimumSamples" /> successful attempts, and the worst
+    ///     the feature can do is stop shortening. A policy whose <see cref="AttemptTimeout" /> is at or
+    ///     below <see cref="NResilience.AttemptTimeouts.Floor" /> gets no default at all, because the
+    ///     measured term could never lower anything there - rather than the configuration error the same
+    ///     pair would be if the caller had written it.
+    /// </remarks>
+    public AttemptTimeouts? Timeouts
+    {
+        get => _timeoutsSet ? _timeouts : DefaultTimeouts();
+        init
+        {
+            _timeouts = value;
+            _timeoutsSet = true;
+        }
+    }
 
     /// <summary>The delay between one attempt and the next.</summary>
     public Backoff Backoff { get; init; } = Backoff.Default;
@@ -403,6 +436,39 @@ public sealed partial record Resilience
 
         if (value <= TimeSpan.Zero)
             problems.Add($"{name} must be positive, or Timeout.InfiniteTimeSpan for no bound; it is {value}.");
+    }
+
+    /// <summary>The measured ceiling a caller who never mentioned one gets.</summary>
+    /// <returns>The configuration, or null when the library declines to default one on.</returns>
+    /// <remarks>
+    ///     <para>
+    ///         Two policies get no default, and both for the same reason: the measured term is only safe
+    ///         to default on because it can do nothing but tighten a ceiling the caller chose, so where
+    ///         there is no such ceiling to tighten there is nothing to default.
+    ///     </para>
+    ///     <para>
+    ///         An <see cref="Timeout.InfiniteTimeSpan" /> <see cref="AttemptTimeout" /> is the caller
+    ///         saying the deadline is the only per-attempt bound, and a measured ceiling under it would
+    ///         be a bound nothing they wrote clamps. Writing <see cref="Timeouts" /> alongside an
+    ///         infinite <see cref="AttemptTimeout" /> is a different statement - "bound me by the
+    ///         dependency's own latency and nothing else" - and that one is honoured.
+    ///     </para>
+    ///     <para>
+    ///         A floor at or above <see cref="AttemptTimeout" /> makes the measured term unreachable,
+    ///         which is a configuration error when the caller wrote it. A caller who only tightened
+    ///         <see cref="AttemptTimeout" /> wrote no such thing, and the library does not refuse a
+    ///         configuration on account of a value it supplied itself - so there the default steps aside
+    ///         instead.
+    ///     </para>
+    /// </remarks>
+    private AttemptTimeouts? DefaultTimeouts()
+    {
+        if (AttemptTimeout == Timeout.InfiniteTimeSpan)
+            return null;
+
+        var timeouts = AttemptTimeouts.Above(DefaultTimeoutMultiple);
+
+        return timeouts.Floor >= AttemptTimeout ? null : timeouts;
     }
 
     private static class HttpHolder

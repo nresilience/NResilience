@@ -12,10 +12,11 @@ The table below summarizes each feature and its default setting.
 | :--- | :--- | :--- |
 | Retry, backoff, and jitter | Three attempts, exponential backoff, and full jitter | [Retry](retry.md) |
 | Deadlines and attempt timeouts | 30 s deadline and 10 s attempt timeout | [Deadlines](deadlines.md) |
-| Measured attempt ceiling | Disabled (opt-in, and it can only tighten the configured ceiling) | [Deadlines](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) |
+| Measured attempt ceiling | Three times the recent p95, and it can only tighten the configured ceiling | [Deadlines](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) |
 | Classification | `Classifier.Default`, or `Classifier.Http` for the HTTP preset | [Classification](classification.md) |
 | Retry budget | 10% of successful traffic, private per policy | [Retry budget](retry-budget.md) |
 | Circuit breaker | Disabled (requires manual construction and scoping) | [Circuit breaker](circuit-breaker.md) |
+| Breaker trip conditions | Five consecutive failures, five times the measured error rate, and half a window at three times the measured normal latency | [Circuit breaker](circuit-breaker.md#trip-conditions) |
 | Rate limiting | Disabled (opt-in, and queueing off when enabled) | [Rate limiting](rate-limiting.md) |
 | Hedging | Disabled (opt-in, and never against a fixed delay) | [Hedging](hedging.md) |
 | Keyed policy scope | Disabled (opt-in; on by default per host for HTTP and per service for gRPC) | [Keyed policy scope](policy-scope.md) |

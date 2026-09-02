@@ -221,7 +221,7 @@ public sealed class RelativeFailureRatioTests
     public void A_breaker_with_no_relative_trip_has_no_rate_to_report()
     {
         var time = new FakeTimeProvider();
-        var breaker = new Breaker(new BreakerSettings { FailureRatio = 0.5, Time = time });
+        var breaker = new Breaker(new BreakerSettings { FailureRatio = 0.5, Failures = null, Time = time });
 
         Sample(breaker, VerdictKind.Ok, 100);
 

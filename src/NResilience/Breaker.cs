@@ -52,16 +52,51 @@ internal enum BreakerTransition : byte
 ///     close it again.
 /// </summary>
 /// <remarks>
-///     Every default here is a departure from Polly v8, and each one is deliberate. Polly removed
-///     classic consecutive-failure breaking, leaving only a rate-based trip at <c>FailureRatio</c> 0.1
-///     over a minimum throughput of 100 calls per 30 s - which means a service doing fewer than 100
-///     calls per 30 s can never open its breaker, and that is the median .NET service. Consecutive
-///     failures is therefore the default trip condition here, and the rate-based trip is opt-in
-///     alongside it.
+///     <para>
+///         Every default here is a departure from Polly v8, and each one is deliberate. Polly removed
+///         classic consecutive-failure breaking, leaving only a rate-based trip at <c>FailureRatio</c>
+///         0.1 over a minimum throughput of 100 calls per 30 s - which means a service doing fewer than
+///         100 calls per 30 s can never open its breaker, and that is the median .NET service.
+///         Consecutive failures is therefore the first trip condition here, and the absolute rate-based
+///         trip is opt-in alongside it.
+///     </para>
+///     <para>
+///         The two <i>relative</i> trips are not opt-in. <see cref="SlowCalls" /> and
+///         <see cref="Failures" /> are on by default, because the constants their absolute counterparts
+///         need are numbers nobody can pick before the dependency has run, and because a default
+///         breaker that cannot see a brownout cannot see the most common way a dependency fails. Both
+///         are measured against the dependency's own behaviour, both stay invisible until they have a
+///         baseline, and both can only trip sooner than the settings around them - so the cold and the
+///         healthy cases behave exactly as a consecutive-failures breaker does. Set either to
+///         <c>null</c> to turn it off.
+///     </para>
 /// </remarks>
 public sealed record BreakerSettings
 {
+    /// <summary>
+    ///     The multiple the default relative failure trip uses: five times the dependency's own
+    ///     measured error rate.
+    /// </summary>
+    private const double DefaultFailureMultiple = 5.0;
+
+    /// <summary>
+    ///     The multiple the default brownout trip uses: three times the dependency's own measured
+    ///     normal latency.
+    /// </summary>
+    private const double DefaultSlowCallMultiple = 3.0;
+
+    private readonly Failures? _failures;
+    private readonly bool _failuresSet;
+    private readonly SlowCalls? _slowCalls;
+    private readonly bool _slowCallsSet;
     private readonly TimeProvider? _time;
+
+    /// <summary>
+    ///     The longest baseline window the library will derive for a trip it defaulted on. Beyond it the
+    ///     baseline would no longer describe "normally", so the default steps aside instead - see
+    ///     <see cref="DefaultFailures" />.
+    /// </summary>
+    private static readonly TimeSpan MaxDerivedBaseline = TimeSpan.FromHours(1);
 
     /// <summary>Consecutive failures before opening. The reading most people have of "circuit breaker".</summary>
     public int ConsecutiveFailures { get; init; } = 5;
@@ -92,7 +127,22 @@ public sealed record BreakerSettings
     ///         window are both required rather than cosmetic.
     ///     </para>
     /// </summary>
-    public Failures? Failures { get; init; }
+    /// <remarks>
+    ///     On by default at <c>Failures.Above(5)</c>. Set it to <c>null</c> to turn the relative trip
+    ///     off; set it to a value to change it. The default is invisible until the breaker has a
+    ///     baseline - <see cref="NResilience.Failures.MinimumSamples" /> outcomes over
+    ///     <see cref="NResilience.Failures.Window" /> - and cannot fire below
+    ///     <see cref="NResilience.Failures.AbsoluteFloor" /> however quiet that baseline was.
+    /// </remarks>
+    public Failures? Failures
+    {
+        get => _failuresSet ? _failures : DefaultFailures();
+        init
+        {
+            _failures = value;
+            _failuresSet = true;
+        }
+    }
 
     /// <summary>How many sampled calls a rate-based trip needs before it means anything.</summary>
     public int MinimumCalls { get; init; } = 20;
@@ -129,7 +179,28 @@ public sealed record BreakerSettings
     ///         cosmetic.
     ///     </para>
     /// </summary>
-    public SlowCalls? SlowCalls { get; init; }
+    /// <remarks>
+    ///     On by default at <c>SlowCalls.Above(3)</c>, because a dependency answering <c>200 OK</c> in
+    ///     thirty seconds is the most common way one fails and an error-rate breaker sits closed through
+    ///     the whole incident. Set it to <c>null</c> to turn the brownout trip off; set it to a value to
+    ///     change it. Setting <see cref="SlowCallThreshold" /> also turns the default off, because the
+    ///     two are the same trip defined two ways and the caller named the absolute one.
+    ///     <para>
+    ///         The default is invisible until the breaker has a baseline -
+    ///         <see cref="NResilience.SlowCalls.MinimumSamples" /> successful attempts over
+    ///         <see cref="NResilience.SlowCalls.Window" /> - so a cold breaker behaves exactly as a
+    ///         consecutive-failures one does.
+    ///     </para>
+    /// </remarks>
+    public SlowCalls? SlowCalls
+    {
+        get => _slowCallsSet ? _slowCalls : DefaultSlowCalls();
+        init
+        {
+            _slowCalls = value;
+            _slowCallsSet = true;
+        }
+    }
 
     /// <summary>The proportion of slow calls in the window that opens the breaker.</summary>
     public double SlowCallRatio { get; init; } = 0.5;
@@ -348,6 +419,74 @@ public sealed record BreakerSettings
             $"failures and the breaker can never open on the error rate. Lengthen {nameof(Failures)}.Window, lower " +
             $"{nameof(Failures)}.Multiple, or shorten {nameof(Window)}.");
     }
+
+    /// <summary>The relative failure trip a caller who never mentioned one gets.</summary>
+    /// <returns>The configuration, or null when the library declines to default one on.</returns>
+    /// <remarks>
+    ///     <see cref="NResilience.Failures.Window" />'s own default wins the contamination race
+    ///     <see cref="ValidateRace(Failures, List{string})" /> checks at <see cref="Window" />'s default
+    ///     and only there, so a default the caller did not write widens its baseline to whatever the
+    ///     configured trip window needs. The library does not refuse a configuration on account of a
+    ///     value the caller never named - and past <see cref="MaxDerivedBaseline" /> a baseline stops
+    ///     describing "normally" at all, so there the default steps aside instead.
+    /// </remarks>
+    private Failures? DefaultFailures()
+    {
+        var failures = NResilience.Failures.Above(DefaultFailureMultiple);
+
+        // Window has its own message in Validate, and the race check skips itself for the same
+        // reason: a second complaint derived from a nonsense value would only be noise.
+        if (Window <= TimeSpan.Zero)
+            return failures;
+
+        if (Baseline(2 * DefaultFailureMultiple * Window.Ticks, failures.Window) is not { } baseline)
+            return null;
+
+        return baseline == failures.Window ? failures : failures with { Window = baseline };
+    }
+
+    /// <summary>The brownout trip a caller who never mentioned one gets.</summary>
+    /// <returns>The configuration, or null when the library declines to default one on.</returns>
+    /// <remarks>The baseline widens for the reason <see cref="DefaultFailures" /> gives.</remarks>
+    private SlowCalls? DefaultSlowCalls()
+    {
+        // The caller named the absolute form of this trip, so the relative default steps aside rather
+        // than colliding with it in Validate. They are the same trip defined two ways, and the one
+        // that was written down wins.
+        if (SlowCallThreshold is not null)
+            return null;
+
+        var slow = NResilience.SlowCalls.Above(DefaultSlowCallMultiple);
+
+        // Each of these has its own message in Validate; see DefaultFailures.
+        if (Window <= TimeSpan.Zero || double.IsNaN(SlowCallRatio) || SlowCallRatio <= 0 || SlowCallRatio > 1)
+            return slow;
+
+        if (Baseline(2 * SlowCallRatio * Window.Ticks / slow.Quantile, slow.Window) is not { } baseline)
+            return null;
+
+        return baseline == slow.Window ? slow : slow with { Window = baseline };
+    }
+
+    /// <summary>
+    ///     The baseline window a derived default gets: its own, when that already outlasts the trip
+    ///     window by the factor the race check demands, and the demanded span when it does not.
+    /// </summary>
+    /// <param name="ticks">The ticks the race check demands of the baseline.</param>
+    /// <param name="own">The baseline window the value defaults to on its own.</param>
+    /// <returns>The window, or null when the demanded span is longer than one worth measuring.</returns>
+    private static TimeSpan? Baseline(double ticks, TimeSpan own)
+    {
+        if (double.IsNaN(ticks) || ticks > MaxDerivedBaseline.Ticks)
+            return null;
+
+        if (ticks <= own.Ticks)
+            return own;
+
+        // A second of cushion on a widened window, so the "at least twice" the race check wants
+        // cannot be lost to rounding on the way back out through a double.
+        return TimeSpan.FromTicks((long)Math.Ceiling(ticks) + TimeSpan.TicksPerSecond);
+    }
 }
 
 /// <summary>
@@ -411,8 +550,16 @@ public sealed class Breaker
     /// </summary>
     private const int MinimumRelativeFailures = 2;
 
+    /// <summary>
+    ///     <see cref="Settings" />'s two relative trips, read once. Both are defaulted on read rather
+    ///     than stored, so reading them per attempt would recompute a default the settings cannot
+    ///     change. Non-null exactly when <see cref="_normal" /> and <see cref="_rate" /> are.
+    /// </summary>
+    private readonly SlowCalls? _adaptive;
+
     private readonly int[]? _calls;
     private readonly int[]? _failures;
+    private readonly Failures? _relative;
 
     private readonly object _gate = new();
 
@@ -465,8 +612,9 @@ public sealed class Breaker
         _startedAt = _time.GetTimestamp();
         _ticksPerBucket = Math.Max(Settings.Window.Ticks / BucketCount, 1);
 
-        // The window arrays exist only when something reads them. A consecutive-failures breaker -
-        // the default - is three fields and no allocation beyond the object itself.
+        // The window arrays exist only when something reads them. A breaker whose relative trips have
+        // both been turned off, leaving only the consecutive counter, is three fields and no
+        // allocation beyond the object itself.
         if (IsWindowed(Settings))
         {
             _calls = new int[BucketCount];
@@ -479,13 +627,19 @@ public sealed class Breaker
         // sharing a breaker are two views of one dependency, and they should share one idea of what
         // that dependency's normal latency is.
         if (Settings.SlowCalls is { } adaptive)
+        {
+            _adaptive = adaptive;
             _normal = new LatencyWindow(adaptive.Quantile, adaptive.Window, _time);
+        }
 
         // The same bargain for the error rate, and the same reason it lives on the breaker: two
         // policies sharing a breaker are two views of one dependency, and they should share one idea
         // of how often that dependency fails.
         if (Settings.Failures is { } relative)
+        {
+            _relative = relative;
             _rate = new RateWindow(relative.Window);
+        }
     }
 
     /// <summary>A name for this breaker, used in diagnostics and health endpoints.</summary>
@@ -528,7 +682,7 @@ public sealed class Breaker
     ///     </para>
     /// </summary>
     public TimeSpan? NormalLatency =>
-        _normal is null ? null : _normal.Threshold(Settings.SlowCalls!.Value.MinimumSamples);
+        _normal is null ? null : _normal.Threshold(_adaptive!.Value.MinimumSamples);
 
     /// <summary>
     ///     How often a call to this dependency currently fails, as this breaker measures it - the number
@@ -550,7 +704,7 @@ public sealed class Breaker
 
             lock (_gate)
             {
-                return _rate.Ratio(Settings.Failures!.Value.MinimumSamples);
+                return _rate.Ratio(_relative!.Value.MinimumSamples);
             }
         }
     }
@@ -787,7 +941,7 @@ public sealed class Breaker
         if (_normal is null)
             return false;
 
-        var adaptive = Settings.SlowCalls!.Value;
+        var adaptive = _adaptive!.Value;
         var normal = _normal.RecordAndThreshold(duration, adaptive.MinimumSamples);
 
         return normal is { } measured && duration >= adaptive.ThresholdFor(measured);
@@ -859,7 +1013,7 @@ public sealed class Breaker
         if (failures < MinimumRelativeFailures)
             return false;
 
-        var relative = Settings.Failures!.Value;
+        var relative = _relative!.Value;
 
         if (_rate.Ratio(relative.MinimumSamples) is not { } baseline)
             return false;

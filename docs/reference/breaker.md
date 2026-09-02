@@ -15,8 +15,8 @@ The `Breaker` is a `sealed class` implementing the circuit breaker pattern. It i
 | `Settings` | The `BreakerSettings` used to configure the breaker. |
 | `State` | The current state of the breaker. If a breaker is open but the break duration has elapsed, it reports `HalfOpen` because the next call will be treated as a probe. Reading this property does not consume a probe slot. |
 | `OpenedAt` | The timestamp of when the breaker last opened, or `null` if it is currently closed. |
-| `NormalLatency` | How long a healthy call to this dependency currently takes, as the breaker measures it. `null` unless `SlowCalls` is configured and the baseline has enough samples. An adaptive breaker trips at `NormalLatency` times `SlowCalls.Multiple`. |
-| `NormalFailureRate` | How often a call to this dependency fails, as the breaker measures it. `null` unless `Failures` is configured and the baseline has enough samples. The relative trip point is `max(Failures.AbsoluteFloor, NormalFailureRate * Failures.Multiple)`. |
+| `NormalLatency` | How long a healthy call to this dependency currently takes, as the breaker measures it. `null` unless `SlowCalls` is in effect - it is by default - and the baseline has enough samples. An adaptive breaker trips at `NormalLatency` times `SlowCalls.Multiple`. |
+| `NormalFailureRate` | How often a call to this dependency fails, as the breaker measures it. `null` unless `Failures` is in effect - it is by default - and the baseline has enough samples. The relative trip point is `max(Failures.AbsoluteFloor, NormalFailureRate * Failures.Multiple)`. |
 | `Isolate()` | Forces the breaker into the `Isolated` state. An isolated breaker does not self-heal. |
 | `Reset()` | Closes the breaker and clears its failure history. `NormalLatency` and `NormalFailureRate` survive, because they are measurements of the dependency rather than decisions about it. |
 
@@ -41,11 +41,11 @@ The `BreakerState` enum defines the breaker's states:
 | :--- | :--- | :--- |
 | `ConsecutiveFailures` | 5 | The number of consecutive failures required to trip the breaker. |
 | `FailureRatio` | `null` | An optional rate-based trip threshold in the range (0, 1]. This is evaluated alongside the consecutive failure counter. |
-| `Failures` | `null` | The same trip, expressed as a multiple of the dependency's own measured error rate. Composes with `FailureRatio`, which stays the ceiling when both are set. See [`Failures`](#failures). |
+| `Failures` | `Failures.Above(5)` | The same trip, expressed as a multiple of the dependency's own measured error rate. On by default; set it to `null` to turn it off. Composes with `FailureRatio`, which stays the ceiling when both are set. See [`Failures`](#failures). |
 | `MinimumCalls` | 20 | The minimum number of sampled calls in the window before a rate-based trip is evaluated. |
 | `Window` | 30 s | The sliding window duration over which rates are measured. |
 | `SlowCallThreshold` | `null` | A constant duration above which an attempt counts as "slow", even if it succeeded. |
-| `SlowCalls` | `null` | The same trip, expressed as a multiple of measured normal latency. Set this or `SlowCallThreshold`, not both. See [`SlowCalls`](#slowcalls). |
+| `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default; set it to `null` to turn it off, or set `SlowCallThreshold` to state the absolute figure instead. Setting both is rejected. See [`SlowCalls`](#slowcalls). |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that will trip the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set it equal to `BreakDuration` to disable growth. |
@@ -81,7 +81,8 @@ The `BreakerState` enum defines the breaker's states:
 - **Trip point**: `min(FailureRatio, max(AbsoluteFloor, NormalFailureRate * Multiple))`, clamped to 1. The relative trip can only fire sooner than `FailureRatio`, never later.
 - **Two failures minimum**: a relative trip needs at least two failures in the window whatever the ratio says, because at the default floor a single failure in a 20-call window is already 5%. An absolute `FailureRatio` is not held to that.
 - **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Failures.Window` divided by `Multiple` is less than twice `Window`. Such a breaker cannot open on the error rate at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-relative-failure-ratio).
-- **Cost**: two `int[10]` rings per breaker, allocated only when `Failures` is set.
+- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.Window` needs it to, and no relative trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `Failures` you wrote is used as written, or rejected.
+- **Cost**: two `int[10]` rings per breaker, allocated whenever `Failures` is set - which, at the defaults, is always.
 
 ## `SlowCalls`
 
@@ -100,6 +101,7 @@ The `BreakerState` enum defines the breaker's states:
 - **Sampling**: Only successful attempts feed the baseline. A `Transient`, `Throttled`, or `Permanent` outcome says nothing about how long the dependency takes to do the work.
 - **The baseline is separate from the trip window**: it is not cleared when the breaker opens, closes, or is `Reset`.
 - **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Quantile` times `SlowCalls.Window` is less than twice `SlowCallRatio` times `Window`. Such a breaker cannot open on latency at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold).
-- **Cost**: one `LatencyWindow` per breaker, allocated only when `SlowCalls` is set.
+- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.Window` needs it to, and no brownout trip is defaulted on at all once that requirement passes an hour, or when `SlowCallThreshold` names the absolute form instead. All three apply to the default only - a `SlowCalls` you wrote is used as written, or rejected.
+- **Cost**: one `LatencyWindow` per breaker, about 3.4 KB, allocated whenever `SlowCalls` is set - which, at the defaults, is always.
 
 For a detailed explanation of the logic, see [Breaker internals](../deep-dives/breaker-internals.md).

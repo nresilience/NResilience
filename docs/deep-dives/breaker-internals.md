@@ -85,7 +85,7 @@ The baseline decays on its own, because an idle estimator reports nothing rather
 
 ### Cost
 
-One `LatencyWindow` per breaker, allocated only when `SlowCalls` is set, living on the breaker rather than the policy: the breaker is the object whose scope is explicit, and two policies sharing a breaker are two views of one dependency that should share one idea of its normal latency. Per attempt, on the success path only, the breaker adds one histogram increment and one memoized read, both behind the lock it already holds, sharing the one clock read that `LatencyWindow.RecordAndThreshold` exists to make possible.
+One `LatencyWindow` per breaker - about 3.4 KB - allocated whenever `SlowCalls` is set, which at the defaults is every breaker, living on the breaker rather than the policy: the breaker is the object whose scope is explicit, and two policies sharing a breaker are two views of one dependency that should share one idea of its normal latency. Per attempt, on the success path only, the breaker adds one histogram increment and one memoized read, both behind the lock it already holds, sharing the one clock read that `LatencyWindow.RecordAndThreshold` exists to make possible.
 
 ## The relative failure ratio
 
@@ -110,7 +110,7 @@ An outage contaminates the baseline as it fills it, exactly as a brownout contam
 - The trip window turns over to failures in `Window` - 30 seconds at the defaults.
 - After `t` seconds the baseline reads roughly `t / Failures.Window`, so the trip point reads `Multiple` times that. A trip window can be at most 100% failures, so once the baseline reaches `1 / Multiple` the breaker cannot open on the error rate at all - which takes `Failures.Window / Multiple`, or 60 seconds at the defaults.
 
-`BreakerSettings.Validate` requires the second to be at least twice the first, the same factor of two `SlowCalls` is held to, and the defaults meet it exactly. A consequence worth stating: raising `Multiple` shortens the survival time, so `Failures.Above(10)` on a 30-second trip window wants a 10-minute baseline and is refused with a 5-minute one. That is the honest trade, and the message names all three knobs that resolve it.
+`BreakerSettings.Validate` requires the second to be at least twice the first, the same factor of two `SlowCalls` is held to, and the defaults meet it exactly. A consequence worth stating: raising `Multiple` shortens the survival time, so `Failures.Above(10)` on a 30-second trip window wants a 10-minute baseline and is refused with a 5-minute one. That is the honest trade, and the message names all three knobs that resolve it. It is also why the *default* `Failures` derives its baseline from the trip window rather than taking 5 minutes as given: a default the caller never wrote must not be able to turn their `Window` into a configuration error, so it widens instead, and steps aside entirely once the baseline it would need passes an hour.
 
 ### Composition, and why this one is not exclusive
 
@@ -118,7 +118,7 @@ An outage contaminates the baseline as it fills it, exactly as a brownout contam
 
 ### Cost, and what clears it
 
-Two `int[10]` rings per breaker - 80 bytes - allocated only when `Failures` is set, and nothing on the executor's path at all. The baseline is bucketed over its own window rather than the trip window's, rotated on write like the trip window, and guarded by the same lock.
+Two `int[10]` rings per breaker - 80 bytes - allocated whenever `Failures` is set, which at the defaults is every breaker, and nothing on the executor's path at all. The baseline is bucketed over its own window rather than the trip window's, rotated on write like the trip window, and guarded by the same lock.
 
 Nothing clears it. `OpenCore`, `CloseCore` and `Reset` clear the trip window, because those counts are evidence for a decision that has now been made; the baseline is a measurement of the dependency, and forgetting it at the moment the breaker opens would leave the next thirty seconds unjudgeable until the rate had been re-learned. It decays on its own instead: an outage longer than `Failures.Window` leaves the breaker with no baseline, `Breaker.NormalFailureRate` reporting `null`, and the relative trip disarmed until 100 outcomes have re-established it. The consecutive counter and `FailureRatio` are unaffected, which is what covers the cold start.
 

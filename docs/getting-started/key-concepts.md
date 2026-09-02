@@ -67,7 +67,7 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-The effective ceiling for an attempt is the smaller of the `AttemptTimeout` and the time remaining on the `Deadline`.
+The effective ceiling for an attempt is the smallest of the `AttemptTimeout`, the time remaining on the `Deadline`, and three times what a call recently took - the policy measures that last one for you, and it can only lower the ceiling.
 
 For more information, see [Deadlines and attempt timeouts](../features/deadlines.md).
 
@@ -113,6 +113,6 @@ Prevent a fleet of clients from overwhelming a struggling dependency using these
 - **Retry budget**: Limits retries as a fraction of total traffic.
 - **Limiter**: Limits the absolute rate, or the concurrency, of what leaves this process.
 
-The retry budget is on by default. Construct the circuit breaker and share it across a dependency's scope; the limiter is opt-in.
+The retry budget is on by default. Construct the circuit breaker and share it across a dependency's scope - it trips on slowness and on error rates measured against the dependency's own, without being told what either normally is. The limiter is opt-in.
 
 For more information, see [Circuit breaker](../features/circuit-breaker.md), [retry budget](../features/retry-budget.md) and [rate limiting](../features/rate-limiting.md).

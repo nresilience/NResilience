@@ -62,16 +62,16 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter` | Settings for the backoff curve. |
 | `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget` | Settings for the retry budget. Use `0` to disable the budget. |
 | `Breaker` | A `BreakerOptions` section. Omit this to disable the circuit breaker. |
-| `Timeouts` | An `AttemptTimeoutsOptions` section. Omit this and `AttemptTimeout` is the only per-attempt bound. |
+| `Timeouts` | An `AttemptTimeoutsOptions` section. On by default; `"Timeouts": { "Multiple": 0 }` leaves `AttemptTimeout` as the only per-attempt bound. |
 | `Telemetry` | Set to `false` to opt this policy out of the telemetry meter. |
 
 The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
 
-`Breaker:SlowCalls` is a nested section rather than a flat property, and its presence arms the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number). Every setting has a default, so `"SlowCalls": {}` is complete; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. Set this or `SlowCallThreshold`, not both - a section that sets both is rejected when the breaker is built.
+`Breaker:SlowCalls` is a nested section rather than a flat property, and the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number) it configures is on by default. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. `"SlowCalls": { "Multiple": 0 }` turns the trip off, and so does naming `SlowCallThreshold` instead - they are the same trip defined two ways, and a section that sets both is rejected when the breaker is built.
 
-`Breaker:Failures` is a nested section on the same pattern, and its presence arms the [relative failure trip](../features/circuit-breaker.md#trip-on-errors-without-guessing-a-rate). Every setting has a default, so `"Failures": {}` is complete; it accepts `Multiple`, `Window`, `MinimumSamples`, and `AbsoluteFloor`. Set `FailureRatio` as well when you have a rate you never want exceeded - it becomes the ceiling, and the relative trip can only fire sooner.
+`Breaker:Failures` is a nested section on the same pattern, and the [relative failure trip](../features/circuit-breaker.md#trip-on-errors-without-guessing-a-rate) it configures is on by default too. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Window`, `MinimumSamples`, and `AbsoluteFloor`, with `"Failures": { "Multiple": 0 }` turning the trip off. Set `FailureRatio` as well when you have a rate you never want exceeded - it becomes the ceiling, and the relative trip can only fire sooner.
 
-`Timeouts` is likewise a nested section whose presence arms the [measured attempt ceiling](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it). Every setting has a default, so `"Timeouts": {}` is complete; it accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Floor`. It never lengthens `AttemptTimeout` - the measured term can only lower the ceiling - so the two settings compose rather than compete.
+`Timeouts` is likewise a nested section, configuring the [measured attempt ceiling](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) the default policy already carries. It accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Floor`, with `"Timeouts": { "Multiple": 0 }` turning the measured term off. It never lengthens `AttemptTimeout` - the measured term can only lower the ceiling - so the two settings compose rather than compete.
 
 ## Projection via ResilienceOptions
 

@@ -28,7 +28,7 @@ That is a working retried client. Your only job is to pass your own cancellation
 - Three attempts
 - Exponential backoff with full jitter
 - A 30-second deadline
-- A 10-second attempt timeout
+- A 10-second attempt timeout, tightened to three times what a call to that host recently took
 - An HTTP classifier that retries `503` responses but not `404` responses
 
 The client's [policy](../http/index.md) handles HTTP-specific logic: it rebuilds the request for every attempt, excludes POST requests from the retry path, and scopes the circuit breaker to the host.

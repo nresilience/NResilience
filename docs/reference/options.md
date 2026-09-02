@@ -130,11 +130,11 @@ There is deliberately no fixed-delay setting. A constant threshold is the failur
 
 ## `AttemptTimeoutsOptions`
 
-`AttemptTimeoutsOptions` provides the bindable shape of [`AttemptTimeouts`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it). The presence of the section is what turns it on, and every property has a working default - so `"Timeouts": {}` is a complete configuration.
+`AttemptTimeoutsOptions` provides the bindable shape of [`AttemptTimeouts`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), which the default policy has on. Every property has a working default, so the section is only needed to change one - or to turn the feature off, which is `"Timeouts": { "Multiple": 0 }`. A section cannot say `null`, and "zero times the recent p95" is not a ceiling anyone could mean.
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
-| `Multiple` | `3` | How many times the measured quantile an attempt may take. Must be greater than 1. |
+| `Multiple` | `3` | How many times the measured quantile an attempt may take. Must be greater than 1, or `0` to turn the measured ceiling off. |
 | `Quantile` | `0.95` | The quantile of recent successful latency the ceiling is measured from. Between 0.5 and 0.99. |
 | `Window` | `5 min` | How much history the estimate covers. |
 | `MinimumSamples` | `20` | How many recent successful calls the estimate needs before it bounds anything. |
@@ -147,6 +147,8 @@ There is deliberately no way to make the measured ceiling longer than `AttemptTi
 `BreakerOptions` provides the bindable shape of [`BreakerSettings`](breaker.md) with nullable properties.
 
 - **`ToBreaker(string? name = null)`**: Builds a live `Breaker` instance. A configured breaker is created once per policy and survives configuration reloads, keeping its state.
+
+The two relative trips are on by default, as they are on `BreakerSettings`, and a section turns one off the same way `Timeouts` does: `"SlowCalls": { "Multiple": 0 }` or `"Failures": { "Multiple": 0 }`. Setting `SlowCallThreshold` also turns `SlowCalls` off, because the two are the same trip defined two ways.
 
 ## `AddRateLimit` on `IHttpClientBuilder`
 

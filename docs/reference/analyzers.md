@@ -151,7 +151,7 @@ static readonly Resilience Search = Resilience.Http with { Hedge = Hedge.At(0.95
 
 Two limits are deliberate:
 
-- The rule reports a policy that **sets** `Hedge` or `Timeouts` in the expression the compiler can see. `Api with { Deadline = budget }`, where the estimator was configured on `Api`, is not reported - establishing that would mean following the referenced symbol, and a rule that is merely usually right about a shape this common is a rule people turn off.
+- The rule reports a policy that **sets** `Hedge` or `Timeouts` in the expression the compiler can see. `Api with { Deadline = budget }`, where the estimator was configured on `Api`, is not reported - establishing that would mean following the referenced symbol, and a rule that is merely usually right about a shape this common is a rule people turn off. Because `Timeouts` is on in every preset but `Resilience.None`, that unreported shape has a cold estimate too: it falls back to `AttemptTimeout`, exactly as the reported one does.
 - Setting either property to `null` is not reported. That removes the feature rather than configuring one, and it is how the HTTP handler builds its own single-shot policy.
 
 If you need a per-request bound on a policy that carries an estimator, prefer `ResilienceDeadline.Begin` with `UseAmbientDeadline` over deriving a policy per request. See [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop).

@@ -112,9 +112,10 @@ public sealed class ResilienceOptions
     public HedgeOptions? Hedge { get; set; }
 
     /// <summary>
-    ///     The adaptive per-attempt ceiling, or null - the default - for none. The presence of the
-    ///     section is what turns it on, and every property has a working default, so
-    ///     <c>"Timeouts": {}</c> is a complete configuration.
+    ///     The measured per-attempt ceiling, which <see cref="Resilience.Timeouts" /> has on by default.
+    ///     Every property has a working default, so this section is only needed to change one -
+    ///     <c>"Timeouts": { "Multiple": 5 }</c> - or to turn the feature off, which is
+    ///     <c>"Timeouts": { "Multiple": 0 }</c>.
     /// </summary>
     public AttemptTimeoutsOptions? Timeouts { get; set; }
 
@@ -208,7 +209,7 @@ public sealed class ResilienceOptions
             policy = policy with { Hedge = hedge.ToHedge() };
 
         if (Timeouts is { } timeouts)
-            policy = policy with { Timeouts = timeouts.ToTimeouts() };
+            policy = policy with { Timeouts = timeouts.Multiple is 0 ? null : timeouts.ToTimeouts() };
 
         return policy;
     }
@@ -311,7 +312,11 @@ public sealed class HedgeOptions
 /// </remarks>
 public sealed class AttemptTimeoutsOptions
 {
-    /// <summary>The multiple of the measured quantile. Defaults to 3.</summary>
+    /// <summary>
+    ///     The multiple of the measured quantile. Defaults to 3, and <c>0</c> is the off switch: a
+    ///     section cannot say <c>null</c>, and "zero times the recent p95" is not a ceiling anyone
+    ///     could mean.
+    /// </summary>
     public double? Multiple { get; set; }
 
     /// <summary><see cref="NResilience.AttemptTimeouts.Quantile" />.</summary>
@@ -370,9 +375,11 @@ public sealed class BreakerOptions
 
     /// <summary>
     ///     <see cref="BreakerSettings.Failures" /> - the same rate-based trip stated as a multiple of the
-    ///     dependency's own measured error rate instead of an absolute ratio. A section of its own, so
-    ///     its presence is what turns it on. Composes with <see cref="FailureRatio" />, which stays the
-    ///     ceiling when both are set.
+    ///     dependency's own measured error rate instead of an absolute ratio, which the breaker has on
+    ///     by default. A section of its own, so it is only needed to change a property -
+    ///     <c>"Failures": { "Multiple": 10 }</c> - or to turn the trip off, which is
+    ///     <c>"Failures": { "Multiple": 0 }</c>. Composes with <see cref="FailureRatio" />, which stays
+    ///     the ceiling when both are set.
     /// </summary>
     public FailureOptions? Failures { get; set; }
 
@@ -408,8 +415,11 @@ public sealed class BreakerOptions
 
     /// <summary>
     ///     <see cref="BreakerSettings.SlowCalls" /> - the same brownout trip stated as a multiple of
-    ///     measured normal latency instead of a constant. A section of its own, so its presence is what
-    ///     turns it on. Set this or <see cref="SlowCallThreshold" />, not both.
+    ///     measured normal latency instead of a constant, which the breaker has on by default. A section
+    ///     of its own, so it is only needed to change a property - <c>"SlowCalls": { "Multiple": 5 }</c>
+    ///     - or to turn the trip off, which is <c>"SlowCalls": { "Multiple": 0 }</c>. Setting
+    ///     <see cref="SlowCallThreshold" /> also turns it off, because the two are the same trip defined
+    ///     two ways; setting both this and <see cref="SlowCallThreshold" /> is refused.
     /// </summary>
     public SlowCallOptions? SlowCalls { get; set; }
 
@@ -435,7 +445,7 @@ public sealed class BreakerOptions
             settings = settings with { FailureRatio = ratio };
 
         if (Failures is { } relative)
-            settings = settings with { Failures = relative.ToFailures() };
+            settings = settings with { Failures = relative.Multiple is 0 ? null : relative.ToFailures() };
 
         if (MinimumCalls is { } minimum)
             settings = settings with { MinimumCalls = minimum };
@@ -462,7 +472,7 @@ public sealed class BreakerOptions
             settings = settings with { SlowCallThreshold = slow };
 
         if (SlowCalls is { } adaptive)
-            settings = settings with { SlowCalls = adaptive.ToSlowCalls() };
+            settings = settings with { SlowCalls = adaptive.Multiple is 0 ? null : adaptive.ToSlowCalls() };
 
         if (SlowCallRatio is { } slowRatio)
             settings = settings with { SlowCallRatio = slowRatio };
@@ -475,14 +485,15 @@ public sealed class BreakerOptions
 ///     The bindable shape of a <see cref="NResilience.Failures" />.
 ///     <para>
 ///         A section rather than four flat properties, so <c>"Failures": { "Multiple": 5 }</c> is a
-///         complete configuration and the presence of the section is what arms the relative trip.
+///         complete configuration, and <c>"Multiple": 0</c> is how a section turns the trip off.
 ///     </para>
 /// </summary>
 public sealed class FailureOptions
 {
     /// <summary>
     ///     <see cref="NResilience.Failures.Multiple" />. Defaults to 5, so <c>"Failures": {}</c> is a
-    ///     complete configuration.
+    ///     complete configuration, and <c>0</c> is the off switch: a section cannot say <c>null</c>, and
+    ///     "zero times the recent error rate" is not a trip point anyone could mean.
     /// </summary>
     public double? Multiple { get; set; }
 
@@ -518,14 +529,15 @@ public sealed class FailureOptions
 ///     The bindable shape of a <see cref="NResilience.SlowCalls" />.
 ///     <para>
 ///         A section rather than four flat properties, so <c>"SlowCalls": { "Multiple": 3 }</c> is a
-///         complete configuration and the presence of the section is what arms the adaptive trip.
+///         complete configuration, and <c>"Multiple": 0</c> is how a section turns the trip off.
 ///     </para>
 /// </summary>
 public sealed class SlowCallOptions
 {
     /// <summary>
     ///     <see cref="NResilience.SlowCalls.Multiple" />. Defaults to 3, so <c>"SlowCalls": {}</c> is a
-    ///     complete configuration.
+    ///     complete configuration, and <c>0</c> is the off switch: a section cannot say <c>null</c>, and
+    ///     "zero times normal latency" is not a threshold anyone could mean.
     /// </summary>
     public double? Multiple { get; set; }
 

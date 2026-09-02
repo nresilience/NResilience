@@ -14,6 +14,8 @@ The NResilience handler prevents that by keeping a separate circuit breaker and 
 
 `BreakerPerHost` and `BudgetPerHost` are on by default. The handler creates a breaker and a retry budget for each authority the first time a request goes to it.
 
+Each of those breakers measures that host's own normal latency and error rate, because [`SlowCalls` and `Failures`](../features/circuit-breaker.md#trip-conditions) are on by default - so a brownout at one host trips that host's breaker and nothing else. The estimates cost about 3.5 KB per host: at the default `MaxHosts` of 1024, a ceiling of roughly 3.5 MB for a client talking to a thousand hosts, and nothing at all for the usual client talking to three.
+
 ## Bound the host registry
  
 The registry keeps 1024 hosts by default. Use `MaxHosts` to change the cap, or set it to `null` to remove it:

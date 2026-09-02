@@ -12,7 +12,7 @@ The **deadline** is the ceiling for the entire operation, including every attemp
 
 Both are on by default:
 - **Deadline**: 30 seconds for the whole call.
-- **Attempt timeout**: 10 seconds for any single attempt.
+- **Attempt timeout**: 10 seconds for any single attempt, and usually far less: the ceiling is measured from the dependency's own latency, and 10 seconds is where the lowering stops.
 
 Use `Timeout.InfiniteTimeSpan` to disable either bound.
 
@@ -45,7 +45,7 @@ var api = Resilience.Default with
 
 ## Measure the attempt ceiling instead of guessing it
 
-`AttemptTimeout` is a number you pick per dependency before it runs in production, and you must update it whenever the dependency changes. If you set `Timeouts`, the ceiling is measured from the dependency's own latency instead.
+**On by default.** `AttemptTimeout` alone is a number you pick per dependency before it runs, and update whenever it changes. `Timeouts` measures the ceiling from the dependency's own latency instead, by default at `AttemptTimeouts.Above(3)` - three times the recent p95. `Timeouts = null` leaves `AttemptTimeout` as the only per-attempt ceiling.
 
 <!-- snippet: deadline-measured-ceiling -->
 ```csharp
@@ -74,9 +74,10 @@ The effective ceiling is the minimum of `AttemptTimeout`, the time remaining on 
 | `MinimumSamples` | `20` | How many recent successful calls the estimate needs before it bounds anything. |
 | `Floor` | `50 ms` | A floor under the measured ceiling, so a dependency whose p95 is microseconds does not cancel itself on one scheduling hiccup. |
 
-Three behaviours are worth knowing:
+Four behaviors are worth knowing:
 
 - **A cold process does not guess.** Below `MinimumSamples` there is no measured term and the attempt gets `AttemptTimeout` unchanged.
+- **It only tightens a ceiling you set.** A policy whose `AttemptTimeout` is `Timeout.InfiniteTimeSpan` gets no default measured ceiling: you said the deadline was the only per-attempt bound, and there is nothing there to tighten. Writing `Timeouts` yourself there is a different instruction - "bound me by the dependency's latency and nothing else" - and it is honored.
 - **Only successful attempts are sampled.** A ceiling tight enough to cancel calls that would have succeeded starves its own estimator, so the policy reverts to `AttemptTimeout` rather than tightening further.
 - **The estimate is per policy instance.** The HTTP handler derives one policy per host, so each host's ceiling is measured from that host's own latency.
 
@@ -119,7 +120,7 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-Note that a `Floor` at or above `AttemptTimeout` is refused at validation. That combination pins the ceiling to exactly `AttemptTimeout`, which makes `Timeouts` do nothing at all, and the library refuses configurations that silently have no effect - so the honest way to say "an exact attempt timeout, always" is to leave `Timeouts` unset. It is `null` in every preset, so that is also the default.
+Note that a `Floor` at or above `AttemptTimeout` is refused at validation. That combination pins the ceiling to exactly `AttemptTimeout`, which makes `Timeouts` do nothing at all, and the library refuses configurations that silently have no effect - so the honest way to say "an exact attempt timeout, always" is `Timeouts = null`. An `AttemptTimeout` at or below the default 50 ms `Floor` works the same way: the default steps aside rather than turning your policy into an error.
 
 ### Bounding one request, not one policy
 

@@ -21,6 +21,7 @@ NResilience replaces complex fluent builders, confusing policy ordering, and man
 - **Sensible defaults.** Get a working, retried HTTP call with one line of code.
 - **One method for everything.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
 - **Retry budget.** A cap on retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
+- **Measured, not guessed.** The attempt ceiling and the breaker's slow-call and error-rate trips are measured from the dependency's own behavior, on by default, so no millisecond figure has to be guessed per dependency.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
 - **Native AOT compatible.** Zero external dependencies and no reflection.
 

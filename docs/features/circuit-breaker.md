@@ -44,15 +44,17 @@ A circuit breaker is always in one of these four states:
 
 A breaker trips on consecutive failures, or on rates of failure and slowness. Slowness matters: a dependency can return successful responses so slowly that it exhausts your thread and connection pools.
 
+`new Breaker()` trips on all three: five consecutive failures, an error rate five times the dependency's own, and half a window three times slower than its own normal. The last two are measured, not configured, and neither is armed until the breaker has a baseline - so a cold breaker behaves exactly as a consecutive-failures one does.
+
 | Setting | Default | Description |
 | :--- | :--- | :--- |
 | `ConsecutiveFailures` | 5 | The number of consecutive failures before the breaker opens. |
 | `FailureRatio` | null | An optional rate-based trip condition, evaluated alongside the consecutive failure counter. |
-| `Failures` | null | The same trip, expressed as a multiple of the dependency's own measured error rate. Composes with `FailureRatio`, which stays the ceiling. |
+| `Failures` | `Failures.Above(5)` | The same trip, expressed as a multiple of the dependency's own measured error rate. On by default. Composes with `FailureRatio`, which stays the ceiling. |
 | `MinimumCalls` | 20 | The minimum number of calls required before a ratio-based trip is evaluated. |
 | `Window` | 30 s | The sliding window over which rates are measured. |
 | `SlowCallThreshold` | null | A constant latency threshold; any attempt slower than this counts as a slow call. |
-| `SlowCalls` | null | The same trip, expressed as a multiple of measured normal latency. Set this or `SlowCallThreshold`, not both. |
+| `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default. Setting `SlowCallThreshold` replaces it; setting both is rejected. |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls within the window that trips the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles on each consecutive open. |
@@ -86,7 +88,7 @@ The breaker samples individual **attempts**, and only `Transient` outcomes count
 
 ## Trip on brownouts without guessing a number
 
-`SlowCallThreshold` asks for a millisecond figure per dependency - before that dependency has ever run in production, and again every time its latency changes. `SlowCalls` asks for a multiple instead, and measures the rest itself.
+**On by default.** `SlowCallThreshold` asks for a millisecond figure per dependency - before that dependency has ever run in production, and again every time its latency changes. `SlowCalls` asks for a multiple instead and measures the rest itself, so it is what an unconfigured breaker trips on. `SlowCalls = null` turns it off; `SlowCallThreshold` states the absolute figure instead.
 
 <!-- snippet: breaker-adaptive-slow-calls -->
 ```csharp
@@ -117,13 +119,13 @@ Two settings make this work, both with defaults you can leave alone:
 - `Quantile` (default 0.5, capped there) is the quantile that counts as normal. A brownout only starts moving the median once it accounts for more than half the baseline window.
 - `Window` (default 5 minutes) is how far back the baseline reaches - 10 times the trip window, so the trip window fills with slow calls long before the baseline notices them.
 
-`BreakerSettings.Validate` rejects combinations where the baseline would move first - such a breaker never opens on latency at all. See [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold) for the arithmetic.
+`BreakerSettings.Validate` rejects combinations where the baseline would move first - such a breaker never opens on latency at all. That rejection is for a baseline you configured; the *default* baseline widens with a longer `Window` instead, because a value you did not write must not turn your configuration into an error. See [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold) for the arithmetic.
 
 Only successful attempts feed the baseline, and the baseline survives an open, a close, and a `Reset` - it measures the dependency, it does not decide anything about it. That is what makes a slow probe against a still-degraded dependency recognizable as one.
 
 ## Trip on errors without guessing a rate
 
-`FailureRatio` asks for an absolute error rate, and no single number fits two dependencies. `Failures` asks for a multiple of the dependency's own rate instead, and measures the rest itself.
+**On by default.** `FailureRatio` asks for an absolute error rate, and no single number fits two dependencies. `Failures` asks for a multiple of the dependency's own rate instead and measures the rest itself. `Failures = null` turns it off.
 
 <!-- snippet: breaker-relative-failures -->
 ```csharp
@@ -153,7 +155,7 @@ Three guards make it safe, all defaulted:
 
 - `AbsoluteFloor` (default 0.05) is the rate below which nothing is wrong, whatever the baseline was. Five times a baseline of nearly zero is nearly zero, so without a floor the first error of the day would open the circuit. A relative trip also needs at least two failures in the window, because one failure is not a rate.
 - `MinimumSamples` (default 100) is how many outcomes the baseline needs before the relative trip is armed. Until then the breaker behaves exactly as it does without the setting.
-- `Window` (default 5 minutes) is how far back the baseline reaches. `BreakerSettings.Validate` rejects a baseline short enough that an outage raises it before the trip window fills - such a breaker never opens on the error rate at all.
+- `Window` (default 5 minutes) is how far back the baseline reaches. `BreakerSettings.Validate` rejects a baseline short enough that an outage raises it before the trip window fills - such a breaker never opens on the error rate at all. The default baseline widens instead, the way the slow-call baseline does.
 
 Set `FailureRatio` as well when you have a rate you never want exceeded. The relative trip can only fire sooner than it, never later.
 

@@ -360,9 +360,30 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(TimeSpan.FromMilliseconds(20), timeouts.Floor);
     }
 
+    /// <summary>
+    ///     A section is not what arms the measured ceiling any more - the policy has one by default -
+    ///     so a section that named nothing is indistinguishable from no section at all.
+    /// </summary>
     [Fact]
-    public void A_policy_with_no_timeouts_section_has_no_measured_ceiling() =>
-        Assert.Null(new ResilienceOptions { Attempts = 3 }.ToPolicy().Timeouts);
+    public void A_policy_with_no_timeouts_section_still_has_the_default_measured_ceiling()
+    {
+        Assert.Equal(AttemptTimeouts.Above(3), new ResilienceOptions { Attempts = 3 }.ToPolicy().Timeouts);
+        Assert.Equal(AttemptTimeouts.Above(3), new ResilienceOptions { Timeouts = new AttemptTimeoutsOptions() }.ToPolicy().Timeouts);
+    }
+
+    /// <summary>
+    ///     A configuration section cannot say <c>null</c>, so a zero multiple is the off switch - the
+    ///     same shape <c>BudgetFraction: 0</c> uses.
+    /// </summary>
+    [Fact]
+    public void A_zero_multiple_turns_the_measured_ceiling_off()
+    {
+        var options = new ResilienceOptions();
+
+        Config(("Timeouts:Multiple", "0")).Bind(options);
+
+        Assert.Null(options.ToPolicy().Timeouts);
+    }
 
     /// <summary>
     ///     The same arrangement for the adaptive slow-call trip, and for the same reason: the presence
@@ -590,6 +611,40 @@ public sealed class ResilienceOptionsTests
 
         // The projection is not validation's substitute, but a projected policy must be executable.
         policy.Validate();
+    }
+
+    /// <summary>
+    ///     Both relative trips are on by default, and a section cannot say <c>null</c> - so a zero
+    ///     multiple is how configuration turns one off, the same way it turns the measured ceiling off.
+    /// </summary>
+    [Fact]
+    public void A_zero_multiple_turns_a_relative_trip_off()
+    {
+        var options = new ResilienceOptions();
+
+        Config(
+                ("Breaker:SlowCalls:Multiple", "0"),
+                ("Breaker:Failures:Multiple", "0"))
+            .Bind(options);
+
+        var settings = options.ToPolicy().Breaker!.Settings;
+
+        Assert.Null(settings.SlowCalls);
+        Assert.Null(settings.Failures);
+    }
+
+    /// <summary>An absolute threshold in a section replaces the default relative trip, as it does in code.</summary>
+    [Fact]
+    public void An_absolute_slow_call_threshold_in_a_section_replaces_the_default_relative_trip()
+    {
+        var options = new ResilienceOptions();
+
+        Config(("Breaker:SlowCallThreshold", "00:00:02")).Bind(options);
+
+        var settings = options.ToPolicy().Breaker!.Settings;
+
+        Assert.Equal(TimeSpan.FromSeconds(2), settings.SlowCallThreshold);
+        Assert.Null(settings.SlowCalls);
     }
 
     private static TimeSpan Delay(Resilience policy, int attemptNumber) =>

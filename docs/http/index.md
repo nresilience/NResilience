@@ -76,6 +76,10 @@ using var client = ResilienceHttp.CreateClient(
 | `MaxHosts` | `1024` | Bounds the per-host registry. `null` is unbounded. | [Per-host scope](per-host-scope.md) |
 | `DetectNestedRetries` | `true` | Detects nested retry loops. | [Nested retries](nested-retries.md) |
 
+Three things the handler does without being asked, because `Resilience.Http` and the per-host `BreakerSettings` carry them: each attempt is bounded by three times that host's measured p95, each host's breaker trips on an error rate five times that host's own, and each host's breaker trips on half a window of calls three times slower than that host's own normal. All three are measured per host, none is armed until it has a baseline, and each can be turned off - see [attempt timeouts](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) and [trip conditions](../features/circuit-breaker.md#trip-conditions).
+
+The one adaptive guard that is *not* on by default is the concurrency limit, because a limiter holds live permits and queues callers - not something a default should start doing. It is one option when you want it: `.AddRateLimit(o => o.Adaptive = new())` gives every host a concurrency limit discovered from its own latency. See [rate limiting](../features/rate-limiting.md#from-configuration).
+
 ## Manage the transport timeout
 
 When `OwnTransportTimeout` is `true`, NResilience sets `HttpClient.Timeout` to `Timeout.InfiniteTimeSpan`, leaving the [deadline](../features/deadlines.md) as the only active time bound.
