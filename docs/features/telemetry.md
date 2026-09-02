@@ -101,6 +101,7 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.attempt.duration` | s | Duration of a single attempt |
 | `nresilience.hedges` | `{hedge}` | [Hedged](hedging.md) attempts, tagged `started`, `won` or `discarded` |
 | `nresilience.hedge.threshold` | s | The latency quantile a hedge fired at, recorded when it fired |
+| `nresilience.attempt.timeout` | s | The measured per-attempt [ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), recorded when it changes |
 | `nresilience.limiter.leases` | `{lease}` | Permits a [limiter](rate-limiting.md) was asked for, tagged `acquired` or `denied` |
 | `nresilience.limiter.wait.duration` | s | How long a caller waited on a limiter. Zero unless queueing is enabled |
 

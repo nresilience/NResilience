@@ -41,6 +41,14 @@ internal sealed class ExecutionState
 
     private readonly LatencyWindow? _latency;
 
+    private readonly LatencyWindow? _timeouts;
+
+    /// <summary>
+    ///     The last measured ceiling reported for this policy instance, in ticks. Zero until one is,
+    ///     which no real ceiling can be.
+    /// </summary>
+    private long _lastCeilingTicks;
+
     private ExecutionState(Resilience policy)
     {
         // A policy that cannot retry has nothing to spend and nobody to fund, so it gets no budget
@@ -52,6 +60,14 @@ internal sealed class ExecutionState
         // rather than once per call. Validate() has already run, so the quantile and the window are
         // known good here.
         _latency = policy.Hedge is { } hedge ? new LatencyWindow(hedge.Quantile, hedge.Window, policy.Time) : null;
+
+        // A second window rather than a shared one, because one window answers one quantile - and these
+        // two want opposite things from the same distribution. A hedge reads a high quantile of a short
+        // window so the threshold moves with the dependency; a ceiling reads a high quantile of a long
+        // one so it does not. See LatencyWindow's remarks: this is the case they flagged.
+        _timeouts = policy.Timeouts is { } timeouts
+            ? new LatencyWindow(timeouts.Quantile, timeouts.Window, policy.Time)
+            : null;
     }
 
     /// <summary>Validates the policy on its first execution, and caches the result per thread.</summary>
@@ -92,6 +108,42 @@ internal sealed class ExecutionState
     ///     slow host's tail would hedge everything.
     /// </remarks>
     public static LatencyWindow? LatencyFor(Resilience policy) => StateFor(policy)._latency;
+
+    /// <summary>
+    ///     The latency estimate this policy measures its attempt ceiling from, or null when it does not
+    ///     have one.
+    /// </summary>
+    /// <remarks>
+    ///     Resolved at each of the two points that need it - once before an attempt to read the ceiling,
+    ///     once after a successful one to record it - rather than hoisted into a local by the caller. A
+    ///     reference held across the attempt <c>await</c> would be a field in every caller's
+    ///     state-machine box whether or not <see cref="Resilience.Timeouts" /> was ever configured, and
+    ///     this feature is not allowed to cost the callers who did not ask for it. The steady-state read
+    ///     is the per-thread reference comparison <see cref="StateFor" /> primes; a continuation that
+    ///     resumed on another pool thread pays one lock-free table lookup instead, and no allocation
+    ///     either way.
+    /// </remarks>
+    public static LatencyWindow? TimeoutsFor(Resilience policy) => StateFor(policy)._timeouts;
+
+    /// <summary>
+    ///     Whether this measured ceiling differs from the last one reported for this policy instance,
+    ///     and records it either way.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <param name="ceiling">The ceiling about to be applied.</param>
+    /// <returns>True when it is worth telling a listener about.</returns>
+    /// <remarks>
+    ///     Keeps the event rate proportional to how much the estimate moves rather than to traffic.
+    ///     <see cref="LatencyWindow" /> memoizes its answer per slice, so a steady dependency changes
+    ///     this a handful of times per window and a listener sees a handful of events. Reached only when
+    ///     a listener is configured and the measured term actually won.
+    /// </remarks>
+    public static bool CeilingChanged(Resilience policy, TimeSpan ceiling)
+    {
+        var ticks = ceiling.Ticks;
+
+        return Interlocked.Exchange(ref StateFor(policy)._lastCeilingTicks, ticks) != ticks;
+    }
 
     /// <summary>
     ///     The state for a policy: the per-thread cache when this thread just used the same policy,

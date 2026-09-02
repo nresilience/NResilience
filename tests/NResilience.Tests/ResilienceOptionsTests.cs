@@ -321,6 +321,50 @@ public sealed class ResilienceOptionsTests
         Assert.Null(new ResilienceOptions { Attempts = 3 }.ToPolicy().Hedge);
 
     /// <summary>
+    ///     The same arrangement for the adaptive attempt ceiling: the presence of the section arms it
+    ///     and every default is usable, so <c>"Timeouts": {}</c> is a complete configuration.
+    /// </summary>
+    [Fact]
+    public void An_empty_timeouts_section_is_a_complete_configuration()
+    {
+        var options = new ResilienceOptions();
+        Config(("Timeouts:Quantile", "0.9")).Bind(options);
+
+        var timeouts = Assert.NotNull(options.ToPolicy().Timeouts);
+
+        Assert.Equal(3, timeouts.Multiple);
+        Assert.Equal(0.9, timeouts.Quantile);
+        Assert.Equal(TimeSpan.FromMinutes(5), timeouts.Window);
+        Assert.Equal(20, timeouts.MinimumSamples);
+        Assert.Equal(TimeSpan.FromMilliseconds(50), timeouts.Floor);
+    }
+
+    [Fact]
+    public void Every_attempt_timeout_setting_projects()
+    {
+        var options = new ResilienceOptions();
+
+        Config(
+            ("Timeouts:Multiple", "4"),
+            ("Timeouts:Quantile", "0.99"),
+            ("Timeouts:Window", "00:10:00"),
+            ("Timeouts:MinimumSamples", "75"),
+            ("Timeouts:Floor", "00:00:00.020")).Bind(options);
+
+        var timeouts = Assert.NotNull(options.ToPolicy().Timeouts);
+
+        Assert.Equal(4, timeouts.Multiple);
+        Assert.Equal(0.99, timeouts.Quantile);
+        Assert.Equal(TimeSpan.FromMinutes(10), timeouts.Window);
+        Assert.Equal(75, timeouts.MinimumSamples);
+        Assert.Equal(TimeSpan.FromMilliseconds(20), timeouts.Floor);
+    }
+
+    [Fact]
+    public void A_policy_with_no_timeouts_section_has_no_measured_ceiling() =>
+        Assert.Null(new ResilienceOptions { Attempts = 3 }.ToPolicy().Timeouts);
+
+    /// <summary>
     ///     The same arrangement for the adaptive slow-call trip, and for the same reason: the presence
     ///     of the section arms it, and every default is usable, so <c>"SlowCalls": {}</c> is a complete
     ///     brownout trip that needs nobody to have guessed a millisecond figure.

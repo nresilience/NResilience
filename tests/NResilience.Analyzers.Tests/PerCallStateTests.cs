@@ -2,7 +2,10 @@ using Microsoft.CodeAnalysis;
 
 namespace NResilience.Analyzers.Tests;
 
-/// <summary>NRES005 and NRES006: state that has to outlive the call - a breaker, a budget, a policy scope, a client.</summary>
+/// <summary>
+///     NRES005, NRES006 and NRES008: state that has to outlive the call - a breaker, a budget, a policy
+///     scope, a client, and the latency estimate a policy instance carries.
+/// </summary>
 public sealed class PerCallStateTests
 {
     [Fact]
@@ -293,5 +296,146 @@ public sealed class PerCallStateTests
                                }
                                """),
                 OutputKind.ConsoleApplication));
+    }
+
+    // ---- NRES008: the latency estimate a policy instance carries ----
+
+    /// <summary>
+    ///     The estimate is keyed by the policy instance, so a policy built per call is permanently
+    ///     cold - and both features that read one are documented to do nothing until they have samples.
+    ///     A hedge that never fires is invisible: the call just behaves as if hedging were off.
+    /// </summary>
+    [Fact]
+    public void A_hedging_policy_built_per_call_has_a_permanently_cold_estimate()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Dependencies
+                                                                {
+                                                                    internal static Resilience Search() => Resilience.Http with { Hedge = Hedge.At(0.95) };
+                                                                }
+                                                                """)));
+
+        Assert.Equal("NRES008", reported.Id);
+        Assert.Contains("'Hedge'", reported.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("'Search'", reported.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("MinimumSamples", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     The same for a measured attempt ceiling, which fails the same way and just as quietly: the
+    ///     attempt gets the configured AttemptTimeout, which is exactly what it would have got without
+    ///     Timeouts configured at all.
+    /// </summary>
+    [Fact]
+    public void A_policy_with_a_measured_ceiling_built_per_call_is_reported()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Dependencies
+                                                                {
+                                                                    internal static Resilience Api() => Resilience.Http with { Timeouts = AttemptTimeouts.Above(3) };
+                                                                }
+                                                                """)));
+
+        Assert.Equal("NRES008", reported.Id);
+        Assert.Contains("'Timeouts'", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    /// <summary>The shape the docs teach, and the reason the rule excludes field initializers.</summary>
+    [Fact]
+    public void A_policy_held_in_a_static_field_keeps_its_estimate()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Dependencies
+                                                    {
+                                                        internal static readonly Resilience Api =
+                                                            Resilience.Http with { Timeouts = AttemptTimeouts.Above(3) };
+                                                    }
+                                                    """)));
+    }
+
+    /// <summary>
+    ///     An expression-bodied property runs on every read, so it is a method for this rule's purposes -
+    ///     the same distinction NRES005 draws.
+    /// </summary>
+    [Fact]
+    public void An_expression_bodied_policy_property_is_reported()
+    {
+        Assert.Equal(["NRES008"], Harness.Ids(Harness.InFile("""
+                                                             internal static class Dependencies
+                                                             {
+                                                                 internal static Resilience Api =>
+                                                                     Resilience.Http with { Hedge = Hedge.At(0.95) };
+                                                             }
+                                                             """)));
+    }
+
+    /// <summary>
+    ///     Setting the property to null removes the feature rather than configuring one. The HTTP
+    ///     handler's own single-shot policy is written exactly this way, so reporting it would fire on
+    ///     the library's own recommended shape.
+    /// </summary>
+    [Fact]
+    public void Clearing_the_estimate_per_call_is_not_reported()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Dependencies
+                                                    {
+                                                        internal static Resilience Single(Resilience policy) =>
+                                                            policy with { Attempts = 1, Hedge = null };
+                                                    }
+                                                    """)));
+    }
+
+    /// <summary>
+    ///     Narrowing a policy per call is a legitimate and documented thing to do - a per-request
+    ///     deadline is the example - and this expression says nothing about whether the source carries an
+    ///     estimator. Establishing that would mean following the referenced symbol, and a rule that is
+    ///     merely usually right about a shape this common is a rule people turn off. Recorded as a test
+    ///     so the limit is deliberate rather than an omission.
+    /// </summary>
+    [Fact]
+    public void Narrowing_a_policy_per_call_without_naming_an_estimator_is_not_reported()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Dependencies
+                                                    {
+                                                        internal static readonly Resilience Api =
+                                                            Resilience.Http with { Timeouts = AttemptTimeouts.Above(3) };
+
+                                                        internal static Resilience ForRequest(TimeSpan budget) =>
+                                                            Api with { Deadline = budget, UseAmbientDeadline = true };
+                                                    }
+                                                    """)));
+    }
+
+    /// <summary>The object-initializer form reaches the same check, so neither syntax is a way around it.</summary>
+    [Fact]
+    public void The_object_initializer_form_is_reported_too()
+    {
+        Assert.Equal(["NRES008"], Harness.Ids(Harness.InFile("""
+                                                             internal static class Dependencies
+                                                             {
+                                                                 internal static Resilience Api() =>
+                                                                     new Resilience { Attempts = 2, Timeouts = AttemptTimeouts.Above(3) };
+                                                             }
+                                                             """)));
+    }
+
+    /// <summary>
+    ///     One diagnostic per policy, not one per estimator. A policy configuring both is one mistake.
+    /// </summary>
+    [Fact]
+    public void A_policy_configuring_both_estimators_is_reported_once()
+    {
+        Assert.Equal(["NRES008"], Harness.Ids(Harness.InFile("""
+                                                             internal static class Dependencies
+                                                             {
+                                                                 internal static Resilience Api() => Resilience.Http with
+                                                                 {
+                                                                     Hedge = Hedge.At(0.95),
+                                                                     Timeouts = AttemptTimeouts.Above(3),
+                                                                 };
+                                                             }
+                                                             """)));
     }
 }

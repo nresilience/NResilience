@@ -25,6 +25,7 @@ The presets cover common scenarios:
 | `Attempts` | `int` | 3 | The total number of attempts, including the first. |
 | `Deadline` | `TimeSpan` | 30 s | The wall-clock budget for the entire call. Use `Timeout.InfiniteTimeSpan` to disable the bound. |
 | `AttemptTimeout` | `TimeSpan` | 10 s | The maximum duration for a single attempt. The effective value is the minimum of this property and the remaining time on the deadline. |
+| `Timeouts` | `AttemptTimeouts?` | `null` | A measured attempt ceiling. A `null` value means `AttemptTimeout` is the only per-attempt bound. The measured term can only lower the ceiling. |
 | `UseAmbientDeadline` | `bool` | `false` | Whether the deadline is clamped by the one the current call inherited from its caller. When set, the effective deadline is the minimum of `Deadline` and `ResilienceDeadline.Remaining`, resolved once per call. |
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
 | `Classify` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
@@ -35,6 +36,12 @@ The presets cover common scenarios:
 | `OnEvent` | `Action<CallEvent>?` | `null` | The telemetry listener. If `null`, no events are raised and no performance cost is incurred. |
 | `Name` | `string?` | `null` | A name used in diagnostics and telemetry tags. |
 | `Time` | `TimeProvider` | `TimeProvider.System` | The clock used for timing. Use the system provider in production. |
+
+One property is computed rather than configured:
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `MeasuredAttemptTimeout` | `TimeSpan?` | What `Timeouts` currently measures the ceiling to be, before `AttemptTimeout` and the deadline clamp it. `null` when `Timeouts` is not configured or the estimate is still cold. Reading it validates the policy, exactly as executing it does. |
 
 ## Methods
 

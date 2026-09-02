@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Globalization;
+using Microsoft.Extensions.Time.Testing;
 using NResilience.Extensions;
 using NResilience.Testing;
 
@@ -125,6 +126,45 @@ public sealed class MetricsTests
         Assert.All(
             recording.Measurements.Where(m => m.Instrument.EndsWith("duration", StringComparison.Ordinal)),
             m => Assert.InRange(m.Value, 0, 10));
+    }
+
+    /// <summary>
+    ///     The measured attempt ceiling reaches the meter, as a histogram recorded when it moves rather
+    ///     than a gauge - which would need a registry of live policies that outlives them, the same
+    ///     reason <c>nresilience.limiter.limit</c> is a histogram.
+    /// </summary>
+    [Fact]
+    public async Task The_measured_attempt_ceiling_is_recorded_when_it_moves()
+    {
+        using var recording = new Recording();
+        var time = new FakeTimeProvider();
+
+        var policy = (TestPolicy.On(time) with
+        {
+            Name = "t-ceiling",
+            Attempts = 1,
+            AttemptTimeout = TimeSpan.FromSeconds(30),
+            Timeouts = AttemptTimeouts.Above(3) with { Window = TimeSpan.FromHours(1) },
+        }).WithTelemetry();
+
+        for (var i = 0; i < 40; i++)
+        {
+            await policy.RunAsync(_ =>
+            {
+                time.Advance(TimeSpan.FromMilliseconds(100));
+                return Task.FromResult(1);
+            });
+        }
+
+        var recorded = recording.Measurements
+            .Where(m => m.Instrument == "nresilience.attempt.timeout" && Equals(m.Tags["nresilience.policy"], "t-ceiling"))
+            .ToList();
+
+        // Once, when it moved - not forty times, once per attempt.
+        var single = Assert.Single(recorded);
+
+        // Seconds, matching the instrument's unit: three times a p95 of 100 ms.
+        Assert.InRange(single.Value, 0.3, 0.34);
     }
 
     // ---- Tagging ----

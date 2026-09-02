@@ -12,6 +12,7 @@ The table below summarizes each feature and its default setting.
 | :--- | :--- | :--- |
 | Retry, backoff, and jitter | Three attempts, exponential backoff, and full jitter | [Retry](retry.md) |
 | Deadlines and attempt timeouts | 30 s deadline and 10 s attempt timeout | [Deadlines](deadlines.md) |
+| Measured attempt ceiling | Disabled (opt-in, and it can only tighten the configured ceiling) | [Deadlines](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) |
 | Classification | `Classifier.Default`, or `Classifier.Http` for the HTTP preset | [Classification](classification.md) |
 | Retry budget | 10% of successful traffic, private per policy | [Retry budget](retry-budget.md) |
 | Circuit breaker | Disabled (requires manual construction and scoping) | [Circuit breaker](circuit-breaker.md) |

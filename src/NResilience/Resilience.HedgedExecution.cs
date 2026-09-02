@@ -389,7 +389,12 @@ public sealed partial record Resilience
             leg.StartTimestamp = Time.GetTimestamp();
 
             var remaining = Remaining(Time, start, deadline);
-            var effective = Effective(AttemptTimeout, remaining);
+            var ceiling = Ceiling(leg.Number);
+            var effective = Effective(ceiling, remaining);
+
+            // See the sequential loop: computed here, beside the ceiling, rather than in the catch
+            // below - so the ceiling is not live across this leg's awaits.
+            var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
 
             leg.Effective = effective;
             leg.Timed = leg.Timer is not null;
@@ -450,7 +455,7 @@ public sealed partial record Resilience
                 // See the sequential loop: when the deadline supplied the ceiling, the ceiling that
                 // fired *was* the deadline, and that is the fact to stop on rather than what the clock
                 // says afterwards.
-                deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
+                deadlineSpent = deadlineCeiling;
             }
             catch (RateLimitedException limited)
             {

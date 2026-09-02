@@ -106,7 +106,7 @@ The `IResiliencePolicies` service gives access to registered policies.
 `ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone".
 
 **Properties**:
-`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Hedge`, `Telemetry`, `Logging`.
+`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `Timeouts`, `UseAmbientDeadline`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Hedge`, `Telemetry`, `Logging`.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **Budget disabling**: Setting `BudgetFraction = 0` disables the retry budget.
@@ -127,6 +127,20 @@ For more information on the configuration structure, see [Configuration](../di/c
 | `Window` | `30 s` | How much history the latency estimate covers. |
 
 There is deliberately no fixed-delay setting. A constant threshold is the failure mode the adaptive one exists to avoid, and it would be one JSON key away if it existed at all.
+
+## `AttemptTimeoutsOptions`
+
+`AttemptTimeoutsOptions` provides the bindable shape of [`AttemptTimeouts`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it). The presence of the section is what turns it on, and every property has a working default - so `"Timeouts": {}` is a complete configuration.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Multiple` | `3` | How many times the measured quantile an attempt may take. Must be greater than 1. |
+| `Quantile` | `0.95` | The quantile of recent successful latency the ceiling is measured from. Between 0.5 and 0.99. |
+| `Window` | `5 min` | How much history the estimate covers. |
+| `MinimumSamples` | `20` | How many recent successful calls the estimate needs before it bounds anything. |
+| `Floor` | `50 ms` | A floor under the measured ceiling. |
+
+There is deliberately no way to make the measured ceiling longer than `AttemptTimeout`. The clamp is what makes the feature safe to leave on, and a key that lifted it would be the one key nobody should have.
 
 ## `BreakerOptions`
 

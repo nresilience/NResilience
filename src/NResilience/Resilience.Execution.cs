@@ -377,7 +377,16 @@ public sealed partial record Resilience
                     }
                 }
 
-                var effective = Effective(AttemptTimeout, remaining);
+                var ceiling = Ceiling(log.Count + 1);
+                var effective = Effective(ceiling, remaining);
+
+                // Whether the deadline supplied this attempt's ceiling. Computed here, where both terms
+                // are still in hand, rather than in the catch below: with Timeouts configured,
+                // `effective != AttemptTimeout` no longer means "the deadline won", and hoisting the
+                // ceiling itself across the attempt await would cost every caller 8 bytes of
+                // state-machine box where a fourth bool costs none - it lands in the padding
+                // `recorded`, `hasValue` and `deadlineSpent` already leave.
+                var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
 
                 CancellationTokenSource? timer = null;
                 CancellationTokenSource? attemptSource = null;
@@ -444,7 +453,7 @@ public sealed partial record Resilience
                     // remainder. Reading the clock instead spends the rest of the attempt budget on
                     // attempts that are cancelled before they can send anything, and reports
                     // AttemptsExhausted for a call the deadline stopped.
-                    deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
+                    deadlineSpent = deadlineCeiling;
                 }
                 catch (RateLimitedException limited)
                 {
@@ -640,7 +649,12 @@ public sealed partial record Resilience
                     }
                 }
 
-                var effective = Effective(AttemptTimeout, remaining);
+                var ceiling = Ceiling(log.Count + 1);
+                var effective = Effective(ceiling, remaining);
+
+                // See ExecuteAsync: computed beside the ceiling so the ceiling itself is not live across
+                // the attempt await.
+                var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
 
                 CancellationTokenSource? timer = null;
                 CancellationTokenSource? attemptSource = null;
@@ -695,7 +709,7 @@ public sealed partial record Resilience
                 {
                     verdict = Verdict.Transient;
                     error = new AttemptTimeoutException(effective, canceled);
-                    deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
+                    deadlineSpent = deadlineCeiling;
                 }
                 catch (RateLimitedException limited)
                 {
@@ -922,6 +936,14 @@ public sealed partial record Resilience
 
             return;
         }
+
+        // Successes only, which is what makes the measured ceiling self-correcting: one tight enough to
+        // cancel calls that would have succeeded starves its own estimator, the window falls back below
+        // MinimumSamples, and the policy reverts to the configured AttemptTimeout until successes
+        // accumulate again. Sampling the failures instead would let a wave of timeouts raise the ceiling
+        // that produced them.
+        if (verdict.Kind == VerdictKind.Ok && Timeouts is not null)
+            ExecutionState.TimeoutsFor(this)?.Record(duration);
 
         if (OnEvent is not null)
         {
@@ -1188,6 +1210,83 @@ public sealed partial record Resilience
 
         var left = deadline - time.GetElapsedTime(start);
         return left > TimeSpan.Zero ? left : TimeSpan.Zero;
+    }
+
+    /// <summary>
+    ///     This attempt's ceiling before the deadline is applied: <see cref="AttemptTimeout" />, lowered
+    ///     by a multiple of recent latency when <see cref="Timeouts" /> is configured and has an
+    ///     estimate to offer.
+    ///     <para>
+    ///         Lowered, never raised. The clamp here is the whole safety argument for the feature - see
+    ///         <see cref="AttemptTimeouts" /> - and it is also what keeps this method total: every path
+    ///         with no measured answer hands back the configured constant, which is exactly today's
+    ///         behaviour.
+    ///     </para>
+    /// </summary>
+    /// <param name="attemptNumber">Which attempt this is, for the event a changed ceiling raises.</param>
+    /// <returns>The ceiling, or <see cref="Timeout.InfiniteTimeSpan" /> when there is none.</returns>
+    /// <remarks>
+    ///     Called once per attempt, and the cost to a policy that does not configure
+    ///     <see cref="Timeouts" /> is one branch inside <see cref="Measured" />: a field read off
+    ///     <c>this</c>, which is already a field of the caller's state-machine box. Nothing here is held
+    ///     across an <c>await</c>, which is the point - see <c>ExecutionState.TimeoutsFor</c>.
+    /// </remarks>
+    private TimeSpan Ceiling(int attemptNumber)
+    {
+        if (Measured() is not { } measured)
+            return AttemptTimeout;
+
+        // InfiniteTimeSpan is negative, so it cannot take part in the comparison - a policy that set no
+        // constant ceiling and asked for a measured one gets the measured one, still bounded by the
+        // deadline like any other.
+        if (AttemptTimeout != Timeout.InfiniteTimeSpan && measured >= AttemptTimeout)
+            return AttemptTimeout;
+
+        if (OnEvent is not null && ExecutionState.CeilingChanged(this, measured))
+            Notify(CallEventKind.AttemptTimeoutAdapted, attemptNumber, Verdict.Ok, TimeSpan.Zero, measured, null, null);
+
+        return measured;
+    }
+
+    /// <summary>
+    ///     The measured ceiling with its floors applied, before <see cref="AttemptTimeout" /> and the
+    ///     deadline clamp it. Null when <see cref="Timeouts" /> is not configured or the estimate is
+    ///     still cold, which is the case that leaves the policy behaving exactly as it does today.
+    /// </summary>
+    /// <returns>The ceiling the measurement asks for, or null.</returns>
+    private TimeSpan? Measured()
+    {
+        if (Timeouts is not { } timeouts)
+            return null;
+
+        if (ExecutionState.TimeoutsFor(this)?.Threshold(timeouts.MinimumSamples) is not { } tail)
+            return null;
+
+        var measured = timeouts.CeilingFor(tail);
+
+        if (measured < timeouts.Floor)
+            measured = timeouts.Floor;
+
+        // A hedge arms its second leg at the hedge threshold, so a ceiling at or below that would cancel
+        // the first leg at the moment the second was due to start, and the caller would have bought a
+        // feature that never fires. So when hedging is configured the ceiling is measured from at least
+        // the hedge's own quantile: the same Multiple, applied to the larger of the two estimates. That
+        // keeps the unit - the ceiling is always a multiple of a latency estimate - and it leaves the
+        // first leg the room the second one needs rather than a tie nobody can rely on.
+        //
+        // A floor here rather than a refusal in Validate(), because whether the two collide depends on
+        // the shape of the distribution and not on the configuration. Both quantiles are read from the
+        // same traffic; only the traffic knows how far apart they are. It is unreachable whenever
+        // Timeouts.Quantile is at or above Hedge.Quantile, which is the common case.
+        if (Hedge is { } hedge && ExecutionState.LatencyFor(this)?.Threshold(hedge.MinimumSamples) is { } armed)
+        {
+            var hedgeFloor = timeouts.CeilingFor(armed > hedge.MinimumDelay ? armed : hedge.MinimumDelay);
+
+            if (measured < hedgeFloor)
+                measured = hedgeFloor;
+        }
+
+        return measured;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

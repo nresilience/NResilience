@@ -112,6 +112,20 @@ public static class ResilienceTelemetry
         "{permit}",
         "The concurrency limit an adaptive limiter has settled on, recorded when it changes. Watching this fall is watching the dependency tell you it is queueing.");
 
+    /// <summary>
+    ///     Recorded when the per-attempt ceiling measured by <see cref="Resilience.Timeouts" /> changes.
+    ///     <para>
+    ///         This is a histogram because the estimate is private to each policy instance. A ceiling
+    ///         that does not move is not reported, and a ceiling clamped to
+    ///         <see cref="Resilience.AttemptTimeout" /> also reports nothing, signaling that the
+    ///         dependency has slowed beyond the point where measurement is useful.
+    ///     </para>
+    /// </summary>
+    private static readonly Histogram<double> AttemptTimeout = Meter.CreateHistogram<double>(
+        "nresilience.attempt.timeout",
+        "s",
+        "The measured per-attempt ceiling, recorded when it changes. Watching this rise is watching the dependency get slower before anything has failed.");
+
     private static readonly Histogram<double> LeaseWait = Meter.CreateHistogram<double>(
         "nresilience.limiter.wait.duration",
         unit: "s",
@@ -222,6 +236,13 @@ public static class ResilienceTelemetry
                     HedgeThreshold.Record(threshold.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
 
                 Annotate(e, "nresilience.hedge_started");
+                break;
+
+            case CallEventKind.AttemptTimeoutAdapted:
+                if (e.Delay is { } ceiling)
+                    AttemptTimeout.Record(ceiling.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
+
+                Annotate(e, "nresilience.attempt_timeout_adapted");
                 break;
 
             case CallEventKind.HedgeWon:

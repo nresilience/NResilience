@@ -79,6 +79,29 @@ public sealed partial record Resilience
     /// </summary>
     public TimeSpan AttemptTimeout { get; init; } = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    ///     Null (the default) means <see cref="AttemptTimeout" /> is the only per-attempt ceiling. When set,
+    ///     the ceiling is the minimum of <see cref="AttemptTimeout" />, the time remaining on the deadline,
+    ///     and a multiple of recent latency.
+    ///     <para>
+    ///         The measured term only lowers the ceiling, making the feature safe to leave on: <see cref="AttemptTimeout" />
+    ///         remains the absolute ceiling, and a dependency slow enough that the measurement exceeds it
+    ///         gets the default behavior. See <see cref="NResilience.AttemptTimeouts" /> for details.
+    ///     </para>
+    ///     <para>
+    ///         The estimate is fed by successful attempts only and requires
+    ///         <see cref="NResilience.AttemptTimeouts.MinimumSamples" /> before it bounds any attempt; until then,
+    ///         the attempt uses <see cref="AttemptTimeout" /> unchanged. When <see cref="Hedge" /> is also configured,
+    ///         the hedge threshold acts as a floor for the ceiling to prevent the first leg from being cancelled
+    ///         before the second leg starts.
+    ///     </para>
+    ///     <para>
+    ///         Configuring this does not increase the allocation of the caller's state-machine box.
+    ///         See <c>ExecutionState.TimeoutsFor</c> for details.
+    ///     </para>
+    /// </summary>
+    public AttemptTimeouts? Timeouts { get; init; }
+
     /// <summary>The delay between one attempt and the next.</summary>
     public Backoff Backoff { get; init; } = Backoff.Default;
 
@@ -225,6 +248,30 @@ public sealed partial record Resilience
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
     /// <summary>
+    ///     The current measured ceiling, including the floor and hedge floor, before <see cref="AttemptTimeout" />
+    ///     and the deadline clamp it. Returns <c>null</c> when <see cref="Timeouts" /> is not configured,
+    ///     or when the estimate is still cold.
+    ///     <para>
+    ///         This value is what the attempt gets whenever it is below <see cref="AttemptTimeout" />.
+    ///         A value above <see cref="AttemptTimeout" /> indicates that the clamp is currently bounding the attempt.
+    ///     </para>
+    ///     <para>
+    ///         This is the primary value to monitor on a dashboard. Reading it validates the policy,
+    ///         just as executing it does.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     The estimate is private to the policy instance. The HTTP handler derives one policy per host,
+    ///     so each host's ceiling is measured independently.
+    ///     <para>
+    ///         Reading this validates the policy; a policy with an invalid configuration throws
+    ///         <see cref="ResilienceConfigurationException" /> here.
+    ///     </para>
+    /// </remarks>
+    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
+    public TimeSpan? MeasuredAttemptTimeout => Measured();
+
+    /// <summary>
     ///     True when the policy imposes nothing at all, so a call can hand back the callback's own
     ///     task without an executor frame.
     /// </summary>
@@ -240,6 +287,12 @@ public sealed partial record Resilience
         && BeforeAttempt is null
         && Admit is null
         && Hedge is null
+
+        // A measured ceiling is a bound, and one this policy has asked for even though the two
+        // constants above say "no bound". A policy that set AttemptTimeout to infinite and Timeouts
+        // to something has asked to be bounded by the dependency's own latency, which passthrough
+        // cannot deliver.
+        && Timeouts is null
 
         // An inbound deadline is a bound like any other, and a policy asking to be clamped by one has
         // asked for a bound it cannot see from here - so passthrough is off the table whether or not
@@ -289,6 +342,22 @@ public sealed partial record Resilience
             problems.Add("Time must not be null.");
 
         Backoff.Validate(problems);
+
+        if (Timeouts is { } timeouts)
+        {
+            timeouts.Validate(problems);
+
+            // A floor at or above the configured ceiling makes the measured term unreachable: the
+            // clamp would hand back AttemptTimeout on every attempt, whatever the dependency did.
+            // Rejected rather than ignored, for the reason the Hedge check below is: silently doing
+            // nothing is how a caller ends up believing a ceiling is being measured when it is not.
+            if (AttemptTimeout != Timeout.InfiniteTimeSpan && timeouts.Floor >= AttemptTimeout)
+            {
+                problems.Add(
+                    $"Timeouts.Floor must be below AttemptTimeout; they are {timeouts.Floor} and {AttemptTimeout}. " +
+                    "The measured ceiling is clamped by AttemptTimeout, so a floor at or above it can never lower anything.");
+            }
+        }
 
         if (Hedge is { } hedge)
         {

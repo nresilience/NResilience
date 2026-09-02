@@ -129,6 +129,14 @@ internal sealed class LogListener
                     Log.HedgeDiscarded(_logger, discarded, policy, e.AttemptNumber, Ms(e.Duration));
 
                 break;
+
+            // Raised on change rather than per call, so this is already one line per movement of the
+            // estimate. No flood control for the same reason the breaker transitions need none.
+            case CallEventKind.AttemptTimeoutAdapted:
+                if (Level(Log.Ids.AttemptTimeoutAdapted, e) is { } ceiling)
+                    Log.AttemptTimeoutAdapted(_logger, ceiling, policy, Ms(e.Delay));
+
+                break;
         }
     }
 

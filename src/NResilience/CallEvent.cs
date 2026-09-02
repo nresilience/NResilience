@@ -113,6 +113,21 @@ public enum CallEventKind
     ///     </para>
     /// </summary>
     HedgeDiscarded,
+
+    /// <summary>
+    ///     The measured per-attempt ceiling moved. <see cref="CallEvent.Delay" /> is the new ceiling, and
+    ///     it is the whole output of <see cref="Resilience.Timeouts" /> - nothing else in the process can
+    ///     report it.
+    ///     <para>
+    ///         Raised only when the measured term is what bounds the attempt, and only when the number
+    ///         differs from the last one raised for this policy instance, so the rate follows how much
+    ///         the estimate moves rather than how much traffic there is. A policy whose ceiling is
+    ///         pinned to <see cref="Resilience.AttemptTimeout" /> - because the estimate is cold, or
+    ///         because the dependency has slowed until the clamp is what wins - raises nothing, and that
+    ///         silence is itself the signal.
+    ///     </para>
+    /// </summary>
+    AttemptTimeoutAdapted,
 }
 
 /// <summary>

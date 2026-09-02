@@ -17,6 +17,7 @@ internal static class Diagnostics
     internal const string PerCallGuardStateId = "NRES005";
     internal const string PerCallClientId = "NRES006";
     internal const string RedundantAsyncCallbackId = "NRES007";
+    internal const string PerCallEstimatorId = "NRES008";
 
     private const string Reliability = "Reliability";
     private const string Usage = "Usage";
@@ -99,6 +100,26 @@ internal static class Diagnostics
         "Every async method that awaits allocates a state machine. A callback like " +
         "'async attempt => await Work(attempt)' adds an unnecessary allocation to every attempt, because the " +
         "execution overloads accept the task directly (whether Task-returning or ValueTask-returning).");
+
+    /// <summary>NRES008: a per-call policy whose latency estimate can therefore never warm up.</summary>
+    internal static readonly DiagnosticDescriptor PerCallEstimator = Rule(
+        PerCallEstimatorId,
+        "A policy created per call never warms its latency estimate",
+        "'{0}' is set on a policy created inside '{1}', so every call builds a new one; the latency estimate is private to the policy instance, so it never reaches MinimumSamples and '{0}' silently does nothing",
+        Reliability,
+        DiagnosticSeverity.Info,
+        "Hedge and Timeouts both measure a quantile of recent latency, and that estimate is held per policy " +
+        "instance - which is the scope the feature wants, because one host's p95 is not another's. A policy " +
+        "rebuilt per call therefore starts cold every time, and both features are documented to do nothing " +
+        "until they have MinimumSamples: the hedge never fires and the measured attempt ceiling never lowers " +
+        "anything. Neither failure is visible, because each one falls back to the policy's configured " +
+        "behaviour. Hold the policy in a static readonly field, resolve it from IResiliencePolicies, or let " +
+        "the HTTP handler derive it per host." +
+        "\n\n" +
+        "Info rather than a warning, for the reason NRES006 is: a policy written inline in a method is a " +
+        "common and often deliberate shape, and nothing here is less safe than the same policy without the " +
+        "feature - the hedge simply does not fire, and the ceiling stays at AttemptTimeout. It is dead " +
+        "configuration rather than a hazard.");
 
     private static DiagnosticDescriptor Rule(
         string id,

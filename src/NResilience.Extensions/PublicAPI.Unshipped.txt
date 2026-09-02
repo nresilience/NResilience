@@ -20,6 +20,19 @@ NResilience.Extensions.AdaptiveLimiter
 NResilience.Extensions.AdaptiveLimiter.Baseline.get -> System.TimeSpan?
 NResilience.Extensions.AdaptiveLimiter.CurrentLimit.get -> int
 NResilience.Extensions.AdaptiveLimiter.InFlight.get -> int
+NResilience.Extensions.AttemptTimeoutsOptions
+NResilience.Extensions.AttemptTimeoutsOptions.AttemptTimeoutsOptions() -> void
+NResilience.Extensions.AttemptTimeoutsOptions.Floor.get -> System.TimeSpan?
+NResilience.Extensions.AttemptTimeoutsOptions.Floor.set -> void
+NResilience.Extensions.AttemptTimeoutsOptions.MinimumSamples.get -> int?
+NResilience.Extensions.AttemptTimeoutsOptions.MinimumSamples.set -> void
+NResilience.Extensions.AttemptTimeoutsOptions.Multiple.get -> double?
+NResilience.Extensions.AttemptTimeoutsOptions.Multiple.set -> void
+NResilience.Extensions.AttemptTimeoutsOptions.Quantile.get -> double?
+NResilience.Extensions.AttemptTimeoutsOptions.Quantile.set -> void
+NResilience.Extensions.AttemptTimeoutsOptions.ToTimeouts() -> NResilience.AttemptTimeouts
+NResilience.Extensions.AttemptTimeoutsOptions.Window.get -> System.TimeSpan?
+NResilience.Extensions.AttemptTimeoutsOptions.Window.set -> void
 NResilience.Extensions.BreakerOptions
 NResilience.Extensions.BreakerOptions.BreakDuration.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.BreakDuration.set -> void
@@ -146,6 +159,8 @@ NResilience.Extensions.ResilienceOptions.Telemetry.get -> bool?
 NResilience.Extensions.ResilienceOptions.Telemetry.set -> void
 NResilience.Extensions.ResilienceOptions.ThrottledBaseDelay.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.ThrottledBaseDelay.set -> void
+NResilience.Extensions.ResilienceOptions.Timeouts.get -> NResilience.Extensions.AttemptTimeoutsOptions?
+NResilience.Extensions.ResilienceOptions.Timeouts.set -> void
 NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseline = null) -> NResilience.Resilience!
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.TransientBaseDelay.set -> void

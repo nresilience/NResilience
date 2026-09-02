@@ -112,6 +112,13 @@ public sealed class ResilienceOptions
     public HedgeOptions? Hedge { get; set; }
 
     /// <summary>
+    ///     The adaptive per-attempt ceiling, or null - the default - for none. The presence of the
+    ///     section is what turns it on, and every property has a working default, so
+    ///     <c>"Timeouts": {}</c> is a complete configuration.
+    /// </summary>
+    public AttemptTimeoutsOptions? Timeouts { get; set; }
+
+    /// <summary>
     ///     Whether the registered policy records to <see cref="ResilienceTelemetry" />. On by default,
     ///     which is the one place this library is not pay-for-play - see
     ///     <see cref="ResilienceTelemetry" /> for why registering a policy in a container is taken as
@@ -199,6 +206,9 @@ public sealed class ResilienceOptions
 
         if (Hedge is { } hedge)
             policy = policy with { Hedge = hedge.ToHedge() };
+
+        if (Timeouts is { } timeouts)
+            policy = policy with { Timeouts = timeouts.ToTimeouts() };
 
         return policy;
     }
@@ -289,6 +299,52 @@ public sealed class HedgeOptions
             hedge = hedge with { Window = window };
 
         return hedge;
+    }
+}
+
+/// <summary>
+///     The bindable shape of an <see cref="NResilience.AttemptTimeouts" />.
+/// </summary>
+/// <remarks>
+///     There is no way to make the measured ceiling longer than <see cref="ResilienceOptions.AttemptTimeout" />.
+///     This ensures the feature cannot unexpectedly increase the attempt duration.
+/// </remarks>
+public sealed class AttemptTimeoutsOptions
+{
+    /// <summary>The multiple of the measured quantile. Defaults to 3.</summary>
+    public double? Multiple { get; set; }
+
+    /// <summary><see cref="NResilience.AttemptTimeouts.Quantile" />.</summary>
+    public double? Quantile { get; set; }
+
+    /// <summary><see cref="NResilience.AttemptTimeouts.Window" />.</summary>
+    public TimeSpan? Window { get; set; }
+
+    /// <summary><see cref="NResilience.AttemptTimeouts.MinimumSamples" />.</summary>
+    public int? MinimumSamples { get; set; }
+
+    /// <summary><see cref="NResilience.AttemptTimeouts.Floor" />.</summary>
+    public TimeSpan? Floor { get; set; }
+
+    /// <summary>Converts the options to an <see cref="NResilience.AttemptTimeouts" /> value, using defaults for any unset properties.</summary>
+    /// <returns>The configuration.</returns>
+    public AttemptTimeouts ToTimeouts()
+    {
+        var timeouts = AttemptTimeouts.Above(Multiple ?? 3.0);
+
+        if (Quantile is { } quantile)
+            timeouts = timeouts with { Quantile = quantile };
+
+        if (Window is { } window)
+            timeouts = timeouts with { Window = window };
+
+        if (MinimumSamples is { } samples)
+            timeouts = timeouts with { MinimumSamples = samples };
+
+        if (Floor is { } floor)
+            timeouts = timeouts with { Floor = floor };
+
+        return timeouts;
     }
 }
 

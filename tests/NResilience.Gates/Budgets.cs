@@ -14,6 +14,16 @@ namespace NResilience.Gates;
 ///     charge. No budget was widened for it; the design's open question 1 allowed 64 B of headroom for
 ///     the breaker and budget and this used an eighth of it. The breaker costs nothing in the box at all, because the
 ///     policy holding it is already a field.
+    ///     The adaptive attempt ceiling (<c>Resilience.Timeouts</c>) does not increase allocations on any path.
+    ///     <c>Ceiling()</c> resolves the latency window at each of the two points that need it rather than
+    ///     hoisting it into a local, so the reference never joins the state-machine box. Additionally, the
+    ///     four call sites compute <c>deadlineCeiling</c> as a <c>bool</c> beside the ceiling instead of keeping
+    ///     the ceiling itself live across the attempt <c>await</c>.
+    ///     Measured both ways: a hoisted <c>TimeSpan</c> cost the streaming path 8 bytes (848 -> 855
+    ///     B/op) and the bool cost nothing. Suspending figures are unchanged to the byte - 344, 408, 424
+    ///     and 584 - and the sequential loops now carry a fourth <c>bool</c> that lands in existing padding
+    ///     (<c>recorded</c>, <c>hasValue</c> and <c>deadlineSpent</c>).
+
 ///     Every budget points at the <b>shipping</b> executor. Where a figure changed, the
 ///     stand-in value is kept in the comment, because the delta is the answer to the question
 ///     the stand-in exists to ask.

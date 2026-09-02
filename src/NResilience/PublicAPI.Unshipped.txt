@@ -23,6 +23,19 @@ NResilience.AttemptTimeoutException.AttemptTimeoutException(string! message) -> 
 NResilience.AttemptTimeoutException.AttemptTimeoutException(string! message, System.Exception! innerException) -> void
 NResilience.AttemptTimeoutException.Attempts.get -> NResilience.AttemptLog!
 NResilience.AttemptTimeoutException.Timeout.get -> System.TimeSpan
+NResilience.AttemptTimeouts
+NResilience.AttemptTimeouts.AttemptTimeouts() -> void
+NResilience.AttemptTimeouts.Equals(NResilience.AttemptTimeouts other) -> bool
+NResilience.AttemptTimeouts.Floor.get -> System.TimeSpan
+NResilience.AttemptTimeouts.Floor.init -> void
+NResilience.AttemptTimeouts.MinimumSamples.get -> int
+NResilience.AttemptTimeouts.MinimumSamples.init -> void
+NResilience.AttemptTimeouts.Multiple.get -> double
+NResilience.AttemptTimeouts.Multiple.init -> void
+NResilience.AttemptTimeouts.Quantile.get -> double
+NResilience.AttemptTimeouts.Quantile.init -> void
+NResilience.AttemptTimeouts.Window.get -> System.TimeSpan
+NResilience.AttemptTimeouts.Window.init -> void
 NResilience.Backoff
 NResilience.Backoff.Backoff() -> void
 NResilience.Backoff.Compute(in NResilience.NextAttempt next) -> System.TimeSpan
@@ -97,6 +110,7 @@ NResilience.CallEvent.Result.get -> object?
 NResilience.CallEvent.Verdict.get -> NResilience.Verdict
 NResilience.CallEventKind
 NResilience.CallEventKind.Attempt = 0 -> NResilience.CallEventKind
+NResilience.CallEventKind.AttemptTimeoutAdapted = 16 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerClosed = 9 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerHalfOpened = 10 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerOpened = 8 -> NResilience.CallEventKind
@@ -242,6 +256,7 @@ NResilience.Resilience.Deadline.init -> void
 NResilience.Resilience.Equals(NResilience.Resilience? other) -> bool
 NResilience.Resilience.Hedge.get -> NResilience.Hedge?
 NResilience.Resilience.Hedge.init -> void
+NResilience.Resilience.MeasuredAttemptTimeout.get -> System.TimeSpan?
 NResilience.Resilience.Name.get -> string?
 NResilience.Resilience.Name.init -> void
 NResilience.Resilience.OnEvent.get -> System.Action<NResilience.CallEvent>?
@@ -255,6 +270,8 @@ NResilience.Resilience.RunAsync<TState, T>(System.Func<TState, System.Threading.
 NResilience.Resilience.RunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 NResilience.Resilience.Time.get -> System.TimeProvider!
 NResilience.Resilience.Time.init -> void
+NResilience.Resilience.Timeouts.get -> NResilience.AttemptTimeouts?
+NResilience.Resilience.Timeouts.init -> void
 NResilience.Resilience.TryRunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
 NResilience.Resilience.TryRunAsync<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
 NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
@@ -318,6 +335,8 @@ const NResilience.ResilienceDeadline.Header = "X-Deadline-Ms" -> string!
 const NResilience.ResilienceNestedRetry.Marker = "1" -> string!
 override NResilience.Attempt.ToString() -> string!
 override NResilience.AttemptLog.ToString() -> string!
+override NResilience.AttemptTimeouts.GetHashCode() -> int
+override NResilience.AttemptTimeouts.ToString() -> string!
 override NResilience.Backoff.GetHashCode() -> int
 override NResilience.BreakerSettings.Equals(object? obj) -> bool
 override NResilience.BreakerSettings.GetHashCode() -> int
@@ -336,6 +355,9 @@ override NResilience.Verdict.GetHashCode() -> int
 override NResilience.Verdict.ToString() -> string!
 static NResilience.AttemptLog.Empty.get -> NResilience.AttemptLog!
 static NResilience.AttemptLog.Of(System.Exception! exception) -> NResilience.AttemptLog?
+static NResilience.AttemptTimeouts.Above(double multiple = 3) -> NResilience.AttemptTimeouts
+static NResilience.AttemptTimeouts.operator !=(NResilience.AttemptTimeouts left, NResilience.AttemptTimeouts right) -> bool
+static NResilience.AttemptTimeouts.operator ==(NResilience.AttemptTimeouts left, NResilience.AttemptTimeouts right) -> bool
 static NResilience.Backoff.Constant(System.TimeSpan delay) -> NResilience.Backoff
 static NResilience.Backoff.Custom(System.Func<NResilience.NextAttempt, System.TimeSpan>! compute) -> NResilience.Backoff
 static NResilience.Backoff.Default.get -> NResilience.Backoff
@@ -392,6 +414,7 @@ static NResilience.Verdict.Throttled(System.TimeSpan? retryAfter = null) -> NRes
 static NResilience.Verdict.Transient.get -> NResilience.Verdict
 static NResilience.Verdict.operator !=(NResilience.Verdict left, NResilience.Verdict right) -> bool
 static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Verdict right) -> bool
+~override NResilience.AttemptTimeouts.Equals(object obj) -> bool
 ~override NResilience.Backoff.Equals(object obj) -> bool
 ~override NResilience.Backoff.ToString() -> string
 ~override NResilience.Hedge.Equals(object obj) -> bool

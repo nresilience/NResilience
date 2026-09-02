@@ -131,6 +131,78 @@ public sealed class Features
     }
 
     [Fact]
+    public async Task The_attempt_ceiling_can_be_measured_instead_of_guessed()
+    {
+        var time = new FakeTimeProvider();
+
+        // <snippet:deadline-measured-ceiling>
+        var api = Resilience.Http with
+        {
+            AttemptTimeout = TimeSpan.FromSeconds(value: 5), // the ceiling. Never exceeded.
+            Timeouts = AttemptTimeouts.Above(multiple: 3), // and usually far below it: 3x the recent p95.
+        };
+
+        // The measured term can only lower the ceiling, so AttemptTimeout stops being a guess about how
+        // long this dependency takes and becomes what it reads as - the point beyond which you stop
+        // caring. A dependency whose p95 is 40 ms gets a 120 ms ceiling; one whose p95 is 2 s gets the
+        // configured 5 s, because 3x its p95 is above that and the clamp is what wins.
+        // </snippet:deadline-measured-ceiling>
+
+        var policy = api with { Time = time, Attempts = 1, Timeouts = AttemptTimeouts.Above(multiple: 3) with { Window = TimeSpan.FromHours(value: 1) } };
+
+        // Twenty successful calls at 40 ms is what an estimate needs before it bounds anything.
+        for (var i = 0; i < 20; i++)
+        {
+            await policy.RunAsync(_ =>
+                {
+                    time.Advance(delta: TimeSpan.FromMilliseconds(value: 40));
+                    return Task.FromResult(result: 1);
+                },
+                cancellationToken: CancellationToken.None);
+        }
+
+        // Three times the measured p95, and two orders of magnitude under the configured 5 s.
+        Assert.InRange(actual: policy.MeasuredAttemptTimeout!.Value, low: TimeSpan.FromMilliseconds(value: 120), high: TimeSpan.FromMilliseconds(value: 135));
+    }
+
+    [Fact]
+    public async Task An_exact_bound_can_keep_a_floor_under_the_measured_ceiling()
+    {
+        var time = new FakeTimeProvider();
+
+        // <snippet:deadline-sla-floor>
+        // An exact SLA: this call has 10 seconds, full stop. Deadline is that bound, and nothing here
+        // lowers or raises it.
+        var api = Resilience.Http with
+        {
+            Deadline = TimeSpan.FromSeconds(value: 10),
+            AttemptTimeout = TimeSpan.FromSeconds(value: 5),
+
+            // And this endpoint legitimately takes up to 2 s sometimes, so no attempt may be
+            // cancelled before then. Adaptation is confined to [2 s, 5 s]: it can trim the dead time
+            // above 2 s and can never cut into the allowance below it.
+            Timeouts = AttemptTimeouts.Above(multiple: 3) with { Floor = TimeSpan.FromSeconds(value: 2) },
+        };
+        // </snippet:deadline-sla-floor>
+
+        var policy = api with { Time = time, Attempts = 1, Timeouts = api.Timeouts!.Value with { Window = TimeSpan.FromHours(value: 1) } };
+
+        // Twenty fast calls, so the raw measurement is about 120 ms - far below the floor.
+        for (var i = 0; i < 20; i++)
+        {
+            await policy.RunAsync(_ =>
+                {
+                    time.Advance(delta: TimeSpan.FromMilliseconds(value: 40));
+                    return Task.FromResult(result: 1);
+                },
+                cancellationToken: CancellationToken.None);
+        }
+
+        // The floor is what the attempt gets, not the measurement.
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 2), actual: policy.MeasuredAttemptTimeout);
+    }
+
+    [Fact]
     public async Task A_deadline_that_runs_out_throws_a_TimeoutException()
     {
         var time = new FakeTimeProvider();

@@ -234,7 +234,13 @@ public sealed partial record Resilience
                     }
                 }
 
-                var effective = Effective(AttemptTimeout, remaining);
+                var ceiling = Ceiling(log.Count + 1);
+                var effective = Effective(ceiling, remaining);
+
+                // See the sequential loop: computed here, beside the ceiling, rather than in the catch
+                // blocks below - so the ceiling is not live across an await and does not join this
+                // iterator's state.
+                var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
 
                 timer = null;
                 attemptSource = null;
@@ -305,7 +311,7 @@ public sealed partial record Resilience
                             {
                                 verdict = Verdict.Transient;
                                 error = new AttemptTimeoutException(effective);
-                                deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
+                                deadlineSpent = deadlineCeiling;
                             }
                             else
                             {
@@ -343,7 +349,7 @@ public sealed partial record Resilience
                     // Our own attempt timeout, arriving as it does for a call.
                     verdict = Verdict.Transient;
                     error = new AttemptTimeoutException(effective, canceled);
-                    deadlineSpent = deadline != Timeout.InfiniteTimeSpan && effective != AttemptTimeout;
+                    deadlineSpent = deadlineCeiling;
                 }
                 catch (RateLimitedException limited)
                 {

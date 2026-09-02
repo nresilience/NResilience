@@ -7,18 +7,25 @@ using Microsoft.CodeAnalysis.Operations;
 namespace NResilience.Analyzers;
 
 /// <summary>
-///     NRES005 and NRES006: the guards are mutable state whose whole purpose is to outlive the call.
-///     A breaker that is rebuilt per call has never seen a failure, a budget that is rebuilt per call
-///     has never seen a deposit, a policy scope or gRPC interceptor that is rebuilt per call has one
+///     NRES005, NRES006 and NRES008: the guards are mutable state whose whole purpose is to outlive the
+///     call. A breaker that is rebuilt per call has never seen a failure, a budget that is rebuilt per
+///     call has never seen a deposit, a policy scope or gRPC interceptor that is rebuilt per call has one
 ///     of each per key and keeps none of them, and a client that is rebuilt per call has no per-host
 ///     anything. All of them read as configured resilience and provide none.
+///     <para>
+///         NRES008 is the same failure one level in. <c>Hedge</c> and <c>Timeouts</c> hold no state of
+///         their own - they are values - but the latency estimate they measure against is keyed by the
+///         policy <i>instance</i>, so a policy rebuilt per call is a feature that never fires. It is a
+///         rule of its own rather than a third case of NRES005 because the subject is the policy rather
+///         than a guard inside it, and because it is worth suppressing separately.
+///     </para>
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 {
     /// <inheritdoc />
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } =
-        ImmutableArray.Create(Diagnostics.PerCallGuardState, Diagnostics.PerCallClient);
+        ImmutableArray.Create(Diagnostics.PerCallGuardState, Diagnostics.PerCallClient, Diagnostics.PerCallEstimator);
 
     /// <inheritdoc />
     public override void Initialize(AnalysisContext context)
@@ -36,6 +43,10 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 
             start.RegisterOperationAction(operation => AnalyzeCreation(operation, known), OperationKind.ObjectCreation);
             start.RegisterOperationAction(operation => AnalyzeInvocation(operation, known), OperationKind.Invocation);
+
+            // `policy with { ... }` is the shape the library teaches, so it is the shape NRES008 has to
+            // see. `new Resilience { ... }` reaches the same check through AnalyzeCreation.
+            start.RegisterOperationAction(operation => AnalyzeWith(operation, known), OperationKind.With);
         });
     }
 
@@ -43,12 +54,86 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     {
         var creation = (IObjectCreationOperation)context.Operation;
 
+        if (known.IsPolicy(creation.Type))
+        {
+            ReportEstimatorIfPerCall(context, creation, creation.Initializer, known);
+            return;
+        }
+
         if (known.IsBreaker(creation.Type))
             ReportGuardIfPerCall(context, creation, known, "breaker", "open");
         else if (known.IsPolicyScope(creation.Type))
             ReportContainerIfPerCall(context, creation, known, "policy scope");
         else if (known.IsResilienceInterceptor(creation.Type))
             ReportContainerIfPerCall(context, creation, known, "gRPC resilience interceptor");
+    }
+
+    private static void AnalyzeWith(OperationAnalysisContext context, KnownSymbols known)
+    {
+        var with = (IWithOperation)context.Operation;
+
+        if (known.IsPolicy(with.Type))
+            ReportEstimatorIfPerCall(context, with, with.Initializer, known);
+    }
+
+    /// <summary>
+    ///     Reported for a policy that <i>sets</i> <c>Hedge</c> or <c>Timeouts</c> inside a method, which
+    ///     is the case the compiler can be sure about.
+    /// </summary>
+    /// <remarks>
+    ///     The commoner and more dangerous shape is invisible from here:
+    ///     <c>Policies.Api with { Deadline = ... }</c>, where the estimator was configured on
+    ///     <c>Policies.Api</c> and this expression only narrows the deadline. Establishing that would mean
+    ///     following the referenced symbol's own initializer, and a rule that is right most of the time
+    ///     about a shape this common is a rule people turn off. So the diagnostic covers what is written
+    ///     here, and the deadline docs cover the rest.
+    /// </remarks>
+    private static void ReportEstimatorIfPerCall(
+        OperationAnalysisContext context,
+        IOperation policy,
+        IObjectOrCollectionInitializerOperation? initializer,
+        KnownSymbols known)
+    {
+        if (initializer is null || !InsideSomethingCalledRepeatedly(context, known, out var container))
+            return;
+
+        foreach (var assignment in initializer.Initializers.OfType<ISimpleAssignmentOperation>())
+        {
+            if (assignment.Target is not IPropertyReferenceOperation property
+                || !known.IsPolicy(property.Property.ContainingType))
+                continue;
+
+            var name = property.Property.Name;
+
+            if (name != "Hedge" && name != "Timeouts")
+                continue;
+
+            // `Hedge = null` removes the feature rather than configuring one, and the HTTP handler's own
+            // single-shot policy is written exactly that way.
+            if (IsNull(assignment.Value))
+                continue;
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                Diagnostics.PerCallEstimator,
+                policy.Syntax.GetLocation(),
+                name,
+                container));
+
+            return;
+        }
+    }
+
+    /// <summary>True for <c>null</c>, through however many conversions the nullable target added.</summary>
+    private static bool IsNull(IOperation value)
+    {
+        var current = value;
+
+        while (current is IConversionOperation conversion)
+        {
+            current = conversion.Operand;
+        }
+
+        return current.ConstantValue is { HasValue: true, Value: null };
     }
 
     private static void AnalyzeInvocation(OperationAnalysisContext context, KnownSymbols known)
