@@ -1092,8 +1092,9 @@ public sealed partial record Resilience
         var delay = Backoff.Compute(new NextAttempt(attempts + 1, verdict, error, left, cancellationToken));
 
         // A delay that would consume the rest of the budget leaves nothing for the attempt after it,
-        // so the deadline stops the operation here rather than sleeping through it.
-        if (bounded && delay >= left)
+        // so the deadline stops the operation here rather than sleeping through it - and neither does
+        // a delay that leaves less than a call to this dependency has ever needed. See Viable().
+        if (bounded && delay + Viable() >= left)
         {
             reason = StopReason.DeadlineExceeded;
             NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start), error);
@@ -1110,6 +1111,44 @@ public sealed partial record Resilience
         wait = delay;
         return NextStep.Retry;
     }
+
+    /// <summary>
+    ///     The least time a retry needs to have any chance of finishing: a low quantile of what a
+    ///     successful call to this dependency recently took. <see cref="TimeSpan.Zero" /> when nothing
+    ///     is measuring, which is what makes this invisible to a policy that has no estimate.
+    ///     <para>
+    ///         The retry decision already refuses an attempt when the backoff alone would outlast the
+    ///         deadline. This asks the other half of the same question: with 6 ms left and a dependency
+    ///         whose median call is 400 ms, starting an attempt sends a real request to a dependency that
+    ///         is probably already struggling, holds a connection for 6 ms, and hands the caller an
+    ///         <see cref="AttemptTimeoutException" /> where the <see cref="DeadlineExceededException" />
+    ///         it was going to get anyway was both truer and available immediately.
+    ///     </para>
+    /// </summary>
+    /// <returns>The estimate, or <see cref="TimeSpan.Zero" /> when there is none.</returns>
+    /// <remarks>
+    ///     <para>
+    ///         <b>Deliberately a low quantile.</b> The question is "could this attempt plausibly
+    ///         finish", and answering it from the tail would refuse attempts that had a good chance. So
+    ///         the source is <see cref="NResilience.Breaker.NormalLatency" /> - the body of the
+    ///         distribution, capped at the p50 by <see cref="SlowCalls.Quantile" /> - and never the
+    ///         high-quantile windows <see cref="Hedge" /> and <see cref="Timeouts" /> own.
+    ///     </para>
+    ///     <para>
+    ///         <b>It can only ever refuse a retry.</b> The first attempt of every call runs whatever the
+    ///         estimate says, because the first attempt is the one the caller asked for; and what this
+    ///         changes is <i>when</i> the caller learns the deadline is spent, not <i>what</i> they
+    ///         learn. The stop reason is the <see cref="StopReason.DeadlineExceeded" /> the call was
+    ///         reaching a few milliseconds later anyway. Only the attempt count in the log differs.
+    ///     </para>
+    ///     <para>
+    ///         Read on the retry decision rather than hoisted into a local, for the reason
+    ///         <see cref="Internal.ExecutionState.TimeoutsFor" /> gives: a field held across the attempt
+    ///         <c>await</c> would cost every caller's state-machine box whether or not anything was
+    ///         measuring. The read itself is a memoized answer per window slice.
+    ///     </para>
+    /// </remarks>
+    private TimeSpan Viable() => Breaker?.NormalLatency ?? TimeSpan.Zero;
 
     /// <summary>
     ///     The pause a refused call serves before it is reported.

@@ -43,6 +43,8 @@ var api = Resilience.Default with
 
 `AttemptTimeout` covers one attempt. If no time remains on the deadline, a retry never starts; the call fails immediately with a deadline exception rather than sleeping through a backoff delay.
 
+This also applies when too little time remains. If the circuit breaker measures how long a healthy call to the dependency takes (which it does by default; see [`Breaker.NormalLatency`](circuit-breaker.md#trip-on-brownouts-without-guessing-a-number)), a retry with less time remaining than that measurement is not started. You get the same `DeadlineExceededException` a few milliseconds sooner, with one fewer attempt in `result.Attempts`, and the dependency gets one fewer request that you would not have waited for. The first attempt of a call always runs regardless of the measurement, and a policy with no breaker or a cold baseline behaves as usual.
+
 ## Measure the attempt ceiling instead of guessing it
 
 **On by default.** `AttemptTimeout` alone is a number you pick per dependency before it runs, and update whenever it changes. `Timeouts` measures the ceiling from the dependency's own latency instead, by default at `AttemptTimeouts.Above(3)` - three times the recent p95. `Timeouts = null` leaves `AttemptTimeout` as the only per-attempt ceiling.

@@ -123,6 +123,8 @@ Two settings make this work, both with defaults you can leave alone:
 
 Only successful attempts feed the baseline, and the baseline survives an open, a close, and a `Reset` - it measures the dependency, it does not decide anything about it. That is what makes a slow probe against a still-degraded dependency recognizable as one.
 
+The retry loop uses this baseline: it does not start a retry if the time remaining on the deadline is less than the time a healthy call to the dependency takes. See [deadlines](deadlines.md#the-two-bounds).
+
 ## Trip on errors without guessing a rate
 
 **On by default.** `FailureRatio` asks for an absolute error rate, and no single number fits two dependencies. `Failures` asks for a multiple of the dependency's own rate instead and measures the rest itself. `Failures = null` turns it off.
