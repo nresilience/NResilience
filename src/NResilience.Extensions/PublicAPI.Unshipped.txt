@@ -36,11 +36,15 @@ NResilience.Extensions.AttemptTimeoutsOptions.Window.set -> void
 NResilience.Extensions.BreakerOptions
 NResilience.Extensions.BreakerOptions.BreakDuration.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.BreakDuration.set -> void
+NResilience.Extensions.BreakerOptions.BreakJitter.get -> NResilience.Jitter?
+NResilience.Extensions.BreakerOptions.BreakJitter.set -> void
 NResilience.Extensions.BreakerOptions.BreakerOptions() -> void
 NResilience.Extensions.BreakerOptions.ConsecutiveFailures.get -> int?
 NResilience.Extensions.BreakerOptions.ConsecutiveFailures.set -> void
 NResilience.Extensions.BreakerOptions.FailureRatio.get -> double?
 NResilience.Extensions.BreakerOptions.FailureRatio.set -> void
+NResilience.Extensions.BreakerOptions.Failures.get -> NResilience.Extensions.FailureOptions?
+NResilience.Extensions.BreakerOptions.Failures.set -> void
 NResilience.Extensions.BreakerOptions.HalfOpenProbes.get -> int?
 NResilience.Extensions.BreakerOptions.HalfOpenProbes.set -> void
 NResilience.Extensions.BreakerOptions.MaxBreakDuration.get -> System.TimeSpan?
@@ -58,6 +62,17 @@ NResilience.Extensions.BreakerOptions.SlowCalls.set -> void
 NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null, System.TimeProvider? time = null) -> NResilience.Breaker!
 NResilience.Extensions.BreakerOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.Window.set -> void
+NResilience.Extensions.FailureOptions
+NResilience.Extensions.FailureOptions.AbsoluteFloor.get -> double?
+NResilience.Extensions.FailureOptions.AbsoluteFloor.set -> void
+NResilience.Extensions.FailureOptions.FailureOptions() -> void
+NResilience.Extensions.FailureOptions.MinimumSamples.get -> int?
+NResilience.Extensions.FailureOptions.MinimumSamples.set -> void
+NResilience.Extensions.FailureOptions.Multiple.get -> double?
+NResilience.Extensions.FailureOptions.Multiple.set -> void
+NResilience.Extensions.FailureOptions.ToFailures() -> NResilience.Failures
+NResilience.Extensions.FailureOptions.Window.get -> System.TimeSpan?
+NResilience.Extensions.FailureOptions.Window.set -> void
 NResilience.Extensions.HedgeOptions
 NResilience.Extensions.HedgeOptions.HedgeOptions() -> void
 NResilience.Extensions.HedgeOptions.MaxConcurrent.get -> int?

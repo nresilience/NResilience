@@ -568,7 +568,7 @@ public sealed class StreamingTests
 
     /// <summary>
     ///     An <see cref="Resilience.Admit" /> hook that refuses every attempt is the other live
-    ///     caller of the null-error fall-through in <c>Failures.Build</c>: nothing threw, no guard
+    ///     caller of the null-error fall-through in <c>FailureException.Build</c>: nothing threw, no guard
     ///     intervened, the hook kept refusing. The message has to read as that rather than as a
     ///     breaker-style refusal.
     /// </summary>

@@ -56,6 +56,7 @@ NResilience.Breaker.Breaker(NResilience.BreakerSettings? settings = null) -> voi
 NResilience.Breaker.Isolate() -> void
 NResilience.Breaker.Name.get -> string?
 NResilience.Breaker.Name.init -> void
+NResilience.Breaker.NormalFailureRate.get -> double?
 NResilience.Breaker.NormalLatency.get -> System.TimeSpan?
 NResilience.Breaker.OpenedAt.get -> System.DateTimeOffset?
 NResilience.Breaker.Reset() -> void
@@ -65,12 +66,16 @@ NResilience.BreakerSettings
 NResilience.BreakerSettings.<Clone>$() -> NResilience.BreakerSettings!
 NResilience.BreakerSettings.BreakDuration.get -> System.TimeSpan
 NResilience.BreakerSettings.BreakDuration.init -> void
+NResilience.BreakerSettings.BreakJitter.get -> NResilience.Jitter
+NResilience.BreakerSettings.BreakJitter.init -> void
 NResilience.BreakerSettings.BreakerSettings() -> void
 NResilience.BreakerSettings.ConsecutiveFailures.get -> int
 NResilience.BreakerSettings.ConsecutiveFailures.init -> void
 NResilience.BreakerSettings.Equals(NResilience.BreakerSettings? other) -> bool
 NResilience.BreakerSettings.FailureRatio.get -> double?
 NResilience.BreakerSettings.FailureRatio.init -> void
+NResilience.BreakerSettings.Failures.get -> NResilience.Failures?
+NResilience.BreakerSettings.Failures.init -> void
 NResilience.BreakerSettings.HalfOpenProbes.get -> int
 NResilience.BreakerSettings.HalfOpenProbes.init -> void
 NResilience.BreakerSettings.MaxBreakDuration.get -> System.TimeSpan
@@ -164,6 +169,17 @@ NResilience.DeadlineExceededException.DeadlineExceededException() -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(System.TimeSpan deadline, NResilience.AttemptLog! attempts, System.Exception? innerException = null) -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message) -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message, System.Exception! innerException) -> void
+NResilience.Failures
+NResilience.Failures.AbsoluteFloor.get -> double
+NResilience.Failures.AbsoluteFloor.init -> void
+NResilience.Failures.Equals(NResilience.Failures other) -> bool
+NResilience.Failures.Failures() -> void
+NResilience.Failures.MinimumSamples.get -> int
+NResilience.Failures.MinimumSamples.init -> void
+NResilience.Failures.Multiple.get -> double
+NResilience.Failures.Multiple.init -> void
+NResilience.Failures.Window.get -> System.TimeSpan
+NResilience.Failures.Window.init -> void
 NResilience.Hedge
 NResilience.Hedge.Equals(NResilience.Hedge other) -> bool
 NResilience.Hedge.Hedge() -> void
@@ -343,6 +359,8 @@ override NResilience.BreakerSettings.GetHashCode() -> int
 override NResilience.BreakerSettings.ToString() -> string!
 override NResilience.CallEvent.ToString() -> string!
 override NResilience.Classifier.ToString() -> string!
+override NResilience.Failures.GetHashCode() -> int
+override NResilience.Failures.ToString() -> string!
 override NResilience.Hedge.GetHashCode() -> int
 override NResilience.Hedge.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
@@ -372,6 +390,9 @@ static NResilience.Classifier.Data.get -> NResilience.Classifier!
 static NResilience.Classifier.Default.get -> NResilience.Classifier!
 static NResilience.Classifier.Http.get -> NResilience.Classifier!
 static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
+static NResilience.Failures.Above(double multiple = 5) -> NResilience.Failures
+static NResilience.Failures.operator !=(NResilience.Failures left, NResilience.Failures right) -> bool
+static NResilience.Failures.operator ==(NResilience.Failures left, NResilience.Failures right) -> bool
 static NResilience.Hedge.At(double quantile = 0.95, int maxConcurrent = 2) -> NResilience.Hedge
 static NResilience.Hedge.operator !=(NResilience.Hedge left, NResilience.Hedge right) -> bool
 static NResilience.Hedge.operator ==(NResilience.Hedge left, NResilience.Hedge right) -> bool
@@ -417,5 +438,6 @@ static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Ver
 ~override NResilience.AttemptTimeouts.Equals(object obj) -> bool
 ~override NResilience.Backoff.Equals(object obj) -> bool
 ~override NResilience.Backoff.ToString() -> string
+~override NResilience.Failures.Equals(object obj) -> bool
 ~override NResilience.Hedge.Equals(object obj) -> bool
 ~override NResilience.SlowCalls.Equals(object obj) -> bool

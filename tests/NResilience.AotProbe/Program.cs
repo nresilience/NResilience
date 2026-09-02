@@ -189,7 +189,7 @@ internal static class Program
         failures += Check("library: the streaming path runs under AOT", streamSum == StreamGate.Items * StreamGate.Value);
 
         // A first element the classifier refuses on the final attempt throws rather than yields: the
-        // fall-through constructor in Failures.Build is load-bearing for streaming, so it executes
+        // fall-through constructor in FailureException.Build is load-bearing for streaming, so it executes
         // here rather than being merely compiled past.
         var rejecting = Resilience.Default with
         {

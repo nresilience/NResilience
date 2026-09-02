@@ -32,6 +32,9 @@ Closing after a single successful probe is risky. If a dependency is only interm
 ### Exponential break growth
 The break duration doubles with each consecutive trip, up to `MaxBreakDuration`. That is exponential backoff applied to the breaker itself, preventing the flapping of fixed-duration breaks.
 
+### Jitter on the break duration
+`Backoff` defaults to full jitter because a narrow band around a shared base still leaves a synchronized pulse. The breaker's own backoff has the same problem and a worse blast radius, so `BreakJitter` defaults to `Jitter.Equal` - see [the synchronized probe](#the-synchronized-probe).
+
 ### Tracking slow calls
 Dependency degradation often shows up as latency rather than errors: a service answering `200 OK` at 30 times normal latency can exhaust thread and connection pools. `SlowCallThreshold` lets the breaker trip on duration, so slow calls count as failures. `SlowCalls` does the same without asking you for a number - see [the adaptive slow-call threshold](#the-adaptive-slow-call-threshold).
 
@@ -83,6 +86,55 @@ The baseline decays on its own, because an idle estimator reports nothing rather
 ### Cost
 
 One `LatencyWindow` per breaker, allocated only when `SlowCalls` is set, living on the breaker rather than the policy: the breaker is the object whose scope is explicit, and two policies sharing a breaker are two views of one dependency that should share one idea of its normal latency. Per attempt, on the success path only, the breaker adds one histogram increment and one memoized read, both behind the lock it already holds, sharing the one clock read that `LatencyWindow.RecordAndThreshold` exists to make possible.
+
+## The relative failure ratio
+
+`FailureRatio` is absolute, and an absolute error rate ports nowhere - which is the argument `SlowCalls` makes about latency, left unmade about errors on the very next line of the same settings object.
+
+Two dependencies, one configuration, opposite outcomes. A payments API whose steady-state transient rate is 0.02% is deeply broken at 5%: every downstream is retrying, somebody has been paged, and `FailureRatio = 0.5` has not noticed - the breaker trips when the dependency is ten times worse than the point a human would have escalated. A third-party search backend whose steady-state rate is 30%, because it is flaky and everyone has always retried it, opens its circuit on ordinary variance at the same setting, and the operator's fix is to raise the number until it stops, at which point it detects nothing.
+
+`Failures.Above(5)` is the same trip stated as a multiple of the dependency's own rate. It configures both.
+
+### The two guards
+
+**The floor is not optional.** A baseline of 0.02% times a multiple of 5 is 0.1%, and on a 30-second window at 20 minimum calls that is one failure. Without `AbsoluteFloor`, this feature is a breaker that opens on a single error against any healthy dependency. The floor is the line that says "below 5% absolute, nothing is wrong no matter how quiet the baseline was".
+
+The trip window has the same problem from the other end. At a 5% floor and `MinimumCalls`' default of 20, one transient error *is* the threshold - so a relative trip also requires at least two failures in the window, because a rate estimated from a single event is not a claim about a rate. An absolute `FailureRatio` is deliberately not held to that: a caller who wrote `0.05` over 20 calls asked for exactly that reading, and this feature does not get to second-guess it.
+
+**The baseline needs more samples than a latency quantile does.** `Failures.MinimumSamples` defaults to 100 against `SlowCalls`' 20, because errors are rare by construction and a rate estimated from 20 calls has a resolution of 5% - the floor itself.
+
+### The same race, in errors
+
+An outage contaminates the baseline as it fills it, exactly as a brownout contaminates the latency baseline, and the arithmetic is the mirror image:
+
+- The trip window turns over to failures in `Window` - 30 seconds at the defaults.
+- After `t` seconds the baseline reads roughly `t / Failures.Window`, so the trip point reads `Multiple` times that. A trip window can be at most 100% failures, so once the baseline reaches `1 / Multiple` the breaker cannot open on the error rate at all - which takes `Failures.Window / Multiple`, or 60 seconds at the defaults.
+
+`BreakerSettings.Validate` requires the second to be at least twice the first, the same factor of two `SlowCalls` is held to, and the defaults meet it exactly. A consequence worth stating: raising `Multiple` shortens the survival time, so `Failures.Above(10)` on a 30-second trip window wants a 10-minute baseline and is refused with a 5-minute one. That is the honest trade, and the message names all three knobs that resolve it.
+
+### Composition, and why this one is not exclusive
+
+`SlowCalls` and `SlowCallThreshold` are the same trip defined two ways, and `Validate` refuses both. `Failures` and `FailureRatio` are a measurement and a ceiling, and setting both is the recommended configuration: the effective trip point is `min(FailureRatio, max(AbsoluteFloor, baseline * Multiple))`. The relative trip can only fire sooner than the absolute one, which is the house rule for every adaptive feature in the library - an estimator may tighten a guard and never loosen one.
+
+### Cost, and what clears it
+
+Two `int[10]` rings per breaker - 80 bytes - allocated only when `Failures` is set, and nothing on the executor's path at all. The baseline is bucketed over its own window rather than the trip window's, rotated on write like the trip window, and guarded by the same lock.
+
+Nothing clears it. `OpenCore`, `CloseCore` and `Reset` clear the trip window, because those counts are evidence for a decision that has now been made; the baseline is a measurement of the dependency, and forgetting it at the moment the breaker opens would leave the next thirty seconds unjudgeable until the rate had been re-learned. It decays on its own instead: an outage longer than `Failures.Window` leaves the breaker with no baseline, `Breaker.NormalFailureRate` reporting `null`, and the relative trip disarmed until 100 outcomes have re-established it. The consecutive counter and `FailureRatio` are unaffected, which is what covers the cold start.
+
+## The synchronized probe
+
+200 pods, one dependency, one outage. Every pod's breaker opens within a second or two of the others, because they are all watching the same failure, and every one of them sets a break of exactly `BreakDuration`. Fifteen seconds later all 200 transition to half-open in the same second and each sends its one probe. The dependency, which has been getting no traffic and may be halfway through recovering, receives a 200-request synchronized pulse. If it fails them - and a dependency mid-recovery often will - all 200 breakers re-open together, with a doubled break, and do it again at 30 seconds.
+
+`HalfOpenProbes = 1` makes each pod polite and does nothing whatever about the fleet. It is the same mistake the [retry budget](../features/retry-budget.md) identifies about per-call attempt limits: a per-call limit cannot prevent a storm, because every caller independently believes it is being reasonable.
+
+`BreakJitter` is the fix, and it defaults to `Jitter.Equal` rather than the `Jitter.Full` that `Backoff` uses. This is the one place the library prefers equal jitter, because the break duration has a purpose beyond de-correlation - it is how long the dependency gets left alone - and full jitter would let a pod probe after 200 milliseconds of a 15-second break. Equal jitter keeps a floor under the delay, which is exactly the property wanted.
+
+Three details make it honest:
+
+- The jitter is applied once, when the breaker opens, to the already-grown and already-capped duration. Growth is therefore computed from the nominal break, so a short first break does not shorten every break after it, and `MaxBreakDuration` still bounds the result.
+- `RetryAfterHint` returns `_breakUntil` minus the elapsed time, so it reports the break actually being served rather than the nominal one, and `CallRejectedException.RetryAfter` is honest by construction.
+- `Jitter.None` is the escape hatch. A test that asserts "after exactly `BreakDuration`, the state is half-open" needs it, and that is the whole migration.
 
 ## Concurrency and implementation
 

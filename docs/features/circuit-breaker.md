@@ -48,6 +48,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 | :--- | :--- | :--- |
 | `ConsecutiveFailures` | 5 | The number of consecutive failures before the breaker opens. |
 | `FailureRatio` | null | An optional rate-based trip condition, evaluated alongside the consecutive failure counter. |
+| `Failures` | null | The same trip, expressed as a multiple of the dependency's own measured error rate. Composes with `FailureRatio`, which stays the ceiling. |
 | `MinimumCalls` | 20 | The minimum number of calls required before a ratio-based trip is evaluated. |
 | `Window` | 30 s | The sliding window over which rates are measured. |
 | `SlowCallThreshold` | null | A constant latency threshold; any attempt slower than this counts as a slow call. |
@@ -55,6 +56,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 | `SlowCallRatio` | 0.5 | The proportion of slow calls within the window that trips the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles on each consecutive open. |
+| `BreakJitter` | `Jitter.Equal` | How much randomness the break duration carries, so a fleet that opened together does not probe together. |
 | `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while in the `HalfOpen` state. |
 | `ProbeSuccesses` | 2 | The number of successful probes required to close the breaker. |
 
@@ -113,11 +115,71 @@ The breaker keeps a baseline of how long a successful call takes - by default th
 Two settings make this work, both with defaults you can leave alone:
 
 - `Quantile` (default 0.5, capped there) is the quantile that counts as normal. A brownout only starts moving the median once it accounts for more than half the baseline window.
-- `Window` (default 5 minutes) is how far back the baseline reaches - ten times the trip window, so the trip window fills with slow calls long before the baseline notices them.
+- `Window` (default 5 minutes) is how far back the baseline reaches - 10 times the trip window, so the trip window fills with slow calls long before the baseline notices them.
 
 `BreakerSettings.Validate` rejects combinations where the baseline would move first - such a breaker never opens on latency at all. See [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold) for the arithmetic.
 
 Only successful attempts feed the baseline, and the baseline survives an open, a close, and a `Reset` - it measures the dependency, it does not decide anything about it. That is what makes a slow probe against a still-degraded dependency recognizable as one.
+
+## Trip on errors without guessing a rate
+
+`FailureRatio` asks for an absolute error rate, and no single number fits two dependencies. `Failures` asks for a multiple of the dependency's own rate instead, and measures the rest itself.
+
+<!-- snippet: breaker-relative-failures -->
+```csharp
+// "5x its own error rate" ports to any dependency. An absolute ratio does not: 5% is
+// catastrophic for a payments API whose steady state is 0.02%, and a quiet day for a
+// third-party search backend that has always run at 30%. The breaker measures the rate
+// itself, from the outcomes it already samples.
+var breaker = new Breaker(settings: new BreakerSettings
+{
+    Failures = Failures.Above(multiple: 5), // too many = 5x the recent error rate
+    FailureRatio = 0.5, // and never more than half the window, whatever the baseline
+    MinimumCalls = 20,
+})
+{
+    Name = "search",
+};
+
+// How often the dependency normally fails, as this breaker measures it. Worth graphing;
+// null until 100 outcomes have landed, and the relative trip is not armed until then.
+var rate = breaker.NormalFailureRate;
+```
+<!-- endsnippet -->
+
+The breaker keeps a baseline error rate - by default over the last five minutes - and trips when the window's rate exceeds `Multiple` times it. Read the baseline from `Breaker.NormalFailureRate`.
+
+Three guards make it safe, all defaulted:
+
+- `AbsoluteFloor` (default 0.05) is the rate below which nothing is wrong, whatever the baseline was. Five times a baseline of nearly zero is nearly zero, so without a floor the first error of the day would open the circuit. A relative trip also needs at least two failures in the window, because one failure is not a rate.
+- `MinimumSamples` (default 100) is how many outcomes the baseline needs before the relative trip is armed. Until then the breaker behaves exactly as it does without the setting.
+- `Window` (default 5 minutes) is how far back the baseline reaches. `BreakerSettings.Validate` rejects a baseline short enough that an outage raises it before the trip window fills - such a breaker never opens on the error rate at all.
+
+Set `FailureRatio` as well when you have a rate you never want exceeded. The relative trip can only fire sooner than it, never later.
+
+## The break is jittered
+
+Every pod's breaker opens within a second of the others, because they are all watching the same dependency fail. Give them all the same break duration and they all probe in the same second, and a dependency halfway through recovering takes the fleet's probes as one pulse - which it often fails, re-opening every breaker together with a doubled break.
+
+`BreakJitter` breaks that correlation, and it is on by default at `Jitter.Equal`: the break runs for half the computed duration plus up to half again.
+
+<!-- snippet: breaker-jitter -->
+```csharp
+// Every pod's breaker opens within a second of the others, because they are all watching
+// the same dependency fail. Without jitter they all probe in the same second, and a
+// dependency halfway through recovering takes the whole fleet's probes at once.
+var breaker = new Breaker(settings: new BreakerSettings
+{
+    BreakDuration = TimeSpan.FromSeconds(value: 15), // now half of that, plus up to half again
+    BreakJitter = Jitter.Equal, // the default
+})
+{
+    Name = "search",
+};
+```
+<!-- endsnippet -->
+
+`Jitter.Equal` rather than `Jitter.Full` keeps a floor under the break, because the duration has a purpose beyond de-correlation - it is how long the dependency gets left alone. `RetryAfterHint` and `CallRejectedException.RetryAfter` report the break actually being served, so a caller scheduling its own retry is never told the nominal figure. Use `Jitter.None` when a test needs the break to expire at exactly `BreakDuration`.
 
 ## Handle refused calls
 

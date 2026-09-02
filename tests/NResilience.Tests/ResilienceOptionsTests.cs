@@ -408,6 +408,66 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(100, slow.MinimumSamples);
     }
 
+    /// <summary>
+    ///     And the same arrangement again for the relative failure trip, which is the third feature to
+    ///     take this shape: a section whose presence arms it, and whose every property defaults.
+    /// </summary>
+    [Fact]
+    public void An_empty_failures_section_is_a_complete_relative_trip()
+    {
+        var options = new ResilienceOptions();
+        Config(("Breaker:Failures:Multiple", "4")).Bind(options);
+
+        var failures = Assert.NotNull(options.ToPolicy().Breaker!.Settings.Failures);
+
+        Assert.Equal(4, failures.Multiple);
+        Assert.Equal(TimeSpan.FromMinutes(5), failures.Window);
+        Assert.Equal(100, failures.MinimumSamples);
+        Assert.Equal(0.05, failures.AbsoluteFloor);
+    }
+
+    [Fact]
+    public void Every_relative_failure_setting_projects()
+    {
+        var policy = new ResilienceOptions
+        {
+            Breaker = new BreakerOptions
+            {
+                Failures = new FailureOptions
+                {
+                    Multiple = 3,
+                    Window = TimeSpan.FromMinutes(10),
+                    MinimumSamples = 200,
+                    AbsoluteFloor = 0.1,
+                },
+            },
+        }.ToPolicy();
+
+        var failures = Assert.NotNull(policy.Breaker!.Settings.Failures);
+
+        Assert.Equal(3, failures.Multiple);
+        Assert.Equal(TimeSpan.FromMinutes(10), failures.Window);
+        Assert.Equal(200, failures.MinimumSamples);
+        Assert.Equal(0.1, failures.AbsoluteFloor);
+    }
+
+    /// <summary>
+    ///     The break's jitter binds by name, so a test that needs a deterministic break can say so from
+    ///     a configuration section rather than only from code.
+    /// </summary>
+    [Fact]
+    public void The_break_jitter_binds_by_name()
+    {
+        var options = new ResilienceOptions();
+        Config(("Breaker:BreakJitter", "None")).Bind(options);
+
+        Assert.Equal(Jitter.None, options.ToPolicy().Breaker!.Settings.BreakJitter);
+    }
+
+    [Fact]
+    public void A_breaker_with_no_jitter_named_jitters_its_break_by_default() =>
+        Assert.Equal(Jitter.Equal, new ResilienceOptions { Breaker = new BreakerOptions() }.ToPolicy().Breaker!.Settings.BreakJitter);
+
     [Fact]
     public void Every_hedge_setting_projects()
     {

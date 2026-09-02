@@ -368,6 +368,14 @@ public sealed class BreakerOptions
     /// <summary><see cref="BreakerSettings.FailureRatio" /> - the rate-based trip, for a service with enough traffic to have a rate.</summary>
     public double? FailureRatio { get; set; }
 
+    /// <summary>
+    ///     <see cref="BreakerSettings.Failures" /> - the same rate-based trip stated as a multiple of the
+    ///     dependency's own measured error rate instead of an absolute ratio. A section of its own, so
+    ///     its presence is what turns it on. Composes with <see cref="FailureRatio" />, which stays the
+    ///     ceiling when both are set.
+    /// </summary>
+    public FailureOptions? Failures { get; set; }
+
     /// <summary><see cref="BreakerSettings.MinimumCalls" /> - the sample below which the ratio means nothing.</summary>
     public int? MinimumCalls { get; set; }
 
@@ -379,6 +387,12 @@ public sealed class BreakerOptions
 
     /// <summary><see cref="BreakerSettings.MaxBreakDuration" />.</summary>
     public TimeSpan? MaxBreakDuration { get; set; }
+
+    /// <summary>
+    ///     <see cref="BreakerSettings.BreakJitter" /> - how much randomness the break duration carries,
+    ///     so a fleet that opened together does not probe together. <c>"Equal"</c> by default.
+    /// </summary>
+    public Jitter? BreakJitter { get; set; }
 
     /// <summary><see cref="BreakerSettings.HalfOpenProbes" />.</summary>
     public int? HalfOpenProbes { get; set; }
@@ -420,6 +434,9 @@ public sealed class BreakerOptions
         if (FailureRatio is { } ratio)
             settings = settings with { FailureRatio = ratio };
 
+        if (Failures is { } relative)
+            settings = settings with { Failures = relative.ToFailures() };
+
         if (MinimumCalls is { } minimum)
             settings = settings with { MinimumCalls = minimum };
 
@@ -431,6 +448,9 @@ public sealed class BreakerOptions
 
         if (MaxBreakDuration is { } maxBreak)
             settings = settings with { MaxBreakDuration = maxBreak };
+
+        if (BreakJitter is { } jitter)
+            settings = settings with { BreakJitter = jitter };
 
         if (HalfOpenProbes is { } probes)
             settings = settings with { HalfOpenProbes = probes };
@@ -448,6 +468,49 @@ public sealed class BreakerOptions
             settings = settings with { SlowCallRatio = slowRatio };
 
         return new Breaker(settings) { Name = name };
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.Failures" />.
+///     <para>
+///         A section rather than four flat properties, so <c>"Failures": { "Multiple": 5 }</c> is a
+///         complete configuration and the presence of the section is what arms the relative trip.
+///     </para>
+/// </summary>
+public sealed class FailureOptions
+{
+    /// <summary>
+    ///     <see cref="NResilience.Failures.Multiple" />. Defaults to 5, so <c>"Failures": {}</c> is a
+    ///     complete configuration.
+    /// </summary>
+    public double? Multiple { get; set; }
+
+    /// <summary><see cref="NResilience.Failures.Window" />.</summary>
+    public TimeSpan? Window { get; set; }
+
+    /// <summary><see cref="NResilience.Failures.MinimumSamples" />.</summary>
+    public int? MinimumSamples { get; set; }
+
+    /// <summary><see cref="NResilience.Failures.AbsoluteFloor" />.</summary>
+    public double? AbsoluteFloor { get; set; }
+
+    /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
+    /// <returns>The configuration.</returns>
+    public Failures ToFailures()
+    {
+        var failures = NResilience.Failures.Above(Multiple ?? 5.0);
+
+        if (Window is { } window)
+            failures = failures with { Window = window };
+
+        if (MinimumSamples is { } samples)
+            failures = failures with { MinimumSamples = samples };
+
+        if (AbsoluteFloor is { } floor)
+            failures = failures with { AbsoluteFloor = floor };
+
+        return failures;
     }
 }
 

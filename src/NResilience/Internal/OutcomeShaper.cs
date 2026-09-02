@@ -59,7 +59,7 @@ internal readonly struct ThrowingShaper<T> : IOutcomeShaper<T, T>
         if (hasValue)
             return lastValue;
 
-        ExceptionDispatchInfo.Capture(Failures.Build(reason, error, deadline, attempts, retryAfter)).Throw();
+        ExceptionDispatchInfo.Capture(FailureException.Build(reason, error, deadline, attempts, retryAfter)).Throw();
         return default!;
     }
 }
@@ -74,7 +74,7 @@ internal readonly struct ResultShaper<T> : IOutcomeShaper<T, CallResult<T>>
 
     public CallResult<T> Failure(T lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts,
         TimeSpan? retryAfter) =>
-        new(false, lastValue, hasValue, hasValue ? null : Failures.Build(reason, error, deadline, attempts, retryAfter), reason, attempts);
+        new(false, lastValue, hasValue, hasValue ? null : FailureException.Build(reason, error, deadline, attempts, retryAfter), reason, attempts);
 }
 
 /// <summary>The non-throwing void entry points.</summary>
@@ -87,7 +87,7 @@ internal readonly struct VoidResultShaper : IOutcomeShaper<VoidResult, CallResul
 
     public CallResult Failure(VoidResult lastValue, bool hasValue, Exception? error, StopReason reason, TimeSpan deadline, AttemptLog attempts,
         TimeSpan? retryAfter) =>
-        new(false, Failures.Build(reason, error, deadline, attempts, retryAfter), reason, attempts);
+        new(false, FailureException.Build(reason, error, deadline, attempts, retryAfter), reason, attempts);
 }
 
 /// <summary>
@@ -100,7 +100,7 @@ internal readonly struct VoidResultShaper : IOutcomeShaper<VoidResult, CallResul
 ///         keeps working.
 ///     </para>
 /// </summary>
-internal static class Failures
+internal static class FailureException
 {
     public static Exception Build(StopReason reason, Exception? error, TimeSpan deadline, AttemptLog attempts, TimeSpan? retryAfter)
     {

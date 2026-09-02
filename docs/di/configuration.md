@@ -65,9 +65,11 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `Timeouts` | An `AttemptTimeoutsOptions` section. Omit this and `AttemptTimeout` is the only per-attempt bound. |
 | `Telemetry` | Set to `false` to opt this policy out of the telemetry meter. |
 
-The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`.
+The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
 
 `Breaker:SlowCalls` is a nested section rather than a flat property, and its presence arms the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number). Every setting has a default, so `"SlowCalls": {}` is complete; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. Set this or `SlowCallThreshold`, not both - a section that sets both is rejected when the breaker is built.
+
+`Breaker:Failures` is a nested section on the same pattern, and its presence arms the [relative failure trip](../features/circuit-breaker.md#trip-on-errors-without-guessing-a-rate). Every setting has a default, so `"Failures": {}` is complete; it accepts `Multiple`, `Window`, `MinimumSamples`, and `AbsoluteFloor`. Set `FailureRatio` as well when you have a rate you never want exceeded - it becomes the ceiling, and the relative trip can only fire sooner.
 
 `Timeouts` is likewise a nested section whose presence arms the [measured attempt ceiling](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it). Every setting has a default, so `"Timeouts": {}` is complete; it accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Floor`. It never lengthens `AttemptTimeout` - the measured term can only lower the ceiling - so the two settings compose rather than compete.
 

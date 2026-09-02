@@ -79,6 +79,55 @@ public sealed class Guards
     }
 
     [Fact]
+    public void A_breaker_can_learn_what_too_many_errors_means()
+    {
+        // <snippet:breaker-relative-failures>
+        // "5x its own error rate" ports to any dependency. An absolute ratio does not: 5% is
+        // catastrophic for a payments API whose steady state is 0.02%, and a quiet day for a
+        // third-party search backend that has always run at 30%. The breaker measures the rate
+        // itself, from the outcomes it already samples.
+        var breaker = new Breaker(settings: new BreakerSettings
+        {
+            Failures = Failures.Above(multiple: 5), // too many = 5x the recent error rate
+            FailureRatio = 0.5, // and never more than half the window, whatever the baseline
+            MinimumCalls = 20,
+        })
+        {
+            Name = "search",
+        };
+
+        // How often the dependency normally fails, as this breaker measures it. Worth graphing;
+        // null until 100 outcomes have landed, and the relative trip is not armed until then.
+        var rate = breaker.NormalFailureRate;
+
+        // </snippet:breaker-relative-failures>
+
+        Assert.Null(rate);
+        Assert.Equal(expected: 5, actual: breaker.Settings.Failures!.Value.Multiple);
+    }
+
+    [Fact]
+    public void A_break_is_jittered_by_default()
+    {
+        // <snippet:breaker-jitter>
+        // Every pod's breaker opens within a second of the others, because they are all watching
+        // the same dependency fail. Without jitter they all probe in the same second, and a
+        // dependency halfway through recovering takes the whole fleet's probes at once.
+        var breaker = new Breaker(settings: new BreakerSettings
+        {
+            BreakDuration = TimeSpan.FromSeconds(value: 15), // now half of that, plus up to half again
+            BreakJitter = Jitter.Equal, // the default
+        })
+        {
+            Name = "search",
+        };
+
+        // </snippet:breaker-jitter>
+
+        Assert.Equal(expected: Jitter.Equal, actual: breaker.Settings.BreakJitter);
+    }
+
+    [Fact]
     public void A_breaker_can_be_read_and_driven_by_an_operator()
     {
         var breaker = new Breaker { Name = "payments" };

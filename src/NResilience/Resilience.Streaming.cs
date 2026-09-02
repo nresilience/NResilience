@@ -486,8 +486,8 @@ public sealed partial record Resilience
 
         // The failure tail, and it is the call path's - reached from the same three breaks (breaker
         // refusal, deadline, AfterAttempt's stop) that reach the call paths' tail, shaped by the
-        // same Failures.Build, so the consumer's first MoveNextAsync throws the exception a failed
-        // call would have thrown, with the same log attached. That is unconditional, including when
+        // same FailureException.Build, so the consumer's first MoveNextAsync throws the exception a
+        // failed call would have thrown, with the same log attached. That is unconditional, including when
         // an attempt produced an element the classifier refused: a call may return its final failed
         // value because a caller holding a failed response can see that it failed - a status code
         // self-describes. An element does not. A stream's only failure channel is completion versus
@@ -506,6 +506,6 @@ public sealed partial record Resilience
             _ => null,
         };
 
-        throw Failures.Build(reason, error, deadline, attempts, retryAfter);
+        throw FailureException.Build(reason, error, deadline, attempts, retryAfter);
     }
 }

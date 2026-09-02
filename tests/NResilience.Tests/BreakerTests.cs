@@ -178,7 +178,11 @@ public sealed class BreakerTests
     public void An_expired_break_reports_half_open_without_consuming_a_probe()
     {
         var time = new FakeTimeProvider();
-        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
+        var breaker = Build(time, new BreakerSettings
+        {
+            BreakDuration = TimeSpan.FromSeconds(15),
+            BreakJitter = Jitter.None,
+        });
 
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(14));
@@ -256,6 +260,7 @@ public sealed class BreakerTests
         {
             BreakDuration = TimeSpan.FromSeconds(10),
             MaxBreakDuration = TimeSpan.FromMinutes(2),
+            BreakJitter = Jitter.None,
         });
 
         Sample(breaker, VerdictKind.Transient, 5);
@@ -282,6 +287,7 @@ public sealed class BreakerTests
         {
             BreakDuration = TimeSpan.FromSeconds(10),
             MaxBreakDuration = TimeSpan.FromSeconds(20),
+            BreakJitter = Jitter.None,
         });
 
         Sample(breaker, VerdictKind.Transient, 5);
@@ -301,7 +307,11 @@ public sealed class BreakerTests
     public void A_clean_close_resets_the_accumulated_growth()
     {
         var time = new FakeTimeProvider();
-        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(10) });
+        var breaker = Build(time, new BreakerSettings
+        {
+            BreakDuration = TimeSpan.FromSeconds(10),
+            BreakJitter = Jitter.None,
+        });
 
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(10));
@@ -317,6 +327,93 @@ public sealed class BreakerTests
         time.Advance(TimeSpan.FromSeconds(10));
 
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
+    }
+
+    // ---- The break duration's jitter ----
+
+    /// <summary>
+    ///     Two hundred pods watching one dependency fail open within a second of each other. Without
+    ///     jitter they all serve the same break and all probe in the same second, and a dependency
+    ///     halfway through recovering takes a two-hundred-request synchronized pulse - which it often
+    ///     fails, re-opening every breaker together with a doubled break. <c>HalfOpenProbes = 1</c> makes
+    ///     each pod polite and does nothing at all about the fleet.
+    /// </summary>
+    [Fact]
+    public void The_break_is_jittered_so_a_fleet_that_opened_together_does_not_probe_together()
+    {
+        var breaks = new HashSet<TimeSpan>();
+
+        for (var pod = 0; pod < 50; pod++)
+        {
+            var time = new FakeTimeProvider();
+            var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
+
+            Sample(breaker, VerdictKind.Transient, 5);
+
+            var served = breaker.RetryAfterHint();
+            Assert.NotNull(served);
+
+            // Equal jitter rather than full: the break duration has a purpose beyond de-correlation -
+            // it is how long the dependency gets left alone - and full jitter would let a pod probe
+            // after 200 ms of a 15-second break.
+            Assert.InRange(served.Value, TimeSpan.FromSeconds(7.5), TimeSpan.FromSeconds(15));
+            breaks.Add(served.Value);
+        }
+
+        Assert.True(breaks.Count > 25, $"50 pods drew only {breaks.Count} distinct breaks");
+    }
+
+    [Fact]
+    public void The_hint_reports_the_break_being_served_rather_than_the_nominal_one()
+    {
+        var time = new FakeTimeProvider();
+
+        var breaker = Build(time, new BreakerSettings
+        {
+            BreakDuration = TimeSpan.FromSeconds(15),
+            BreakJitter = Jitter.None,
+        });
+
+        Sample(breaker, VerdictKind.Transient, 5);
+
+        // Jitter is applied once, at open, so RetryAfterHint stays honest either way - and Jitter.None
+        // is the escape hatch for a test that wants the break to expire at exactly BreakDuration.
+        Assert.Equal(TimeSpan.FromSeconds(15), breaker.RetryAfterHint());
+
+        time.Advance(TimeSpan.FromSeconds(14));
+        Assert.Equal(BreakerState.Open, breaker.State);
+
+        time.Advance(TimeSpan.FromSeconds(1));
+        Assert.Equal(BreakerState.HalfOpen, breaker.State);
+    }
+
+    [Fact]
+    public void The_growth_is_computed_from_the_nominal_break_so_jitter_does_not_compound()
+    {
+        for (var pod = 0; pod < 20; pod++)
+        {
+            var time = new FakeTimeProvider();
+
+            var breaker = Build(time, new BreakerSettings
+            {
+                ConsecutiveFailures = 1,
+                BreakDuration = TimeSpan.FromSeconds(10),
+                MaxBreakDuration = TimeSpan.FromSeconds(20),
+            });
+
+            Sample(breaker, VerdictKind.Transient);
+            time.Advance(TimeSpan.FromSeconds(10));
+
+            Assert.True(breaker.TryEnter(out _));
+            breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
+
+            // The second break is 20 s nominal, so equal jitter puts it in [10 s, 20 s]. Jittering
+            // the grown value rather than growing the jittered one is what keeps the backoff a
+            // backoff: a short first break must not shorten every break after it.
+            var served = breaker.RetryAfterHint();
+            Assert.NotNull(served);
+            Assert.InRange(served.Value, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(20));
+        }
     }
 
     // ---- Manual control ----
@@ -460,7 +557,12 @@ public sealed class BreakerTests
     public async Task A_refusal_carries_a_retry_after_hint()
     {
         var time = new FakeTimeProvider();
-        var breaker = Build(time, new BreakerSettings { BreakDuration = TimeSpan.FromSeconds(15) });
+        var breaker = Build(time, new BreakerSettings
+        {
+            BreakDuration = TimeSpan.FromSeconds(15),
+            BreakJitter = Jitter.None,
+        });
+
         Sample(breaker, VerdictKind.Transient, 5);
 
         var call = (TestPolicy.On(time) with { Breaker = breaker })

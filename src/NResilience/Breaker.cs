@@ -70,8 +70,29 @@ public sealed record BreakerSettings
     ///     Optional rate-based trip, evaluated alongside the consecutive counter. Null disables it, and
     ///     nothing rate-based - including <see cref="SlowCallThreshold" /> - is evaluated until
     ///     <see cref="MinimumCalls" /> outcomes have landed in <see cref="Window" />.
+    ///     <para>
+    ///         This is an absolute rate, which is the number that ports nowhere: 5% is catastrophic for a
+    ///         payments API and a quiet day for a flaky search backend. <see cref="Failures" /> is the same
+    ///         trip expressed as a multiple of the dependency's own measured rate. Setting both is
+    ///         supported and useful - the absolute number becomes the ceiling.
+    ///     </para>
     /// </summary>
     public double? FailureRatio { get; init; }
+
+    /// <summary>
+    ///     The same rate-based trip as <see cref="FailureRatio" />, defined relative to how often this
+    ///     dependency normally fails: <c>Failures.Above(5)</c> is "five times its own recent error rate".
+    ///     <para>
+    ///         The breaker measures the baseline itself, from the outcomes it already samples, so nothing
+    ///         has to be guessed up front and nothing has to be re-tuned when the dependency's error rate
+    ///         changes. Unlike <see cref="SlowCalls" /> and <see cref="SlowCallThreshold" />, this
+    ///         composes with its absolute counterpart rather than replacing it: when
+    ///         <see cref="FailureRatio" /> is also set, the relative trip can only fire sooner, never
+    ///         later. See <see cref="NResilience.Failures" /> for why the absolute floor and the long
+    ///         window are both required rather than cosmetic.
+    ///     </para>
+    /// </summary>
+    public Failures? Failures { get; init; }
 
     /// <summary>How many sampled calls a rate-based trip needs before it means anything.</summary>
     public int MinimumCalls { get; init; } = 20;
@@ -125,6 +146,27 @@ public sealed record BreakerSettings
     ///     </para>
     /// </summary>
     public TimeSpan MaxBreakDuration { get; init; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    ///     How much randomness to apply to the break duration. <see cref="Jitter.Equal" /> by default:
+    ///     the break runs for <c>half the computed duration + random(0, half)</c>.
+    ///     <para>
+    ///         Two hundred pods watching one dependency fail all open within a second of each other and
+    ///         all set the same break, so fifteen seconds later they all probe in the same second and a
+    ///         dependency halfway through recovering takes a two-hundred-request synchronized pulse. If it
+    ///         fails them they re-open together, with a doubled break, and do it again. Jitter is what
+    ///         breaks that correlation, for exactly the reason <see cref="Backoff.Jitter" /> defaults to
+    ///         it - <see cref="HalfOpenProbes" /> makes each pod polite and does nothing about the fleet.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="Jitter.Equal" /> rather than <see cref="Jitter.Full" />, because the break
+    ///         duration has a purpose beyond de-correlation: it is how long the dependency gets left
+    ///         alone, and full jitter would let a pod probe after 200 ms of a 15-second break.
+    ///         <see cref="Jitter.None" /> is the escape hatch for a test that needs a break to expire at
+    ///         exactly <see cref="BreakDuration" />.
+    ///     </para>
+    /// </summary>
+    public Jitter BreakJitter { get; init; } = Jitter.Equal;
 
     /// <summary>Concurrent trial calls allowed while half-open.</summary>
     public int HalfOpenProbes { get; init; } = 1;
@@ -207,6 +249,16 @@ public sealed record BreakerSettings
                 ValidateRace(adaptive, problems);
         }
 
+        if (Failures is { } relative)
+        {
+            relative.Validate(problems);
+
+            // Only worth asking once the two values it is measured against are themselves sane; each
+            // of those has its own message, and a second one derived from a NaN would only be noise.
+            if (Window > TimeSpan.Zero && relative.Multiple > 1 && relative.Window > TimeSpan.Zero)
+                ValidateRace(relative, problems);
+        }
+
         if (SlowCallRatio <= 0 || SlowCallRatio > 1 || double.IsNaN(SlowCallRatio))
             problems.Add($"{nameof(SlowCallRatio)} must be in (0, 1]; it is {SlowCallRatio}.");
 
@@ -260,6 +312,41 @@ public sealed record BreakerSettings
             $"{nameof(SlowCallRatio)} x {nameof(Window)} ({fills:0.##}s), or a brownout moves the baseline before the " +
             $"window fills with slow calls and the breaker can never open on latency. Lengthen {nameof(SlowCalls)}.Window, " +
             $"lower {nameof(SlowCalls)}.Quantile, or shorten {nameof(Window)}.");
+    }
+
+    /// <summary>
+    ///     The same race, for the relative failure trip: a baseline that has absorbed the incident
+    ///     before the trip window has filled with it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A total outage raises the baseline as it fills <see cref="NResilience.Failures.Window" />,
+    ///         so after <c>t</c> seconds the baseline reads <c>t / Failures.Window</c> and the trip point
+    ///         reads <c>Multiple x</c> that. The trip window's own ratio cannot exceed 1, so once the
+    ///         baseline reaches <c>1 / Multiple</c> the breaker cannot open on the error rate at all -
+    ///         which takes <c>Failures.Window / Multiple</c> seconds. The trip window needs
+    ///         <see cref="Window" /> to turn over.
+    ///     </para>
+    ///     <para>
+    ///         A factor of two is the margin, the same one <see cref="SlowCalls" /> is held to, and the
+    ///         defaults meet it exactly: a 5-minute baseline at a multiple of 5 survives 60 s against a
+    ///         30-second window. Raising <see cref="NResilience.Failures.Multiple" /> therefore wants a
+    ///         longer baseline, which is the trade the message states.
+    ///     </para>
+    /// </remarks>
+    private void ValidateRace(Failures relative, List<string> problems)
+    {
+        var survives = relative.Window.TotalSeconds / relative.Multiple;
+        var fills = Window.TotalSeconds;
+
+        if (survives >= 2 * fills)
+            return;
+
+        problems.Add(
+            $"{nameof(Failures)}.Window / {nameof(Failures)}.Multiple ({survives:0.##}s) must be at least twice " +
+            $"{nameof(Window)} ({fills:0.##}s), or an outage raises the baseline before the trip window fills with " +
+            $"failures and the breaker can never open on the error rate. Lengthen {nameof(Failures)}.Window, lower " +
+            $"{nameof(Failures)}.Multiple, or shorten {nameof(Window)}.");
     }
 }
 
@@ -317,6 +404,13 @@ public sealed class Breaker
     /// </summary>
     private const int MaxGrowthShift = 40;
 
+    /// <summary>
+    ///     Failures the trip window needs before a relative <see cref="BreakerSettings.Failures" /> may
+    ///     open the breaker, whatever the ratio says. Two, because one failure is a single event and
+    ///     this trip is a claim about a rate.
+    /// </summary>
+    private const int MinimumRelativeFailures = 2;
+
     private readonly int[]? _calls;
     private readonly int[]? _failures;
 
@@ -329,6 +423,14 @@ public sealed class Breaker
     ///     outliving the trip window it is raced against.
     /// </summary>
     private readonly LatencyWindow? _normal;
+
+    /// <summary>
+    ///     The measured baseline error rate a relative <see cref="BreakerSettings.Failures" /> is
+    ///     multiplied against. Deliberately never cleared by <see cref="ClearWindow" />, for the reason
+    ///     <see cref="_normal" /> is not: it is a measurement of the dependency, not a decision about
+    ///     it, and the design depends on it outliving the trip window it is raced against.
+    /// </summary>
+    private readonly RateWindow? _rate;
 
     private readonly int[]? _slow;
     private readonly long _startedAt;
@@ -378,6 +480,12 @@ public sealed class Breaker
         // that dependency's normal latency is.
         if (Settings.SlowCalls is { } adaptive)
             _normal = new LatencyWindow(adaptive.Quantile, adaptive.Window, _time);
+
+        // The same bargain for the error rate, and the same reason it lives on the breaker: two
+        // policies sharing a breaker are two views of one dependency, and they should share one idea
+        // of how often that dependency fails.
+        if (Settings.Failures is { } relative)
+            _rate = new RateWindow(relative.Window);
     }
 
     /// <summary>A name for this breaker, used in diagnostics and health endpoints.</summary>
@@ -421,6 +529,31 @@ public sealed class Breaker
     /// </summary>
     public TimeSpan? NormalLatency =>
         _normal is null ? null : _normal.Threshold(Settings.SlowCalls!.Value.MinimumSamples);
+
+    /// <summary>
+    ///     How often a call to this dependency currently fails, as this breaker measures it - the number
+    ///     a relative <see cref="BreakerSettings.Failures" /> multiplies. Null when the breaker is not
+    ///     configured that way, or has not seen <see cref="NResilience.Failures.MinimumSamples" />
+    ///     outcomes yet.
+    ///     <para>
+    ///         Worth graphing beside <see cref="NormalLatency" />. It is the library's answer to "how
+    ///         reliable is this dependency, normally?", and the trip point is
+    ///         <c>max(Failures.AbsoluteFloor, NormalFailureRate x Failures.Multiple)</c>.
+    ///     </para>
+    /// </summary>
+    public double? NormalFailureRate
+    {
+        get
+        {
+            if (_rate is null)
+                return null;
+
+            lock (_gate)
+            {
+                return _rate.Ratio(Settings.Failures!.Value.MinimumSamples);
+            }
+        }
+    }
 
     /// <summary>When the breaker last opened, or null while it is closed.</summary>
     public DateTimeOffset? OpenedAt
@@ -661,7 +794,10 @@ public sealed class Breaker
     }
 
     private static bool IsWindowed(BreakerSettings settings) =>
-        settings.FailureRatio is not null || settings.SlowCallThreshold is not null || settings.SlowCalls is not null;
+        settings.FailureRatio is not null
+        || settings.Failures is not null
+        || settings.SlowCallThreshold is not null
+        || settings.SlowCalls is not null;
 
     private long Elapsed() => _time.GetElapsedTime(_startedAt).Ticks;
 
@@ -681,7 +817,7 @@ public sealed class Breaker
         if (calls < Settings.MinimumCalls)
             return;
 
-        if (Settings.FailureRatio is { } ratio && Sum(_failures!) >= ratio * calls)
+        if (TripsOnRate(calls))
         {
             OpenCore(now);
             return;
@@ -689,6 +825,51 @@ public sealed class Breaker
 
         if ((Settings.SlowCallThreshold is not null || _normal is not null) && Sum(_slow!) >= Settings.SlowCallRatio * calls)
             OpenCore(now);
+    }
+
+    /// <summary>
+    ///     Whether the trip window's error rate is enough to open the breaker, against
+    ///     <see cref="BreakerSettings.FailureRatio" />, against the measured baseline, or both. Always
+    ///     called with the lock held, and only once the window holds
+    ///     <see cref="BreakerSettings.MinimumCalls" /> outcomes.
+    /// </summary>
+    /// <param name="calls">How many outcomes the trip window holds.</param>
+    /// <returns>True when the breaker should open.</returns>
+    /// <remarks>
+    ///     A relative trip can only fire sooner than the absolute one, never later:
+    ///     <see cref="BreakerSettings.FailureRatio" /> stays the ceiling when both are set. Until the
+    ///     baseline has <see cref="NResilience.Failures.MinimumSamples" /> outcomes there is no relative
+    ///     trip at all, so a cold breaker behaves exactly as it does without the feature.
+    /// </remarks>
+    private bool TripsOnRate(int calls)
+    {
+        var failures = Sum(_failures!);
+
+        if (Settings.FailureRatio is { } absolute && failures >= absolute * calls)
+            return true;
+
+        if (_rate is null)
+            return false;
+
+        // One failure is not a rate. At the default floor of 5% a 20-call window would otherwise
+        // open on a single transient error against a dependency that has never failed once, which
+        // is twitchier than anything else the breaker does. The absolute trip above is deliberately
+        // left alone: a caller who wrote FailureRatio = 0.05 with MinimumCalls = 20 asked for
+        // exactly that reading, and this feature does not get to second-guess it.
+        if (failures < MinimumRelativeFailures)
+            return false;
+
+        var relative = Settings.Failures!.Value;
+
+        if (_rate.Ratio(relative.MinimumSamples) is not { } baseline)
+            return false;
+
+        var trip = relative.ThresholdFor(baseline);
+
+        if (Settings.FailureRatio is { } ceiling)
+            trip = Math.Min(ceiling, trip);
+
+        return failures >= trip * calls;
     }
 
     private void OpenCore(long now)
@@ -702,7 +883,10 @@ public sealed class Breaker
         var grown = Settings.BreakDuration.Ticks << Math.Min(_consecutiveOpens, MaxGrowthShift);
         var capped = Math.Min(grown <= 0 ? long.MaxValue : grown, Settings.MaxBreakDuration.Ticks);
 
-        _breakUntil = now + capped;
+        // Jittered once, here, so RetryAfterHint reports the break this breaker is actually serving
+        // rather than the nominal one. The growth above is computed from the nominal duration, so
+        // jitter de-correlates the fleet without slowing the backoff down.
+        _breakUntil = now + Jittered(capped);
         _consecutiveOpens = Math.Min(_consecutiveOpens + 1, MaxGrowthShift);
         _probesInFlight = 0;
         _probeSuccesses = 0;
@@ -723,8 +907,31 @@ public sealed class Breaker
         ClearWindow();
     }
 
+    /// <summary>
+    ///     The break this open actually serves. Never longer than the computed duration, so
+    ///     <see cref="BreakerSettings.MaxBreakDuration" /> still bounds it.
+    /// </summary>
+    /// <param name="ticks">The computed break duration.</param>
+    /// <returns>The jittered break duration.</returns>
+    private long Jittered(long ticks)
+    {
+        var jittered = Settings.BreakJitter switch
+        {
+            Jitter.Full => ticks * Rng.NextDouble(),
+            Jitter.Equal => ticks / 2.0 + ticks / 2.0 * Rng.NextDouble(),
+            _ => ticks,
+        };
+
+        return jittered >= long.MaxValue ? long.MaxValue : (long)jittered;
+    }
+
     private void Bucket(long now, bool failure, bool slow)
     {
+        // The baseline sees the same sample stream the trip window does, and outlives it: a rate
+        // measured over five minutes is the only thing that can say whether thirty seconds of
+        // failures is unusual for this dependency.
+        _rate?.Record(now, failure);
+
         if (_calls is null)
             return;
 
@@ -781,5 +988,65 @@ public sealed class Breaker
         }
 
         return total;
+    }
+
+    /// <summary>
+    ///     A sliding failure rate over a window of its own - the baseline a relative
+    ///     <see cref="BreakerSettings.Failures" /> is measured against.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately not the same rings the trip window uses, even though the rotation is the same
+    ///     shape. The trip window is cleared on every open, because a decision must not be made twice
+    ///     on the same evidence; this one must survive exactly that, or the breaker would forget what
+    ///     normal was at the moment it most needs to know. It is guarded by the breaker's lock, like
+    ///     the trip window, rather than being thread-safe on its own.
+    /// </remarks>
+    private sealed class RateWindow
+    {
+        private readonly int[] _calls = new int[BucketCount];
+        private readonly int[] _failures = new int[BucketCount];
+        private readonly long _ticksPerBucket;
+        private long _epoch = -1;
+
+        public RateWindow(TimeSpan window) => _ticksPerBucket = Math.Max(window.Ticks / BucketCount, 1);
+
+        public void Record(long now, bool failure)
+        {
+            var epoch = now / _ticksPerBucket;
+
+            if (epoch != _epoch)
+            {
+                var stale = _epoch < 0 ? BucketCount : Math.Min(epoch - _epoch, BucketCount);
+
+                for (long i = 0; i < stale; i++)
+                {
+                    var stalled = Index(epoch - i);
+                    _calls[stalled] = 0;
+                    _failures[stalled] = 0;
+                }
+
+                _epoch = epoch;
+            }
+
+            var index = Index(epoch);
+            _calls[index]++;
+
+            if (failure)
+                _failures[index]++;
+        }
+
+        /// <summary>
+        ///     The measured rate, or null while the window holds fewer than <paramref name="minimumSamples" />
+        ///     outcomes - an error rate estimated from a handful of calls has a resolution coarser than
+        ///     the floor it would be compared against.
+        /// </summary>
+        /// <param name="minimumSamples">How many outcomes the estimate needs.</param>
+        /// <returns>The proportion of sampled outcomes that failed.</returns>
+        public double? Ratio(int minimumSamples)
+        {
+            var calls = Sum(_calls);
+
+            return calls >= minimumSamples ? (double)Sum(_failures) / calls : null;
+        }
     }
 }
