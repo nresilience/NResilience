@@ -234,7 +234,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public void The_marker_travels_under_the_http_header_s_name_lowercased()
     {
-        Assert.Equal("x-nresilience-retrying", ResilienceHttp.NestedRetryHeader.ToLowerInvariant());
+        Assert.Equal("x-nresilience-retrying", HttpResilience.NestedRetryHeader.ToLowerInvariant());
     }
 
     [Fact]

@@ -6,11 +6,24 @@ namespace NResilience.AspNetCore;
 public sealed class ResilienceExceptionHandlerOptions
 {
     /// <summary>
-    ///     The status for <see cref="DeadlineExceededException" /> and
-    ///     <see cref="AttemptTimeoutException" />. 504 by default: this service did not get a timely
-    ///     answer from something it depends on, which is what 504 is for.
+    ///     The status for <see cref="DeadlineExceededException" /> - the whole call ran out of time.
+    ///     504 by default: this service did not get a timely answer from something it depends on,
+    ///     which is what 504 is for.
     /// </summary>
-    public int TimeoutStatusCode { get; set; } = StatusCodes.Status504GatewayTimeout;
+    /// <remarks>
+    ///     Separate from <see cref="AttemptTimeoutStatusCode" /> because a deadline and an attempt
+    ///     timeout are different failures, and this library does not say "timeout" where either could
+    ///     be meant. They default to the same code, so splitting them costs nothing until an
+    ///     application wants the distinction on the wire.
+    /// </remarks>
+    public int DeadlineStatusCode { get; set; } = StatusCodes.Status504GatewayTimeout;
+
+    /// <summary>
+    ///     The status for <see cref="AttemptTimeoutException" /> - the last attempt ran out of time
+    ///     with the call's deadline still unspent. 504 by default, for the same reason as
+    ///     <see cref="DeadlineStatusCode" />.
+    /// </summary>
+    public int AttemptTimeoutStatusCode { get; set; } = StatusCodes.Status504GatewayTimeout;
 
     /// <summary>
     ///     The status for <see cref="CallRejectedException" /> - an open breaker or an exhausted retry

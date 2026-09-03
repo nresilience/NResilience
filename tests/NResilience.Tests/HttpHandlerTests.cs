@@ -189,7 +189,7 @@ public sealed class HttpHandlerTests
 
         Assert.Same(request, request.MarkRepeatable("key-1"));
 
-        Assert.True(request.Options.TryGetValue(ResilienceHttp.Repeatable, out var repeatable) && repeatable);
+        Assert.True(request.Options.TryGetValue(HttpResilience.Repeatable, out var repeatable) && repeatable);
         Assert.Equal(["key-1"], request.Headers.GetValues("Idempotency-Key"));
     }
 
@@ -218,7 +218,7 @@ public sealed class HttpHandlerTests
 
         request.MarkRepeatable();
 
-        Assert.True(request.Options.TryGetValue(ResilienceHttp.Repeatable, out var repeatable) && repeatable);
+        Assert.True(request.Options.TryGetValue(HttpResilience.Repeatable, out var repeatable) && repeatable);
         Assert.False(request.Headers.Contains("Idempotency-Key"));
     }
 
@@ -238,7 +238,7 @@ public sealed class HttpHandlerTests
     }
 
     /// <summary>
-    ///     <see cref="ResilienceHttp.Repeatable" /> beats <c>RetryUnsafeMethods</c> in both directions,
+    ///     <see cref="HttpResilience.Repeatable" /> beats <c>RetryUnsafeMethods</c> in both directions,
     ///     and the helper pair carries both of them.
     /// </summary>
     [Fact]
@@ -248,7 +248,7 @@ public sealed class HttpHandlerTests
 
         Assert.Same(request, request.MarkSingleShot());
 
-        Assert.True(request.Options.TryGetValue(ResilienceHttp.Repeatable, out var repeatable));
+        Assert.True(request.Options.TryGetValue(HttpResilience.Repeatable, out var repeatable));
         Assert.False(repeatable);
     }
 
@@ -467,7 +467,7 @@ public sealed class HttpHandlerTests
         using var client = Client(transport);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.True(transport.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
+        Assert.True(transport.Requests[0].Headers.Contains(HttpResilience.NestedRetryHeader));
     }
 
     [Fact]
@@ -478,7 +478,7 @@ public sealed class HttpHandlerTests
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1 });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.False(transport.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
+        Assert.False(transport.Requests[0].Headers.Contains(HttpResilience.NestedRetryHeader));
     }
 
     [Fact]
@@ -490,7 +490,7 @@ public sealed class HttpHandlerTests
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
+        request.Headers.Add(HttpResilience.NestedRetryHeader, "1");
 
         (await client.SendAsync(request)).Dispose();
 
@@ -505,11 +505,11 @@ public sealed class HttpHandlerTests
         using var client = Client(transport);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
+        request.Headers.Add(HttpResilience.NestedRetryHeader, "1");
 
         (await client.SendAsync(request)).Dispose();
 
-        Assert.Single(transport.Requests[0].Headers.GetValues(ResilienceHttp.NestedRetryHeader));
+        Assert.Single(transport.Requests[0].Headers.GetValues(HttpResilience.NestedRetryHeader));
     }
 
     [Fact]
@@ -545,7 +545,7 @@ public sealed class HttpHandlerTests
         using var outerClient = Client(outerTransport);
         (await outerClient.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.True(inner.Requests[0].Headers.Contains(ResilienceHttp.NestedRetryHeader));
+        Assert.True(inner.Requests[0].Headers.Contains(HttpResilience.NestedRetryHeader));
     }
 
     [Fact]
@@ -560,7 +560,7 @@ public sealed class HttpHandlerTests
             TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Headers.Add(ResilienceHttp.NestedRetryHeader, "1");
+        request.Headers.Add(HttpResilience.NestedRetryHeader, "1");
 
         (await client.SendAsync(request)).Dispose();
 
@@ -679,10 +679,10 @@ public sealed class HttpHandlerTests
     [Fact]
     public void CreateClient_takes_ownership_of_the_transport_timeout()
     {
-        using var owned = ResilienceHttp.CreateClient(TestPolicy.InstantHttp, innerHandler: new ScriptedHttpHandler());
+        using var owned = HttpResilience.CreateClient(TestPolicy.InstantHttp, innerHandler: new ScriptedHttpHandler());
         Assert.Equal(Timeout.InfiniteTimeSpan, owned.Timeout);
 
-        using var borrowed = ResilienceHttp.CreateClient(
+        using var borrowed = HttpResilience.CreateClient(
             TestPolicy.InstantHttp,
             new HttpResilienceOptions { OwnTransportTimeout = false },
             new ScriptedHttpHandler());

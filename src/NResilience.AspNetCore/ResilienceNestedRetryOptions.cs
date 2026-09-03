@@ -11,8 +11,8 @@ public sealed class ResilienceNestedRetryOptions
 {
     /// <summary>
     ///     The header carrying the caller's retry marker. Defaults to
-    ///     <see cref="ResilienceHttp.NestedRetryHeader" />, which is what a retrying
+    ///     <see cref="HttpResilience.NestedRetryHeader" />, which is what a retrying
     ///     <see cref="ResilienceHandler" /> writes.
     /// </summary>
-    public string Header { get; set; } = ResilienceHttp.NestedRetryHeader;
+    public string Header { get; set; } = HttpResilience.NestedRetryHeader;
 }

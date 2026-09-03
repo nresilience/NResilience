@@ -1,7 +1,7 @@
 namespace NResilience.Http;
 
 /// <summary>
-///     Per-request helpers over <see cref="ResilienceHttp" />'s option keys.
+///     Per-request helpers over <see cref="HttpResilience" />'s option keys.
 /// </summary>
 public static class ResilienceHttpRequestExtensions
 {
@@ -10,7 +10,7 @@ public static class ResilienceHttpRequestExtensions
 
     /// <summary>
     ///     Marks this request as safe to send more than once. Sets
-    ///     <see cref="ResilienceHttp.Repeatable" />, so the handler retries it whatever its method
+    ///     <see cref="HttpResilience.Repeatable" />, so the handler retries it whatever its method
     ///     says, and stamps an idempotency key header when one is supplied, so the service can
     ///     discard the duplicate. The two serve different consumers and a retryable POST needs both.
     /// </summary>
@@ -34,7 +34,7 @@ public static class ResilienceHttpRequestExtensions
         string headerName = DefaultIdempotencyHeader)
     {
         ArgumentNullException.ThrowIfNull(request);
-        request.Options.Set(ResilienceHttp.Repeatable, true);
+        request.Options.Set(HttpResilience.Repeatable, true);
 
         // Contains first: TryAddWithoutValidation appends, and two idempotency keys on one request
         // is a request most services reject outright.
@@ -56,7 +56,7 @@ public static class ResilienceHttpRequestExtensions
     public static HttpRequestMessage MarkSingleShot(this HttpRequestMessage request)
     {
         ArgumentNullException.ThrowIfNull(request);
-        request.Options.Set(ResilienceHttp.Repeatable, false);
+        request.Options.Set(HttpResilience.Repeatable, false);
         return request;
     }
 }

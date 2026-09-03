@@ -49,7 +49,8 @@ public static class ResilienceExceptionHandlerServiceCollectionExtensions
         services
             .AddOptions<ResilienceExceptionHandlerOptions>()
             .Validate(
-                static o => IsStatus(o.TimeoutStatusCode) && IsStatus(o.RejectedStatusCode) && IsStatus(o.RateLimitedStatusCode),
+                static o => IsStatus(o.DeadlineStatusCode) && IsStatus(o.AttemptTimeoutStatusCode) &&
+                            IsStatus(o.RejectedStatusCode) && IsStatus(o.RateLimitedStatusCode),
                 "Status codes must be between 100 and 599.");
 
         // AddExceptionHandler<T>() is a plain AddSingleton, so calling this twice - a library and

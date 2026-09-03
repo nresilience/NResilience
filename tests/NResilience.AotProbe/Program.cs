@@ -264,7 +264,7 @@ internal static class Program
         failures += Check("http: each attempt got its own request", transport.CallCount == 2);
         failures += Check("http: the clone carried the headers and the body", lastTrace == "abc" && lastRequest.Body == "body");
         failures += Check("http: the breaker was scoped to the host", handler.BreakersByHost().ContainsKey("api.invalid"));
-        failures += Check("http: the nested-retry header was stamped", lastRequest.Headers.Contains(ResilienceHttp.NestedRetryHeader));
+        failures += Check("http: the nested-retry header was stamped", lastRequest.Headers.Contains(HttpResilience.NestedRetryHeader));
 
         failures += Check(
             "http: the events came back in order",
@@ -618,7 +618,7 @@ internal static class Program
         };
 
         var limited = await policy
-            .TryRunAsync(static _ => Task.FromException<int>(new RateLimitedException("probe")))
+            .TryRunAsync(static _ => Task.FromException<int>(new RateLimitedException(limiter: "probe")))
             .ConfigureAwait(false);
 
         failures += Check("a refusal is retried to exhaustion under AOT", limited.Attempts.Count == 3);

@@ -3,7 +3,7 @@ namespace NResilience.Http;
 /// <summary>
 ///     The per-request switches and the well-known header the HTTP integration reads and writes.
 /// </summary>
-public static class ResilienceHttp
+public static class HttpResilience
 {
     /// <summary>
     ///     The header a retrying client stamps on every request it can retry, so the service receiving it
@@ -42,7 +42,7 @@ public static class ResilienceHttp
     ///     <code>
     /// var request = new HttpRequestMessage(HttpMethod.Post, "/orders") { Content = body };
     /// request.Headers.Add("Idempotency-Key", key);
-    /// request.Options.Set(ResilienceHttp.Repeatable, true);
+    /// request.Options.Set(HttpResilience.Repeatable, true);
     /// </code>
     /// </example>
     public static HttpRequestOptionsKey<bool> Repeatable { get; } = new("NResilience.Repeatable");

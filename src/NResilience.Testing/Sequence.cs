@@ -33,14 +33,19 @@ public static class Sequence
     ///     overloads can be scripted the same way.
     /// </summary>
     /// <param name="time">The clock delays are served against. See <see cref="For{T}(TimeProvider)" />.</param>
-    public static Sequence<Void> ForVoid(TimeProvider? time = null) => new(time ?? TimeProvider.System);
+    public static Sequence<Unit> ForVoid(TimeProvider? time = null) => new(time ?? TimeProvider.System);
 }
 
 /// <summary>
 ///     The result type of a scripted callback that returns nothing, so <see cref="Sequence.ForVoid" />
 ///     can share one implementation with <see cref="Sequence.For{T}(TimeProvider)" />.
 /// </summary>
-public readonly struct Void
+/// <remarks>
+///     The conventional name for the one-valued type. It is deliberately not called <c>Void</c>: a
+///     public type by that name reads as <see cref="System.Void" />, which is the type no value ever
+///     has, and this is the opposite - the type whose only value carries no information.
+/// </remarks>
+public readonly struct Unit
 {
 }
 

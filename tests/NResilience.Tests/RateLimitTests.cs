@@ -90,7 +90,7 @@ public sealed class RateLimitTests
 
         var result = await RunAsync(
             policy,
-            _ => throw new RateLimitedException("api"),
+            _ => throw new RateLimitedException(limiter: "api"),
             time);
 
         // Four attempts, three retries, and not one of them charged: the dependency was never
@@ -136,7 +136,7 @@ public sealed class RateLimitTests
 
         var policy = TestPolicy.On(time) with { Attempts = 3, Budget = budget };
 
-        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
         Assert.Equal(3, result.Attempts.Count);
         Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
@@ -151,7 +151,7 @@ public sealed class RateLimitTests
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2, Time = time });
         var policy = TestPolicy.On(time) with { Attempts = 6, Breaker = breaker };
 
-        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
         Assert.Equal(6, result.Attempts.Count);
         Assert.Equal(BreakerState.Closed, breaker.State);
@@ -179,7 +179,7 @@ public sealed class RateLimitTests
 
         // The probe is refused by local admission control rather than by the dependency. The slot
         // has to come back, or the breaker never probes again and wedges half-open forever.
-        var refused = await RunAsync(single, _ => throw new RateLimitedException("api"), time);
+        var refused = await RunAsync(single, _ => throw new RateLimitedException(limiter: "api"), time);
         Assert.False(refused.IsSuccess);
 
         var probe = await RunAsync(single, _ => Task.FromResult(1), time);
@@ -210,7 +210,7 @@ public sealed class RateLimitTests
 
         var result = await RunAsync(
             policy,
-            _ => throw new RateLimitedException("api", TimeSpan.FromSeconds(3)),
+            _ => throw new RateLimitedException(retryAfter: TimeSpan.FromSeconds(3), limiter: "api"),
             time);
 
         Assert.False(result.IsSuccess);
@@ -235,7 +235,7 @@ public sealed class RateLimitTests
             }),
         };
 
-        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
         Assert.Empty(seen);
         Assert.True(result.Attempts[0].Verdict.SelfImposed);
@@ -252,7 +252,7 @@ public sealed class RateLimitTests
         // rides in the packed verdict byte and has to survive both paths.
         var policy = TestPolicy.On(time) with { Attempts = 6, Budget = RetryBudget.None };
 
-        var result = await RunAsync(policy, _ => throw new RateLimitedException("api"), time);
+        var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
         Assert.Equal(6, result.Attempts.Count);
 
@@ -280,7 +280,7 @@ public sealed class RateLimitTests
             policy,
             _ => calls++ == 0
                 ? throw new InvalidOperationException("429")
-                : throw new RateLimitedException("api"),
+                : throw new RateLimitedException(limiter: "api"),
             time);
 
         Assert.Equal(3, result.Attempts.Count);
@@ -296,7 +296,7 @@ public sealed class RateLimitTests
         var time = new FakeTimeProvider();
         var policy = TestPolicy.On(time) with { Attempts = 2, Budget = RetryBudget.None };
 
-        var call = policy.RunAsync(_ => Task.FromException<int>(new RateLimitedException("payments", TimeSpan.FromSeconds(4)))).AsTask();
+        var call = policy.RunAsync(_ => Task.FromException<int>(new RateLimitedException(retryAfter: TimeSpan.FromSeconds(4), limiter: "payments"))).AsTask();
 
         while (!call.IsCompleted)
         {

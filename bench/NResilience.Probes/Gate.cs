@@ -77,7 +77,7 @@ public static class Gate
 
             // A cached instance, so the figure describes the refusal machinery rather than
             // exception construction.
-            Refusal = new RateLimitedException("probe");
+            Refusal = new RateLimitedException(limiter: "probe");
         }
 
         public RateLimitedException Refusal { get; }

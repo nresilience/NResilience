@@ -1,9 +1,9 @@
 #nullable enable
 Microsoft.Extensions.DependencyInjection.ResilienceGrpcClientBuilderExtensions
 NResilience.Grpc.GrpcResilience
-NResilience.Grpc.GrpcResilience.SingleShotScopeHandle
-NResilience.Grpc.GrpcResilience.SingleShotScopeHandle.Dispose() -> void
-NResilience.Grpc.GrpcResilience.SingleShotScopeHandle.SingleShotScopeHandle() -> void
+NResilience.Grpc.GrpcResilience.SingleShotScope
+NResilience.Grpc.GrpcResilience.SingleShotScope.Dispose() -> void
+NResilience.Grpc.GrpcResilience.SingleShotScope.SingleShotScope() -> void
 NResilience.Grpc.GrpcResilienceOptions
 NResilience.Grpc.GrpcResilienceOptions.BreakerPerScope.get -> bool
 NResilience.Grpc.GrpcResilienceOptions.BreakerPerScope.set -> void
@@ -39,4 +39,4 @@ static Microsoft.Extensions.DependencyInjection.ResilienceGrpcClientBuilderExten
 static NResilience.Grpc.GrpcResilience.Classifier.get -> NResilience.Classifier!
 static NResilience.Grpc.GrpcResilience.Default.get -> NResilience.Resilience!
 static NResilience.Grpc.GrpcResilience.IsSingleShot.get -> bool
-static NResilience.Grpc.GrpcResilience.SingleShot() -> NResilience.Grpc.GrpcResilience.SingleShotScopeHandle
+static NResilience.Grpc.GrpcResilience.SingleShot() -> NResilience.Grpc.GrpcResilience.SingleShotScope

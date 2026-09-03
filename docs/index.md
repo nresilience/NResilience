@@ -33,7 +33,7 @@ For most HTTP scenarios, use the pre-configured client:
 
 ```csharp
 // Create one client for the application's lifetime
-private static readonly HttpClient Client = ResilienceHttp.CreateClient();
+private static readonly HttpClient Client = HttpResilience.CreateClient();
 
 private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
     await Client.GetFromJsonAsync<User>(new Uri($"https://api.example.com/users/{id}"), cancellationToken);

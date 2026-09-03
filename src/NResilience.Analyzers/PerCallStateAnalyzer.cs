@@ -196,7 +196,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
             return;
         }
 
-        if (method.Name == "CreateClient" && known.IsResilienceHttp(method.ContainingType))
+        if (method.Name == "CreateClient" && known.IsHttpResilience(method.ContainingType))
             ReportClientIfPerCall(context, invocation, known);
     }
 

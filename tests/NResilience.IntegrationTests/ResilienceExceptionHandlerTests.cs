@@ -80,7 +80,7 @@ public sealed class ResilienceExceptionHandlerTests
     [Fact]
     public async Task A_rate_limited_exception_maps_to_503_with_retry_after()
     {
-        await using var app = await App(exception: new RateLimitedException("orders", TimeSpan.FromSeconds(1)));
+        await using var app = await App(exception: new RateLimitedException(retryAfter: TimeSpan.FromSeconds(1), limiter: "orders"));
 
         using var client = new HttpClient();
         using var response = await client.GetAsync(app.Uri);
@@ -93,7 +93,7 @@ public sealed class ResilienceExceptionHandlerTests
     [Fact]
     public async Task Retry_after_is_whole_seconds_rounded_up()
     {
-        await using var app = await App(exception: new RateLimitedException("orders", TimeSpan.FromSeconds(2.5)));
+        await using var app = await App(exception: new RateLimitedException(retryAfter: TimeSpan.FromSeconds(2.5), limiter: "orders"));
 
         using var client = new HttpClient();
         using var response = await client.GetAsync(app.Uri);
@@ -133,7 +133,7 @@ public sealed class ResilienceExceptionHandlerTests
         // UseExceptionHandler's middleware construction, rather than on the first request. Either
         // way it fires loudly: a status that is not a status is refused rather than written.
         await Assert.ThrowsAsync<OptionsValidationException>(async () =>
-            await App(configure: o => o.TimeoutStatusCode = 42));
+            await App(configure: o => o.DeadlineStatusCode = 42));
     }
 
     [Fact]

@@ -74,10 +74,10 @@ internal sealed class ResilienceExceptionHandler(IOptions<ResilienceExceptionHan
     private static Mapped? Map(Exception exception, ResilienceExceptionHandlerOptions options) => exception switch
     {
         DeadlineExceededException => new Mapped(
-            options.TimeoutStatusCode, "urn:nresilience:deadline-exceeded", "Deadline Exceeded", null),
+            options.DeadlineStatusCode, "urn:nresilience:deadline-exceeded", "Deadline Exceeded", null),
 
         AttemptTimeoutException => new Mapped(
-            options.TimeoutStatusCode, "urn:nresilience:attempt-timeout", "Attempt Timeout", null),
+            options.AttemptTimeoutStatusCode, "urn:nresilience:attempt-timeout", "Attempt Timeout", null),
 
         CallRejectedException { Reason: StopReason.BudgetExhausted } rejected => new Mapped(
             options.RejectedStatusCode, "urn:nresilience:retry-budget-exhausted", "Retry Budget Exhausted",

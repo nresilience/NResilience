@@ -27,7 +27,7 @@ The `ResilienceHandler` runs a [policy](../reference/resilience.md) around the H
 
 ## Create a resilient client
 
-To use the handler, create a long-lived `HttpClient` using `ResilienceHttp.CreateClient()`.
+To use the handler, create a long-lived `HttpClient` using `HttpResilience.CreateClient()`.
 
 <!-- snippet: http-create-client -->
 ```csharp
@@ -35,7 +35,7 @@ To use the handler, create a long-lived `HttpClient` using `ResilienceHttp.Creat
 // nothing to a client that is rebuilt per call.
 private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cancellationToken)
 {
-    using var client = ResilienceHttp.CreateClient();
+    using var client = HttpResilience.CreateClient();
 
     using var response = await client.GetAsync(
         requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);
@@ -53,7 +53,7 @@ Customize the handler's behavior with `HttpResilienceOptions`.
 
 <!-- snippet: http-options -->
 ```csharp
-using var client = ResilienceHttp.CreateClient(
+using var client = HttpResilience.CreateClient(
     policy: Resilience.Http with { Attempts = 4 },
     options: new HttpResilienceOptions
     {

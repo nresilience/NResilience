@@ -78,7 +78,7 @@ public sealed class Troubleshooting
             .Respond(HttpStatusCode.ServiceUnavailable)
             .Respond(HttpStatusCode.OK);
 
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 

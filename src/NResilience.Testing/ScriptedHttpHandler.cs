@@ -17,7 +17,7 @@ public sealed record SentRequest(HttpMethod Method, Uri? RequestUri, HttpRequest
 ///     .Respond(HttpStatusCode.ServiceUnavailable, times: 2)
 ///     .Respond(HttpStatusCode.OK);
 ///
-/// using var client = ResilienceHttp.CreateClient(policy, innerHandler: transport);
+/// using var client = HttpResilience.CreateClient(policy, innerHandler: transport);
 /// var response = await client.GetAsync(uri, cancellationToken);
 ///
 /// Assert.Equal(3, transport.CallCount);

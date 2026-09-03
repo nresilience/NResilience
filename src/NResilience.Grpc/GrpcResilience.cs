@@ -22,7 +22,7 @@ namespace NResilience.Grpc;
 /// </example>
 public static class GrpcResilience
 {
-    private static readonly AsyncLocal<bool> SingleShotScope = new();
+    private static readonly AsyncLocal<bool> Current = new();
 
     /// <summary>
     ///     <see cref="Classifier.Default" /> plus gRPC status knowledge: what an
@@ -59,7 +59,7 @@ public static class GrpcResilience
     ///     Whether the current logical call is inside a <see cref="SingleShot" /> scope, and must
     ///     therefore not be repeated.
     /// </summary>
-    public static bool IsSingleShot => SingleShotScope.Value;
+    public static bool IsSingleShot => Current.Value;
 
     /// <summary>
     ///     Refuses repetition for the calls made inside the scope, whatever
@@ -78,11 +78,11 @@ public static class GrpcResilience
     ///     await client.ChargeCardAsync(request);
     /// </code>
     /// </example>
-    public static SingleShotScopeHandle SingleShot()
+    public static SingleShotScope SingleShot()
     {
-        var previous = SingleShotScope.Value;
-        SingleShotScope.Value = true;
-        return new SingleShotScopeHandle(previous);
+        var previous = Current.Value;
+        Current.Value = true;
+        return new SingleShotScope(previous);
     }
 
     /// <summary>The verdict for one gRPC status code. The table lives here so the docs and the code cannot drift.</summary>
@@ -138,13 +138,13 @@ public static class GrpcResilience
     ///     same reason <see cref="ResilienceNestedRetry.NestedRetryScope" /> is: it is on the path of
     ///     every call that uses it.
     /// </summary>
-    public readonly struct SingleShotScopeHandle : IDisposable
+    public readonly struct SingleShotScope : IDisposable
     {
         private readonly bool _previous;
 
-        internal SingleShotScopeHandle(bool previous) => _previous = previous;
+        internal SingleShotScope(bool previous) => _previous = previous;
 
         /// <summary>Restores the previous value.</summary>
-        public void Dispose() => SingleShotScope.Value = _previous;
+        public void Dispose() => Current.Value = _previous;
     }
 }

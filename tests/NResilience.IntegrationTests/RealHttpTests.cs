@@ -27,7 +27,7 @@ public sealed class RealHttpTests
         await using var server = await LoopbackHttp.StartAsync(
             new LoopbackResponse(HttpStatusCode.OK, "ok"u8.ToArray()));
 
-        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp, innerHandler: null);
+        using var client = HttpResilience.CreateClient(TestPolicy.InstantHttp, innerHandler: null);
         using var response = await client.GetAsync(server.BaseUri);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -43,7 +43,7 @@ public sealed class RealHttpTests
             new LoopbackResponse(HttpStatusCode.OK, "ok"u8.ToArray()));
 
         var events = new EventRecorder();
-        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp with { OnEvent = events.Record });
+        using var client = HttpResilience.CreateClient(TestPolicy.InstantHttp with { OnEvent = events.Record });
 
         using var response = await client.GetAsync(server.BaseUri);
 
@@ -61,7 +61,7 @@ public sealed class RealHttpTests
         await using var server = await LoopbackHttp.StartAsync(
             new LoopbackResponse(HttpStatusCode.ServiceUnavailable));
 
-        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp);
+        using var client = HttpResilience.CreateClient(TestPolicy.InstantHttp);
         using var response = await client.GetAsync(server.BaseUri);
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -75,7 +75,7 @@ public sealed class RealHttpTests
             new LoopbackResponse(HttpStatusCode.NotFound));
 
         var events = new EventRecorder();
-        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp with { OnEvent = events.Record });
+        using var client = HttpResilience.CreateClient(TestPolicy.InstantHttp with { OnEvent = events.Record });
         using var response = await client.GetAsync(server.BaseUri);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -96,7 +96,7 @@ public sealed class RealHttpTests
             LoopbackResponse.WithRetryAfter(HttpStatusCode.TooManyRequests, 1),
             new LoopbackResponse(HttpStatusCode.OK));
 
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             TestPolicy.InstantHttp with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
 
         using var response = await client.GetAsync(server.BaseUri);
@@ -122,7 +122,7 @@ public sealed class RealHttpTests
             return Task.FromResult(new LoopbackResponse(HttpStatusCode.ServiceUnavailable));
         });
 
-        using var client = ResilienceHttp.CreateClient(TestPolicy.InstantHttp);
+        using var client = HttpResilience.CreateClient(TestPolicy.InstantHttp);
         using var response = await client.PostAsync(server.BaseUri, new StringContent("{}"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -137,7 +137,7 @@ public sealed class RealHttpTests
             new LoopbackResponse(HttpStatusCode.ServiceUnavailable),
             new LoopbackResponse(HttpStatusCode.OK));
 
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             TestPolicy.InstantHttp,
             new HttpResilienceOptions { RetryUnsafeMethods = true });
 

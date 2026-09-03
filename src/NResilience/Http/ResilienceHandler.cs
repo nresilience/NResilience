@@ -30,12 +30,12 @@ namespace NResilience.Http;
 ///         </item>
 ///     </list>
 ///     Taking ownership of the transport timeout is the sixth, and it belongs to whoever builds the
-///     <see cref="HttpClient" /> - see <see cref="ResilienceHttp.CreateClient" /> and
+///     <see cref="HttpClient" /> - see <see cref="HttpResilience.CreateClient" /> and
 ///     <see cref="HttpResilienceOptions.OwnTransportTimeout" />.
 /// </summary>
 /// <example>
 ///     <code>
-/// using HttpClient client = ResilienceHttp.CreateClient();
+/// using HttpClient client = HttpResilience.CreateClient();
 /// using var response = await client.GetAsync(uri, cancellationToken);
 /// </code>
 /// </example>
@@ -104,7 +104,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// <returns>True when the policy allows more than one attempt and the request may be repeated.</returns>
     /// <remarks>
     ///     GET, HEAD, PUT, DELETE, OPTIONS and TRACE are repeatable; POST and PATCH are not, and
-    ///     neither is any method the library has not heard of. <see cref="ResilienceHttp.Repeatable" />
+    ///     neither is any method the library has not heard of. <see cref="HttpResilience.Repeatable" />
     ///     on the request overrides all of it, in both directions.
     /// </remarks>
     public bool WillRetry(HttpRequestMessage request)
@@ -141,7 +141,7 @@ public sealed class ResilienceHandler : DelegatingHandler
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
 
             if (!inbound)
-                request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, ResilienceNestedRetry.Marker);
+                request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
 
             InsideRetryingClient.Value = true;
         }
@@ -237,7 +237,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     {
         // An explicit declaration beats everything, in both directions: whoever wrote the request
         // knows whether it carries an idempotency key, and the client registration does not.
-        if (request.Options.TryGetValue(ResilienceHttp.Repeatable, out var declared))
+        if (request.Options.TryGetValue(HttpResilience.Repeatable, out var declared))
             return declared;
 
         // An unrecognized method is treated as unsafe. Retrying something the library has never
@@ -261,7 +261,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// </summary>
     private static bool CarriesRetryMarker(HttpRequestMessage request)
     {
-        if (!request.Headers.TryGetValues(ResilienceHttp.NestedRetryHeader, out var values))
+        if (!request.Headers.TryGetValues(HttpResilience.NestedRetryHeader, out var values))
             return false;
 
         foreach (var value in values)

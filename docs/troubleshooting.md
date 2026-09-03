@@ -82,7 +82,7 @@ using var client = new HttpClient(new ResilienceHandler(new HttpClientHandler())
 };
 ```
 
-`ResilienceHttp.CreateClient` and the dependency injection registration handle this for you unless `OwnTransportTimeout` is set to `false`. See [The transport timeout](./http/index.md#the-transport-timeout).
+`HttpResilience.CreateClient` and the dependency injection registration handle this for you unless `OwnTransportTimeout` is set to `false`. See [The transport timeout](./http/index.md#the-transport-timeout).
 
 ### Symptom: The attempt timeout fires, but the call continues to run.
 

@@ -1,6 +1,6 @@
 ---
 title: HTTP reference
-description: Reference for ResilienceHandler, HttpResilienceOptions, and the ResilienceHttp utility class.
+description: Reference for ResilienceHandler, HttpResilienceOptions, and the HttpResilience utility class.
 order: 9
 ---
 
@@ -40,9 +40,9 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. |
 | `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `ResilienceDeadline.Header` is the same value, and is what the inbound middleware reads. |
 
-## `ResilienceHttp`
+## `HttpResilience`
 
-`ResilienceHttp` is a `static class` providing utility methods and constants for HTTP resilience.
+`HttpResilience` is a `static class` providing utility methods and constants for HTTP resilience.
 
 | Member | Description |
 | :--- | :--- |
@@ -52,12 +52,12 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 
 ## `ResilienceHttpRequestExtensions`
 
-`ResilienceHttpRequestExtensions` is a `static class` of per-request helpers over `ResilienceHttp`'s option keys. Both return the same request, so they compose in an initializer. See [Idempotency](../http/idempotency.md#mark-a-request-as-repeatable).
+`ResilienceHttpRequestExtensions` is a `static class` of per-request helpers over `HttpResilience`'s option keys. Both return the same request, so they compose in an initializer. See [Idempotency](../http/idempotency.md#mark-a-request-as-repeatable).
 
 | Member | Description |
 | :--- | :--- |
-| `MarkRepeatable(idempotencyKey = null, headerName = "Idempotency-Key")` | Sets `ResilienceHttp.Repeatable` to `true` and stamps the idempotency key header when a key is supplied. An existing header of that name is left alone. |
-| `MarkSingleShot()` | Sets `ResilienceHttp.Repeatable` to `false`, so the request is sent at most once whatever its method and whatever `RetryUnsafeMethods` says. |
+| `MarkRepeatable(idempotencyKey = null, headerName = "Idempotency-Key")` | Sets `HttpResilience.Repeatable` to `true` and stamps the idempotency key header when a key is supplied. An existing header of that name is left alone. |
+| `MarkSingleShot()` | Sets `HttpResilience.Repeatable` to `false`, so the request is sent at most once whatever its method and whatever `RetryUnsafeMethods` says. |
 
 ### Default retryable methods
 The handler retries the following methods by default: `GET`, `HEAD`, `PUT`, `DELETE`, `OPTIONS`, and `TRACE`. 

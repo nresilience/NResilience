@@ -16,7 +16,7 @@ public sealed class HttpDocs
             .Respond(HttpStatusCode.ServiceUnavailable)
             .Respond(HttpStatusCode.OK);
 
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
@@ -32,7 +32,7 @@ public sealed class HttpDocs
     // nothing to a client that is rebuilt per call.
     private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cancellationToken)
     {
-        using var client = ResilienceHttp.CreateClient();
+        using var client = HttpResilience.CreateClient();
 
         using var response = await client.GetAsync(
             requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);
@@ -46,7 +46,7 @@ public sealed class HttpDocs
     public void The_switches_that_are_properties_of_http_rather_than_of_resilience()
     {
         // <snippet:http-options>
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Attempts = 4 },
             options: new HttpResilienceOptions
             {
@@ -72,7 +72,7 @@ public sealed class HttpDocs
             .Respond(HttpStatusCode.ServiceUnavailable)
             .Respond(HttpStatusCode.OK);
 
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 
@@ -164,7 +164,7 @@ public sealed class HttpDocs
 
         var events = new EventRecorder();
 
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { OnEvent = events.Record },
             innerHandler: transport);
 

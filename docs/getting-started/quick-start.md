@@ -15,7 +15,7 @@ dotnet add package NResilience
 <!-- snippet: quick-start-http-client -->
 ```csharp
 // One client for the application's lifetime, with the policy already inside it.
-private static readonly HttpClient Client = ResilienceHttp.CreateClient();
+private static readonly HttpClient Client = HttpResilience.CreateClient();
 
 private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
     await Client.GetFromJsonAsync<User>(requestUri: new Uri(uriString: $"https://api.example.com/users/{id}"), cancellationToken: cancellationToken);

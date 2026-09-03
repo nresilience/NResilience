@@ -19,7 +19,7 @@ internal sealed class KnownSymbols
         INamedTypeSymbol resilience,
         INamedTypeSymbol? resilienceValueTask,
         INamedTypeSymbol cancellationToken,
-        INamedTypeSymbol? resilienceHttp,
+        INamedTypeSymbol? httpResilience,
         INamedTypeSymbol? breaker,
         INamedTypeSymbol? retryBudget,
         INamedTypeSymbol? policyScope,
@@ -31,7 +31,7 @@ internal sealed class KnownSymbols
         Resilience = resilience;
         ResilienceValueTask = resilienceValueTask;
         CancellationToken = cancellationToken;
-        ResilienceHttp = resilienceHttp;
+        HttpResilience = httpResilience;
         Breaker = breaker;
         RetryBudget = retryBudget;
         PolicyScope = policyScope;
@@ -58,7 +58,7 @@ internal sealed class KnownSymbols
 
     internal INamedTypeSymbol CancellationToken { get; }
 
-    internal INamedTypeSymbol? ResilienceHttp { get; }
+    internal INamedTypeSymbol? HttpResilience { get; }
 
     internal INamedTypeSymbol? Breaker { get; }
 
@@ -103,7 +103,7 @@ internal sealed class KnownSymbols
             resilience,
             compilation.GetTypeByMetadataName("NResilience.ResilienceValueTask"),
             token,
-            compilation.GetTypeByMetadataName("NResilience.Http.ResilienceHttp"),
+            compilation.GetTypeByMetadataName("NResilience.Http.HttpResilience"),
             compilation.GetTypeByMetadataName("NResilience.Breaker"),
             compilation.GetTypeByMetadataName("NResilience.RetryBudget"),
             compilation.GetTypeByMetadataName("NResilience.PolicyScope`1"),
@@ -129,7 +129,7 @@ internal sealed class KnownSymbols
 
     internal bool IsRetryBudget(ITypeSymbol? type) => Is(type, RetryBudget);
 
-    internal bool IsResilienceHttp(ITypeSymbol? type) => Is(type, ResilienceHttp);
+    internal bool IsHttpResilience(ITypeSymbol? type) => Is(type, HttpResilience);
 
     /// <summary>True for any construction of <c>PolicyScope&lt;TKey&gt;</c>, whatever the key type.</summary>
     internal bool IsPolicyScope(ITypeSymbol? type) => Is((type as INamedTypeSymbol)?.OriginalDefinition, PolicyScope);

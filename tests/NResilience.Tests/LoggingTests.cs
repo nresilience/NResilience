@@ -473,7 +473,7 @@ public sealed class LoggingTests
         var api = Logged(logger, Resilience.Default with { Name = "api", Attempts = 1 });
 
         await Assert.ThrowsAnyAsync<Exception>(() => api.RunAsync(
-            _ => throw new RateLimitedException("quota", TimeSpan.FromSeconds(1)),
+            _ => throw new RateLimitedException(retryAfter: TimeSpan.FromSeconds(1), limiter: "quota"),
             TestContext.Current.CancellationToken).AsTask());
 
         Assert.Contains(1002, Ids(logger));

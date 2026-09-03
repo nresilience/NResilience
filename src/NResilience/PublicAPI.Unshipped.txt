@@ -206,6 +206,7 @@ NResilience.Hedge.WinRate.get -> NResilience.WinRate?
 NResilience.Hedge.WinRate.init -> void
 NResilience.Hedge.Window.get -> System.TimeSpan
 NResilience.Hedge.Window.init -> void
+NResilience.Http.HttpResilience
 NResilience.Http.HttpResilienceOptions
 NResilience.Http.HttpResilienceOptions.BreakerPerHost.get -> bool
 NResilience.Http.HttpResilienceOptions.BreakerPerHost.set -> void
@@ -234,7 +235,6 @@ NResilience.Http.ResilienceHandler.Policy.get -> NResilience.Resilience!
 NResilience.Http.ResilienceHandler.ResilienceHandler(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
 NResilience.Http.ResilienceHandler.ResilienceHandler(System.Net.Http.HttpMessageHandler! innerHandler, NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
 NResilience.Http.ResilienceHandler.WillRetry(System.Net.Http.HttpRequestMessage! request) -> bool
-NResilience.Http.ResilienceHttp
 NResilience.Http.ResilienceHttpRequestExtensions
 NResilience.Jitter
 NResilience.Jitter.Equal = 1 -> NResilience.Jitter
@@ -271,9 +271,9 @@ NResilience.PolicyScope<TKey>.Template.get -> NResilience.Resilience!
 NResilience.RateLimitedException
 NResilience.RateLimitedException.Limiter.get -> string?
 NResilience.RateLimitedException.RateLimitedException() -> void
+NResilience.RateLimitedException.RateLimitedException(System.TimeSpan? retryAfter = null, string? limiter = null, System.Exception? innerException = null) -> void
 NResilience.RateLimitedException.RateLimitedException(string! message) -> void
 NResilience.RateLimitedException.RateLimitedException(string! message, System.Exception! innerException) -> void
-NResilience.RateLimitedException.RateLimitedException(string? limiter = null, System.TimeSpan? retryAfter = null, System.Exception? innerException = null) -> void
 NResilience.RateLimitedException.RetryAfter.get -> System.TimeSpan?
 NResilience.Recovery
 NResilience.Recovery.Equals(NResilience.Recovery other) -> bool
@@ -397,7 +397,7 @@ NResilience.WinRate.WinRate() -> void
 NResilience.WinRate.Window.get -> System.TimeSpan
 NResilience.WinRate.Window.init -> void
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
-const NResilience.Http.ResilienceHttp.NestedRetryHeader = "X-NResilience-Retrying" -> string!
+const NResilience.Http.HttpResilience.NestedRetryHeader = "X-NResilience-Retrying" -> string!
 const NResilience.MeasuredBase.DefaultMultiple = 1 -> double
 const NResilience.ResilienceDeadline.Header = "X-Deadline-Ms" -> string!
 const NResilience.ResilienceNestedRetry.Marker = "1" -> string!
@@ -456,8 +456,8 @@ static NResilience.Failures.operator ==(NResilience.Failures left, NResilience.F
 static NResilience.Hedge.At(double quantile = 0.95, int maxConcurrent = 2) -> NResilience.Hedge
 static NResilience.Hedge.operator !=(NResilience.Hedge left, NResilience.Hedge right) -> bool
 static NResilience.Hedge.operator ==(NResilience.Hedge left, NResilience.Hedge right) -> bool
-static NResilience.Http.ResilienceHttp.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
-static NResilience.Http.ResilienceHttp.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
+static NResilience.Http.HttpResilience.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
+static NResilience.Http.HttpResilience.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
 static NResilience.Http.ResilienceHttpRequestExtensions.MarkRepeatable(this System.Net.Http.HttpRequestMessage! request, string? idempotencyKey = null, string! headerName = "Idempotency-Key") -> System.Net.Http.HttpRequestMessage!
 static NResilience.Http.ResilienceHttpRequestExtensions.MarkSingleShot(this System.Net.Http.HttpRequestMessage! request) -> System.Net.Http.HttpRequestMessage!
 static NResilience.MeasuredBase.Of(double multiple = 1) -> NResilience.MeasuredBase

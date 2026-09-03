@@ -54,7 +54,7 @@ The [resilience handler](../http/index.md) clones each request so it can be retr
 // nothing to a client that is rebuilt per call.
 private static async Task<HttpStatusCode> ReadOrderAsync(CancellationToken cancellationToken)
 {
-    using var client = ResilienceHttp.CreateClient();
+    using var client = HttpResilience.CreateClient();
 
     using var response = await client.GetAsync(
         requestUri: new Uri(uriString: "https://api.example.com/orders/1"), cancellationToken: cancellationToken);

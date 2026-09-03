@@ -108,7 +108,7 @@ var transport = new ScriptedHttpHandler()
     .Respond(HttpStatusCode.ServiceUnavailable)
     .Respond(HttpStatusCode.OK);
 
-using HttpClient client = ResilienceHttp.CreateClient(
+using HttpClient client = HttpResilience.CreateClient(
     Resilience.Http with { Backoff = Backoff.None },
     innerHandler: transport);
 

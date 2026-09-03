@@ -42,7 +42,7 @@ public sealed class HedgedCallTests
         });
 
         var events = new EventRecorder();
-        using var client = ResilienceHttp.CreateClient(Hedging(events));
+        using var client = HttpResilience.CreateClient(Hedging(events));
 
         await WarmAsync(client, server);
 
@@ -103,7 +103,7 @@ public sealed class HedgedCallTests
         });
 
         var events = new EventRecorder();
-        using var client = ResilienceHttp.CreateClient(Hedging(events));
+        using var client = HttpResilience.CreateClient(Hedging(events));
 
         await WarmAsync(client, server);
 
@@ -139,7 +139,7 @@ public sealed class HedgedCallTests
         });
 
         var events = new EventRecorder();
-        using var client = ResilienceHttp.CreateClient(Hedging(events));
+        using var client = HttpResilience.CreateClient(Hedging(events));
 
         await WarmAsync(client, server);
 

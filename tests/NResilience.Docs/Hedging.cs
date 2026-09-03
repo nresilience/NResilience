@@ -147,7 +147,7 @@ public sealed class Hedging
 
         // </snippet:hedging-repeatable>
 
-        Assert.True(request.Options.TryGetValue(key: ResilienceHttp.Repeatable, value: out var repeatable) && repeatable);
+        Assert.True(request.Options.TryGetValue(key: HttpResilience.Repeatable, value: out var repeatable) && repeatable);
     }
 
     /// <summary>

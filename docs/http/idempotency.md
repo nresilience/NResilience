@@ -28,7 +28,7 @@ A retried `POST` is a duplicate order, a duplicate message, or a duplicate charg
 
 If you know a specific `POST` or `PATCH` request is safe to repeat - it carries an idempotency key, say - mark it repeatable per request. That is the most precise way to control retry behavior.
 
-`MarkRepeatable` writes both halves of that decision in one call, and both matter because they serve different consumers: the `ResilienceHttp.Repeatable` option tells *this client* the request may be sent again, and the idempotency key header tells *the service* to discard the second copy. A retryable `POST` needs both - the option without a key duplicates the order, and the key without the option is never used.
+`MarkRepeatable` writes both halves of that decision in one call, and both matter because they serve different consumers: the `HttpResilience.Repeatable` option tells *this client* the request may be sent again, and the idempotency key header tells *the service* to discard the second copy. A retryable `POST` needs both - the option without a key duplicates the order, and the key without the option is never used.
 
 <!-- snippet: http-repeatable -->
 ```csharp
@@ -45,7 +45,7 @@ using var response = await client.SendAsync(request: request, cancellationToken:
 
 `Idempotency-Key` is an IETF draft rather than a standard, so the header name is a parameter: `request.MarkRepeatable(key, headerName: "X-Request-Id")`. Passing no key at all leaves the headers alone, for a service that does not deduplicate. An existing key on the request is never replaced - two idempotency keys on one request is a request most services reject outright.
 
-The `ResilienceHttp.Repeatable` option overrides the client-level `RetryUnsafeMethods` setting in both directions:
+The `HttpResilience.Repeatable` option overrides the client-level `RetryUnsafeMethods` setting in both directions:
 - Setting it to `true` - what `MarkRepeatable` does - allows a `POST` or `PATCH` request to be retried.
 - Setting it to `false` - what `MarkSingleShot()` does - prevents a `GET` or `PUT` request from being retried, whatever its method says.
 

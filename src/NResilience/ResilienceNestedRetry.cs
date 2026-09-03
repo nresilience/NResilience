@@ -7,7 +7,7 @@ namespace NResilience;
 ///     <para>
 ///         <see cref="Http.ResilienceHandler" /> already knows when it is nested inside another
 ///         retrying handler in this process, and it stamps
-///         <see cref="Http.ResilienceHttp.NestedRetryHeader" /> so the next hop can know too. What
+///         <see cref="Http.HttpResilience.NestedRetryHeader" /> so the next hop can know too. What
 ///         neither half can do is get that fact from an inbound request into the outbound calls the
 ///         request makes - the middle of a three-hop chain, which is exactly where amplification is
 ///         happening and the only place it was invisible.

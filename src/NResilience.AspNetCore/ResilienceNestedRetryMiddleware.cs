@@ -12,7 +12,7 @@ namespace NResilience.AspNetCore;
 ///         This is the half of nested-retry detection that needs a server. The other halves are in
 ///         the core package: a <see cref="Http.ResilienceHandler" /> knows when it is nested inside
 ///         another retrying handler in this process, and it stamps
-///         <see cref="Http.ResilienceHttp.NestedRetryHeader" /> so the next hop can know too.
+///         <see cref="Http.HttpResilience.NestedRetryHeader" /> so the next hop can know too.
 ///     </para>
 /// </summary>
 /// <remarks>

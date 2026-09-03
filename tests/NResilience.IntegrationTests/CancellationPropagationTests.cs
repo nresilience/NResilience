@@ -40,7 +40,7 @@ public sealed class CancellationPropagationTests
             }
         });
 
-        using var client = ResilienceHttp.CreateClient(Resilience.Http with
+        using var client = HttpResilience.CreateClient(Resilience.Http with
         {
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
@@ -73,7 +73,7 @@ public sealed class CancellationPropagationTests
             return Task.FromResult(new LoopbackResponse(HttpStatusCode.OK, Delay: TimeSpan.FromSeconds(30)));
         });
 
-        using var client = ResilienceHttp.CreateClient(Resilience.Http with
+        using var client = HttpResilience.CreateClient(Resilience.Http with
         {
             Backoff = Backoff.None,
             Attempts = 1,
@@ -109,7 +109,7 @@ public sealed class CancellationPropagationTests
             return Task.FromResult(new LoopbackResponse(HttpStatusCode.OK, Delay: TimeSpan.FromSeconds(30)));
         });
 
-        using var client = ResilienceHttp.CreateClient(Resilience.Http with
+        using var client = HttpResilience.CreateClient(Resilience.Http with
         {
             Backoff = Backoff.None,
             Attempts = 3,

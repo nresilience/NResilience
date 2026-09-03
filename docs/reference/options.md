@@ -125,7 +125,8 @@ Only the value `"1"` counts as the marker. Like the deadline middleware, it repo
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
-| `TimeoutStatusCode` | `504` | The status for `DeadlineExceededException` and `AttemptTimeoutException`. |
+| `DeadlineStatusCode` | `504` | The status for `DeadlineExceededException`. |
+| `AttemptTimeoutStatusCode` | `504` | The status for `AttemptTimeoutException`. |
 | `RejectedStatusCode` | `503` | The status for `CallRejectedException`, with `Retry-After` when the rejection carried a hint. |
 | `RateLimitedStatusCode` | `503` | The status for `RateLimitedException`. Not 429: the refusal is self-imposed. Set it to 429 when the limiter is per-caller quota. |
 | `IncludeAttemptDetails` | `false` | Whether the body carries the attempt count and elapsed time. Off by default; see the [caution](../http/error-responses.md#read-the-response). |

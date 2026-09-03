@@ -10,6 +10,10 @@ NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.get -> System.TimeSpan
 NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.ResilienceDeadlineOptions() -> void
 NResilience.AspNetCore.ResilienceExceptionHandlerOptions
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.AttemptTimeoutStatusCode.get -> int
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.AttemptTimeoutStatusCode.set -> void
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.DeadlineStatusCode.get -> int
+NResilience.AspNetCore.ResilienceExceptionHandlerOptions.DeadlineStatusCode.set -> void
 NResilience.AspNetCore.ResilienceExceptionHandlerOptions.IncludeAttemptDetails.get -> bool
 NResilience.AspNetCore.ResilienceExceptionHandlerOptions.IncludeAttemptDetails.set -> void
 NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RateLimitedStatusCode.get -> int
@@ -17,8 +21,6 @@ NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RateLimitedStatusCode.s
 NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RejectedStatusCode.get -> int
 NResilience.AspNetCore.ResilienceExceptionHandlerOptions.RejectedStatusCode.set -> void
 NResilience.AspNetCore.ResilienceExceptionHandlerOptions.ResilienceExceptionHandlerOptions() -> void
-NResilience.AspNetCore.ResilienceExceptionHandlerOptions.TimeoutStatusCode.get -> int
-NResilience.AspNetCore.ResilienceExceptionHandlerOptions.TimeoutStatusCode.set -> void
 NResilience.AspNetCore.ResilienceNestedRetryApplicationBuilderExtensions
 NResilience.AspNetCore.ResilienceNestedRetryOptions
 NResilience.AspNetCore.ResilienceNestedRetryOptions.Header.get -> string!

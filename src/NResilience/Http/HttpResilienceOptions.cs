@@ -21,7 +21,7 @@ public sealed class HttpResilienceOptions
     ///     </para>
     ///     <para>
     ///         Turning this on is a statement about a whole client. Per request,
-    ///         <see cref="ResilienceHttp.Repeatable" /> is the finer instrument and it wins.
+    ///         <see cref="HttpResilience.Repeatable" /> is the finer instrument and it wins.
     ///     </para>
     /// </summary>
     public bool RetryUnsafeMethods { get; set; }
@@ -36,7 +36,7 @@ public sealed class HttpResilienceOptions
     ///         timeout is expressed in the same vocabulary.
     ///     </para>
     ///     <para>
-    ///         It is honored by whoever builds the client - <see cref="ResilienceHttp.CreateClient" />, or
+    ///         It is honored by whoever builds the client - <see cref="HttpResilience.CreateClient" />, or
     ///         the DI registration - because a <c>DelegatingHandler</c> cannot reach the client in front
     ///         of it. Setting it false on a handler you hand to your own <see cref="HttpClient" /> does
     ///         nothing at all.
@@ -124,7 +124,7 @@ public sealed class HttpResilienceOptions
     public string DeadlineHeader { get; set; } = ResilienceDeadline.Header;
 
     /// <summary>
-    ///     Whether the handler stamps <see cref="ResilienceHttp.NestedRetryHeader" /> on outbound
+    ///     Whether the handler stamps <see cref="HttpResilience.NestedRetryHeader" /> on outbound
     ///     requests and reports nesting it detects. On by default; it costs one header on a request
     ///     that can be retried.
     /// </summary>

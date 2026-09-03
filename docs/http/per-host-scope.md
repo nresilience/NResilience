@@ -84,5 +84,5 @@ When a request is marked non-repeatable, the handler still runs the resilience p
 ### State lifetime
 Host state lives as long as the handler does, or until eviction, whichever comes first:
 - **`IHttpClientFactory`**: Rotates handler chains every two minutes by default. Per-host state is reset when the handler is rotated.
-- **`ResilienceHttp.CreateClient`**: Per-host state persists for the lifetime of the process if the client is maintained.
+- **`HttpResilience.CreateClient`**: Per-host state persists for the lifetime of the process if the client is maintained.
 - **Eviction**: A host dropped by a `MaxHosts` sweep resets to a closed breaker and a full budget the next time it is seen.

@@ -57,7 +57,7 @@ internal sealed class RateLimitHandler : DelegatingHandler
         ResilienceTelemetry.RecordLease(_name, lease.IsAcquired, Stopwatch.GetElapsedTime(start));
 
         if (!lease.IsAcquired)
-            throw new RateLimitedException(_name, RateLimiterExtensions.RetryAfterOf(lease));
+            throw new RateLimitedException(RateLimiterExtensions.RetryAfterOf(lease), _name);
 
         return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }

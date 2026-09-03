@@ -21,7 +21,7 @@ public sealed class Guides
             .Respond(() => Doubles.Json(value: new Order(Id: "A-1", Status: "shipped")));
 
         var order = await ReadOrderAsync(
-            client: ResilienceHttp.CreateClient(policy: Resilience.Http with { Backoff = Backoff.None }, innerHandler: transport),
+            client: HttpResilience.CreateClient(policy: Resilience.Http with { Backoff = Backoff.None }, innerHandler: transport),
             id: "A-1",
             cancellationToken: TestContext.Current.CancellationToken);
 

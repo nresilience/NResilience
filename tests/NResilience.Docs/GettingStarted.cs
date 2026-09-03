@@ -10,7 +10,7 @@ public sealed class GettingStarted
 {
     // <snippet:quick-start-http-client>
     // One client for the application's lifetime, with the policy already inside it.
-    private static readonly HttpClient Client = ResilienceHttp.CreateClient();
+    private static readonly HttpClient Client = HttpResilience.CreateClient();
 
     private static async Task<User?> GetUserAsync(int id, CancellationToken cancellationToken) =>
         await Client.GetFromJsonAsync<User>(requestUri: new Uri(uriString: $"https://api.example.com/users/{id}"), cancellationToken: cancellationToken);
@@ -24,7 +24,7 @@ public sealed class GettingStarted
             .Respond(() => Doubles.Status(status: HttpStatusCode.ServiceUnavailable))
             .Respond(() => Doubles.Json(value: new User(Name: "ada")));
 
-        using var client = ResilienceHttp.CreateClient(
+        using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },
             innerHandler: transport);
 

@@ -101,7 +101,7 @@ Creating a resilient `HttpClient` within a `using` block inside a method causes 
 
 ```csharp
 // Reported: the handler's per-host state dies with the client.
-using HttpClient client = ResilienceHttp.CreateClient();
+using HttpClient client = HttpResilience.CreateClient();
 ```
 
 This is reported only for `using` forms where the client provably does not outlive the method. For the correct approach, see [the HTTP handler](../http/index.md) and [`AddResilience()`](../di/index.md).

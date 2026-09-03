@@ -40,7 +40,7 @@ public sealed class NestedRetryMiddlewareTests
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, ResilienceNestedRetry.Marker);
+        request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
 
         using var response = await client.SendAsync(request);
 
@@ -73,7 +73,7 @@ public sealed class NestedRetryMiddlewareTests
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, value);
+        request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, value);
 
         using var response = await client.SendAsync(request);
 
@@ -97,7 +97,7 @@ public sealed class NestedRetryMiddlewareTests
         {
             pipeline.Use((context, next) =>
             {
-                context.Request.Headers[ResilienceHttp.NestedRetryHeader] =
+                context.Request.Headers[HttpResilience.NestedRetryHeader] =
                     new StringValues([ResilienceNestedRetry.Marker, string.Empty]);
 
                 return next(context);
@@ -159,7 +159,7 @@ public sealed class NestedRetryMiddlewareTests
 
         using var caller = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, ResilienceNestedRetry.Marker);
+        request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
 
         using var response = await caller.SendAsync(request);
         Assert.Equal("done", await response.Content.ReadAsStringAsync());
@@ -219,7 +219,7 @@ public sealed class NestedRetryMiddlewareTests
 
         using (var request = new HttpRequestMessage(HttpMethod.Get, app.Uri))
         {
-            request.Headers.TryAddWithoutValidation(ResilienceHttp.NestedRetryHeader, ResilienceNestedRetry.Marker);
+            request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
             using var response = await client.SendAsync(request);
             Assert.Equal("retrying", await response.Content.ReadAsStringAsync());
         }

@@ -23,7 +23,7 @@ The NResilience handler detects and reports nested loops so you can find them.
 X-NResilience-Retrying: 1
 ```
 
-You can use the `ResilienceHttp.NestedRetryHeader` constant to refer to this header in your code.
+You can use the `HttpResilience.NestedRetryHeader` constant to refer to this header in your code.
 
 The header indicates that the sender has retries enabled for this request, not that this particular request is a retry. It is present on the first attempt - the one that matters - because by the time a retry goes out, the amplification has already happened.
 
@@ -46,7 +46,7 @@ The in-process half crosses as well: a gRPC call made inside a retrying HTTP han
 If you are building a service that receives requests, you can check for the nested retry header to determine if the caller will retry the operation. Check the value, not just the header's presence: an intermediary that forwards unknown headers can add an empty one, and `1` is the only value a retrying handler writes.
 
 ```csharp
-bool callerWillRetry = request.Headers[ResilienceHttp.NestedRetryHeader]
+bool callerWillRetry = request.Headers[HttpResilience.NestedRetryHeader]
     .Any(ResilienceNestedRetry.IsMarker);
 ```
 

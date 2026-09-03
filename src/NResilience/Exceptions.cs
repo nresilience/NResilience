@@ -225,11 +225,17 @@ public sealed class AttemptTimeoutException : TimeoutException
 /// </summary>
 public sealed class RateLimitedException : Exception
 {
-    /// <summary>Creates a refusal.</summary>
-    /// <param name="limiter">The limiter that refused, for diagnostics.</param>
+    /// <summary>Creates a refusal, with the generated message describing it.</summary>
     /// <param name="retryAfter">When the limiter said a permit would be available, if it said.</param>
+    /// <param name="limiter">The limiter that refused, for diagnostics.</param>
     /// <param name="innerException">The cause, when the limiter surfaced one.</param>
-    public RateLimitedException(string? limiter = null, TimeSpan? retryAfter = null, Exception? innerException = null)
+    /// <remarks>
+    ///     <paramref name="retryAfter" /> comes first so that this overload cannot be reached by a
+    ///     single string argument. <c>new RateLimitedException("api")</c> is the message overload
+    ///     below and nothing else, which is what a reader of that line expects; name the argument -
+    ///     <c>new RateLimitedException(limiter: "api")</c> - to set <see cref="Limiter" />.
+    /// </remarks>
+    public RateLimitedException(TimeSpan? retryAfter = null, string? limiter = null, Exception? innerException = null)
         : base(Describe(limiter, retryAfter), innerException)
     {
         Limiter = limiter;
@@ -238,7 +244,7 @@ public sealed class RateLimitedException : Exception
 
     /// <summary>Creates a refusal.</summary>
     public RateLimitedException()
-        : this(null, null, null)
+        : this(retryAfter: null)
     {
     }
 

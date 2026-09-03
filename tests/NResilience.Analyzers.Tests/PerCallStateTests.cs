@@ -223,7 +223,7 @@ public sealed class PerCallStateTests
                                                                 {
                                                                     internal static async Task<string> ReadAsync(Uri url, CancellationToken cancellationToken)
                                                                     {
-                                                                        using HttpClient client = ResilienceHttp.CreateClient();
+                                                                        using HttpClient client = HttpResilience.CreateClient();
                                                                         return await client.GetStringAsync(url, cancellationToken);
                                                                     }
                                                                 }
@@ -242,7 +242,7 @@ public sealed class PerCallStateTests
                                                              {
                                                                  internal static async Task<string> ReadAsync(Uri url, CancellationToken cancellationToken)
                                                                  {
-                                                                     using (HttpClient client = ResilienceHttp.CreateClient())
+                                                                     using (HttpClient client = HttpResilience.CreateClient())
                                                                      {
                                                                          return await client.GetStringAsync(url, cancellationToken);
                                                                      }
@@ -261,7 +261,7 @@ public sealed class PerCallStateTests
                                                         {
                                                             using (source)
                                                             {
-                                                                return ResilienceHttp.CreateClient();
+                                                                return HttpResilience.CreateClient();
                                                             }
                                                         }
                                                     }
@@ -274,7 +274,7 @@ public sealed class PerCallStateTests
         Assert.Equal([], Harness.Ids(Harness.InFile("""
                                                     internal static class Clients
                                                     {
-                                                        internal static HttpClient Build() => ResilienceHttp.CreateClient();
+                                                        internal static HttpClient Build() => HttpResilience.CreateClient();
                                                     }
                                                     """)));
     }
@@ -290,7 +290,7 @@ public sealed class PerCallStateTests
                                {
                                    internal static async Task Main()
                                    {
-                                       using HttpClient client = ResilienceHttp.CreateClient();
+                                       using HttpClient client = HttpResilience.CreateClient();
                                        await client.GetStringAsync(new Uri("https://example.com"), CancellationToken.None);
                                    }
                                }

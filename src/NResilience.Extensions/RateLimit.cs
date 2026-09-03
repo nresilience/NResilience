@@ -251,6 +251,6 @@ public static class RateLimiterExtensions
         var retryAfter = RetryAfterOf(lease);
         lease.Dispose();
 
-        throw new RateLimitedException(name, retryAfter);
+        throw new RateLimitedException(retryAfter, name);
     }
 }

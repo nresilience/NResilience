@@ -15,7 +15,7 @@ The `Sequence` class is a factory for scripted call sequences that return pre-de
 | Member | Description |
 | :--- | :--- |
 | `Sequence.For<T>(TimeProvider? time = null)` | Creates a scripted sequence that returns values of type `T`. |
-| `Sequence.ForVoid(TimeProvider? time = null)` | Creates a scripted sequence for void execution overloads, returning a `Sequence<Void>`. |
+| `Sequence.ForVoid(TimeProvider? time = null)` | Creates a scripted sequence for void execution overloads, returning a `Sequence<Unit>`. |
 
 Pass the same `TimeProvider` to the `Sequence` that you gave the resilience policy, so scripted delays stay deterministic and never become real sleeps.
 

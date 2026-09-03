@@ -118,7 +118,7 @@ public sealed class TelemetryCompositionTests
         using var recording = new MeterRecording();
 
         // No WithLogging, no WithTelemetry - the surfaces stay empty.
-        using var client = ResilienceHttp.CreateClient(Resilience.Http with
+        using var client = HttpResilience.CreateClient(Resilience.Http with
         {
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,

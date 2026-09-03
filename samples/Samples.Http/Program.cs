@@ -5,7 +5,7 @@ using NResilience.Http;
 // The HTTP handler, driven against an in-process fake transport so the sample needs no network.
 var transport = new FakeTransport();
 
-using var client = ResilienceHttp.CreateClient(
+using var client = HttpResilience.CreateClient(
     Resilience.Http with
     {
         Name = "orders",
