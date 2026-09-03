@@ -45,8 +45,23 @@ NResilience.Backoff.Jitter.get -> NResilience.Jitter
 NResilience.Backoff.Jitter.init -> void
 NResilience.Backoff.Kind.get -> NResilience.BackoffKind
 NResilience.Backoff.Max.get -> System.TimeSpan
+NResilience.Backoff.Measured.get -> NResilience.BackoffBase?
+NResilience.Backoff.Measured.init -> void
 NResilience.Backoff.ThrottledBase.get -> System.TimeSpan
 NResilience.Backoff.TransientBase.get -> System.TimeSpan
+NResilience.BackoffBase
+NResilience.BackoffBase.BackoffBase() -> void
+NResilience.BackoffBase.Equals(NResilience.BackoffBase other) -> bool
+NResilience.BackoffBase.MinimumSamples.get -> int
+NResilience.BackoffBase.MinimumSamples.init -> void
+NResilience.BackoffBase.Multiple.get -> double
+NResilience.BackoffBase.Multiple.init -> void
+NResilience.BackoffBase.Quantile.get -> double
+NResilience.BackoffBase.Quantile.init -> void
+NResilience.BackoffBase.Spread.get -> double
+NResilience.BackoffBase.Spread.init -> void
+NResilience.BackoffBase.Window.get -> System.TimeSpan
+NResilience.BackoffBase.Window.init -> void
 NResilience.BackoffKind
 NResilience.BackoffKind.Constant = 1 -> NResilience.BackoffKind
 NResilience.BackoffKind.Custom = 2 -> NResilience.BackoffKind
@@ -121,6 +136,7 @@ NResilience.CallEvent.Verdict.get -> NResilience.Verdict
 NResilience.CallEventKind
 NResilience.CallEventKind.Attempt = 0 -> NResilience.CallEventKind
 NResilience.CallEventKind.AttemptTimeoutAdapted = 16 -> NResilience.CallEventKind
+NResilience.CallEventKind.BackoffBaseAdapted = 17 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerClosed = 9 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerHalfOpened = 10 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerOpened = 8 -> NResilience.CallEventKind
@@ -295,6 +311,7 @@ NResilience.Resilience.Equals(NResilience.Resilience? other) -> bool
 NResilience.Resilience.Hedge.get -> NResilience.Hedge?
 NResilience.Resilience.Hedge.init -> void
 NResilience.Resilience.MeasuredAttemptCeiling.get -> System.TimeSpan?
+NResilience.Resilience.MeasuredBackoffBase.get -> System.TimeSpan?
 NResilience.Resilience.Name.get -> string?
 NResilience.Resilience.Name.init -> void
 NResilience.Resilience.OnEvent.get -> System.Action<NResilience.CallEvent>?
@@ -366,6 +383,7 @@ NResilience.VerdictKind.Permanent = 3 -> NResilience.VerdictKind
 NResilience.VerdictKind.Throttled = 2 -> NResilience.VerdictKind
 NResilience.VerdictKind.Transient = 1 -> NResilience.VerdictKind
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
+const NResilience.BackoffBase.DefaultMultiple = 1 -> double
 const NResilience.Http.ResilienceHttp.NestedRetryHeader = "X-NResilience-Retrying" -> string!
 const NResilience.ResilienceDeadline.Header = "X-Deadline-Ms" -> string!
 const NResilience.ResilienceNestedRetry.Marker = "1" -> string!
@@ -374,6 +392,8 @@ override NResilience.AttemptCeiling.GetHashCode() -> int
 override NResilience.AttemptCeiling.ToString() -> string!
 override NResilience.AttemptLog.ToString() -> string!
 override NResilience.Backoff.GetHashCode() -> int
+override NResilience.BackoffBase.GetHashCode() -> int
+override NResilience.BackoffBase.ToString() -> string!
 override NResilience.BreakerSettings.Equals(object? obj) -> bool
 override NResilience.BreakerSettings.GetHashCode() -> int
 override NResilience.BreakerSettings.ToString() -> string!
@@ -398,6 +418,7 @@ static NResilience.AttemptCeiling.operator !=(NResilience.AttemptCeiling left, N
 static NResilience.AttemptCeiling.operator ==(NResilience.AttemptCeiling left, NResilience.AttemptCeiling right) -> bool
 static NResilience.AttemptLog.Empty.get -> NResilience.AttemptLog!
 static NResilience.AttemptLog.Of(System.Exception! exception) -> NResilience.AttemptLog?
+static NResilience.Backoff.Adaptive(double multiple = 1, System.TimeSpan? transientBase = null, System.TimeSpan? throttledBase = null, double factor = 2, System.TimeSpan? max = null) -> NResilience.Backoff
 static NResilience.Backoff.Constant(System.TimeSpan delay) -> NResilience.Backoff
 static NResilience.Backoff.Custom(System.Func<NResilience.NextAttempt, System.TimeSpan>! compute) -> NResilience.Backoff
 static NResilience.Backoff.Default.get -> NResilience.Backoff
@@ -405,6 +426,9 @@ static NResilience.Backoff.Exponential(System.TimeSpan? transientBase = null, Sy
 static NResilience.Backoff.None.get -> NResilience.Backoff
 static NResilience.Backoff.operator !=(NResilience.Backoff left, NResilience.Backoff right) -> bool
 static NResilience.Backoff.operator ==(NResilience.Backoff left, NResilience.Backoff right) -> bool
+static NResilience.BackoffBase.Of(double multiple = 1) -> NResilience.BackoffBase
+static NResilience.BackoffBase.operator !=(NResilience.BackoffBase left, NResilience.BackoffBase right) -> bool
+static NResilience.BackoffBase.operator ==(NResilience.BackoffBase left, NResilience.BackoffBase right) -> bool
 static NResilience.BreakerSettings.operator !=(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
 static NResilience.BreakerSettings.operator ==(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
 static NResilience.CallEvent.Create(NResilience.CallEventKind kind, string? policyName = null, int attemptNumber = 1, NResilience.Verdict verdict = default(NResilience.Verdict), System.TimeSpan duration = default(System.TimeSpan), System.TimeSpan? delay = null, System.Exception? exception = null, object? result = null, NResilience.StopReason? reason = null) -> NResilience.CallEvent
@@ -463,6 +487,7 @@ static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Ver
 ~override NResilience.AttemptCeiling.Equals(object obj) -> bool
 ~override NResilience.Backoff.Equals(object obj) -> bool
 ~override NResilience.Backoff.ToString() -> string
+~override NResilience.BackoffBase.Equals(object obj) -> bool
 ~override NResilience.Failures.Equals(object obj) -> bool
 ~override NResilience.Hedge.Equals(object obj) -> bool
 ~override NResilience.Recovery.Equals(object obj) -> bool

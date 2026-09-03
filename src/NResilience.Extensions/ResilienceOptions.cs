@@ -273,12 +273,23 @@ public sealed class BackoffOptions
     /// <summary>How much of the computed delay is randomized. <see cref="NResilience.Jitter.Full" /> is the default and the right answer for almost everyone.</summary>
     public Jitter? Jitter { get; set; }
 
+    /// <summary>
+    ///     Measures <see cref="TransientBase" /> from the dependency's own recent latency instead of
+    ///     taking it as the constant above. Off unless the section says so, which is
+    ///     <c>"Backoff": { "Measured": { "Multiple": 1 } }</c>.
+    /// </summary>
+    public BackoffBaseOptions? Measured { get; set; }
+
     /// <summary>Whether this section names anything that changes the shape of the curve rather than only its randomness.</summary>
     private bool HasCurve =>
         TransientBase is not null
         || ThrottledBase is not null
         || Max is not null
-        || Factor is not null;
+        || Factor is not null
+
+        // A measured base is only carried by an exponential curve, so naming one is a reason to
+        // rebuild a Constant or Custom baseline into an exponential exactly as naming a knob is.
+        || Measured is not null;
 
     /// <summary>Patches a curve with whatever this section named.</summary>
     /// <param name="baseline">The curve the base policy carried.</param>
@@ -303,7 +314,75 @@ public sealed class BackoffOptions
             Max ?? existing.Max) with
         {
             Jitter = Jitter ?? baseline.Jitter,
+            Measured = Measured is { } measured
+                ? measured.Enabled is false ? null : measured.ToBackoffBase()
+                : existing.Measured,
         };
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.BackoffBase" />.
+/// </summary>
+/// <remarks>
+///     Opt-in, unlike <see cref="AttemptCeilingOptions" />: a measured base can lengthen a delay as well
+///     as shorten one, so it is not something the library turns on for a policy that did not ask. See
+///     <see cref="NResilience.BackoffBase" /> for the argument.
+/// </remarks>
+public sealed class BackoffBaseOptions
+{
+    /// <summary>
+    ///     Whether the backoff base is measured at all. <c>false</c> drops a measured base the base
+    ///     policy carried, whatever else this section says.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
+    ///     How many normal calls the first retry waits. Defaults to 1, and must be greater than zero -
+    ///     <c>"Enabled": false</c> is how a section turns the measurement off.
+    /// </summary>
+    public double? Multiple { get; set; }
+
+    /// <summary><see cref="NResilience.BackoffBase.Quantile" />.</summary>
+    public double? Quantile { get; set; }
+
+    /// <summary><see cref="NResilience.BackoffBase.Window" />.</summary>
+    public TimeSpan? Window { get; set; }
+
+    /// <summary><see cref="NResilience.BackoffBase.MinimumSamples" />.</summary>
+    public int? MinimumSamples { get; set; }
+
+    /// <summary><see cref="NResilience.BackoffBase.Spread" />.</summary>
+    public double? Spread { get; set; }
+
+    /// <summary>Converts the options to a <see cref="NResilience.BackoffBase" /> value, using defaults for any unset properties.</summary>
+    /// <returns>The configuration.</returns>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which is the shape an off switch would take.</exception>
+    public BackoffBase ToBackoffBase()
+    {
+        if (Multiple is 0)
+        {
+            throw RetiredOffSwitch.For(
+                "Backoff.Measured",
+                nameof(Multiple),
+                "Zero normal calls is not a delay anyone could mean.");
+        }
+
+        var measured = BackoffBase.Of(Multiple ?? BackoffBase.DefaultMultiple);
+
+        if (Quantile is { } quantile)
+            measured = measured with { Quantile = quantile };
+
+        if (Window is { } window)
+            measured = measured with { Window = window };
+
+        if (MinimumSamples is { } samples)
+            measured = measured with { MinimumSamples = samples };
+
+        if (Spread is { } spread)
+            measured = measured with { Spread = spread };
+
+        return measured;
     }
 }
 

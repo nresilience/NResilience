@@ -137,6 +137,14 @@ internal sealed class LogListener
                     Log.AttemptTimeoutAdapted(_logger, ceiling, policy, Ms(e.Delay));
 
                 break;
+
+            // On change too, and here it matters more: this one is raised on the retry decision, so
+            // without the change filter it would be a line per retry during the incident.
+            case CallEventKind.BackoffBaseAdapted:
+                if (Level(Log.Ids.BackoffBaseAdapted, e) is { } backoffBase)
+                    Log.BackoffBaseAdapted(_logger, backoffBase, policy, Ms(e.Delay));
+
+                break;
         }
     }
 

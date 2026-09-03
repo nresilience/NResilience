@@ -105,7 +105,7 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 `ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone". An unrecognized key is an error, not a no-op - see [An unrecognized key is an error](../di/configuration.md#an-unrecognized-key-is-an-error).
 
-**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`.
+**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`. `Backoff` carries a `Measured` subsection of its own.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
@@ -187,6 +187,21 @@ There is deliberately no fixed-delay setting. A constant threshold is the failur
 | `Floor` | `50 ms` | A floor under the measured ceiling. |
 
 There is deliberately no way to make the measured ceiling longer than `AttemptTimeout`. The clamp is what makes the feature safe to leave on, and a key that lifted it would be the one key nobody should have.
+
+## `BackoffBaseOptions`
+
+`BackoffBaseOptions` provides the bindable shape of [`BackoffBase`](backoff.md#backoffbase), the measured [backoff base](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it). It is a subsection of `Backoff`, and it is off unless the section asks for it.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Enabled` | `null` | `false` drops a measured base the base policy carried. |
+| `Multiple` | `1` | How many normal calls the first retry waits. Must be greater than zero. |
+| `Quantile` | `0.5` | The quantile of recent successful latency that counts as normal. Must be in `(0, 0.5]`. |
+| `Window` | `5 min` | How much history the baseline covers. |
+| `MinimumSamples` | `20` | How many recent successful calls the baseline needs before it moves anything. |
+| `Spread` | `10` | How far the measured base may move from `TransientBase`, as a factor in either direction. |
+
+Naming this section rebuilds a `Constant` or `Custom` base curve into an exponential one, exactly as naming any other `Backoff` knob does - a measured base is only carried by an exponential curve.
 
 ## `BreakerOptions`
 

@@ -71,6 +71,19 @@ public readonly record struct Backoff
     public Jitter Jitter { get; init; }
 
     /// <summary>
+    ///     Measures <see cref="TransientBase" /> from the dependency's own recent latency instead of
+    ///     taking it as a constant. Null - the default - leaves the configured base alone.
+    ///     <para>
+    ///         Only <see cref="BackoffKind.Exponential" /> curves can carry one, and it moves only the
+    ///         transient base: <see cref="ThrottledBase" />, <see cref="Factor" />, <see cref="Jitter" />,
+    ///         <see cref="Max" /> and the <see cref="Verdict.RetryAfter" /> pushback precedence are all
+    ///         unchanged. See <see cref="BackoffBase" /> for why, and <see cref="Adaptive" /> for the
+    ///         short way to write it.
+    ///     </para>
+    /// </summary>
+    public BackoffBase? Measured { get; init; }
+
+    /// <summary>
     ///     Base delay for a <see cref="VerdictKind.Transient" /> failure. Returns zero for
     ///     <see cref="BackoffKind.Custom" /> curves because they compute their own delays.
     /// </summary>
@@ -114,6 +127,27 @@ public readonly record struct Backoff
             max ?? DefaultMax,
             null);
 
+    /// <summary>
+    ///     Exponential backoff whose transient base is measured from the dependency's own recent
+    ///     latency rather than guessed, clamped to a factor either side of
+    ///     <paramref name="transientBase" />. Everything else - the throttled base, the factor, the
+    ///     jitter, the cap and the <see cref="Verdict.RetryAfter" /> pushback precedence - is
+    ///     <see cref="Exponential" />'s.
+    /// </summary>
+    /// <param name="multiple">How many normal calls the first retry waits. Defaults to 1.</param>
+    /// <param name="transientBase">The base the measurement is clamped around. Defaults to 100 ms.</param>
+    /// <param name="throttledBase">Base delay for <see cref="VerdictKind.Throttled" />, which is never measured. Defaults to 1 s.</param>
+    /// <param name="factor">Growth per attempt. Defaults to 2.0.</param>
+    /// <param name="max">Hard cap on any single delay. Defaults to 30 s.</param>
+    /// <returns>The configured backoff.</returns>
+    public static Backoff Adaptive(
+        double multiple = BackoffBase.DefaultMultiple,
+        TimeSpan? transientBase = null,
+        TimeSpan? throttledBase = null,
+        double factor = DefaultFactor,
+        TimeSpan? max = null)
+        => Exponential(transientBase, throttledBase, factor, max) with { Measured = BackoffBase.Of(multiple) };
+
     /// <summary>The same delay every time.</summary>
     /// <param name="delay">The delay.</param>
     /// <returns>The configured backoff.</returns>
@@ -142,7 +176,25 @@ public readonly record struct Backoff
     /// </summary>
     /// <param name="next">The attempt that is about to happen.</param>
     /// <returns>The delay, never negative.</returns>
-    public TimeSpan Compute(in NextAttempt next)
+    /// <remarks>
+    ///     A curve carrying a <see cref="Measured" /> base computes its <i>unmeasured</i> delay here.
+    ///     The estimate is private to the policy instance that owns it, so only the executor can supply
+    ///     it, and a caller asking a bare <see cref="Backoff" /> value what it would do gets the
+    ///     configured curve - the same answer the executor gives while the estimate is still cold.
+    /// </remarks>
+    public TimeSpan Compute(in NextAttempt next) => Compute(next, null);
+
+    /// <summary>
+    ///     The delay before <paramref name="next" />, given what a normal call to this dependency
+    ///     recently took.
+    /// </summary>
+    /// <param name="next">The attempt that is about to happen.</param>
+    /// <param name="normal">
+    ///     The measured baseline, already gated on <see cref="BackoffBase.MinimumSamples" />, or null
+    ///     when nothing is measuring or the estimate is still cold.
+    /// </param>
+    /// <returns>The delay, never negative.</returns>
+    internal TimeSpan Compute(in NextAttempt next, TimeSpan? normal)
     {
         var effective = Normalized();
 
@@ -158,7 +210,13 @@ public readonly record struct Backoff
             return capped > TimeSpan.Zero ? capped : TimeSpan.Zero;
         }
 
-        var @base = next.PreviousVerdict.Kind == VerdictKind.Throttled ? effective._throttledBase : effective._transientBase;
+        var throttled = next.PreviousVerdict.Kind == VerdictKind.Throttled;
+        var @base = throttled ? effective._throttledBase : effective._transientBase;
+
+        // Throttling is deliberately excluded: a rate limiter's refill interval is not visible in how
+        // fast it said no, and the one case where the server does know is the pushback above.
+        if (!throttled && normal is { } measured && effective.Measured is { } adaptive)
+            @base = adaptive.BaseFor(effective._transientBase, measured);
 
         if (@base <= TimeSpan.Zero)
             return TimeSpan.Zero;
@@ -203,6 +261,23 @@ public readonly record struct Backoff
 
         if (effective._max < TimeSpan.Zero && effective._max != Timeout.InfiniteTimeSpan)
             problems.Add($"Backoff maximum delay must not be negative; it is {effective._max}.");
+
+        if (Measured is { } measured)
+        {
+            measured.Validate(problems);
+
+            // A measured base replaces the transient base of a curve that has one. A Constant curve's
+            // single delay is also its cap, and a Custom curve computes everything itself - measuring
+            // into either would be a value the caller cannot predict from what they wrote. Refused
+            // rather than ignored, because silently doing nothing is how a caller ends up believing
+            // their backoff tracks the dependency when it does not.
+            if (effective._kind != BackoffKind.Exponential)
+            {
+                problems.Add(
+                    $"Backoff.Measured is only supported on an exponential curve; this one is {effective._kind}. " +
+                    "Use Backoff.Adaptive(...) to build one, or drop Measured to keep the curve as written.");
+            }
+        }
     }
 
     /// <summary>
@@ -212,6 +287,10 @@ public readonly record struct Backoff
     /// </summary>
     private Backoff Normalized() =>
         _kind == BackoffKind.Exponential && _factor == 0
-            ? new Backoff(BackoffKind.Exponential, DefaultTransientBase, DefaultThrottledBase, DefaultFactor, DefaultMax, null) { Jitter = Jitter }
+            ? new Backoff(BackoffKind.Exponential, DefaultTransientBase, DefaultThrottledBase, DefaultFactor, DefaultMax, null)
+            {
+                Jitter = Jitter,
+                Measured = Measured,
+            }
             : this;
 }

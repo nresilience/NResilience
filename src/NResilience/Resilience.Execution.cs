@@ -945,6 +945,12 @@ public sealed partial record Resilience
         if (verdict.Kind == VerdictKind.Ok && AttemptCeiling is not null)
             ExecutionState.AttemptCeilingFor(this)?.Record(duration);
 
+        // Successes only again, and here it is what keeps backoff from collapsing: a dependency failing
+        // fast has a very short latency distribution, and a base measured from it would turn the retry
+        // curve into a tight loop at the moment the dependency could least afford one.
+        if (verdict.Kind == VerdictKind.Ok && Backoff.Measured is not null)
+            ExecutionState.BackoffBaseFor(this)?.Record(duration);
+
         if (OnEvent is not null)
         {
             var observed = ResultOf(value, hasValue);
@@ -1089,7 +1095,7 @@ public sealed partial record Resilience
             return NextStep.Stop;
         }
 
-        var delay = Backoff.Compute(new NextAttempt(attempts + 1, verdict, error, left, cancellationToken));
+        var delay = Backoff.Compute(new NextAttempt(attempts + 1, verdict, error, left, cancellationToken), MeasuredBase(attempts + 1, verdict.Kind));
 
         // A delay that would consume the rest of the budget leaves nothing for the attempt after it,
         // so the deadline stops the operation here rather than sleeping through it - and neither does
@@ -1149,6 +1155,42 @@ public sealed partial record Resilience
     ///     </para>
     /// </remarks>
     private TimeSpan Viable() => Breaker?.NormalLatency ?? TimeSpan.Zero;
+
+    /// <summary>
+    ///     What a normal call to this dependency recently took, for
+    ///     <see cref="NResilience.Backoff.Measured" /> to derive its base from. Null when nothing is
+    ///     measuring or the estimate is still cold, which is the case that leaves the curve exactly as
+    ///     it is configured.
+    /// </summary>
+    /// <param name="attemptNumber">Which attempt is about to be delayed, for the event a changed base raises.</param>
+    /// <param name="kind">What ended the previous attempt. A throttled one is never measured - see <see cref="BackoffBase" />.</param>
+    /// <returns>The baseline, or null.</returns>
+    /// <remarks>
+    ///     Read on the retry decision rather than hoisted into a local, for the reason
+    ///     <see cref="Internal.ExecutionState.AttemptCeilingFor" /> gives. A policy that configures no
+    ///     measured base pays one field read off <c>this</c> per retry - and nothing at all per call,
+    ///     because a call that does not retry never reaches here.
+    /// </remarks>
+    private TimeSpan? MeasuredBase(int attemptNumber, VerdictKind kind)
+    {
+        if (kind == VerdictKind.Throttled || Backoff.Measured is not { } measured)
+            return null;
+
+        if (ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is not { } normal)
+            return null;
+
+        if (OnEvent is not null)
+        {
+            // The base the curve will actually use, which is the measurement after the clamp - the
+            // number an operator comparing it against what they configured wants to see.
+            var applied = measured.BaseFor(Backoff.TransientBase, normal);
+
+            if (ExecutionState.BackoffBaseChanged(this, applied))
+                Notify(CallEventKind.BackoffBaseAdapted, attemptNumber, Verdict.Ok, TimeSpan.Zero, applied, null, null);
+        }
+
+        return normal;
+    }
 
     /// <summary>
     ///     The pause a refused call serves before it is reported.

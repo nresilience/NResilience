@@ -279,12 +279,13 @@ public sealed partial record Resilience
     ///         Setting it to <c>false</c> is the one-line answer to "make this deterministic": it turns
     ///         off every measured term the library would otherwise supply, leaving only the constants
     ///         written here. Today that is <see cref="AttemptCeiling" />; anything added later that
-    ///         measures rather than asks joins it.
+    ///         measures rather than asks joins it, and <see cref="NResilience.Backoff.Measured" />
+    ///         already has.
     ///     </para>
     ///     <para>
     ///         It suppresses defaults rather than overriding what you wrote. A policy that says
-    ///         <c>false</c> and then configures <see cref="AttemptCeiling" /> or <see cref="Hedge" />
-    ///         has contradicted itself, and <see cref="Validate" /> says so rather than picking a
+    ///         <c>false</c> and then configures <see cref="AttemptCeiling" />, <see cref="Hedge" /> or
+    ///         <see cref="NResilience.Backoff.Measured" /> has contradicted itself, and <see cref="Validate" /> says so rather than picking a
     ///         winner.
     ///     </para>
     ///     <para>
@@ -330,6 +331,39 @@ public sealed partial record Resilience
     /// </remarks>
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
     public TimeSpan? MeasuredAttemptCeiling => Measured();
+
+    /// <summary>
+    ///     The base delay the next transient retry would wait, when <see cref="NResilience.Backoff.Measured" />
+    ///     is configured: the measured baseline, after <see cref="BackoffBase.Spread" /> has clamped it
+    ///     around <see cref="NResilience.Backoff.TransientBase" />. Returns <c>null</c> when no base is
+    ///     being measured, or when the estimate is still cold and the configured constant is what a
+    ///     retry would use.
+    ///     <para>
+    ///         The jitter and the growth factor are applied on top of this per attempt, so it is the
+    ///         first retry's delay before randomness rather than any single delay a call served.
+    ///     </para>
+    ///     <para>
+    ///         The value to put on a dashboard beside the configured base: the gap between the two is
+    ///         how wrong the constant was. Reading it validates the policy, just as executing it does.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     The estimate is private to the policy instance. The HTTP handler derives one policy per host,
+    ///     so each host's base is measured independently.
+    /// </remarks>
+    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
+    public TimeSpan? MeasuredBackoffBase
+    {
+        get
+        {
+            if (Backoff.Measured is not { } measured)
+                return null;
+
+            return Internal.ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is { } normal
+                ? measured.BaseFor(Backoff.TransientBase, normal)
+                : null;
+        }
+    }
 
     /// <summary>
     ///     True when the policy imposes nothing at all, so a call can hand back the callback's own
@@ -429,6 +463,14 @@ public sealed partial record Resilience
                 problems.Add(
                     "Adaptive is false, so this policy measures nothing, but AttemptCeiling is set. " +
                     "Remove one: drop AttemptCeiling to keep the policy deterministic, or drop Adaptive = false to keep the measured ceiling.");
+            }
+
+            if (Backoff.Measured is not null)
+            {
+                problems.Add(
+                    "Adaptive is false, so this policy measures nothing, but Backoff.Measured is set. " +
+                    "Remove one: use Backoff.Exponential(...) to keep the policy deterministic, or drop " +
+                    "Adaptive = false to keep the measured backoff base.");
             }
 
             if (Hedge is not null)

@@ -108,17 +108,20 @@ internal static class Diagnostics
         "'{0}' is set on a policy created inside '{1}', so every call builds a new one; the latency estimate is private to the policy instance, so it never reaches MinimumSamples and '{0}' silently does nothing",
         Reliability,
         DiagnosticSeverity.Info,
-        "Hedge and AttemptCeiling both measure a quantile of recent latency, and that estimate is held per policy " +
+        "Hedge, AttemptCeiling and Backoff.Adaptive all measure a quantile of recent latency, and that estimate " +
+        "is held per policy " +
         "instance - which is the scope the feature wants, because one host's p95 is not another's. A policy " +
-        "rebuilt per call therefore starts cold every time, and both features are documented to do nothing " +
-        "until they have MinimumSamples: the hedge never fires and the measured attempt ceiling never lowers " +
-        "anything. Neither failure is visible, because each one falls back to the policy's configured " +
+        "rebuilt per call therefore starts cold every time, and all three features are documented to do nothing " +
+        "until they have MinimumSamples: the hedge never fires, the measured attempt ceiling never lowers " +
+        "anything, and the backoff base stays the constant it was configured with. None of it is visible, " +
+        "because each one falls back to the policy's configured " +
         "behaviour. Hold the policy in a static readonly field, resolve it from IResiliencePolicies, or let " +
         "the HTTP handler derive it per host." +
         "\n\n" +
         "Info rather than a warning, for the reason NRES006 is: a policy written inline in a method is a " +
         "common and often deliberate shape, and nothing here is less safe than the same policy without the " +
-        "feature - the hedge simply does not fire, and the ceiling stays at AttemptTimeout. It is dead " +
+        "feature - the hedge simply does not fire, and the ceiling and the backoff base stay where they were " +
+        "configured. It is dead " +
         "configuration rather than a hazard.");
 
     private static DiagnosticDescriptor Rule(

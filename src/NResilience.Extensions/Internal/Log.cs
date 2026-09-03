@@ -141,6 +141,12 @@ internal static partial class Log
         Message = "{Policy} measured a new per-attempt ceiling of {CeilingMs} ms from recent latency")]
     internal static partial void AttemptTimeoutAdapted(ILogger logger, LogLevel level, string policy, long ceilingMs);
 
+    [LoggerMessage(
+        EventId = Codes.BackoffBaseAdapted,
+        EventName = nameof(Ids.BackoffBaseAdapted),
+        Message = "{Policy} measured a new backoff base of {BaseMs} ms from recent latency")]
+    internal static partial void BackoffBaseAdapted(ILogger logger, LogLevel level, string policy, long baseMs);
+
     /// <summary>
     ///     The IDs as constants, so the <c>[LoggerMessage]</c> attributes and the level switches in
     ///     <c>LogListener</c> - both of which need a compile-time constant - name them rather than
@@ -174,6 +180,7 @@ internal static partial class Log
         internal const int HedgeWon = 1023;
         internal const int HedgeDiscarded = 1024;
         internal const int AttemptTimeoutAdapted = 1025;
+        internal const int BackoffBaseAdapted = 1026;
     }
 
     /// <summary>
@@ -208,5 +215,6 @@ internal static partial class Log
         internal static readonly EventId HedgeWon = new(Codes.HedgeWon, nameof(HedgeWon));
         internal static readonly EventId HedgeDiscarded = new(Codes.HedgeDiscarded, nameof(HedgeDiscarded));
         internal static readonly EventId AttemptTimeoutAdapted = new(Codes.AttemptTimeoutAdapted, nameof(AttemptTimeoutAdapted));
+        internal static readonly EventId BackoffBaseAdapted = new(Codes.BackoffBaseAdapted, nameof(BackoffBaseAdapted));
     }
 }

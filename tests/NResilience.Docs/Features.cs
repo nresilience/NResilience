@@ -47,6 +47,26 @@ public sealed class Features
     }
 
     [Fact]
+    public void The_backoff_base_can_be_measured()
+    {
+        // <snippet:retry-backoff-adaptive>
+        var api = Resilience.Http with
+        {
+            // "Wait about one normal call before retrying", instead of a millisecond count that is
+            // only right for one dependency. The measured base is clamped to a factor of 10 either
+            // side of the 100 ms written here, so the constant stays the anchor.
+            Backoff = Backoff.Adaptive(multiple: 1, transientBase: TimeSpan.FromMilliseconds(value: 100)),
+        };
+
+        // </snippet:retry-backoff-adaptive>
+
+        Assert.NotNull(api.Backoff.Measured);
+
+        // Cold until the estimate has samples, and the retry waits the configured base until then.
+        Assert.Null(api.MeasuredBackoffBase);
+    }
+
+    [Fact]
     public void Jitter_is_derived_not_rebuilt()
     {
         // <snippet:retry-jitter>

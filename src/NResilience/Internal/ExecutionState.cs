@@ -43,11 +43,19 @@ internal sealed class ExecutionState
 
     private readonly LatencyWindow? _ceiling;
 
+    private readonly LatencyWindow? _backoffBase;
+
     /// <summary>
     ///     The last measured ceiling reported for this policy instance, in ticks. Zero until one is,
     ///     which no real ceiling can be.
     /// </summary>
     private long _lastCeilingTicks;
+
+    /// <summary>
+    ///     The last measured backoff base reported for this policy instance, in ticks. Zero until one
+    ///     is, which no real base can be.
+    /// </summary>
+    private long _lastBackoffBaseTicks;
 
     private ExecutionState(Resilience policy)
     {
@@ -67,6 +75,14 @@ internal sealed class ExecutionState
         // one so it does not. See LatencyWindow's remarks: this is the case they flagged.
         _ceiling = policy.AttemptCeiling is { } ceiling
             ? new LatencyWindow(ceiling.Quantile, ceiling.Window, policy.Time)
+            : null;
+
+        // A third window, and the same argument again: this one reads a *low* quantile of a long
+        // window, because a backoff base is a measure of what healthy looked like rather than of the
+        // tail. It is the reading SlowCalls takes, and the breaker's copy of it is not reachable here -
+        // a Breaker is a live object two policies may share, and it may not be configured at all.
+        _backoffBase = policy.Backoff.Measured is { } measured
+            ? new LatencyWindow(measured.Quantile, measured.Window, policy.Time)
             : null;
     }
 
@@ -126,6 +142,17 @@ internal sealed class ExecutionState
     public static LatencyWindow? AttemptCeilingFor(Resilience policy) => StateFor(policy)._ceiling;
 
     /// <summary>
+    ///     The latency estimate this policy measures its backoff base from, or null when it does not
+    ///     have one.
+    /// </summary>
+    /// <remarks>
+    ///     Resolved at the two points that need it - once on the retry decision to read the base, once
+    ///     after a successful attempt to record it - rather than hoisted into a local, for the reason
+    ///     <see cref="AttemptCeilingFor" /> gives.
+    /// </remarks>
+    public static LatencyWindow? BackoffBaseFor(Resilience policy) => StateFor(policy)._backoffBase;
+
+    /// <summary>
     ///     Whether this measured ceiling differs from the last one reported for this policy instance,
     ///     and records it either way.
     /// </summary>
@@ -143,6 +170,25 @@ internal sealed class ExecutionState
         var ticks = ceiling.Ticks;
 
         return Interlocked.Exchange(ref StateFor(policy)._lastCeilingTicks, ticks) != ticks;
+    }
+
+    /// <summary>
+    ///     Whether this measured backoff base differs from the last one reported for this policy
+    ///     instance, and records it either way.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <param name="base">The base about to be applied.</param>
+    /// <returns>True when it is worth telling a listener about.</returns>
+    /// <remarks>
+    ///     The same rate argument <see cref="CeilingChanged" /> makes, and it matters more here: this
+    ///     one is read on the retry decision, so without it a listener would see an event per retry
+    ///     during exactly the incident it is trying to read.
+    /// </remarks>
+    public static bool BackoffBaseChanged(Resilience policy, TimeSpan @base)
+    {
+        var ticks = @base.Ticks;
+
+        return Interlocked.Exchange(ref StateFor(policy)._lastBackoffBaseTicks, ticks) != ticks;
     }
 
     /// <summary>

@@ -49,6 +49,48 @@ Server pushback overrides the backoff curve. If a verdict carries a `RetryAfter`
 
 `Backoff.Constant(delay)` and `Backoff.None` are also available. Use `Backoff.None` only if you know the dependency is not shared.
 
+## Measure the backoff base instead of guessing it
+
+`transientBase` is a guess about a dependency the library is already measuring. Against a dependency whose normal call takes three seconds, 100 ms is not backoff - the retry lands while the first attempt's work is very likely still queued. Against one that answers in two milliseconds, it spends 100 ms of the deadline doing nothing.
+
+`Backoff.Adaptive` sets the transient base to a multiple of what a call to this dependency recently took, and changes nothing else - the throttled base, the factor, the jitter, the cap, and server pushback all behave exactly as they do on `Backoff.Exponential`.
+
+<!-- snippet: retry-backoff-adaptive -->
+```csharp
+var api = Resilience.Http with
+{
+    // "Wait about one normal call before retrying", instead of a millisecond count that is
+    // only right for one dependency. The measured base is clamped to a factor of 10 either
+    // side of the 100 ms written here, so the constant stays the anchor.
+    Backoff = Backoff.Adaptive(multiple: 1, transientBase: TimeSpan.FromMilliseconds(value: 100)),
+};
+```
+<!-- endsnippet -->
+
+Unlike the [measured attempt ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), this estimate is not tighten-only: a longer backoff during a brownout is arguably correct, and it also lengthens every call's wall-clock time during the incident. So the measured base is clamped to `Spread` either side of the base you configured, and the constant you wrote stays the anchor.
+
+`Backoff.Adaptive(1)` is a complete configuration. The properties you can change, through `Backoff.Measured`:
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Multiple` | none - you supply it | How many normal calls the first retry waits. Must be greater than zero. |
+| `Quantile` | `0.5` | The quantile of recent successful latency that counts as normal. Capped at `0.5`. |
+| `Window` | `5 min` | How much history the baseline covers. |
+| `MinimumSamples` | `20` | How many recent successful calls the baseline needs before it moves anything. |
+| `Spread` | `10` | How far the measured base may move from `transientBase`, as a factor in either direction. Must be greater than 1. |
+
+Four behaviors are worth knowing:
+
+- **A cold process does not guess.** Below `MinimumSamples` there is no measured base and the retry waits `transientBase` unchanged.
+- **Throttling keeps its constant.** A rate limiter that answers in two milliseconds is telling you about its token bucket, not about how long to wait. Where the server does know, it says so, and `Retry-After` already wins over every curve.
+- **Only successful attempts are sampled.** A dependency failing fast has a very short latency distribution, and a base measured from it would turn the retry curve into a tight loop at the moment the dependency could least afford one.
+- **The estimate is per policy instance.** The [HTTP handler](../http/index.md) derives one policy per host, so each host's base is measured from that host's own latency. A policy rebuilt per call never warms its estimate - [`NRES008`](../reference/analyzers.md#nres008) reports that shape.
+
+Read the current value from `MeasuredBackoffBase`, or watch the `nresilience.backoff.base` histogram, which is recorded when the number moves. Both report the base after the clamp, so the gap between it and your `transientBase` is how wrong the constant was.
+
+> [!NOTE]
+> This is opt-in. It is the one measured term the library does not turn on for you, because it is the one that can lengthen a delay rather than only shorten one. `Adaptive = false` on the policy refuses it alongside every other measured term.
+
 ## Configure jitter
 
 When many clients retry at the same time - right after a brief outage, say - they create a second traffic spike. Jitter prevents that by adding a random component to each delay.

@@ -340,6 +340,60 @@ public sealed class PerCallStateTests
         Assert.Contains("'AttemptCeiling'", reported.GetMessage(), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    ///     And the same for a measured backoff base. It fails the quietest of the three: the retry
+    ///     simply waits the constant the curve was configured with, which is what it would have waited
+    ///     without the measurement.
+    /// </summary>
+    [Fact]
+    public void A_policy_with_a_measured_backoff_base_built_per_call_is_reported()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Dependencies
+                                                                {
+                                                                    internal static Resilience Api() => Resilience.Http with { Backoff = Backoff.Adaptive(1) };
+                                                                }
+                                                                """)));
+
+        Assert.Equal("NRES008", reported.Id);
+        Assert.Contains("'Backoff.Adaptive'", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    /// <summary>The long-hand form measures the same thing and is reported the same way.</summary>
+    [Fact]
+    public void The_long_hand_measured_backoff_base_is_reported_too()
+    {
+        var reported = Assert.Single(Harness.Run(Harness.InFile("""
+                                                                internal static class Dependencies
+                                                                {
+                                                                    internal static Resilience Api() => Resilience.Http with
+                                                                    {
+                                                                        Backoff = Backoff.Exponential() with { Measured = BackoffBase.Of(1) },
+                                                                    };
+                                                                }
+                                                                """)));
+
+        Assert.Equal("NRES008", reported.Id);
+        Assert.Contains("'Backoff.Measured'", reported.GetMessage(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     A per-call <c>Backoff</c> is ordinary - it is a value with no state behind it - so only the
+    ///     measured shape is reported. Reporting every curve written in a method would fire on a great
+    ///     deal of correct code.
+    /// </summary>
+    [Fact]
+    public void A_per_call_backoff_with_no_measured_base_is_not_reported()
+    {
+        Assert.Equal([], Harness.Ids(Harness.InFile("""
+                                                    internal static class Dependencies
+                                                    {
+                                                        internal static Resilience Api() =>
+                                                            Resilience.Http with { Backoff = Backoff.Exponential() };
+                                                    }
+                                                    """)));
+    }
+
     /// <summary>The shape the docs teach, and the reason the rule excludes field initializers.</summary>
     [Fact]
     public void A_policy_held_in_a_static_field_keeps_its_estimate()

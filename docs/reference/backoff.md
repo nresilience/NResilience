@@ -13,6 +13,7 @@ order: 4
 | `Backoff.Default` | Uses `Exponential()` with a 100 ms transient base, 1 s throttled base, factor of 2, 30 s cap, and full jitter. |
 | `Backoff.None` | Retries immediately. Use this only when the dependency is not shared. |
 | `Backoff.Exponential(transientBase, throttledBase, factor, max)` | Uses exponential backoff with separate bases for different retryable verdicts. All parameters are optional. |
+| `Backoff.Adaptive(multiple, transientBase, throttledBase, factor, max)` | Uses exponential backoff whose transient base is measured from recent latency. All parameters are optional. |
 | `Backoff.Constant(delay)` | Uses the same delay before every retry. |
 | `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Computes the delay yourself. This mode ignores the `Max` property and jitter. |
 | `Jitter` | Determines the amount of randomness applied to the delay. |
@@ -21,6 +22,7 @@ order: 4
 | `ThrottledBase` | The base delay for a `Throttled` verdict. Zero for a `Custom` curve. |
 | `Factor` | The growth per attempt. |
 | `Kind` | Which curve this is: `Exponential`, `Constant`, or `Custom`. |
+| `Measured` | A `BackoffBase?` that measures `TransientBase` from recent latency, or `null` to keep the configured constant. Only an `Exponential` curve may carry one. |
 | `Compute(in NextAttempt)` | Calculates the delay before the specified attempt. This value is never negative. |
 
 ### Reading a backoff back
@@ -70,6 +72,29 @@ The result is capped at `Max` and then jittered. The first retry is served the b
 The [executor](index.md) also keeps a delay from consuming the deadline's remaining time. If a delay would exceed the deadline, the call fails immediately with a deadline exception instead of sleeping.
 
 **Note**: `default(Backoff)` is equivalent to `Backoff.Default`.
+
+## `BackoffBase`
+
+`BackoffBase` is a `readonly record struct` that measures `TransientBase` from what a call to this
+dependency recently took, instead of taking it as a constant. It is opt-in, and
+[Retry](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it) has the argument for it.
+
+| Member | Default | Description |
+| :--- | :--- | :--- |
+| `BackoffBase.Of(multiple)` | `1` | Builds a configuration. `multiple` is how many normal calls the first retry waits. |
+| `Multiple` | none - you supply it | How many normal calls the first retry waits. Must be greater than zero. |
+| `Quantile` | `0.5` | The quantile of recent successful latency that counts as normal. Must be in `(0, 0.5]`. |
+| `Window` | `5 min` | How much history the baseline covers. |
+| `MinimumSamples` | `20` | How many recent successful calls the baseline needs before it moves anything. |
+| `Spread` | `10` | How far the measured base may move from `TransientBase`, as a factor in either direction. Must be greater than 1. |
+
+The measured base applies to `TransientBase` only. `ThrottledBase` stays the constant it was
+configured as, and `Verdict.RetryAfter` still wins over both. Value equality is over the *effective*
+configuration, so a value that names a default equals one that left it alone.
+
+`Compute(in NextAttempt)` returns the *unmeasured* curve: the estimate is private to the policy
+instance that owns it, so only the executor can supply it, and a bare `Backoff` value answers with
+the configured curve - the same answer the executor gives while the estimate is still cold.
 
 ## `BackoffKind`
 

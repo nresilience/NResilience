@@ -13,7 +13,8 @@ namespace NResilience.Analyzers;
 ///     of each per key and keeps none of them, and a client that is rebuilt per call has no per-host
 ///     anything. All of them read as configured resilience and provide none.
 ///     <para>
-///         NRES008 is the same failure one level in. <c>Hedge</c> and <c>AttemptCeiling</c> hold no state of
+///         NRES008 is the same failure one level in. <c>Hedge</c>, <c>AttemptCeiling</c> and a
+///         <c>Backoff</c> carrying a measured base hold no state of
 ///         their own - they are values - but the latency estimate they measure against is keyed by the
 ///         policy <i>instance</i>, so a policy rebuilt per call is a feature that never fires. It is a
 ///         rule of its own rather than a third case of NRES005 because the subject is the policy rather
@@ -104,23 +105,69 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
                 continue;
 
             var name = property.Property.Name;
+            string reported;
 
-            if (name != "Hedge" && name != "AttemptCeiling")
-                continue;
+            if (name is "Hedge" or "AttemptCeiling")
+            {
+                // `Hedge = null` removes the feature rather than configuring one, and the HTTP handler's
+                // own single-shot policy is written exactly that way.
+                if (IsNull(assignment.Value))
+                    continue;
 
-            // `Hedge = null` removes the feature rather than configuring one, and the HTTP handler's own
-            // single-shot policy is written exactly that way.
-            if (IsNull(assignment.Value))
+                reported = name;
+            }
+            else if (name == "Backoff" && MeasuredBase(assignment.Value) is { } written)
+            {
+                // A per-call Backoff is ordinary - it is a value with no state. Only the measured base
+                // has an estimate behind it, so only that shape is reported.
+                reported = written;
+            }
+            else
+            {
                 continue;
+            }
 
             context.ReportDiagnostic(Diagnostic.Create(
                 Diagnostics.PerCallEstimator,
                 policy.Syntax.GetLocation(),
-                name,
+                reported,
                 container));
 
             return;
         }
+    }
+
+    /// <summary>
+    ///     How this curve was given a measured base - <c>Backoff.Adaptive(...)</c> or an explicit
+    ///     <c>Measured</c> - or null when it was given none.
+    /// </summary>
+    /// <remarks>
+    ///     Only the two shapes written at the assignment are recognized, for the reason the estimator
+    ///     rule as a whole stops at what is written here: a curve held in a field and copied in is the
+    ///     commoner shape and following it would mean following the symbol's own initializer.
+    /// </remarks>
+    private static string? MeasuredBase(IOperation value)
+    {
+        var current = value;
+
+        while (current is IConversionOperation conversion)
+        {
+            current = conversion.Operand;
+        }
+
+        if (current is IInvocationOperation { TargetMethod.Name: "Adaptive" })
+            return "Backoff.Adaptive";
+
+        if (current is IWithOperation with && with.Initializer is { } initializer)
+        {
+            foreach (var assignment in initializer.Initializers.OfType<ISimpleAssignmentOperation>())
+            {
+                if (assignment.Target is IPropertyReferenceOperation { Property.Name: "Measured" } && !IsNull(assignment.Value))
+                    return "Backoff.Measured";
+            }
+        }
+
+        return null;
     }
 
     /// <summary>True for <c>null</c>, through however many conversions the nullable target added.</summary>

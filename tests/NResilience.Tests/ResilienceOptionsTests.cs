@@ -244,6 +244,55 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(Backoff.Default.Factor, policy.Backoff.Factor);
     }
 
+    /// <summary>
+    ///     A measured backoff base binds like any other section, and it is opt-in: a policy whose
+    ///     configuration says nothing about it keeps the constant it was written with.
+    /// </summary>
+    [Fact]
+    public void A_measured_backoff_base_binds_from_configuration()
+    {
+        var options = new ResilienceOptions();
+
+        Config(
+            ("Backoff:TransientBase", "00:00:00.200"),
+            ("Backoff:Measured:Multiple", "2"),
+            ("Backoff:Measured:Spread", "4"),
+            ("Backoff:Measured:MinimumSamples", "50")).Bind(options);
+
+        var policy = options.ToPolicy();
+
+        Assert.Equal(TimeSpan.FromMilliseconds(200), policy.Backoff.TransientBase);
+
+        var measured = Assert.NotNull(policy.Backoff.Measured);
+
+        Assert.Equal(2.0, measured.Multiple);
+        Assert.Equal(4.0, measured.Spread);
+        Assert.Equal(50, measured.MinimumSamples);
+
+        policy.Validate();
+    }
+
+    /// <summary>The default is off, which is the difference from the measured attempt ceiling.</summary>
+    [Fact]
+    public void No_backoff_base_is_measured_unless_the_section_asks_for_one()
+    {
+        Assert.Null(new ResilienceOptions().ToPolicy().Backoff.Measured);
+    }
+
+    /// <summary><c>"Enabled": false</c> drops a measured base the base policy carried.</summary>
+    [Fact]
+    public void A_disabled_measured_section_drops_the_base_policys_measurement()
+    {
+        var baseline = Resilience.Default with { Backoff = Backoff.Adaptive(1) };
+
+        var policy = new ResilienceOptions
+        {
+            Backoff = new BackoffOptions { Measured = new BackoffBaseOptions { Enabled = false } },
+        }.ToPolicy(baseline);
+
+        Assert.Null(policy.Backoff.Measured);
+    }
+
     /// <summary>Jitter on its own is a modifier, not a reason to rebuild the curve.</summary>
     [Fact]
     public void Jitter_alone_leaves_the_rest_of_the_backoff_alone()
@@ -341,6 +390,7 @@ public sealed class ResilienceOptionsTests
     /// </summary>
     [Theory]
     [InlineData("AttemptCeiling:Multiple", "AttemptCeiling")]
+    [InlineData("Backoff:Measured:Multiple", "Backoff.Measured")]
     [InlineData("Budget:Fraction", "Budget")]
     [InlineData("Breaker:SlowCalls:Multiple", "SlowCalls")]
     [InlineData("Breaker:Failures:Multiple", "Failures")]
