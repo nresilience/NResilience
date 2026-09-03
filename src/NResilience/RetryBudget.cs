@@ -103,9 +103,11 @@ public sealed class RetryBudget
             if (_time is null)
                 return 0;
 
+            var now = _time.GetTimestamp();
+
             lock (_gate)
             {
-                Refill();
+                Refill(now);
                 var spent = 1 - _tokens / _capacity;
                 return spent < 0 ? 0 : spent > 1 ? 1 : spent;
             }
@@ -175,9 +177,12 @@ public sealed class RetryBudget
         if (_time is null)
             return true;
 
+        // Read outside the lock, so the critical section is arithmetic and nothing else. See Refill.
+        var now = _time.GetTimestamp();
+
         lock (_gate)
         {
-            Refill();
+            Refill(now);
 
             if (_tokens < 1)
                 return false;
@@ -193,9 +198,13 @@ public sealed class RetryBudget
         if (_time is null)
             return;
 
+        // Read outside the lock. Deposit() runs on every successful call, so this is the one gate the
+        // library takes on the success path and the one worth keeping to arithmetic. See Refill.
+        var now = _time.GetTimestamp();
+
         lock (_gate)
         {
-            Refill();
+            Refill(now);
             _tokens = Math.Min(_capacity, _tokens + _fraction);
         }
     }
@@ -210,12 +219,14 @@ public sealed class RetryBudget
         if (_time is null || _refillPerSecond <= 0)
             return null;
 
+        var now = _time.GetTimestamp();
+
         lock (_gate)
         {
             // Refilled first, like every other reader of _tokens. The executor asks for this hint
             // *after* serving the guarded rejection delay, so without the refill the answer would be
             // the shortfall as it stood 100 ms ago and the hint would overstate.
-            Refill();
+            Refill(now);
 
             var needed = 1 - _tokens;
             return needed <= 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(needed / _refillPerSecond);
@@ -238,10 +249,23 @@ public sealed class RetryBudget
         return fraction;
     }
 
-    private void Refill()
+    /// <summary>Accrues the floor rate up to <paramref name="now" />.</summary>
+    /// <param name="now">
+    ///     A timestamp its caller read <i>before</i> taking <c>_gate</c>, which is what keeps the clock
+    ///     read out of the critical section: <see cref="Deposit" /> runs on every successful call, so a
+    ///     process holding one static policy funnels all of its successful traffic through this lock and
+    ///     the read roughly doubles how long each one holds it.
+    ///     <para>
+    ///         Reading before the lock means a thread can arrive with a timestamp another thread has
+    ///         already refilled past. The <c>seconds &lt;= 0</c> guard below is what makes that safe -
+    ///         it was already there for a non-monotonic clock, and it covers this too: the stale caller
+    ///         accrues nothing rather than rewinding <c>_refilledAt</c>. The lost accrual is the
+    ///         sub-microsecond gap between the two reads, which no rate expressed per second can see.
+    ///     </para>
+    /// </param>
+    private void Refill(long now)
     {
-        var now = _time!.GetTimestamp();
-        var seconds = _time.GetElapsedTime(_refilledAt, now).TotalSeconds;
+        var seconds = _time!.GetElapsedTime(_refilledAt, now).TotalSeconds;
 
         if (seconds <= 0)
             return;

@@ -890,11 +890,17 @@ public sealed partial record Resilience
         out TimeSpan wait,
         out StopReason reason)
     {
+        // One clock read for the whole post-attempt half. How long the attempt ran and how much of the
+        // deadline is left after it are two facts about the same instant - the moment it returned - and
+        // reading the clock twice both costs twice and lets the two disagree. The same argument
+        // LatencyWindow.RecordAndThreshold makes, one level up; `deadlineSpent` exists for it too.
+        var now = Time.GetTimestamp();
+
         RecordAttempt(
-            ref log, ref probe, start, Time.GetElapsedTime(start, attemptStart).Ticks, Time.GetElapsedTime(attemptStart),
+            ref log, ref probe, start, Time.GetElapsedTime(start, attemptStart).Ticks, Time.GetElapsedTime(attemptStart, now),
             timed, effective, verdict, error, in value, hasValue, AttemptFlags.None);
 
-        return Decide(log.Count, start, deadline, deadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken, out wait, out reason);
+        return Decide(log.Count, start, now, deadline, deadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken, out wait, out reason);
     }
 
     /// <summary>
@@ -953,7 +959,12 @@ public sealed partial record Resilience
         // MinimumSamples, and the policy reverts to the configured AttemptTimeout until successes
         // accumulate again. Sampling the failures instead would let a wave of timeouts raise the ceiling
         // that produced them.
-        if (verdict.Kind == VerdictKind.Ok && AttemptCeiling is not null)
+        //
+        // Unguarded by an AttemptCeiling null-check, unlike the MeasuredBase line below: that one is a
+        // plain field read off a struct, while this one would recompute the property's default per
+        // attempt to save a thread-static reference comparison. AttemptCeilingFor already returns null
+        // exactly when there is nothing measuring.
+        if (verdict.Kind == VerdictKind.Ok)
             ExecutionState.AttemptCeilingFor(this)?.Record(duration);
 
         // Successes only again, and here it is what keeps backoff from collapsing: a dependency failing
@@ -994,12 +1005,17 @@ public sealed partial record Resilience
     /// <summary>
     ///     The six questions, in the order they have to be asked: did it succeed, did the caller cancel,
     ///     is it permanent, are the attempts spent, is the deadline spent, will the budget fund another
-    ///     one. Nothing here reads the log or the clock except to report; every input arrives as a
-    ///     parameter.
+    ///     one. Nothing here reads the log or the clock at all; every input arrives as a parameter,
+    ///     <paramref name="now" /> included.
     /// </summary>
     /// <typeparam name="T">What the callback returns, or <c>VoidResult</c>.</typeparam>
     /// <param name="attempts">How many attempts have been recorded, which is the number this one is.</param>
     /// <param name="start">Timestamp the whole call started at.</param>
+    /// <param name="now">
+    ///     Timestamp the attempt being judged finished at, read once by the caller. Every elapsed time
+    ///     this method reports or acts on is derived from it, so the deadline it checks and the durations
+    ///     it publishes are facts about one instant rather than about several clock reads.
+    /// </param>
     /// <param name="deadline">The effective deadline: <see cref="Deadline" />, clamped by an inbound one when <see cref="UseAmbientDeadline" /> is set.</param>
     /// <param name="deadlineSpent">Whether the ceiling that fired was the deadline rather than <see cref="AttemptTimeout" />.</param>
     /// <param name="verdict">How the outcome being judged was classified.</param>
@@ -1014,6 +1030,7 @@ public sealed partial record Resilience
     private NextStep Decide<T>(
         int attempts,
         long start,
+        long now,
         TimeSpan deadline,
         bool deadlineSpent,
         Verdict verdict,
@@ -1044,7 +1061,7 @@ public sealed partial record Resilience
             // caller who cancelled while an attempt was already succeeding has waited for that attempt
             // either way, and throwing away work that is done and paid for helps nobody.
             if (OnEvent is not null)
-                Notify(CallEventKind.Succeeded, attempts, verdict, Time.GetElapsedTime(start), null, null, ResultOf(value, hasValue),
+                Notify(CallEventKind.Succeeded, attempts, verdict, Time.GetElapsedTime(start, now), null, null, ResultOf(value, hasValue),
                     StopReason.Succeeded);
 
             return NextStep.Succeeded;
@@ -1060,7 +1077,7 @@ public sealed partial record Resilience
             {
                 // The event that makes "Classifier.Default did not recognize your exception type"
                 // visible rather than mysterious: the type is right there on it.
-                Notify(CallEventKind.NotRetried, attempts, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                Notify(CallEventKind.NotRetried, attempts, verdict, Time.GetElapsedTime(start, now), null, error, ResultOf(value, hasValue),
                     StopReason.Permanent);
             }
 
@@ -1072,18 +1089,18 @@ public sealed partial record Resilience
             reason = StopReason.AttemptsExhausted;
 
             if (OnEvent is not null)
-                Notify(CallEventKind.Exhausted, attempts, verdict, Time.GetElapsedTime(start), null, error, ResultOf(value, hasValue),
+                Notify(CallEventKind.Exhausted, attempts, verdict, Time.GetElapsedTime(start, now), null, error, ResultOf(value, hasValue),
                     StopReason.AttemptsExhausted);
 
             return NextStep.Stop;
         }
 
-        var left = Remaining(Time, start, deadline);
+        var left = Remaining(Time, start, now, deadline);
 
         if (left == TimeSpan.Zero || deadlineSpent)
         {
             reason = StopReason.DeadlineExceeded;
-            NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start), error);
+            NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start, now), error);
             return NextStep.Stop;
         }
 
@@ -1102,7 +1119,7 @@ public sealed partial record Resilience
             wait = GuardDelay(left);
 
             if (OnEvent is not null)
-                Notify(CallEventKind.RejectedByBudget, attempts, verdict, Time.GetElapsedTime(start), wait, error, ResultOf(value, hasValue),
+                Notify(CallEventKind.RejectedByBudget, attempts, verdict, Time.GetElapsedTime(start, now), wait, error, ResultOf(value, hasValue),
                     StopReason.BudgetExhausted);
 
             return NextStep.Stop;
@@ -1116,7 +1133,7 @@ public sealed partial record Resilience
         if (bounded && delay + Viable() >= left)
         {
             reason = StopReason.DeadlineExceeded;
-            NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start), error);
+            NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start, now), error);
             return NextStep.Stop;
         }
 
@@ -1124,7 +1141,7 @@ public sealed partial record Resilience
         {
             // Raised before the backoff is served rather than after it, so a listener sees the retry
             // coming and can report how long the call is about to sit idle.
-            Notify(CallEventKind.Retrying, attempts + 1, verdict, Time.GetElapsedTime(start), delay, error, ResultOf(value, hasValue));
+            Notify(CallEventKind.Retrying, attempts + 1, verdict, Time.GetElapsedTime(start, now), delay, error, ResultOf(value, hasValue));
         }
 
         wait = delay;
@@ -1297,12 +1314,30 @@ public sealed partial record Resilience
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal static TimeSpan Remaining(TimeProvider time, long start, TimeSpan deadline)
+    internal static TimeSpan Remaining(TimeProvider time, long start, TimeSpan deadline) =>
+        Remaining(time, start, time.GetTimestamp(), deadline);
+
+    /// <summary>
+    ///     How much of the deadline is left as of <paramref name="now" />, rather than as of a clock read
+    ///     of this method's own.
+    /// </summary>
+    /// <param name="time">The clock, for its tick frequency only - this overload does not read it.</param>
+    /// <param name="start">Timestamp the whole call started at.</param>
+    /// <param name="now">The instant to measure from.</param>
+    /// <param name="deadline">The effective deadline.</param>
+    /// <returns>What is left, never negative, or <see cref="Timeout.InfiniteTimeSpan" />.</returns>
+    /// <remarks>
+    ///     For a caller that already holds a timestamp and wants this fact about that same instant. See
+    ///     <see cref="AfterAttempt{T}" />: the duration of the attempt and the deadline left after it are
+    ///     two facts about one moment, and deriving them from two clock reads makes them disagree as well
+    ///     as costing twice.
+    /// </remarks>
+    internal static TimeSpan Remaining(TimeProvider time, long start, long now, TimeSpan deadline)
     {
         if (deadline == Timeout.InfiniteTimeSpan)
             return Timeout.InfiniteTimeSpan;
 
-        var left = deadline - time.GetElapsedTime(start);
+        var left = deadline - time.GetElapsedTime(start, now);
         return left > TimeSpan.Zero ? left : TimeSpan.Zero;
     }
 
@@ -1321,8 +1356,8 @@ public sealed partial record Resilience
     /// <returns>The ceiling, or <see cref="Timeout.InfiniteTimeSpan" /> when there is none.</returns>
     /// <remarks>
     ///     Called once per attempt, and the cost to a policy that does not configure
-    ///     <see cref="AttemptCeiling" /> is one branch inside <see cref="Measured" />: a field read off
-    ///     <c>this</c>, which is already a field of the caller's state-machine box. Nothing here is held
+    ///     <see cref="AttemptCeiling" /> is one branch inside <see cref="Measured" />, behind the
+    ///     thread-static reference comparison <c>ExecutionState.StateFor</c> primes. Nothing here is held
     ///     across an <c>await</c>, which is the point - see <c>ExecutionState.AttemptCeilingFor</c>.
     /// </remarks>
     private TimeSpan Ceiling(int attemptNumber)
@@ -1350,10 +1385,13 @@ public sealed partial record Resilience
     /// <returns>The ceiling the measurement asks for, or null.</returns>
     private TimeSpan? Measured()
     {
-        if (AttemptCeiling is not { } ceiling)
+        // Both from ExecutionState rather than the settings off `this` and the window from the table:
+        // the AttemptCeiling property recomputes its default on every read, and this is the read the
+        // executor makes once per attempt. See ExecutionState.CeilingFor.
+        if (ExecutionState.CeilingFor(this, out var window) is not { } ceiling)
             return null;
 
-        if (ExecutionState.AttemptCeilingFor(this)?.Threshold(ceiling.MinimumSamples) is not { } tail)
+        if (window?.Threshold(ceiling.MinimumSamples) is not { } tail)
             return null;
 
         var measured = ceiling.CeilingFor(tail);

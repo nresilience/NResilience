@@ -302,8 +302,8 @@ public sealed partial record Resilience
                     // Ok is Decide's first branch and always comes back Succeeded, so the return value
                     // has nothing to say. Going through it anyway is what keeps the budget deposit and
                     // the terminal event in one place for all three loops.
-                    _ = Decide(winner, start, deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken,
-                        out _, out _);
+                    _ = Decide(winner, start, Time.GetTimestamp(), deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget,
+                        cancellationToken, out _, out _);
 
                     var succeeded = shaper.WantsLogOnSuccess
                         ? log.Materialize(Time.GetElapsedTime(start), deadline)
@@ -317,9 +317,12 @@ public sealed partial record Resilience
                 if (legs.Count > 0)
                     continue;
 
+                // The one clock read for the whole decision, like AfterAttempt's: the deadline this
+                // consults and the elapsed times its events report are all facts about the instant the
+                // round ended.
                 var next = Decide(
-                    log.Count, start, deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken,
-                    out var wait, out var stopped);
+                    log.Count, start, Time.GetTimestamp(), deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget,
+                    cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Stop)
                 {
