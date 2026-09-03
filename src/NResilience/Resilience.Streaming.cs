@@ -237,33 +237,16 @@ public sealed partial record Resilience
                     }
                 }
 
-                var ceiling = Ceiling(log.Count + 1);
-                var effective = Effective(ceiling, remaining);
-
-                // See the sequential loop: computed here, beside the ceiling, rather than in the catch
-                // blocks below - so the ceiling is not live across an await and does not join this
-                // iterator's state.
-                var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
-
-                timer = null;
-                attemptSource = null;
+                // The enumerator is re-initialized here, before Arm() can hand back this iteration's
+                // sources - see the field comments above for why all three must be.
                 enumerator = null;
-                var attemptToken = cancellationToken;
 
-                if (effective != Timeout.InfiniteTimeSpan)
-                {
-                    // The same two-source arrangement as a call, with one difference in ownership,
-                    // not construction: on the attempt that survives, neither source is released
-                    // here. See the field comments above.
-                    timer = CtsPool.Rent(Time);
-                    timer.CancelAfter(effective);
-
-                    attemptSource = cancellationToken.CanBeCanceled
-                        ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
-                        : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
-
-                    attemptToken = attemptSource.Token;
-                }
+                // The ceiling, where it came from, and the sources that enforce it. The same two-source
+                // arrangement as a call, with one difference in ownership, not construction: on the
+                // attempt that survives, neither source is released here. See Arm() and the field
+                // comments above.
+                Arm(log.Count + 1, remaining, deadline, cancellationToken,
+                    out timer, out attemptSource, out var attemptToken, out var effective, out var deadlineCeiling);
 
                 var attemptStart = Time.GetTimestamp();
                 error = null;

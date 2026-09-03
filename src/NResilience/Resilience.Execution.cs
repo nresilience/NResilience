@@ -56,15 +56,7 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask<T>(work(cancellationToken));
 
-        if (Hedge is not null)
-            return ExecuteHedgedAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
-                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
-
-        if (Admit is not null)
-            return ExecuteWithAdmitAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
-                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
-
-        return ExecuteAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
+        return Dispatch<VoidResult, T, StatelessInvoker<VoidResult, T>, T, ThrowingShaper<T>>(
             new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
     }
 
@@ -80,15 +72,7 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask(work(cancellationToken));
 
-        if (Hedge is not null)
-            return Discard(ExecuteHedgedAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
-                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken));
-
-        if (Admit is not null)
-            return Discard(ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
-                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken));
-
-        return Discard(ExecuteAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
+        return Discard(Dispatch<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, VoidResult, ThrowingShaper<VoidResult>>(
             new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken));
     }
 
@@ -111,15 +95,7 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask<T>(work(state, cancellationToken));
 
-        if (Hedge is not null)
-            return ExecuteHedgedAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
-                new StatefulInvoker<TState, T>(work), state, cancellationToken);
-
-        if (Admit is not null)
-            return ExecuteWithAdmitAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
-                new StatefulInvoker<TState, T>(work), state, cancellationToken);
-
-        return ExecuteAsync<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
+        return Dispatch<TState, T, StatefulInvoker<TState, T>, T, ThrowingShaper<T>>(
             new StatefulInvoker<TState, T>(work), state, cancellationToken);
     }
 
@@ -137,15 +113,7 @@ public sealed partial record Resilience
         if (IsPassthrough)
             return new ValueTask(work(state, cancellationToken));
 
-        if (Hedge is not null)
-            return Discard(ExecuteHedgedAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
-                new VoidStatefulInvoker<TState>(work), state, cancellationToken));
-
-        if (Admit is not null)
-            return Discard(ExecuteWithAdmitAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
-                new VoidStatefulInvoker<TState>(work), state, cancellationToken));
-
-        return Discard(ExecuteAsync<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
+        return Discard(Dispatch<TState, VoidResult, VoidStatefulInvoker<TState>, VoidResult, ThrowingShaper<VoidResult>>(
             new VoidStatefulInvoker<TState>(work), state, cancellationToken));
     }
 
@@ -167,15 +135,7 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
-        if (Hedge is not null)
-            return ExecuteHedgedAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
-                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
-
-        if (Admit is not null)
-            return ExecuteWithAdmitAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
-                new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
-
-        return ExecuteAsync<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
+        return Dispatch<VoidResult, T, StatelessInvoker<VoidResult, T>, CallResult<T>, ResultShaper<T>>(
             new StatelessInvoker<VoidResult, T>(work), default, cancellationToken);
     }
 
@@ -188,15 +148,7 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
-        if (Hedge is not null)
-            return ExecuteHedgedAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
-                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken);
-
-        if (Admit is not null)
-            return ExecuteWithAdmitAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
-                new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken);
-
-        return ExecuteAsync<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
+        return Dispatch<VoidResult, VoidResult, VoidStatelessInvoker<VoidResult>, CallResult, VoidResultShaper>(
             new VoidStatelessInvoker<VoidResult>(work), default, cancellationToken);
     }
 
@@ -213,15 +165,7 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
-        if (Hedge is not null)
-            return ExecuteHedgedAsync<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
-                new StatefulInvoker<TState, T>(work), state, cancellationToken);
-
-        if (Admit is not null)
-            return ExecuteWithAdmitAsync<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
-                new StatefulInvoker<TState, T>(work), state, cancellationToken);
-
-        return ExecuteAsync<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
+        return Dispatch<TState, T, StatefulInvoker<TState, T>, CallResult<T>, ResultShaper<T>>(
             new StatefulInvoker<TState, T>(work), state, cancellationToken);
     }
 
@@ -236,15 +180,7 @@ public sealed partial record Resilience
         ArgumentNullException.ThrowIfNull(work);
         ExecutionState.EnsureValidated(this);
 
-        if (Hedge is not null)
-            return ExecuteHedgedAsync<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
-                new VoidStatefulInvoker<TState>(work), state, cancellationToken);
-
-        if (Admit is not null)
-            return ExecuteWithAdmitAsync<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
-                new VoidStatefulInvoker<TState>(work), state, cancellationToken);
-
-        return ExecuteAsync<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
+        return Dispatch<TState, VoidResult, VoidStatefulInvoker<TState>, CallResult, VoidResultShaper>(
             new VoidStatefulInvoker<TState>(work), state, cancellationToken);
     }
 
@@ -260,6 +196,112 @@ public sealed partial record Resilience
     /// </summary>
     private static ValueTask Discard(ValueTask<VoidResult> pending) =>
         pending.IsCompletedSuccessfully ? default : new ValueTask(pending.AsTask());
+
+    /// <summary>
+    ///     Picks the loop this call runs in: hedged if <see cref="Hedge" /> is set, otherwise the
+    ///     admission-aware loop if <see cref="Admit" /> is, otherwise the plain one.
+    ///     <para>
+    ///         The order is the invariant - hedging wins over admission, because a hedged call admits
+    ///         per leg inside <see cref="ExecuteHedgedAsync{TState,T,TInvoker,TOut,TShaper}" /> rather
+    ///         than once for the operation. Every entry point ended with this same three-way test, so
+    ///         the invariant was asserted by sixteen independent copies; here it has one home.
+    ///     </para>
+    ///     <para>
+    ///         Not <c>async</c>, so it adds no state machine and no box - it hands back the chosen
+    ///         loop's <see cref="ValueTask{TResult}" /> untouched. The same property is why
+    ///         <see cref="AfterAttempt{T}" /> and <see cref="Arm" /> are shareable.
+    ///     </para>
+    /// </summary>
+    private ValueTask<TOut> Dispatch<TState, T, TInvoker, TOut, TShaper>(
+        TInvoker invoker,
+        TState state,
+        CancellationToken cancellationToken)
+        where TInvoker : struct, IInvoker<TState, T>
+        where TShaper : struct, IOutcomeShaper<T, TOut>
+    {
+        if (Hedge is not null)
+            return ExecuteHedgedAsync<TState, T, TInvoker, TOut, TShaper>(invoker, state, cancellationToken);
+
+        if (Admit is not null)
+            return ExecuteWithAdmitAsync<TState, T, TInvoker, TOut, TShaper>(invoker, state, cancellationToken);
+
+        return ExecuteAsync<TState, T, TInvoker, TOut, TShaper>(invoker, state, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Arranges one attempt's ceiling: what it is, where it came from, and the two cancellation
+    ///     sources that enforce it.
+    ///     <para>
+    ///         A pooled source drives the timer, and the attempt links it with the caller's token to make
+    ///         the token the callback receives. The pooled source's own token is never handed out:
+    ///         <c>TryReset</c> preserves token identity, so a callback that outlived its attempt would
+    ///         observe the next operation's cancellation.
+    ///     </para>
+    ///     <para>
+    ///         The tempting shortcut - one fresh <c>CreateLinkedTokenSource(caller)</c> with
+    ///         <c>CancelAfter</c> on it, dodging the second source - measures 96 B/call <i>worse</i>. A
+    ///         pooled source keeps its <c>TimerQueueTimer</c> across <c>TryReset</c>, so its
+    ///         <c>CancelAfter</c> allocates nothing, and a fresh source's cannot. Measured, not reasoned.
+    ///     </para>
+    ///     <para>
+    ///         Extracted for the same reason as <see cref="AfterAttempt{T}" />, whose documentation makes
+    ///         the case: this was the same code in all three sequential loops, and it is the code whose
+    ///         rule the streaming file describes as the one whose violation is silent, intermittent, and
+    ///         blamed on the wrong call. The hedged loop arranges its sources before its body runs, so it
+    ///         does not call this - and that is now a visible difference rather than a fourth copy.
+    ///     </para>
+    ///     <para>
+    ///         Not <c>async</c>, and the results go straight into the caller's own locals through
+    ///         <c>out</c>, so nothing extra reaches the state-machine box - the identical argument
+    ///         <see cref="AfterAttempt{T}" /> already makes.
+    ///     </para>
+    /// </summary>
+    /// <param name="attemptNumber">Which attempt this is, one-based; the ceiling may vary with it.</param>
+    /// <param name="remaining">What is left of the deadline right now.</param>
+    /// <param name="deadline">The operation's effective deadline, for deciding which term supplied the ceiling.</param>
+    /// <param name="caller">The caller's token, linked into the attempt's own.</param>
+    /// <param name="timer">The pooled source driving the ceiling, or null when there is no ceiling. The caller returns it to the pool.</param>
+    /// <param name="source">The linked source whose token the attempt runs on, or null. The caller disposes it.</param>
+    /// <param name="token">The token to hand the callback: the linked one, or <paramref name="caller" /> when there is no ceiling.</param>
+    /// <param name="effective">The ceiling actually applied, or <see cref="Timeout.InfiniteTimeSpan" />.</param>
+    /// <param name="deadlineCeiling">
+    ///     Whether the deadline supplied the ceiling rather than <see cref="AttemptTimeout" />. Computed
+    ///     here, where both terms are still in hand, rather than in the caller's catch: with
+    ///     <see cref="AttemptCeiling" /> configured, <c>effective != AttemptTimeout</c> no longer means
+    ///     "the deadline won", and hoisting the ceiling itself across the attempt await would cost every
+    ///     caller 8 bytes of state-machine box where a bool costs none.
+    /// </param>
+    private void Arm(
+        int attemptNumber,
+        TimeSpan remaining,
+        TimeSpan deadline,
+        CancellationToken caller,
+        out CancellationTokenSource? timer,
+        out CancellationTokenSource? source,
+        out CancellationToken token,
+        out TimeSpan effective,
+        out bool deadlineCeiling)
+    {
+        var ceiling = Ceiling(attemptNumber);
+        effective = Effective(ceiling, remaining);
+        deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
+
+        timer = null;
+        source = null;
+        token = caller;
+
+        if (effective == Timeout.InfiniteTimeSpan)
+            return;
+
+        timer = CtsPool.Rent(Time);
+        timer.CancelAfter(effective);
+
+        source = caller.CanBeCanceled
+            ? CancellationTokenSource.CreateLinkedTokenSource(caller, timer.Token)
+            : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
+
+        token = source.Token;
+    }
 
     private async ValueTask<TOut> ExecuteAsync<TState, T, TInvoker, TOut, TShaper>(
         TInvoker invoker,
@@ -382,41 +424,9 @@ public sealed partial record Resilience
                     }
                 }
 
-                var ceiling = Ceiling(log.Count + 1);
-                var effective = Effective(ceiling, remaining);
-
-                // Whether the deadline supplied this attempt's ceiling. Computed here, where both terms
-                // are still in hand, rather than in the catch below: with AttemptCeiling configured,
-                // `effective != AttemptTimeout` no longer means "the deadline won", and hoisting the
-                // ceiling itself across the attempt await would cost every caller 8 bytes of
-                // state-machine box where a fourth bool costs none - it lands in the padding
-                // `probe`, `hasValue` and `deadlineSpent` already leave.
-                var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
-
-                CancellationTokenSource? timer = null;
-                CancellationTokenSource? attemptSource = null;
-                var attemptToken = cancellationToken;
-
-                if (effective != Timeout.InfiniteTimeSpan)
-                {
-                    // A pooled source drives the timer, and the attempt links it with the caller's
-                    // token to make the token the callback receives. The pooled source's own token is
-                    // never handed out: TryReset preserves token identity, so a callback that outlived
-                    // its attempt would observe the next operation's cancellation.
-                    //
-                    // The tempting shortcut - one fresh CreateLinkedTokenSource(caller) with
-                    // CancelAfter on it, dodging the second source - measures 96 B/call *worse*.
-                    // A pooled source keeps its TimerQueueTimer across TryReset, so its CancelAfter
-                    // allocates nothing, and a fresh source's cannot. Measured, not reasoned.
-                    timer = CtsPool.Rent(Time);
-                    timer.CancelAfter(effective);
-
-                    attemptSource = cancellationToken.CanBeCanceled
-                        ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
-                        : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
-
-                    attemptToken = attemptSource.Token;
-                }
+                // The ceiling, where it came from, and the sources that enforce it. See Arm().
+                Arm(log.Count + 1, remaining, deadline, cancellationToken,
+                    out var timer, out var attemptSource, out var attemptToken, out var effective, out var deadlineCeiling);
 
                 var attemptStart = Time.GetTimestamp();
                 error = null;
@@ -658,28 +668,9 @@ public sealed partial record Resilience
                     }
                 }
 
-                var ceiling = Ceiling(log.Count + 1);
-                var effective = Effective(ceiling, remaining);
-
-                // See ExecuteAsync: computed beside the ceiling so the ceiling itself is not live across
-                // the attempt await.
-                var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
-
-                CancellationTokenSource? timer = null;
-                CancellationTokenSource? attemptSource = null;
-                var attemptToken = cancellationToken;
-
-                if (effective != Timeout.InfiniteTimeSpan)
-                {
-                    timer = CtsPool.Rent(Time);
-                    timer.CancelAfter(effective);
-
-                    attemptSource = cancellationToken.CanBeCanceled
-                        ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timer.Token)
-                        : CancellationTokenSource.CreateLinkedTokenSource(timer.Token);
-
-                    attemptToken = attemptSource.Token;
-                }
+                // The ceiling, where it came from, and the sources that enforce it. See Arm().
+                Arm(log.Count + 1, remaining, deadline, cancellationToken,
+                    out var timer, out var attemptSource, out var attemptToken, out var effective, out var deadlineCeiling);
 
                 var attemptStart = Time.GetTimestamp();
                 error = null;
