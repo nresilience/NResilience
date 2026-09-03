@@ -27,13 +27,13 @@ internal sealed class WinWindow
     private const int Rings = 4;
 
     private readonly WinRate _feedback;
+    private readonly object _gate = new();
     private readonly long[] _ringEpochs = new long[Rings];
     private readonly int[] _started = new int[Rings];
     private readonly long _startedAt;
     private readonly long _ticksPerRing;
     private readonly TimeProvider _time;
     private readonly int[] _won = new int[Rings];
-    private readonly object _gate = new();
 
     /// <summary>The fraction of would-be hedges currently admitted. Starts at 1: a cold loop hedges as configured.</summary>
     private double _allowance = 1;

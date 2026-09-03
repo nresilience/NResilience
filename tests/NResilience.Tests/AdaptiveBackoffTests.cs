@@ -39,7 +39,7 @@ public sealed class AdaptiveBackoffTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _);
 
-        await WarmAsync(policy, time, Normal, times: 19);
+        await WarmAsync(policy, time, Normal, 19);
 
         Assert.Null(policy.MeasuredBackoffBase);
     }
@@ -51,7 +51,7 @@ public sealed class AdaptiveBackoffTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _);
 
-        await WarmAsync(policy, time, Normal, times: 20);
+        await WarmAsync(policy, time, Normal, 20);
 
         var measured = policy.MeasuredBackoffBase;
 
@@ -69,7 +69,7 @@ public sealed class AdaptiveBackoffTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _) with { Backoff = Backoff.Exponential(Configured) };
 
-        await WarmAsync(policy, time, Normal, times: 40);
+        await WarmAsync(policy, time, Normal, 40);
 
         Assert.Null(policy.MeasuredBackoffBase);
     }
@@ -108,13 +108,13 @@ public sealed class AdaptiveBackoffTests
 
         // The clamp is opened up on purpose: this test is about the multiple porting, and the default
         // band around 100 ms is what both bases would otherwise come from.
-        var wide = MeasuredBase.Of(1) with { Window = Window, Spread = 1000 };
+        var wide = MeasuredBase.Of() with { Window = Window, Spread = 1000 };
 
         var quick = Adaptive(time, out _) with { Backoff = Backoff.Measured(1, Configured) with { MeasuredBase = wide } };
         var slow = Adaptive(time, out _) with { Backoff = Backoff.Measured(1, Configured) with { MeasuredBase = wide } };
 
-        await WarmAsync(quick, time, TimeSpan.FromMilliseconds(2), times: 40);
-        await WarmAsync(slow, time, TimeSpan.FromSeconds(2), times: 40);
+        await WarmAsync(quick, time, TimeSpan.FromMilliseconds(2), 40);
+        await WarmAsync(slow, time, TimeSpan.FromSeconds(2), 40);
 
         Assert.InRange(quick.MeasuredBackoffBase!.Value, TimeSpan.FromMilliseconds(2), TimeSpan.FromMilliseconds(2.3));
         Assert.InRange(slow.MeasuredBackoffBase!.Value, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2.3));
@@ -130,7 +130,7 @@ public sealed class AdaptiveBackoffTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out var events) with { Attempts = 2 };
 
-        await WarmAsync(policy, time, Normal, times: 40);
+        await WarmAsync(policy, time, Normal, 40);
 
         var calls = 0;
 
@@ -172,7 +172,7 @@ public sealed class AdaptiveBackoffTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _);
 
-        await WarmAsync(policy, time, TimeSpan.FromSeconds(60), times: 40);
+        await WarmAsync(policy, time, TimeSpan.FromSeconds(60), 40);
 
         // Ten times the configured 100 ms, exactly, whatever the dependency did.
         Assert.Equal(TimeSpan.FromSeconds(1), policy.MeasuredBackoffBase);
@@ -189,7 +189,7 @@ public sealed class AdaptiveBackoffTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _);
 
-        await WarmAsync(policy, time, TimeSpan.FromMicroseconds(100), times: 40);
+        await WarmAsync(policy, time, TimeSpan.FromMicroseconds(100), 40);
 
         // A tenth of the configured 100 ms, exactly.
         Assert.Equal(TimeSpan.FromMilliseconds(10), policy.MeasuredBackoffBase);
@@ -246,7 +246,7 @@ public sealed class AdaptiveBackoffTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _);
 
-        await WarmAsync(policy, time, Normal, times: 20);
+        await WarmAsync(policy, time, Normal, 20);
         var before = policy.MeasuredBackoffBase;
 
         // Sixty fast failures against twenty slow successes. Were failures sampled, the median would
@@ -275,7 +275,7 @@ public sealed class AdaptiveBackoffTests
         var one = Adaptive(time, out _);
         var other = Adaptive(time, out _);
 
-        await WarmAsync(one, time, Normal, times: 40);
+        await WarmAsync(one, time, Normal, 40);
 
         Assert.NotNull(one.MeasuredBackoffBase);
         Assert.Null(other.MeasuredBackoffBase);
@@ -296,7 +296,7 @@ public sealed class AdaptiveBackoffTests
     [InlineData(0)]
     public void A_quantile_outside_the_body_is_refused(double quantile)
     {
-        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Of(1) with { Quantile = quantile } } };
+        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Of() with { Quantile = quantile } } };
 
         Assert.Contains(Problems(policy), p => p.Contains("MeasuredBase.Quantile", StringComparison.Ordinal));
     }
@@ -305,7 +305,7 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void A_spread_of_one_or_less_is_refused()
     {
-        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Of(1) with { Spread = 1 } } };
+        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Of() with { Spread = 1 } } };
 
         Assert.Contains(Problems(policy), p => p.Contains("MeasuredBase.Spread", StringComparison.Ordinal));
     }
@@ -318,8 +318,8 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void A_measured_base_on_a_curve_that_is_not_exponential_is_refused()
     {
-        var constant = TestPolicy.Instant with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(1)) with { MeasuredBase = MeasuredBase.Of(1) } };
-        var custom = TestPolicy.Instant with { Backoff = Backoff.Custom(_ => TimeSpan.Zero) with { MeasuredBase = MeasuredBase.Of(1) } };
+        var constant = TestPolicy.Instant with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(1)) with { MeasuredBase = MeasuredBase.Of() } };
+        var custom = TestPolicy.Instant with { Backoff = Backoff.Custom(_ => TimeSpan.Zero) with { MeasuredBase = MeasuredBase.Of() } };
 
         Assert.Contains(Problems(constant), p => p.Contains("Backoff.MeasuredBase", StringComparison.Ordinal));
         Assert.Contains(Problems(custom), p => p.Contains("Backoff.MeasuredBase", StringComparison.Ordinal));
@@ -341,9 +341,9 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void Naming_a_default_equals_leaving_it_alone()
     {
-        Assert.Equal(MeasuredBase.Of(1), MeasuredBase.Of(1) with { Quantile = 0.5 });
-        Assert.Equal(MeasuredBase.Of(1).GetHashCode(), (MeasuredBase.Of(1) with { MinimumSamples = 20 }).GetHashCode());
-        Assert.NotEqual(MeasuredBase.Of(1), MeasuredBase.Of(2));
+        Assert.Equal(MeasuredBase.Of(), MeasuredBase.Of() with { Quantile = 0.5 });
+        Assert.Equal(MeasuredBase.Of().GetHashCode(), (MeasuredBase.Of() with { MinimumSamples = 20 }).GetHashCode());
+        Assert.NotEqual(MeasuredBase.Of(), MeasuredBase.Of(2));
     }
 
     /// <summary>
@@ -373,7 +373,7 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void An_unconstructed_curve_keeps_a_measured_base()
     {
-        var backoff = default(Backoff) with { MeasuredBase = MeasuredBase.Of(1), Jitter = Jitter.None };
+        var backoff = default(Backoff) with { MeasuredBase = MeasuredBase.Of(), Jitter = Jitter.None };
 
         Assert.Equal(Normal, Delay(backoff, Verdict.Transient, 2, Normal));
     }
@@ -381,7 +381,7 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void It_prints_its_effective_configuration()
     {
-        var text = MeasuredBase.Of(1).ToString();
+        var text = MeasuredBase.Of().ToString();
 
         Assert.Contains("1x p50", text, StringComparison.Ordinal);
         Assert.Contains("300s", text, StringComparison.Ordinal);
@@ -403,7 +403,7 @@ public sealed class AdaptiveBackoffTests
             Backoff = Backoff.Measured(1, Configured) with
             {
                 Jitter = Jitter.None,
-                MeasuredBase = MeasuredBase.Of(1) with { Window = Window },
+                MeasuredBase = MeasuredBase.Of() with { Window = Window },
             },
             OnEvent = recorder.Record,
         };

@@ -141,11 +141,6 @@ public readonly record struct Failures
         init => _absoluteFloor = value;
     }
 
-    /// <summary>The way to configure a relative failure trip.</summary>
-    /// <param name="multiple">How many times the baseline error rate counts as too many. Must be greater than 1.</param>
-    /// <returns>The configuration.</returns>
-    public static Failures Above(double multiple = 5.0) => new() { Multiple = multiple };
-
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
     ///     explicitly equals one that left it alone.
@@ -157,6 +152,11 @@ public readonly record struct Failures
         && Window == other.Window
         && MinimumSamples == other.MinimumSamples
         && Floor.Equals(other.Floor);
+
+    /// <summary>The way to configure a relative failure trip.</summary>
+    /// <param name="multiple">How many times the baseline error rate counts as too many. Must be greater than 1.</param>
+    /// <returns>The configuration.</returns>
+    public static Failures Above(double multiple = 5.0) => new() { Multiple = multiple };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Multiple, Window, MinimumSamples, Floor);

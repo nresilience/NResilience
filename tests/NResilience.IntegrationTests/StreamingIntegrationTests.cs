@@ -19,17 +19,17 @@ namespace NResilience.IntegrationTests;
 /// </remarks>
 public sealed class LoopbackStreamServer : IAsyncDisposable
 {
+    private readonly TimeSpan _delay;
+    private readonly int _dropFirst;
+    private readonly int _lines;
     private readonly TcpListener _listener;
     private readonly Task _pump;
     private readonly CancellationTokenSource _shutdown = new();
-    private readonly int _dropFirst;
-    private readonly int _lines;
-    private readonly TimeSpan _delay;
+    private long _closed;
 
     private long _connections;
-    private long _served;
     private long _dropped;
-    private long _closed;
+    private long _served;
 
     private LoopbackStreamServer(TcpListener listener, int lines, TimeSpan delay, int dropFirst)
     {
@@ -54,13 +54,6 @@ public sealed class LoopbackStreamServer : IAsyncDisposable
 
     public int Port => ((IPEndPoint)_listener.Server.LocalEndPoint!).Port;
 
-    public static async Task<LoopbackStreamServer> StartAsync(int lines, TimeSpan delay, int dropFirst = 0)
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        return new LoopbackStreamServer(listener, lines, delay, dropFirst);
-    }
-
     public async ValueTask DisposeAsync()
     {
         await _shutdown.CancelAsync().ConfigureAwait(false);
@@ -73,6 +66,13 @@ public sealed class LoopbackStreamServer : IAsyncDisposable
         {
             // The pump ends when the listener stops accepting.
         }
+    }
+
+    public static async Task<LoopbackStreamServer> StartAsync(int lines, TimeSpan delay, int dropFirst = 0)
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        return new LoopbackStreamServer(listener, lines, delay, dropFirst);
     }
 
     /// <summary>
@@ -208,12 +208,14 @@ public sealed class StreamingIntegrationTests
     [Fact]
     public async Task A_stream_drains_fully_over_a_real_socket()
     {
-        await using var server = await LoopbackStreamServer.StartAsync(lines: 5, delay: TimeSpan.FromMilliseconds(10));
+        await using var server = await LoopbackStreamServer.StartAsync(5, TimeSpan.FromMilliseconds(10));
 
         var text = new StringBuilder();
 
         await foreach (var chunk in Policy().RunAsync(server.ConnectAsync))
+        {
             text.Append(chunk);
+        }
 
         Assert.Contains("line 0", text.ToString(), StringComparison.Ordinal);
         Assert.Contains("line 4", text.ToString(), StringComparison.Ordinal);
@@ -231,7 +233,7 @@ public sealed class StreamingIntegrationTests
     [Fact]
     public async Task Mid_enumeration_cancellation_breaks_the_real_connection()
     {
-        await using var server = await LoopbackStreamServer.StartAsync(lines: 100, delay: TimeSpan.FromMilliseconds(50));
+        await using var server = await LoopbackStreamServer.StartAsync(100, TimeSpan.FromMilliseconds(50));
 
         using var cts = new CancellationTokenSource();
         var chunks = 0;
@@ -285,17 +287,18 @@ public sealed class StreamingIntegrationTests
     public async Task A_reset_first_connection_is_retried_over_a_real_socket()
     {
         await using var server =
-            await LoopbackStreamServer.StartAsync(lines: 3, delay: TimeSpan.FromMilliseconds(10), dropFirst: 1);
+            await LoopbackStreamServer.StartAsync(3, TimeSpan.FromMilliseconds(10), 1);
 
         var text = new StringBuilder();
 
         await foreach (var chunk in Policy().RunAsync(server.ConnectAsync))
+        {
             text.Append(chunk);
+        }
 
         Assert.Contains("line 0", text.ToString(), StringComparison.Ordinal);
         Assert.Equal(2, server.Connections);
         Assert.Equal(1, server.Dropped);
         Assert.Equal(1, server.Served);
     }
-
 }

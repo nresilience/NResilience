@@ -38,7 +38,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out var events);
 
-        await WarmAsync(policy, time, Fast, times: 19);
+        await WarmAsync(policy, time, Fast, 19);
 
         Assert.Null(policy.MeasuredAttemptCeiling);
         Assert.False(events.Contains(CallEventKind.AttemptTimeoutAdapted));
@@ -51,7 +51,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out var events);
 
-        await WarmAsync(policy, time, Fast, times: 20);
+        await WarmAsync(policy, time, Fast, 20);
 
         var measured = policy.MeasuredAttemptCeiling;
 
@@ -62,7 +62,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         Assert.InRange(measured.Value, TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(340));
 
         // Reported once, when it moved, rather than once per attempt.
-        await WarmAsync(policy, time, Fast, times: 20);
+        await WarmAsync(policy, time, Fast, 20);
         Assert.Equal(1, events.CountOf(CallEventKind.AttemptTimeoutAdapted));
     }
 
@@ -79,9 +79,9 @@ public sealed class AdaptiveAttemptTimeoutTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _);
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
-        var result = await HangAsync(policy, time, advance: TimeSpan.FromMilliseconds(400));
+        var result = await HangAsync(policy, time, TimeSpan.FromMilliseconds(400));
 
         Assert.False(result.IsSuccess);
         var timeout = Assert.IsType<AttemptTimeoutException>(result.Exception);
@@ -102,13 +102,13 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         // The floor is out of the way on purpose: this test is about the multiple porting, and the
         // default 50 ms floor would be what the quick dependency's ceiling came from instead.
-        var noFloor = AttemptCeiling.Above(3) with { Window = Window, Floor = TimeSpan.FromTicks(1) };
+        var noFloor = AttemptCeiling.Above() with { Window = Window, Floor = TimeSpan.FromTicks(1) };
 
         var quick = Adaptive(time, out _) with { AttemptCeiling = noFloor };
         var slow = Adaptive(time, out _) with { AttemptCeiling = noFloor };
 
-        await WarmAsync(quick, time, TimeSpan.FromMilliseconds(2), times: 40);
-        await WarmAsync(slow, time, TimeSpan.FromSeconds(2), times: 40);
+        await WarmAsync(quick, time, TimeSpan.FromMilliseconds(2), 40);
+        await WarmAsync(slow, time, TimeSpan.FromSeconds(2), 40);
 
         // Same AttemptCeiling.Above(3) on both, and the two ceilings are three orders of magnitude
         // apart because the dependencies are.
@@ -130,11 +130,11 @@ public sealed class AdaptiveAttemptTimeoutTests
         var policy = Adaptive(time, out var events);
 
         // A p95 of 20 s. Three times that is a minute, and the configured ceiling is 30 seconds.
-        await WarmAsync(policy, time, TimeSpan.FromSeconds(20), times: 40);
+        await WarmAsync(policy, time, TimeSpan.FromSeconds(20), 40);
 
         Assert.True(policy.MeasuredAttemptCeiling > Configured);
 
-        var result = await HangAsync(policy, time, advance: TimeSpan.FromSeconds(31));
+        var result = await HangAsync(policy, time, TimeSpan.FromSeconds(31));
 
         var timeout = Assert.IsType<AttemptTimeoutException>(result.Exception);
         Assert.Equal(Configured, timeout.Timeout);
@@ -155,9 +155,9 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         var policy = Adaptive(time, out _) with { AttemptTimeout = Timeout.InfiniteTimeSpan };
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
-        var result = await HangAsync(policy, time, advance: TimeSpan.FromMilliseconds(400));
+        var result = await HangAsync(policy, time, TimeSpan.FromMilliseconds(400));
 
         Assert.IsType<AttemptTimeoutException>(result.Exception);
     }
@@ -175,13 +175,15 @@ public sealed class AdaptiveAttemptTimeoutTests
         var time = new FakeTimeProvider();
         var policy = Adaptive(time, out _);
 
-        await WarmAsync(policy, time, Fast, times: 20);
+        await WarmAsync(policy, time, Fast, 20);
         var before = policy.MeasuredAttemptCeiling;
 
         // Ten calls that time out at the measured ceiling. Were failures sampled, the ceiling would
         // now be climbing on the evidence of the timeouts it produced.
         for (var i = 0; i < 10; i++)
-            await HangAsync(policy, time, advance: TimeSpan.FromMilliseconds(400));
+        {
+            await HangAsync(policy, time, TimeSpan.FromMilliseconds(400));
+        }
 
         Assert.Equal(before, policy.MeasuredAttemptCeiling);
     }
@@ -198,7 +200,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var one = Adaptive(time, out _);
         var other = Adaptive(time, out _);
 
-        await WarmAsync(one, time, Fast, times: 40);
+        await WarmAsync(one, time, Fast, 40);
 
         Assert.NotNull(one.MeasuredAttemptCeiling);
         Assert.Null(other.MeasuredAttemptCeiling);
@@ -218,10 +220,10 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         var policy = Adaptive(time, out _) with
         {
-            AttemptCeiling = AttemptCeiling.Above(3) with { Window = Window, Floor = TimeSpan.FromMilliseconds(50) },
+            AttemptCeiling = AttemptCeiling.Above() with { Window = Window, Floor = TimeSpan.FromMilliseconds(50) },
         };
 
-        await WarmAsync(policy, time, TimeSpan.FromMicroseconds(300), times: 40);
+        await WarmAsync(policy, time, TimeSpan.FromMicroseconds(300), 40);
 
         // Three times a p95 of 300 microseconds is about a millisecond. The floor is what the attempt
         // actually gets, and it is exactly the floor rather than anything derived from it.
@@ -255,14 +257,14 @@ public sealed class AdaptiveAttemptTimeoutTests
         // reports AttemptsExhausted whatever stopped it.
         var policy = Adaptive(time, out _) with { Attempts = 3, Deadline = TimeSpan.FromMilliseconds(150) };
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         // The measured ceiling is about 300 ms and the deadline is 150 ms, so the deadline supplies the
         // ceiling - and when it fires, the call has to stop rather than spend its two remaining
         // attempts on a budget that is gone. That is the fact `deadlineCeiling` carries, and getting it
         // wrong is what a measured ceiling would have broken: `effective != AttemptTimeout` is true
         // here for two different reasons and only one of them is the deadline.
-        var result = await HangAsync(policy, time, advance: TimeSpan.FromMilliseconds(200));
+        var result = await HangAsync(policy, time, TimeSpan.FromMilliseconds(200));
 
         Assert.False(result.IsSuccess);
         Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
@@ -289,7 +291,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var policy = Adaptive(time, out _) with
         {
             Attempts = 2,
-            Hedge = Hedge.At(0.95) with { Window = Window, MinimumDelay = TimeSpan.Zero },
+            Hedge = Hedge.At() with { Window = Window, MinimumDelay = TimeSpan.Zero },
 
             // Read from the median, which is the whole point: the p50 of this dependency is 10 ms and
             // its p95 is 500 ms, so twice the median is 20 ms and a hedge at the p95 could never arm.
@@ -318,7 +320,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var policy = Adaptive(time, out var events) with
         {
             Attempts = 2,
-            Hedge = Hedge.At(0.95) with { Window = Window, MinimumDelay = TimeSpan.Zero },
+            Hedge = Hedge.At() with { Window = Window, MinimumDelay = TimeSpan.Zero },
             AttemptCeiling = AttemptCeiling.Above(2) with { Window = Window, Quantile = 0.5, Floor = TimeSpan.FromTicks(1) },
         };
 
@@ -377,7 +379,7 @@ public sealed class AdaptiveAttemptTimeoutTests
     [InlineData(0.999)]
     public void A_quantile_outside_the_tail_is_refused(double quantile)
     {
-        var problems = Problems(TestPolicy.Instant with { AttemptCeiling = AttemptCeiling.Above(3) with { Quantile = quantile } });
+        var problems = Problems(TestPolicy.Instant with { AttemptCeiling = AttemptCeiling.Above() with { Quantile = quantile } });
 
         Assert.Contains(problems, p => p.Contains("AttemptCeiling.Quantile", StringComparison.Ordinal));
     }
@@ -393,7 +395,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var policy = TestPolicy.Instant with
         {
             AttemptTimeout = TimeSpan.FromSeconds(1),
-            AttemptCeiling = AttemptCeiling.Above(3) with { Floor = TimeSpan.FromSeconds(1) },
+            AttemptCeiling = AttemptCeiling.Above() with { Floor = TimeSpan.FromSeconds(1) },
         };
 
         Assert.Contains(Problems(policy), p => p.Contains("AttemptCeiling.Floor", StringComparison.Ordinal));
@@ -418,10 +420,10 @@ public sealed class AdaptiveAttemptTimeoutTests
         var policy = Resilience.None.UseClock(time) with
         {
             Adaptive = true,
-            AttemptCeiling = AttemptCeiling.Above(3) with { Window = Window },
+            AttemptCeiling = AttemptCeiling.Above() with { Window = Window },
         };
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         // Passthrough hands back the callback's own task and would never have recorded a sample.
         Assert.NotNull(policy.MeasuredAttemptCeiling);
@@ -431,9 +433,9 @@ public sealed class AdaptiveAttemptTimeoutTests
     [Fact]
     public void Naming_a_default_equals_leaving_it_alone()
     {
-        Assert.Equal(AttemptCeiling.Above(3), AttemptCeiling.Above(3) with { Quantile = 0.95 });
-        Assert.Equal(AttemptCeiling.Above(3).GetHashCode(), (AttemptCeiling.Above(3) with { MinimumSamples = 20 }).GetHashCode());
-        Assert.NotEqual(AttemptCeiling.Above(3), AttemptCeiling.Above(4));
+        Assert.Equal(AttemptCeiling.Above(), AttemptCeiling.Above() with { Quantile = 0.95 });
+        Assert.Equal(AttemptCeiling.Above().GetHashCode(), (AttemptCeiling.Above() with { MinimumSamples = 20 }).GetHashCode());
+        Assert.NotEqual(AttemptCeiling.Above(), AttemptCeiling.Above(4));
     }
 
     /// <summary>
@@ -459,7 +461,7 @@ public sealed class AdaptiveAttemptTimeoutTests
     [Fact]
     public void It_prints_its_effective_configuration()
     {
-        var text = AttemptCeiling.Above(3).ToString();
+        var text = AttemptCeiling.Above().ToString();
 
         Assert.Contains("3x p95", text, StringComparison.Ordinal);
         Assert.Contains("300s", text, StringComparison.Ordinal);
@@ -479,7 +481,7 @@ public sealed class AdaptiveAttemptTimeoutTests
             Name = "api",
             Attempts = 1,
             AttemptTimeout = Configured,
-            AttemptCeiling = AttemptCeiling.Above(3) with { Window = Window },
+            AttemptCeiling = AttemptCeiling.Above() with { Window = Window },
             OnEvent = recorder.Record,
         };
 
@@ -518,8 +520,8 @@ public sealed class AdaptiveAttemptTimeoutTests
     {
         for (var i = 0; i < 10; i++)
         {
-            await WarmAsync(policy, time, TimeSpan.FromMilliseconds(10), times: 9);
-            await WarmAsync(policy, time, TimeSpan.FromMilliseconds(500), times: 1);
+            await WarmAsync(policy, time, TimeSpan.FromMilliseconds(10), 9);
+            await WarmAsync(policy, time, TimeSpan.FromMilliseconds(500), 1);
         }
     }
 

@@ -210,7 +210,7 @@ public sealed class RateLimitTests
 
         var result = await RunAsync(
             policy,
-            _ => throw new RateLimitedException(retryAfter: TimeSpan.FromSeconds(3), limiter: "api"),
+            _ => throw new RateLimitedException(TimeSpan.FromSeconds(3), "api"),
             time);
 
         Assert.False(result.IsSuccess);
@@ -296,7 +296,7 @@ public sealed class RateLimitTests
         var time = new FakeTimeProvider();
         var policy = TestPolicy.On(time) with { Attempts = 2, Budget = RetryBudget.None };
 
-        var call = policy.RunAsync(_ => Task.FromException<int>(new RateLimitedException(retryAfter: TimeSpan.FromSeconds(4), limiter: "payments"))).AsTask();
+        var call = policy.RunAsync(_ => Task.FromException<int>(new RateLimitedException(TimeSpan.FromSeconds(4), "payments"))).AsTask();
 
         while (!call.IsCompleted)
         {

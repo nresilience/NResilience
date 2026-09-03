@@ -46,12 +46,14 @@ public sealed class RetryBudget
     private readonly object _gate = new();
     private readonly double _refillPerSecond;
     private readonly TimeProvider? _time;
-    private readonly bool _isAutomatic;
     private long _refilledAt;
 
     private double _tokens;
 
-    private RetryBudget(bool isAutomatic = false) => _isAutomatic = isAutomatic;
+    private RetryBudget(bool isAutomatic = false)
+    {
+        IsAutomatic = isAutomatic;
+    }
 
     private RetryBudget(string? name, double fraction, int minimumPerSecond, TimeProvider time)
     {
@@ -86,7 +88,7 @@ public sealed class RetryBudget
     ///         HTTP calls.
     ///     </para>
     /// </summary>
-    public static RetryBudget Automatic { get; } = new(isAutomatic: true);
+    public static RetryBudget Automatic { get; } = new(true);
 
     /// <summary>The name a <see cref="Shared(string, double, int)" /> budget was looked up by, if any.</summary>
     public string? Name { get; }
@@ -117,7 +119,7 @@ public sealed class RetryBudget
     /// <summary>
     ///     True for <see cref="Automatic" />, which the executor resolves to a bucket per policy instance.
     /// </summary>
-    public bool IsAutomatic => _isAutomatic;
+    public bool IsAutomatic { get; }
 
     /// <summary>
     ///     True for <see cref="None" />, which the executor skips entirely.
@@ -129,7 +131,7 @@ public sealed class RetryBudget
     ///         "nothing spent".
     ///     </para>
     /// </summary>
-    public bool IsNone => _time is null && !_isAutomatic;
+    public bool IsNone => _time is null && !IsAutomatic;
 
     /// <summary>A budget private to whoever holds this instance.</summary>
     /// <param name="fraction">

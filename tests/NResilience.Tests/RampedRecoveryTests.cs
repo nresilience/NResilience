@@ -21,7 +21,7 @@ public sealed class RampedRecoveryTests
         Time = time,
         BreakDuration = TimeSpan.FromSeconds(10),
         BreakJitter = Jitter.None,
-        Recovery = recovery ?? Recovery.Over(0.25),
+        Recovery = recovery ?? Recovery.Over(),
     };
 
     private static void Sample(Breaker breaker, VerdictKind kind, int count = 1, TimeSpan duration = default)
@@ -92,7 +92,7 @@ public sealed class RampedRecoveryTests
 
         // 5% of the offered calls, which is where Recovery.Initial starts the ramp. The rest are
         // refused exactly as an open breaker refuses them.
-        Assert.Equal(5, Offer(breaker, 100, VerdictKind.Ok));
+        Assert.Equal(5, Offer(breaker, 100));
     }
 
     /// <summary>
@@ -149,7 +149,7 @@ public sealed class RampedRecoveryTests
     [Fact]
     public void The_ramp_length_is_clamped_at_both_ends()
     {
-        var recovery = Recovery.Over(0.25) with { MinimumLength = TimeSpan.FromSeconds(2), MaximumLength = TimeSpan.FromSeconds(20) };
+        var recovery = Recovery.Over() with { MinimumLength = TimeSpan.FromSeconds(2), MaximumLength = TimeSpan.FromSeconds(20) };
 
         // A one-second break would be a 250 ms ramp, which is a cliff with extra state.
         Assert.Equal(TimeSpan.FromSeconds(2), recovery.RampFor(TimeSpan.FromSeconds(1)));
@@ -193,7 +193,9 @@ public sealed class RampedRecoveryTests
 
         // The dependency gets faster, and the ramp resumes from where it stalled.
         for (var step = 0; step < 5; step++)
+        {
             Offer(breaker, 100);
+        }
 
         Assert.Equal(BreakerState.Closed, breaker.State);
     }
@@ -320,16 +322,16 @@ public sealed class RampedRecoveryTests
     [Fact]
     public void A_value_that_names_a_default_equals_one_that_left_it_alone()
     {
-        var spelled = Recovery.Over(0.25) with
+        var spelled = Recovery.Over() with
         {
             MinimumLength = TimeSpan.FromSeconds(1),
             MaximumLength = TimeSpan.FromSeconds(30),
             InitialFraction = 0.05,
         };
 
-        Assert.Equal(Recovery.Over(0.25), spelled);
-        Assert.Equal(Recovery.Over(0.25).GetHashCode(), spelled.GetHashCode());
-        Assert.Equal("0.25x the break, from 5% (min 1s, max 30s)", Recovery.Over(0.25).ToString());
+        Assert.Equal(Recovery.Over(), spelled);
+        Assert.Equal(Recovery.Over().GetHashCode(), spelled.GetHashCode());
+        Assert.Equal("0.25x the break, from 5% (min 1s, max 30s)", Recovery.Over().ToString());
     }
 
     // ---- Through the executor ----
@@ -410,7 +412,7 @@ public sealed class RampedRecoveryTests
     public void A_ramped_breaker_delivers_more_than_a_cliffed_one_against_a_dependency_that_has_to_warm()
     {
         var cliffed = Simulate(null);
-        var ramped = Simulate(Recovery.Over(0.25));
+        var ramped = Simulate(Recovery.Over());
 
         // Measured over the forty-five seconds after the dependency comes back, which is the only
         // stretch the two breakers can differ over. The numbers are 8,250 and 3,002.
@@ -449,8 +451,8 @@ public sealed class RampedRecoveryTests
     /// </remarks>
     private static int Simulate(Recovery? recovery)
     {
-        const int Offered = 20;         // calls per 100 ms step - 200 a second
-        const int Full = 20;            // what the dependency serves per step when it is warm
+        const int Offered = 20; // calls per 100 ms step - 200 a second
+        const int Full = 20; // what the dependency serves per step when it is warm
         const double WarmPerStep = 0.2; // cold to full in ten seconds
         const double OverloadPenalty = 1.0;
 
@@ -503,17 +505,11 @@ public sealed class RampedRecoveryTests
                 var cold = fast * (Full / cap);
 
                 if (admitted <= cap)
-                {
                     Serve(cold);
-                }
                 else if (admitted <= 3 * cap)
-                {
                     Serve(cold * (admitted / cap));
-                }
                 else
-                {
                     breaker.Record(VerdictKind.Transient, fast);
-                }
 
                 void Serve(TimeSpan latency)
                 {
@@ -527,7 +523,7 @@ public sealed class RampedRecoveryTests
             if (!down)
             {
                 capacity = admitted > 2 * Math.Max(room, 1) ? Math.Max(1, capacity - OverloadPenalty)
-                    : admitted == 0 ? Math.Min(Full, capacity + (WarmPerStep / 4))
+                    : admitted == 0 ? Math.Min(Full, capacity + WarmPerStep / 4)
                     : Math.Min(Full, capacity + WarmPerStep);
             }
 

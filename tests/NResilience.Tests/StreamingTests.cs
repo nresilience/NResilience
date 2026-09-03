@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Linq;
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Internal;
 using NResilience.Testing;
@@ -213,6 +212,7 @@ public sealed class StreamingTests
     public async Task A_deadline_expiring_between_attempts_stops_the_stream()
     {
         var time = new FakeTimeProvider();
+
         var streams = ScriptedStream.For<int>(time)
             .Throws(new IOException())
             .Yields(1);
@@ -236,6 +236,7 @@ public sealed class StreamingTests
     public async Task An_attempt_ceiling_bounds_time_to_the_first_element()
     {
         var time = new FakeTimeProvider();
+
         var streams = ScriptedStream.For<int>(time)
             .YieldsAfter(TimeSpan.FromSeconds(30), 0)
             .Yields(1, 2);
@@ -313,6 +314,7 @@ public sealed class StreamingTests
             CallEventKind.Attempt,
             CallEventKind.Succeeded,
         ], events.Select(e => e.Kind).ToArray());
+
         Assert.IsType<AttemptTimeoutException>(events[0].Exception);
     }
 
@@ -345,9 +347,10 @@ public sealed class StreamingTests
 
         // Eagerly: the refusal is at the RunAsync call, not three frames later at the consumer's
         // first MoveNextAsync.
-        Assert.Throws<ResilienceConfigurationException>(() => policy.RunAsync<int>(static ct => Empty()));
+        Assert.Throws<ResilienceConfigurationException>(() => policy.RunAsync(static ct => Empty()));
+
         Assert.Throws<ResilienceConfigurationException>(() =>
-            policy.RunAsync<int, int>(static (_, ct) => Empty(), 0));
+            policy.RunAsync(static (_, ct) => Empty(), 0));
 
         // The same policy still runs a call.
         Assert.Equal(4, await policy.RunAsync(ct => Task.FromResult(4)));
@@ -527,6 +530,7 @@ public sealed class StreamingTests
         Assert.NotNull(rejected.RetryAfter);
         Assert.Single(rejected.Attempts);
         Assert.Equal(1, streams.Starts);
+
         Assert.Equal([CallEventKind.Attempt, CallEventKind.BreakerOpened, CallEventKind.Retrying, CallEventKind.RejectedByBreaker],
             events.Select(e => e.Kind));
     }
@@ -604,6 +608,7 @@ public sealed class StreamingTests
     public async Task Exhausted_attempts_on_a_faulting_source_throw_the_original()
     {
         var fault = new IOException("socket reset");
+
         var streams = ScriptedStream.For<int>()
             .Throws(fault)
             .Throws(fault)
@@ -662,7 +667,7 @@ public sealed class StreamingTests
     public async Task The_retry_budget_refuses_a_stream_retry()
     {
         var time = new FakeTimeProvider();
-        var budget = RetryBudget.Of(fraction: 0.5, minimumPerSecond: 0, time: time);
+        var budget = RetryBudget.Of(0.5, 0, time);
 
         var streams = ScriptedStream.For<int>(time)
             .Throws(new IOException())
@@ -704,7 +709,7 @@ public sealed class StreamingTests
     {
         var policy = Resilience.Default with { Attempts = 0 };
 
-        Assert.Throws<ResilienceConfigurationException>(() => policy.RunAsync<int>(static ct => Empty()));
+        Assert.Throws<ResilienceConfigurationException>(() => policy.RunAsync(static ct => Empty()));
     }
 
     private static async IAsyncEnumerable<int> Empty()
@@ -725,15 +730,21 @@ public sealed class StreamingTests
     private static async Task<List<int>> CollectAsync(IAsyncEnumerable<int> stream)
     {
         var items = new List<int>();
+
         await foreach (var item in stream)
+        {
             items.Add(item);
+        }
+
         return items;
     }
 
     private static async Task CollectIntoAsync(IAsyncEnumerable<int> stream, List<int> into)
     {
         await foreach (var item in stream)
+        {
             into.Add(item);
+        }
     }
 
     private static async Task DrainAsync(IAsyncEnumerable<int> stream)
@@ -767,9 +778,7 @@ public sealed class StreamingTests
                 yield return 0;
             }
             else
-            {
                 yield return 99;
-            }
         }
     }
 
@@ -812,8 +821,10 @@ public sealed class StreamingTests
         public async IAsyncEnumerable<int> Items([EnumeratorCancellation] CancellationToken cancellationToken = default)
         {
             yield return 1;
+
             cancellationToken.ThrowIfCancellationRequested();
             yield return 2;
+
             cancellationToken.ThrowIfCancellationRequested();
             yield return 3;
         }

@@ -95,8 +95,12 @@ public sealed class ResilienceOptions
     ///     every measured term off and leaves only the constants this section wrote.
     ///     <para>
     ///         Unlike the property it sets, this one <i>does</i> reach the <see cref="Breaker" />, which
-    ///         a section builds for this policy alone rather than sharing. <c>"Breaker": { "Adaptive":
-    ///         true }</c> overrides it for the breaker only.
+    ///         a section builds for this policy alone rather than sharing.
+    ///         <c>
+    ///             "Breaker": { "Adaptive":
+    ///             true }
+    ///         </c>
+    ///         overrides it for the breaker only.
     ///     </para>
     /// </summary>
     public bool? Adaptive { get; set; }
@@ -305,19 +309,19 @@ public sealed class BackoffOptions
         if (!HasCurve)
             return Jitter is { } only ? baseline with { Jitter = only } : baseline;
 
-        var existing = baseline.Kind == BackoffKind.Exponential ? baseline : NResilience.Backoff.Default;
+        var existing = baseline.Kind == BackoffKind.Exponential ? baseline : Backoff.Default;
 
-        return NResilience.Backoff.Exponential(
-            TransientBase ?? existing.TransientBase,
-            ThrottledBase ?? existing.ThrottledBase,
-            Factor ?? existing.Factor,
-            Max ?? existing.Max) with
-        {
-            Jitter = Jitter ?? baseline.Jitter,
-            MeasuredBase = MeasuredBase is { } measured
-                ? measured.Enabled is false ? null : measured.ToMeasuredBase()
-                : existing.MeasuredBase,
-        };
+        return Backoff.Exponential(
+                TransientBase ?? existing.TransientBase,
+                ThrottledBase ?? existing.ThrottledBase,
+                Factor ?? existing.Factor,
+                Max ?? existing.Max) with
+            {
+                Jitter = Jitter ?? baseline.Jitter,
+                MeasuredBase = MeasuredBase is { } measured
+                    ? measured.Enabled is false ? null : measured.ToMeasuredBase()
+                    : existing.MeasuredBase,
+            };
     }
 }
 
@@ -880,7 +884,7 @@ public sealed class FailuresOptions
                 "Zero times the recent error rate is not a trip point anyone could mean.");
         }
 
-        var failures = NResilience.Failures.Above(Multiple ?? 5.0);
+        var failures = Failures.Above(Multiple ?? 5.0);
 
         if (Window is { } window)
             failures = failures with { Window = window };
@@ -940,7 +944,7 @@ public sealed class RecoveryOptions
                 "A ramp lasting none of the break is not a ramp anyone could mean.");
         }
 
-        var recovery = NResilience.Recovery.Over(Length ?? 0.25);
+        var recovery = Recovery.Over(Length ?? 0.25);
 
         if (MinimumLength is { } minimum)
             recovery = recovery with { MinimumLength = minimum };
@@ -998,7 +1002,7 @@ public sealed class SlowCallsOptions
                 "Zero times normal latency is not a threshold anyone could mean.");
         }
 
-        var slow = NResilience.SlowCalls.Above(Multiple ?? 3.0);
+        var slow = SlowCalls.Above(Multiple ?? 3.0);
 
         if (Quantile is { } quantile)
             slow = slow with { Quantile = quantile };

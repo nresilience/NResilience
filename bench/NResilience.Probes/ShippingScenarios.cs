@@ -126,7 +126,7 @@ public static class ShippingScenarios
     /// </summary>
     public static readonly Resilience DefaultWithHedge = Resilience.Default with
     {
-        Hedge = Hedge.At(0.95),
+        Hedge = Hedge.At(),
     };
 
     /// <summary>
@@ -147,7 +147,7 @@ public static class ShippingScenarios
     /// </summary>
     public static readonly Resilience DefaultWithoutBudget = Resilience.Default with
     {
-        Budget = Lib.RetryBudget.None,
+        Budget = RetryBudget.None,
     };
 
     // ---- Suspending path: the path every real I/O call takes. ----
@@ -266,6 +266,18 @@ public static class ShippingScenarios
     /// </summary>
     public static LimitArm BuildLimited(int refusals = 2) => new(refusals);
 
+    // ---- Streaming. ----
+
+    /// <summary>
+    ///     The streaming shape under the shipping policy: a cold source that suspends before every
+    ///     element, pulled once to the first element and then handed to the consumer, under
+    ///     <see cref="Lib.Resilience.Default" />. Measured against
+    ///     <see cref="StreamGate.RawSuspending" />, the identical enumeration with no policy in the
+    ///     middle, so the difference is the streaming path's own cost and nothing else.
+    /// </summary>
+    public static ValueTask<int> DefaultStreamSuspending() =>
+        StreamGate.DrainAsync(Resilience.Default.RunAsync(static ct => StreamGate.SuspendAsync(ct)));
+
     public sealed class LimitArm
     {
         private readonly Func<Gate.LimitCounter, CancellationToken, Task<int>> _callback = Gate.SuspendThenLimitAsync;
@@ -310,16 +322,4 @@ public static class ShippingScenarios
 
         public ValueTask<int> RunAsync() => _policy.RunAsync(_callback, _counter);
     }
-
-    // ---- Streaming. ----
-
-    /// <summary>
-    ///     The streaming shape under the shipping policy: a cold source that suspends before every
-    ///     element, pulled once to the first element and then handed to the consumer, under
-    ///     <see cref="Lib.Resilience.Default" />. Measured against
-    ///     <see cref="StreamGate.RawSuspending" />, the identical enumeration with no policy in the
-    ///     middle, so the difference is the streaming path's own cost and nothing else.
-    /// </summary>
-    public static ValueTask<int> DefaultStreamSuspending() =>
-        StreamGate.DrainAsync(Resilience.Default.RunAsync(static ct => StreamGate.SuspendAsync(ct)));
 }

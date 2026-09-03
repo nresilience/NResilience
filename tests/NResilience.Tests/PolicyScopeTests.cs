@@ -48,7 +48,7 @@ public sealed class PolicyScopeTests
         var alpha = scope.For("alpha");
 
         Assert.NotSame(prototype, alpha.Breaker);
-        Assert.Equal(expected: 2, alpha.Breaker!.Settings.ConsecutiveFailures);
+        Assert.Equal(2, alpha.Breaker!.Settings.ConsecutiveFailures);
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class PolicyScopeTests
     [Fact]
     public void A_hedging_policy_gets_a_latency_estimate_per_key()
     {
-        var scope = new PolicyScope<string>(Resilience.Default with { Hedge = Hedge.At(0.95) });
+        var scope = new PolicyScope<string>(Resilience.Default with { Hedge = Hedge.At() });
 
         // The estimate is keyed by policy instance, so distinct policies is the property that matters:
         // a slow tenant cannot lower the hedge threshold for a fast one.
@@ -128,8 +128,8 @@ public sealed class PolicyScopeTests
         var batch = scope.For("batch");
         var interactive = scope.For("interactive");
 
-        Assert.Equal(expected: 5, batch.Attempts);
-        Assert.Equal(expected: 2, interactive.Attempts);
+        Assert.Equal(5, batch.Attempts);
+        Assert.Equal(2, interactive.Attempts);
         Assert.NotNull(batch.Breaker);
         Assert.NotSame(batch.Breaker, interactive.Breaker);
         Assert.NotSame(batch.Budget, interactive.Budget);
@@ -147,9 +147,11 @@ public sealed class PolicyScopeTests
         });
 
         for (var i = 0; i < 10; i++)
+        {
             scope.For("alpha");
+        }
 
-        Assert.Equal(expected: 1, shaped);
+        Assert.Equal(1, shaped);
     }
 
     // ---- The views ----
@@ -176,12 +178,12 @@ public sealed class PolicyScopeTests
     {
         var scope = new PolicyScope<string>(Resilience.Default with { Breaker = new Breaker() });
 
-        Assert.Equal(expected: 0, scope.Count);
+        Assert.Equal(0, scope.Count);
         Assert.Empty(scope.Breakers());
 
         scope.For("alpha");
 
-        Assert.Equal(expected: 1, scope.Count);
+        Assert.Equal(1, scope.Count);
     }
 
     [Fact]
@@ -191,8 +193,8 @@ public sealed class PolicyScopeTests
         var scope = new PolicyScope<string>(template, maxKeys: 8);
 
         Assert.Same(template, scope.Template);
-        Assert.Equal(expected: 8, scope.MaxKeys);
-        Assert.Equal(expected: 1024, new PolicyScope<string>(template).MaxKeys);
+        Assert.Equal(8, scope.MaxKeys);
+        Assert.Equal(1024, new PolicyScope<string>(template).MaxKeys);
     }
 
     // ---- Keys ----
@@ -227,10 +229,12 @@ public sealed class PolicyScopeTests
     {
         var scope = new PolicyScope<string>(Resilience.Default with { Breaker = new Breaker() }, maxKeys: maxKeys);
 
-        keys = Enumerable.Range(start: 0, maxKeys + 1).Select(i => $"key{i}").ToArray();
+        keys = Enumerable.Range(0, maxKeys + 1).Select(i => $"key{i}").ToArray();
 
         foreach (var key in keys)
+        {
             scope.For(key);
+        }
 
         return scope;
     }
@@ -241,21 +245,25 @@ public sealed class PolicyScopeTests
         var scope = new PolicyScope<string>(Resilience.Default, maxKeys: 16);
 
         for (var i = 0; i < 16; i++)
+        {
             scope.For($"key{i}");
+        }
 
-        Assert.Equal(expected: 16, scope.Count);
+        Assert.Equal(16, scope.Count);
     }
 
     [Fact]
     public void A_key_seen_since_the_last_sweep_survives_the_next_one()
     {
-        var scope = FullAndCold(maxKeys: 8, out var keys);
+        var scope = FullAndCold(8, out var keys);
         var cold = keys[0];
         var warm = keys[1..];
 
         // Everything but `cold` is touched, so the next sweep has exactly one eviction candidate.
         foreach (var key in warm)
+        {
             scope.For(key);
+        }
 
         scope.For("late");
 
@@ -277,7 +285,9 @@ public sealed class PolicyScopeTests
         // Two hundred keys through a scope that keeps eight: whatever the sweep order, the key nobody
         // has asked for since the first line is gone.
         for (var i = 0; i < 200; i++)
+        {
             scope.For($"key{i}");
+        }
 
         Assert.DoesNotContain("first", scope.Breakers().Keys);
 
@@ -294,17 +304,19 @@ public sealed class PolicyScopeTests
 
         var scope = new PolicyScope<string>(Resilience.Default, maxKeys: max);
 
-        var workers = Enumerable.Range(start: 0, count: 8).Select(worker => Task.Run(() =>
+        var workers = Enumerable.Range(0, 8).Select(worker => Task.Run(() =>
         {
             for (var round = 0; round < 200; round++)
+            {
                 Assert.NotNull(scope.For($"key{(round * 7 + worker) % 400}"));
+            }
         }));
 
         await Task.WhenAll(workers);
 
         // A sweep runs on one thread at a time and lets the others through, so the cap bounds growth
         // rather than pinning the count. Four times the cap is generous and still finite.
-        Assert.InRange(scope.Count, low: 1, high: max * 4);
+        Assert.InRange(scope.Count, 1, max * 4);
     }
 
     // ---- Refusals ----

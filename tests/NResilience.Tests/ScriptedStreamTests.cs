@@ -203,7 +203,9 @@ public sealed class ScriptedStreamTests
         var received = new List<int>();
 
         await foreach (var item in stream)
+        {
             received.Add(item);
+        }
 
         return received;
     }

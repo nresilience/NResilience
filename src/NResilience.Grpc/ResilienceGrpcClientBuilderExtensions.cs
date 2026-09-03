@@ -93,10 +93,14 @@ public static class ResilienceGrpcClientBuilderExtensions
                 if (services.GetService<IOptions<ResilienceHealthOptions>>()?.Value is { } health)
                 {
                     foreach (var (key, breaker) in interceptor.Breakers())
+                    {
                         health.Watch($"{name}:{key}", breaker);
+                    }
 
                     foreach (var (key, budget) in interceptor.Budgets())
+                    {
                         health.Watch($"{name}:{key}", budget);
+                    }
                 }
 
                 return interceptor;

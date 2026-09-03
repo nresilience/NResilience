@@ -58,11 +58,11 @@ public readonly record struct LogSampling
     /// </summary>
     public const int DefaultKeepOneIn = 20;
 
-    /// <summary>How long an incident keeps everything, when <see cref="IncidentWindow" /> was not set.</summary>
-    private static readonly TimeSpan DefaultIncidentWindow = TimeSpan.FromMinutes(1);
-
     /// <summary>How many of each record are kept in full, when <see cref="MinimumSamples" /> was not set.</summary>
     private const int DefaultMinimumSamples = 20;
+
+    /// <summary>How long an incident keeps everything, when <see cref="IncidentWindow" /> was not set.</summary>
+    private static readonly TimeSpan DefaultIncidentWindow = TimeSpan.FromMinutes(1);
 
     private readonly TimeSpan? _incidentWindow;
     private readonly int? _minimumSamples;
@@ -109,11 +109,6 @@ public readonly record struct LogSampling
         init => _minimumSamples = value;
     }
 
-    /// <summary>The way to configure log sampling.</summary>
-    /// <param name="keepOneIn">One traffic record in this many is kept while the policy is healthy. Must be at least 1.</param>
-    /// <returns>The configuration.</returns>
-    public static LogSampling OneIn(int keepOneIn = DefaultKeepOneIn) => new() { KeepOneIn = keepOneIn };
-
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
     ///     explicitly equals one that left it alone.
@@ -124,6 +119,11 @@ public readonly record struct LogSampling
         KeepOneIn == other.KeepOneIn
         && IncidentWindow == other.IncidentWindow
         && MinimumSamples == other.MinimumSamples;
+
+    /// <summary>The way to configure log sampling.</summary>
+    /// <param name="keepOneIn">One traffic record in this many is kept while the policy is healthy. Must be at least 1.</param>
+    /// <returns>The configuration.</returns>
+    public static LogSampling OneIn(int keepOneIn = DefaultKeepOneIn) => new() { KeepOneIn = keepOneIn };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(KeepOneIn, IncidentWindow, MinimumSamples);

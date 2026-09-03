@@ -45,7 +45,7 @@ public sealed class HedgeTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events);
 
-        await WarmAsync(policy, time, Fast, times: 19);
+        await WarmAsync(policy, time, Fast, 19);
 
         var race = await RaceAsync(policy, time);
 
@@ -63,7 +63,7 @@ public sealed class HedgeTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events);
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var race = await RaceAsync(policy, time);
 
@@ -89,10 +89,12 @@ public sealed class HedgeTests
     {
         var time = new FakeTimeProvider();
 
-        var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1, BreakDuration = TimeSpan.FromMinutes(10), MaxBreakDuration = TimeSpan.FromMinutes(10), Time = time });
+        var breaker = new Breaker(new BreakerSettings
+            { ConsecutiveFailures = 1, BreakDuration = TimeSpan.FromMinutes(10), MaxBreakDuration = TimeSpan.FromMinutes(10), Time = time });
+
         var policy = Hedging(time, out var events, p => p with { Breaker = breaker });
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         if (isolated)
             breaker.Isolate();
@@ -122,10 +124,10 @@ public sealed class HedgeTests
     public async Task An_exhausted_budget_funds_no_hedges()
     {
         var time = new FakeTimeProvider();
-        var budget = RetryBudget.Of(fraction: 0.1, minimumPerSecond: 0, time: time);
+        var budget = RetryBudget.Of(0.1, 0, time);
         var policy = Hedging(time, out var events, p => p with { Budget = budget });
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         // Deposits fund withdrawals at a tenth of successful traffic, so drain what the warm-up funded.
         // TrySpend is internal and this project can see it, which is exactly what it is for.
@@ -150,10 +152,10 @@ public sealed class HedgeTests
 
         var policy = Hedging(time, out var events, p => p with
         {
-            Hedge = Hedge.At(0.95) with { Window = Window, MinimumDelay = TimeSpan.FromSeconds(5) },
+            Hedge = Hedge.At() with { Window = Window, MinimumDelay = TimeSpan.FromSeconds(5) },
         });
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var race = await RaceAsync(policy, time);
 
@@ -186,13 +188,13 @@ public sealed class HedgeTests
         var policy = Hedging(time, out var events, p => p with
         {
             Attempts = 2,
-            Hedge = Hedge.At(0.95) with { Window = TimeSpan.FromSeconds(40) },
+            Hedge = Hedge.At() with { Window = TimeSpan.FromSeconds(40) },
         });
 
         // A dependency with a tail: 95% at 10 ms, 5% at 500 ms. The p95 sits in the body, so a 500 ms
         // call is genuinely unusual and worth a copy.
-        await WarmAsync(policy, time, Fast, times: 95);
-        await WarmAsync(policy, time, Slow, times: 5);
+        await WarmAsync(policy, time, Fast, 95);
+        await WarmAsync(policy, time, Slow, 5);
 
         var before = await RaceAsync(policy, time);
 
@@ -202,7 +204,7 @@ public sealed class HedgeTests
         events.Clear();
 
         // The brownout: every call now takes what only the tail used to. The p95 moves with it.
-        await WarmAsync(policy, time, Slow, times: 100);
+        await WarmAsync(policy, time, Slow, 100);
 
         var during = await RaceAsync(policy, time);
 
@@ -225,7 +227,7 @@ public sealed class HedgeTests
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1, Time = time });
         var policy = Hedging(time, out _, p => p with { Breaker = breaker });
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var race = await RaceAsync(policy, time);
 
@@ -270,7 +272,7 @@ public sealed class HedgeTests
         var policy = Hedging(time, out _, p => p with { Breaker = breaker });
         var single = policy with { Attempts = 1, Hedge = null };
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         // A hedged race whose losing leg ignores its token and is still running afterwards. Its
         // clean-up is parked on that leg, and is what will eventually try to release a slot.
@@ -322,7 +324,9 @@ public sealed class HedgeTests
         stranded.TrySetResult();
 
         for (var i = 0; i < 200 && !loser.Closed; i++)
+        {
             await Task.Delay(1);
+        }
 
         Assert.True(loser.Closed, "the discarded leg's clean-up never ran, so the test proved nothing");
         await Task.Delay(20);
@@ -344,7 +348,7 @@ public sealed class HedgeTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out _);
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var race = await RaceAsync(policy, time);
         var attempts = race.Result.Attempts;
@@ -396,7 +400,7 @@ public sealed class HedgeTests
             Classify = Classifier.RetryEverything.OnResult<int>(static v => v == 0 ? Verdict.Transient : Verdict.Ok),
         });
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
         events.Clear();
 
         var call = policy.TryRunAsync(async ct =>
@@ -449,7 +453,7 @@ public sealed class HedgeTests
         var policy = Hedging(time, out _);
         var loser = new Closeable();
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
@@ -476,7 +480,9 @@ public sealed class HedgeTests
 
         // The clean-up is deliberately not awaited by the call, so give it the moment it needs.
         for (var i = 0; i < 100 && !loser.Closed; i++)
+        {
             await Task.Delay(1);
+        }
 
         Assert.True(loser.Closed);
     }
@@ -522,7 +528,7 @@ public sealed class HedgeTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events, p => p with { Attempts = 2 });
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
@@ -559,10 +565,10 @@ public sealed class HedgeTests
         var policy = Hedging(time, out var events, p => p with
         {
             Attempts = 6,
-            Hedge = Hedge.At(0.95, maxConcurrent: 3) with { Window = Window },
+            Hedge = Hedge.At(0.95, 3) with { Window = Window },
         });
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var calls = 0;
@@ -575,7 +581,7 @@ public sealed class HedgeTests
             return 1;
         }).AsTask();
 
-        await PumpAsync(time, call, steps: 20);
+        await PumpAsync(time, call, 20);
 
         gate.TrySetResult();
         await call;
@@ -593,7 +599,7 @@ public sealed class HedgeTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events);
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         var value = await policy.RunAsync(_ =>
         {
@@ -625,7 +631,7 @@ public sealed class HedgeTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events);
 
-        await WarmAsync(policy, time, Fast, times: 40);
+        await WarmAsync(policy, time, Fast, 40);
 
         using var caller = new CancellationTokenSource();
         var started = 0;
@@ -661,7 +667,9 @@ public sealed class HedgeTests
         await Assert.ThrowsAsync<TaskCanceledException>(() => call);
 
         for (var i = 0; i < 100 && cancelled < 2; i++)
+        {
             await Task.Delay(1);
+        }
 
         Assert.Equal(2, cancelled);
     }
@@ -680,7 +688,7 @@ public sealed class HedgeTests
         for (var i = 0; i < 40; i++)
         {
             // A fresh instance every time, which is a fresh estimate every time.
-            var fresh = TestPolicy.On(time) with { Hedge = Hedge.At(0.95) with { Window = Window }, OnEvent = events.Record };
+            var fresh = TestPolicy.On(time) with { Hedge = Hedge.At() with { Window = Window }, OnEvent = events.Record };
 
             await fresh.RunAsync(_ =>
             {
@@ -735,10 +743,10 @@ public sealed class HedgeTests
     [Fact]
     public void An_explicit_zero_stays_zero()
     {
-        var hedge = Hedge.At(0.95) with { MinimumDelay = TimeSpan.Zero };
+        var hedge = Hedge.At() with { MinimumDelay = TimeSpan.Zero };
 
         Assert.Equal(TimeSpan.Zero, hedge.MinimumDelay);
-        Assert.NotEqual(Hedge.At(0.95), hedge);
+        Assert.NotEqual(Hedge.At(), hedge);
     }
 
     [Theory]
@@ -760,7 +768,7 @@ public sealed class HedgeTests
     [Fact]
     public void A_hedge_with_one_attempt_is_refused()
     {
-        var policy = Resilience.Default with { Attempts = 1, Hedge = Hedge.At(0.95) };
+        var policy = Resilience.Default with { Attempts = 1, Hedge = Hedge.At() };
 
         var problems = Assert.Throws<ResilienceConfigurationException>(policy.Validate).Problems;
         Assert.Contains(problems, problem => problem.Contains("Attempts", StringComparison.Ordinal));
@@ -776,7 +784,7 @@ public sealed class HedgeTests
 
     [Fact]
     public void ToString_names_the_quantile_the_way_an_operator_reads_it() =>
-        Assert.StartsWith("p95", Hedge.At(0.95).ToString(), StringComparison.Ordinal);
+        Assert.StartsWith("p95", Hedge.At().ToString(), StringComparison.Ordinal);
 
     // ---- HTTP ----
 
@@ -817,7 +825,9 @@ public sealed class HedgeTests
         using var client = HedgingClient(transport, time);
 
         for (var i = 0; i < 40; i++)
+        {
             (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+        }
 
         racing = true;
 
@@ -832,7 +842,9 @@ public sealed class HedgeTests
         Assert.Equal(2, calls);
 
         for (var i = 0; i < 100 && !loser.Closed; i++)
+        {
             await Task.Delay(1);
+        }
 
         Assert.True(loser.Closed);
     }
@@ -867,7 +879,9 @@ public sealed class HedgeTests
 
         // Warm the estimate on the same host, so nothing but repeatability is holding the hedge back.
         for (var i = 0; i < 40; i++)
+        {
             (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
+        }
 
         racing = true;
 
@@ -896,7 +910,7 @@ public sealed class HedgeTests
         var policy = TestPolicy.On(time) with
         {
             Name = "api",
-            Hedge = Hedge.At(0.95) with { Window = Window },
+            Hedge = Hedge.At() with { Window = Window },
             OnEvent = recorder.Record,
         };
 
@@ -994,7 +1008,7 @@ public sealed class HedgeTests
     /// <summary>An <see cref="HttpClient" /> whose handler hedges, on the test clock.</summary>
     private static HttpClient HedgingClient(HttpMessageHandler transport, FakeTimeProvider time)
     {
-        var policy = TestPolicy.InstantHttp.UseClock(time) with { Hedge = Hedge.At(0.95) with { Window = Window } };
+        var policy = TestPolicy.InstantHttp.UseClock(time) with { Hedge = Hedge.At() with { Window = Window } };
 
         return new HttpClient(new ResilienceHandler(transport, policy));
     }

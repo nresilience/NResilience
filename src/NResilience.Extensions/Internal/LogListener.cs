@@ -28,8 +28,17 @@ internal sealed class LogListener
     /// </summary>
     private const int SamplingSlots = 32;
 
+    /// <summary>How many of each sampled record this listener has seen. Null when sampling is off.</summary>
+    private readonly long[]? _counts;
+
     private readonly ILogger _logger;
     private readonly ResilienceLoggingOptions _options;
+
+    /// <summary>
+    ///     Read once at construction rather than per event: a null here is the whole cost of the feature
+    ///     for a caller who did not configure it.
+    /// </summary>
+    private readonly LogSampling? _sampling;
 
     /// <summary>First-sighting keys for the footgun and unrecognized-exception records.</summary>
     private readonly ConcurrentDictionary<string, byte> _seen = new(StringComparer.Ordinal);
@@ -38,15 +47,6 @@ internal sealed class LogListener
 
     /// <summary>Rejection windows, keyed by policy name and reason - so one bad host does not silence another.</summary>
     private readonly ConcurrentDictionary<string, Window> _windows = new(StringComparer.Ordinal);
-
-    /// <summary>
-    ///     Read once at construction rather than per event: a null here is the whole cost of the feature
-    ///     for a caller who did not configure it.
-    /// </summary>
-    private readonly LogSampling? _sampling;
-
-    /// <summary>How many of each sampled record this listener has seen. Null when sampling is off.</summary>
-    private readonly long[]? _counts;
 
     /// <summary>When the current incident window closes, as a <see cref="TimeProvider.GetTimestamp" /> value.</summary>
     private long _incidentUntil;

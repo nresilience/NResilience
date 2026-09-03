@@ -19,10 +19,12 @@ public sealed class HostRegistryTests
     {
         var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = max });
 
-        hosts = Enumerable.Range(start: 0, max + 1).Select(i => $"host{i}.example").ToArray();
+        hosts = Enumerable.Range(0, max + 1).Select(i => $"host{i}.example").ToArray();
 
         foreach (var host in hosts)
+        {
             registry.For(host);
+        }
 
         return registry;
     }
@@ -33,22 +35,26 @@ public sealed class HostRegistryTests
         var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = 16 });
 
         for (var i = 0; i < 16; i++)
+        {
             registry.For($"host{i}.example");
+        }
 
-        Assert.Equal(expected: 16, registry.Scopes.Count());
+        Assert.Equal(16, registry.Scopes.Count());
         Assert.Same(registry.For("host0.example"), registry.For("host0.example"));
     }
 
     [Fact]
     public void A_host_seen_since_the_last_sweep_survives_the_next_one()
     {
-        var registry = FullAndCold(max: 8, out var hosts);
+        var registry = FullAndCold(8, out var hosts);
         var cold = hosts[0];
         var warm = hosts[1..];
 
         // Everything but `cold` is touched, so the next sweep has exactly one eviction candidate.
         foreach (var host in warm)
+        {
             registry.For(host);
+        }
 
         registry.For("late.example");
 
@@ -62,7 +68,7 @@ public sealed class HostRegistryTests
     [Fact]
     public void A_dropped_host_that_returns_starts_again_with_a_closed_breaker()
     {
-        var registry = FullAndCold(max: 8, out var hosts);
+        var registry = FullAndCold(8, out var hosts);
         var cold = hosts[0];
 
         var before = registry.For(cold);
@@ -74,7 +80,9 @@ public sealed class HostRegistryTests
         registry.For("late1.example");
 
         foreach (var host in hosts[1..])
+        {
             registry.For(host);
+        }
 
         registry.For("late2.example");
 
@@ -93,7 +101,7 @@ public sealed class HostRegistryTests
 
         var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = max });
 
-        var workers = Enumerable.Range(start: 0, count: 8).Select(worker => Task.Run(() =>
+        var workers = Enumerable.Range(0, 8).Select(worker => Task.Run(() =>
         {
             for (var round = 0; round < 200; round++)
             {
@@ -107,7 +115,7 @@ public sealed class HostRegistryTests
 
         // A sweep runs on one thread at a time and lets the others through, so the cap bounds growth
         // rather than pinning the count. Four times the cap is generous and still finite.
-        Assert.InRange(registry.Scopes.Count(), low: 1, max * 4);
+        Assert.InRange(registry.Scopes.Count(), 1, max * 4);
     }
 
     [Fact]
@@ -116,11 +124,13 @@ public sealed class HostRegistryTests
         var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = null });
 
         for (var i = 0; i < 2048; i++)
+        {
             registry.For($"host{i}.example");
+        }
 
-        Assert.Equal(expected: 2048, registry.Scopes.Count());
+        Assert.Equal(2048, registry.Scopes.Count());
     }
 
     [Fact]
-    public void The_default_cap_is_1024() => Assert.Equal(expected: 1024, new HttpResilienceOptions().MaxHosts);
+    public void The_default_cap_is_1024() => Assert.Equal(1024, new HttpResilienceOptions().MaxHosts);
 }

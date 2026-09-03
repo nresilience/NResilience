@@ -17,7 +17,7 @@ namespace NResilience;
 /// <example>
 ///     <code>
 /// static readonly PolicyScope&lt;string&gt; Tenants = new(Resilience.Default with { Breaker = new Breaker() });
-///
+/// 
 /// await Tenants.For(tenantId).RunAsync(ct =&gt; Work(ct), cancellationToken);
 /// </code>
 /// </example>

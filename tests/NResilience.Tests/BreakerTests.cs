@@ -178,6 +178,7 @@ public sealed class BreakerTests
     public void An_expired_break_reports_half_open_without_consuming_a_probe()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(15),
@@ -307,6 +308,7 @@ public sealed class BreakerTests
     public void A_clean_close_resets_the_accumulated_growth()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(10),
@@ -557,6 +559,7 @@ public sealed class BreakerTests
     public async Task A_refusal_carries_a_retry_after_hint()
     {
         var time = new FakeTimeProvider();
+
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(15),

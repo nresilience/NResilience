@@ -30,10 +30,8 @@ internal static class GrpcCall
         foreach (var entry in headers)
         {
             if (!entry.IsBinary && string.Equals(entry.Key, NestedRetryKey, StringComparison.Ordinal)
-                && ResilienceNestedRetry.IsMarker(entry.Value))
-            {
+                                && ResilienceNestedRetry.IsMarker(entry.Value))
                 return true;
-            }
         }
 
         return false;
@@ -55,7 +53,9 @@ internal static class GrpcCall
         if (options.Headers is { } caller)
         {
             foreach (var entry in caller)
+            {
                 headers.Add(entry);
+            }
         }
 
         headers.Add(NestedRetryKey, ResilienceNestedRetry.Marker);

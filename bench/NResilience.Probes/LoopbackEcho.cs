@@ -40,6 +40,17 @@ public sealed class LoopbackEcho : IAsyncDisposable
         _pump = Task.Run(() => EchoAsync(server, _shutdown.Token));
     }
 
+    /// <summary>Round trips issued since the last <see cref="ResetCounters" />.</summary>
+    public long RoundTrips => Interlocked.Read(ref _roundTrips);
+
+    /// <summary>
+    ///     Round trips since the last <see cref="ResetCounters" /> whose receive completed
+    ///     synchronously, and so never suspended. This must be zero: a non-zero count means the
+    ///     probe stopped measuring the suspending path and any ratio taken from it is not
+    ///     comparable to the yield gate's.
+    /// </summary>
+    public long SynchronousReceives => Interlocked.Read(ref _synchronousReceives);
+
     public async ValueTask DisposeAsync()
     {
         await _shutdown.CancelAsync().ConfigureAwait(false);
@@ -103,17 +114,6 @@ public sealed class LoopbackEcho : IAsyncDisposable
         await _client.SendAsync(_send, SocketFlags.None, cancellationToken).ConfigureAwait(false);
         return await receiving.ConfigureAwait(false);
     }
-
-    /// <summary>Round trips issued since the last <see cref="ResetCounters" />.</summary>
-    public long RoundTrips => Interlocked.Read(ref _roundTrips);
-
-    /// <summary>
-    ///     Round trips since the last <see cref="ResetCounters" /> whose receive completed
-    ///     synchronously, and so never suspended. This must be zero: a non-zero count means the
-    ///     probe stopped measuring the suspending path and any ratio taken from it is not
-    ///     comparable to the yield gate's.
-    /// </summary>
-    public long SynchronousReceives => Interlocked.Read(ref _synchronousReceives);
 
     public void ResetCounters()
     {

@@ -4,26 +4,25 @@ namespace NResilience.Gates;
 ///     The checked-in allocation budgets. Every number here was measured on 2026-08-19, .NET 10.0.0
 ///     and .NET 8.0.22, arm64, Release, workstation non-concurrent GC, and is recorded with its
 ///     measured value beside it so a failure reads as "this moved" rather than "this is wrong".
-    ///     Deadline propagation increased every suspending figure by <b>16 bytes</b>. The effective
-    ///     deadline is resolved once per call and stored in the state-machine box for all callers,
-    ///     regardless of <c>UseAmbientDeadline</c>. This avoids re-reading an <c>AsyncLocal</c> per attempt.
-    ///     The 8-byte value costs 16 bytes due to box alignment; dropping the <c>bounded</c> flag did
-    ///     not recover space, indicating it resided in padding.
+///     Deadline propagation increased every suspending figure by <b>16 bytes</b>. The effective
+///     deadline is resolved once per call and stored in the state-machine box for all callers,
+///     regardless of <c>UseAmbientDeadline</c>. This avoids re-reading an <c>AsyncLocal</c> per attempt.
+///     The 8-byte value costs 16 bytes due to box alignment; dropping the <c>bounded</c> flag did
+///     not recover space, indicating it resided in padding.
 ///     The breaker and the retry budget moved every suspending figure by exactly
 ///     <b>8 bytes</b> - one reference field in the state-machine box, for the budget the call will
 ///     charge. No budget was widened for it; the design's open question 1 allowed 64 B of headroom for
 ///     the breaker and budget and this used an eighth of it. The breaker costs nothing in the box at all, because the
 ///     policy holding it is already a field.
-    ///     The adaptive attempt ceiling (<c>Resilience.AttemptCeiling</c>) does not increase allocations on any path.
-    ///     <c>Ceiling()</c> resolves the latency window at each of the two points that need it rather than
-    ///     hoisting it into a local, so the reference never joins the state-machine box. Additionally, the
-    ///     four call sites compute <c>deadlineCeiling</c> as a <c>bool</c> beside the ceiling instead of keeping
-    ///     the ceiling itself live across the attempt <c>await</c>.
-    ///     Measured both ways: a hoisted <c>TimeSpan</c> cost the streaming path 8 bytes (848 -> 855
-    ///     B/op) and the bool cost nothing. Suspending figures are unchanged to the byte - 344, 408, 424
-    ///     and 584 - and the sequential loops now carry a fourth <c>bool</c> that lands in existing padding
-    ///     (<c>recorded</c>, <c>hasValue</c> and <c>deadlineSpent</c>).
-
+///     The adaptive attempt ceiling (<c>Resilience.AttemptCeiling</c>) does not increase allocations on any path.
+///     <c>Ceiling()</c> resolves the latency window at each of the two points that need it rather than
+///     hoisting it into a local, so the reference never joins the state-machine box. Additionally, the
+///     four call sites compute <c>deadlineCeiling</c> as a <c>bool</c> beside the ceiling instead of keeping
+///     the ceiling itself live across the attempt <c>await</c>.
+///     Measured both ways: a hoisted <c>TimeSpan</c> cost the streaming path 8 bytes (848 -> 855
+///     B/op) and the bool cost nothing. Suspending figures are unchanged to the byte - 344, 408, 424
+///     and 584 - and the sequential loops now carry a fourth <c>bool</c> that lands in existing padding
+///     (<c>recorded</c>, <c>hasValue</c> and <c>deadlineSpent</c>).
 ///     Every budget points at the <b>shipping</b> executor. Where a figure changed, the
 ///     stand-in value is kept in the comment, because the delta is the answer to the question
 ///     the stand-in exists to ask.
@@ -204,16 +203,24 @@ public static class Budgets
     ///     middle. The budget is itemized rather than totalled, because every line is a thing the
     ///     design chose to buy and a reviewer is entitled to see which one moved:
     ///     <list type="bullet">
-    ///         <item>one iterator box - <c>ExecuteStreamAsync</c>'s own state machine, the analog of
-    ///         the call paths' box;</item>
-    ///         <item>one linked <c>attemptSource</c> - which a call pays too, for the same reason: the
-    ///         surviving enumerator's token has to reach the source;</item>
-    ///         <item>one pooled timer CTS, returned on every attempt except the winner, whose
-    ///         <b>disposal</b> is the streaming-only delta - the one rule whose violation is silent
-    ///         (a returned-while-linked source lets the next tenant's CancelAfter cancel a live
-    ///         stream), so its cost is paid deliberately and itemized here;</item>
-    ///         <item>the first-element pull and the per-element passthrough loop, which are the
-    ///         source's own enumerator costs above the raw arm's identical pulls.</item>
+    ///         <item>
+    ///             one iterator box - <c>ExecuteStreamAsync</c>'s own state machine, the analog of
+    ///             the call paths' box;
+    ///         </item>
+    ///         <item>
+    ///             one linked <c>attemptSource</c> - which a call pays too, for the same reason: the
+    ///             surviving enumerator's token has to reach the source;
+    ///         </item>
+    ///         <item>
+    ///             one pooled timer CTS, returned on every attempt except the winner, whose
+    ///             <b>disposal</b> is the streaming-only delta - the one rule whose violation is silent
+    ///             (a returned-while-linked source lets the next tenant's CancelAfter cancel a live
+    ///             stream), so its cost is paid deliberately and itemized here;
+    ///         </item>
+    ///         <item>
+    ///             the first-element pull and the per-element passthrough loop, which are the
+    ///             source's own enumerator costs above the raw arm's identical pulls.
+    ///         </item>
     ///     </list>
     ///     The <c>[EnumeratorCancellation]</c> merge allocates one further linked CTS only when the
     ///     caller supplies both a call-time and an enumeration-time token, which this arm does not -

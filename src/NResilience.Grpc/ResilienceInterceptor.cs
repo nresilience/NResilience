@@ -9,12 +9,24 @@ namespace NResilience.Grpc;
 ///     <see cref="Resilience" /> policy around each gRPC call, and does the gRPC-specific things a
 ///     policy on its own cannot.
 ///     <list type="bullet">
-///         <item><description>It classifies a <see cref="StatusCode" />, which is where a gRPC failure actually lives.</description></item>
-///         <item><description>It repeats unary calls by default, and lets you say which ones it must not.</description></item>
-///         <item><description>It writes each attempt's ceiling into <see cref="CallOptions.Deadline" />, so the peer learns it as <c>grpc-timeout</c>.</description></item>
-///         <item><description>It scopes the breaker and the budget per service.</description></item>
-///         <item><description>It reports nested retries, under the same marker the HTTP handler uses.</description></item>
-///         <item><description>It disposes the calls a retry supersedes.</description></item>
+///         <item>
+///             <description>It classifies a <see cref="StatusCode" />, which is where a gRPC failure actually lives.</description>
+///         </item>
+///         <item>
+///             <description>It repeats unary calls by default, and lets you say which ones it must not.</description>
+///         </item>
+///         <item>
+///             <description>It writes each attempt's ceiling into <see cref="CallOptions.Deadline" />, so the peer learns it as <c>grpc-timeout</c>.</description>
+///         </item>
+///         <item>
+///             <description>It scopes the breaker and the budget per service.</description>
+///         </item>
+///         <item>
+///             <description>It reports nested retries, under the same marker the HTTP handler uses.</description>
+///         </item>
+///         <item>
+///             <description>It disposes the calls a retry supersedes.</description>
+///         </item>
 ///     </list>
 /// </summary>
 /// <remarks>

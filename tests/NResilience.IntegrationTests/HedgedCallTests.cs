@@ -158,7 +158,7 @@ public sealed class HedgedCallTests
         {
             Attempts = 3,
             OnEvent = events.Record,
-            Hedge = Hedge.At(quantile: 0.95) with { MinimumSamples = MinimumSamples, MinimumDelay = Floor },
+            Hedge = Hedge.At(0.95) with { MinimumSamples = MinimumSamples, MinimumDelay = Floor },
         };
 
     /// <summary>

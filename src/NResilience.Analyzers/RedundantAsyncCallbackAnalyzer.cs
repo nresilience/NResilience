@@ -7,7 +7,7 @@ using Microsoft.CodeAnalysis.Operations;
 namespace NResilience.Analyzers;
 
 /// <summary>
-///     NRES007: async attempt => await Work(attempt) allocates an unnecessary state machine. 
+///     NRES007: async attempt => await Work(attempt) allocates an unnecessary state machine.
 ///     The execution overloads accept the task directly, regardless of whether it is a Task or ValueTask.
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
@@ -78,17 +78,19 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
     /// <summary>
     ///     Whether dropping <c>async</c> lands the callback on the <c>ValueTask</c> overload set.
     ///     <para>
-    ///         These overloads are extension methods. An async lambda binds to the Task instance 
-    ///         overload because C# prioritizes instance methods over extension methods. Removing 
-    ///         async causes the lambda to return a ValueTask, which matches no instance overload, 
-    ///         forcing the compiler to use the extension method. This preserves the call's name 
-    ///         and behavior while eliminating the state machine and task allocation for 
+    ///         These overloads are extension methods. An async lambda binds to the Task instance
+    ///         overload because C# prioritizes instance methods over extension methods. Removing
+    ///         async causes the lambda to return a ValueTask, which matches no instance overload,
+    ///         forcing the compiler to use the extension method. This preserves the call's name
+    ///         and behavior while eliminating the state machine and task allocation for
     ///         synchronously completing calls.
     ///     </para>
     /// </summary>
     /// <param name="known">Resolved symbols. The rewrite needs the <c>ValueTask</c> overloads to exist.</param>
-    /// <param name="syntax">The lambda. One whose return type is written down cannot be re-bound: the
-    ///     compiler would hold the rewritten body to that same type rather than resolving again.</param>
+    /// <param name="syntax">
+    ///     The lambda. One whose return type is written down cannot be re-bound: the
+    ///     compiler would hold the rewritten body to that same type rather than resolving again.
+    /// </param>
     /// <param name="awaited">The type of the awaited expression.</param>
     /// <param name="returned">The target delegate's return type.</param>
     /// <returns>True when the rewrite is legal and lands on the counterpart overload.</returns>

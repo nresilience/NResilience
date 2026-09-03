@@ -39,9 +39,7 @@ public static class ResilienceHttpRequestExtensions
         // Contains first: TryAddWithoutValidation appends, and two idempotency keys on one request
         // is a request most services reject outright.
         if (idempotencyKey is not null && !request.Headers.Contains(headerName))
-        {
             request.Headers.TryAddWithoutValidation(headerName, idempotencyKey);
-        }
 
         return request;
     }

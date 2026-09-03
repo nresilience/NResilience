@@ -40,7 +40,9 @@ public static class StreamGate
         var sum = 0;
 
         await foreach (var item in stream.ConfigureAwait(false))
+        {
             sum += item;
+        }
 
         return sum;
     }

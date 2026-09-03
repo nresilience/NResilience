@@ -6,10 +6,10 @@ namespace NResilience.Tests;
 /// <summary>
 ///     Tests for <see cref="ValueTask" />-returning callback overloads.
 ///     <para>
-///         These tests specifically verify that callbacks returning a pooled 
-///         <see cref="IValueTaskSource" /> survive retries. Because a <see cref="ValueTask" /> 
-///         can be awaited only once, a loop that incorrectly retains a <see cref="ValueTask" /> 
-///         from a previous attempt would fail. These tests use a source that recycles its 
+///         These tests specifically verify that callbacks returning a pooled
+///         <see cref="IValueTaskSource" /> survive retries. Because a <see cref="ValueTask" />
+///         can be awaited only once, a loop that incorrectly retains a <see cref="ValueTask" />
+///         from a previous attempt would fail. These tests use a source that recycles its
 ///         token, mimicking the behavior of <c>Socket</c> and <c>Channel</c>.
 ///     </para>
 /// </summary>
@@ -18,9 +18,9 @@ public sealed class ValueTaskCallbackTests
     [Fact]
     public async Task A_pooled_source_is_re_invoked_rather_than_re_awaited()
     {
-        var source = new PooledSource(failuresPerCall: 2);
+        var source = new PooledSource(2);
 
-        var value = await TestPolicy.Instant.RunAsync(static (PooledSource s, CancellationToken ct) => s.ReadAsync(ct), source);
+        var value = await TestPolicy.Instant.RunAsync(static (s, ct) => s.ReadAsync(ct), source);
 
         Assert.Equal(PooledSource.Value, value);
         Assert.Equal(3, source.Calls);
@@ -29,27 +29,27 @@ public sealed class ValueTaskCallbackTests
     [Fact]
     public async Task A_synchronously_completing_callback_returns_its_value()
     {
-        var source = new PooledSource(failuresPerCall: 0);
+        var source = new PooledSource(0);
 
-        Assert.Equal(PooledSource.Value, await TestPolicy.Instant.RunAsync(static (PooledSource s, CancellationToken ct) => s.ReadAsync(ct), source));
+        Assert.Equal(PooledSource.Value, await TestPolicy.Instant.RunAsync(static (s, ct) => s.ReadAsync(ct), source));
         Assert.Equal(1, source.Calls);
     }
 
     [Fact]
     public async Task An_asynchronously_completing_callback_returns_its_value()
     {
-        var source = new PooledSource(failuresPerCall: 0, suspend: true);
+        var source = new PooledSource(0, true);
 
-        Assert.Equal(PooledSource.Value, await TestPolicy.Instant.RunAsync(static (PooledSource s, CancellationToken ct) => s.ReadAsync(ct), source));
+        Assert.Equal(PooledSource.Value, await TestPolicy.Instant.RunAsync(static (s, ct) => s.ReadAsync(ct), source));
     }
 
     [Fact]
     public async Task A_faulted_callback_is_classified_retried_and_finally_rethrown()
     {
-        var source = new PooledSource(failuresPerCall: int.MaxValue);
+        var source = new PooledSource(int.MaxValue);
 
         await Assert.ThrowsAsync<TimeoutException>(async () =>
-            await TestPolicy.Instant.RunAsync(static (PooledSource s, CancellationToken ct) => s.ReadAsync(ct), source));
+            await TestPolicy.Instant.RunAsync(static (s, ct) => s.ReadAsync(ct), source));
 
         Assert.Equal(3, source.Calls);
     }
@@ -87,9 +87,9 @@ public sealed class ValueTaskCallbackTests
     [Fact]
     public async Task TryRunAsync_reports_the_attempt_log()
     {
-        var source = new PooledSource(failuresPerCall: 1);
+        var source = new PooledSource(1);
 
-        var result = await TestPolicy.Instant.TryRunAsync(static (PooledSource s, CancellationToken ct) => s.ReadAsync(ct), source);
+        var result = await TestPolicy.Instant.TryRunAsync(static (s, ct) => s.ReadAsync(ct), source);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(PooledSource.Value, result.Value);
@@ -128,7 +128,7 @@ public sealed class ValueTaskCallbackTests
         var calls = 0;
 
         var result = await TestPolicy.Instant.TryRunAsync(
-            static (Ref counter, CancellationToken ct) =>
+            static (counter, ct) =>
             {
                 counter.Bump();
                 return counter.Count < 2 ? ValueTask.FromException(new TimeoutException()) : default;
@@ -159,15 +159,15 @@ public sealed class ValueTaskCallbackTests
         await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
-            await TestPolicy.Instant.RunAsync(static (PooledSource s, CancellationToken ct) => s.ReadAsync(ct), new PooledSource(0), cts.Token));
+            await TestPolicy.Instant.RunAsync(static (s, ct) => s.ReadAsync(ct), new PooledSource(0), cts.Token));
     }
 
     [Fact]
     public async Task Passthrough_hands_back_the_callback_own_task()
     {
-        var source = new PooledSource(failuresPerCall: 0);
+        var source = new PooledSource(0);
 
-        Assert.Equal(PooledSource.Value, await Resilience.None.RunAsync(static (PooledSource s, CancellationToken ct) => s.ReadAsync(ct), source));
+        Assert.Equal(PooledSource.Value, await Resilience.None.RunAsync(static (s, ct) => s.ReadAsync(ct), source));
         Assert.Equal(1, source.Calls);
     }
 
@@ -183,7 +183,11 @@ public sealed class ValueTaskCallbackTests
             Admit = _ => Task.FromResult(++admitted == 1 ? Verdict.Refused() : Verdict.Ok),
         };
 
-        var result = await policy.TryRunAsync(ValueTask<int> (ct) => { calls++; return new ValueTask<int>(9); });
+        var result = await policy.TryRunAsync(ValueTask<int> (ct) =>
+        {
+            calls++;
+            return new ValueTask<int>(9);
+        });
 
         Assert.True(result.IsSuccess);
         Assert.Equal(9, result.Value);
@@ -209,11 +213,11 @@ public sealed class ValueTaskCallbackTests
         }
     }
 
-/// <summary>
-///     An <see cref="IValueTaskSource{TResult}" /> that recycles a single core across calls, 
-///     simulating BCL pooled sources. Awaiting the same token twice throws, which allows these 
-///     tests to verify that the executor does not re-await <see cref="ValueTask" /> objects.
-/// </summary>
+    /// <summary>
+    ///     An <see cref="IValueTaskSource{TResult}" /> that recycles a single core across calls,
+    ///     simulating BCL pooled sources. Awaiting the same token twice throws, which allows these
+    ///     tests to verify that the executor does not re-await <see cref="ValueTask" /> objects.
+    /// </summary>
     private sealed class PooledSource(int failuresPerCall, bool suspend = false) : IValueTaskSource<int>
     {
         public const int Value = 42;
@@ -221,6 +225,13 @@ public sealed class ValueTaskCallbackTests
         private ManualResetValueTaskSourceCore<int> _core;
 
         public int Calls { get; private set; }
+
+        public int GetResult(short token) => _core.GetResult(token);
+
+        public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
+
+        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) =>
+            _core.OnCompleted(continuation, state, token, flags);
 
         public ValueTask<int> ReadAsync(CancellationToken cancellationToken)
         {
@@ -231,6 +242,7 @@ public sealed class ValueTaskCallbackTests
             if (suspend)
             {
                 var pending = new ValueTask<int>(this, _core.Version);
+
                 _ = Task.Run(async () =>
                 {
                     await Task.Yield();
@@ -247,12 +259,5 @@ public sealed class ValueTaskCallbackTests
 
             return new ValueTask<int>(this, _core.Version);
         }
-
-        public int GetResult(short token) => _core.GetResult(token);
-
-        public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
-
-        public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) =>
-            _core.OnCompleted(continuation, state, token, flags);
     }
 }

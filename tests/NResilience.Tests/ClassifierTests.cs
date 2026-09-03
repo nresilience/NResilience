@@ -136,8 +136,8 @@ public sealed class ClassifierTests
     [Fact]
     public void Data_asks_the_provider_whether_a_database_failure_is_transient()
     {
-        Assert.Equal(VerdictKind.Transient, Classifier.Data.ClassifyException(new FakeDbException(transient: true)).Kind);
-        Assert.Equal(VerdictKind.Permanent, Classifier.Data.ClassifyException(new FakeDbException(transient: false)).Kind);
+        Assert.Equal(VerdictKind.Transient, Classifier.Data.ClassifyException(new FakeDbException(true)).Kind);
+        Assert.Equal(VerdictKind.Permanent, Classifier.Data.ClassifyException(new FakeDbException(false)).Kind);
     }
 
     /// <summary>
@@ -172,9 +172,9 @@ public sealed class ClassifierTests
         var classifier = Classifier.Data.On<FakeDbException>(static e =>
             e.Number is 10928 or 10929 ? Verdict.Throttled() : Classifier.Data.ClassifyException(e));
 
-        Assert.Equal(VerdictKind.Throttled, classifier.ClassifyException(new FakeDbException(transient: true) { Number = 10928 }).Kind);
-        Assert.Equal(VerdictKind.Transient, classifier.ClassifyException(new FakeDbException(transient: true)).Kind);
-        Assert.Equal(VerdictKind.Permanent, classifier.ClassifyException(new FakeDbException(transient: false)).Kind);
+        Assert.Equal(VerdictKind.Throttled, classifier.ClassifyException(new FakeDbException(true) { Number = 10928 }).Kind);
+        Assert.Equal(VerdictKind.Transient, classifier.ClassifyException(new FakeDbException(true)).Kind);
+        Assert.Equal(VerdictKind.Permanent, classifier.ClassifyException(new FakeDbException(false)).Kind);
     }
 
     [Fact]

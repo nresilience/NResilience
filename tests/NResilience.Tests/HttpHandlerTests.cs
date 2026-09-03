@@ -72,9 +72,9 @@ public sealed class HttpHandlerTests
     public async Task A_clone_carries_the_headers_the_body_and_the_uri()
     {
         var transport = new ScriptedHttpHandler
-        {
-            CaptureBodies = true,
-        }
+            {
+                CaptureBodies = true,
+            }
             .Respond(HttpStatusCode.ServiceUnavailable)
             .Respond(HttpStatusCode.OK);
 
@@ -126,9 +126,9 @@ public sealed class HttpHandlerTests
     public async Task A_POST_is_retried_when_the_client_opts_in()
     {
         var transport = new ScriptedHttpHandler
-        {
-            CaptureBodies = true,
-        }
+            {
+                CaptureBodies = true,
+            }
             .Respond(HttpStatusCode.ServiceUnavailable)
             .Respond(HttpStatusCode.OK);
 
@@ -426,6 +426,7 @@ public sealed class HttpHandlerTests
             transport,
             TestPolicy.InstantHttp with { Breaker = null, Time = time },
             new HttpResilienceOptions { BreakerPerHost = false });
+
         using var client = new HttpClient(handler);
 
         for (var i = 0; i < 5; i++)
@@ -608,7 +609,7 @@ public sealed class HttpHandlerTests
 
         // The inbound half: a server published the caller's marker as an ambient flag, and the
         // outbound calls this request makes are the ones that need to know.
-        using var scope = ResilienceNestedRetry.Begin(callerRetrying: true);
+        using var scope = ResilienceNestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.True(recorder.Contains(CallEventKind.NestedRetry));
@@ -625,7 +626,7 @@ public sealed class HttpHandlerTests
             new HttpResilienceOptions { DetectNestedRetries = false },
             TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
-        using var scope = ResilienceNestedRetry.Begin(callerRetrying: true);
+        using var scope = ResilienceNestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.False(recorder.Contains(CallEventKind.NestedRetry));
@@ -639,7 +640,7 @@ public sealed class HttpHandlerTests
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1, OnEvent = recorder.Record });
 
-        using var scope = ResilienceNestedRetry.Begin(callerRetrying: true);
+        using var scope = ResilienceNestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.False(recorder.Contains(CallEventKind.NestedRetry));
@@ -657,7 +658,7 @@ public sealed class HttpHandlerTests
         // false and make every later call through this context report nesting from nothing.
         using var client = Client(inner, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
-        using (ResilienceNestedRetry.Begin(callerRetrying: true))
+        using (ResilienceNestedRetry.Begin(true))
         {
             (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 

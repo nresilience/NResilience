@@ -47,7 +47,9 @@ public sealed class DeadlinePropagationTests
         using (ResilienceDeadline.Begin(TimeSpan.FromSeconds(10), time))
         {
             using (ResilienceDeadline.Begin(TimeSpan.FromSeconds(2), time))
+            {
                 Assert.Equal(TimeSpan.FromSeconds(2), ResilienceDeadline.Remaining);
+            }
 
             Assert.Equal(TimeSpan.FromSeconds(10), ResilienceDeadline.Remaining);
         }
@@ -80,7 +82,7 @@ public sealed class DeadlinePropagationTests
     [InlineData("")]
     [InlineData(" 200")]
     [InlineData("200ms")]
-    [InlineData("100m")]      // gRPC's format, which this is deliberately not.
+    [InlineData("100m")] // gRPC's format, which this is deliberately not.
     [InlineData("2.5")]
     [InlineData("-5")]
     [InlineData("0")]
@@ -263,7 +265,7 @@ public sealed class DeadlinePropagationTests
         var policy = TestPolicy.On(time) with
         {
             UseAmbientDeadline = true,
-            Hedge = Hedge.At(0.95),
+            Hedge = Hedge.At(),
         };
 
         using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(50), time);

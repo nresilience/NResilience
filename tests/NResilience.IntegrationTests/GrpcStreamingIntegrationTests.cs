@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NResilience.Grpc;
 using NResilience.IntegrationTests.Grpc;
@@ -34,7 +33,9 @@ public sealed class GrpcStreamingIntegrationTests
         using (call)
         {
             await foreach (var reply in call.ResponseStream.ReadAllAsync(TestContext.Current.CancellationToken))
+            {
                 read.Add(reply.Message);
+            }
         }
 
         Assert.Equal(["0", "1", "2"], read);
@@ -55,7 +56,9 @@ public sealed class GrpcStreamingIntegrationTests
         var failure = await Assert.ThrowsAsync<RpcException>(async () =>
         {
             await foreach (var reply in call.ResponseStream.ReadAllAsync(TestContext.Current.CancellationToken))
+            {
                 read.Add(reply.Message);
+            }
         });
 
         Assert.Equal(StatusCode.Unavailable, failure.StatusCode);

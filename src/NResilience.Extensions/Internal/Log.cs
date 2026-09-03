@@ -124,7 +124,8 @@ internal static partial class Log
     [LoggerMessage(
         EventId = Codes.HedgeStarted,
         EventName = nameof(Ids.HedgeStarted),
-        Message = "{Policy} started hedge attempt {Attempt}: the call has been running longer than {ThresholdMs} ms, which is the current quantile of recent calls")]
+        Message =
+            "{Policy} started hedge attempt {Attempt}: the call has been running longer than {ThresholdMs} ms, which is the current quantile of recent calls")]
     internal static partial void HedgeStarted(ILogger logger, LogLevel level, string policy, int attempt, long thresholdMs);
 
     [LoggerMessage(EventId = Codes.HedgeWon, EventName = nameof(Ids.HedgeWon),

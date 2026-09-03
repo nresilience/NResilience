@@ -379,8 +379,10 @@ public sealed partial record Resilience
                     var pause = GuardDelay(Remaining(Time, start, deadline));
 
                     if (OnEvent is not null)
+                    {
                         Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
                             StopReason.DependencyUnavailable);
+                    }
 
                     await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
                     break;
@@ -443,6 +445,7 @@ public sealed partial record Resilience
                         await attempt.ConfigureAwait(false);
                         value = invoker.Result(attempt);
                     }
+
                     hasValue = true;
                     verdict = Classify.ClassifyResult(value);
                 }
@@ -627,8 +630,10 @@ public sealed partial record Resilience
                     var pause = GuardDelay(Remaining(Time, start, deadline));
 
                     if (OnEvent is not null)
+                    {
                         Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
                             StopReason.DependencyUnavailable);
+                    }
 
                     await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
                     break;
@@ -693,13 +698,12 @@ public sealed partial record Resilience
                             await attempt.ConfigureAwait(false);
                             value = invoker.Result(attempt);
                         }
+
                         hasValue = true;
                         verdict = Classify.ClassifyResult(value);
                     }
                     else
-                    {
                         verdict = decision;
-                    }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -781,21 +785,6 @@ public sealed partial record Resilience
         };
 
         return shaper.Failure(value, hasValue, error, reason, deadline, attempts, retryAfter);
-    }
-
-    /// <summary>
-    ///     What the loop does once <see cref="AfterAttempt{T}" /> has judged an attempt.
-    /// </summary>
-    private enum NextStep : byte
-    {
-        /// <summary>Serve the backoff and start another attempt.</summary>
-        Retry,
-
-        /// <summary>The attempt produced a result the classifier called <see cref="VerdictKind.Ok" />.</summary>
-        Succeeded,
-
-        /// <summary>The call is over. Serve the pause, if there is one, and leave the loop.</summary>
-        Stop,
     }
 
     /// <summary>
@@ -1052,8 +1041,10 @@ public sealed partial record Resilience
             // caller who cancelled while an attempt was already succeeding has waited for that attempt
             // either way, and throwing away work that is done and paid for helps nobody.
             if (OnEvent is not null)
+            {
                 Notify(CallEventKind.Succeeded, attempts, verdict, Time.GetElapsedTime(start, now), null, null, ResultOf(value, hasValue),
                     StopReason.Succeeded);
+            }
 
             return NextStep.Succeeded;
         }
@@ -1080,8 +1071,10 @@ public sealed partial record Resilience
             reason = StopReason.AttemptsExhausted;
 
             if (OnEvent is not null)
+            {
                 Notify(CallEventKind.Exhausted, attempts, verdict, Time.GetElapsedTime(start, now), null, error, ResultOf(value, hasValue),
                     StopReason.AttemptsExhausted);
+            }
 
             return NextStep.Stop;
         }
@@ -1110,8 +1103,10 @@ public sealed partial record Resilience
             wait = GuardDelay(left);
 
             if (OnEvent is not null)
+            {
                 Notify(CallEventKind.RejectedByBudget, attempts, verdict, Time.GetElapsedTime(start, now), wait, error, ResultOf(value, hasValue),
                     StopReason.BudgetExhausted);
+            }
 
             return NextStep.Stop;
         }
@@ -1422,5 +1417,20 @@ public sealed partial record Resilience
             return attemptTimeout;
 
         return attemptTimeout < remaining ? attemptTimeout : remaining;
+    }
+
+    /// <summary>
+    ///     What the loop does once <see cref="AfterAttempt{T}" /> has judged an attempt.
+    /// </summary>
+    private enum NextStep : byte
+    {
+        /// <summary>Serve the backoff and start another attempt.</summary>
+        Retry,
+
+        /// <summary>The attempt produced a result the classifier called <see cref="VerdictKind.Ok" />.</summary>
+        Succeeded,
+
+        /// <summary>The call is over. Serve the pause, if there is one, and leave the loop.</summary>
+        Stop,
     }
 }

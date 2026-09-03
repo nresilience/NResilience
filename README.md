@@ -21,7 +21,8 @@ NResilience replaces complex fluent builders, confusing policy ordering, and man
 - **Sensible defaults.** Get a working, retried HTTP call with one line of code.
 - **One method for everything.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
 - **Retry budget.** A cap on retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
-- **Measured, not guessed.** The attempt ceiling and the breaker's slow-call and error-rate trips are measured from the dependency's own behavior, on by default, so no millisecond figure has to be guessed per dependency.
+- **Measured, not guessed.** The attempt ceiling and the breaker's slow-call and error-rate trips are measured from the dependency's own behavior, on by
+  default, so no millisecond figure has to be guessed per dependency.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
 - **Native AOT compatible.** Zero external dependencies and no reflection.
 
@@ -79,7 +80,8 @@ User best = result.TryGetValue(out User? fetched) ? fetched : cache.LastKnownGoo
 
 NResilience is built for high-performance .NET applications:
 
-- **Low overhead.** A flat execution path ensures that cost doesn't grow as you add more policy settings. Overhead is one allocation per call, and that ceiling is gated in CI.
+- **Low overhead.** A flat execution path ensures that cost doesn't grow as you add more policy settings. Overhead is one allocation per call, and that ceiling
+  is gated in CI.
 - **Built-in analyzers.** Seven diagnostics ship with the package to prevent silent failures.
 - **Native AOT.** Fully compatible with `net8.0` and `net10.0` trimming and AOT publishing.
 
@@ -95,10 +97,10 @@ For more information, see these resources:
 
 ## Packages
 
-| Package                  | Use case                                                                  |
-|--------------------------|---------------------------------------------------------------------------|
-| `NResilience`            | The core library, HTTP handler, and analyzers.                            |
-| `NResilience.Extensions` | Dependency injection, configuration binding, metrics, and health checks. |
-| `NResilience.Testing`    | Helpers for testing your policies, and fault injection.                  |
-| `NResilience.Grpc`       | A gRPC client interceptor with status classification and `grpc-timeout` propagation. |
+| Package                  | Use case                                                                                                                                                                               |
+|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `NResilience`            | The core library, HTTP handler, and analyzers.                                                                                                                                         |
+| `NResilience.Extensions` | Dependency injection, configuration binding, metrics, and health checks.                                                                                                               |
+| `NResilience.Testing`    | Helpers for testing your policies, and fault injection.                                                                                                                                |
+| `NResilience.Grpc`       | A gRPC client interceptor with status classification and `grpc-timeout` propagation.                                                                                                   |
 | `NResilience.AspNetCore` | Middleware that reads the deadline and nested-retry marker a caller sent, so outbound calls inherit both, and an exception handler that maps NResilience exceptions to HTTP responses. |

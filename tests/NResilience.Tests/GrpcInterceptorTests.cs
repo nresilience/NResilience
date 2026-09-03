@@ -2,7 +2,6 @@ using Grpc.Core;
 using Grpc.Core.Interceptors;
 using NResilience.Grpc;
 using NResilience.Http;
-using NResilience.Testing;
 
 namespace NResilience.Tests;
 
@@ -78,8 +77,8 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public void The_classifier_is_one_line_to_override()
     {
-        var retryAborted = GrpcResilience.Classifier.On<RpcException>(
-            static e => e.StatusCode == StatusCode.Aborted ? Verdict.Transient : GrpcResilience.Classifier.ClassifyException(e));
+        var retryAborted = GrpcResilience.Classifier.On<RpcException>(static e =>
+            e.StatusCode == StatusCode.Aborted ? Verdict.Transient : GrpcResilience.Classifier.ClassifyException(e));
 
         Assert.Equal(VerdictKind.Transient, retryAborted.ClassifyException(new RpcException(new Status(StatusCode.Aborted, ""))).Kind);
         Assert.Equal(VerdictKind.Transient, retryAborted.ClassifyException(new RpcException(new Status(StatusCode.Unavailable, ""))).Kind);
@@ -430,10 +429,14 @@ public sealed class GrpcInterceptorTests
         var interceptor = Interceptor(Policy() with { Breaker = new Breaker() });
 
         using (var first = Call(interceptor, new GrpcScript().Respond("ok")))
+        {
             await first.ResponseAsync;
+        }
 
         using (var second = Call(interceptor, new GrpcScript().Respond("ok"), method: Ship))
+        {
             await second.ResponseAsync;
+        }
 
         Assert.Equal(["orders.Orders", "shipping.Shipping"], interceptor.Breakers().Keys.Order());
         Assert.Equal(["orders.Orders", "shipping.Shipping"], interceptor.Budgets().Keys.Order());
@@ -445,10 +448,14 @@ public sealed class GrpcInterceptorTests
         var interceptor = Interceptor(Policy() with { Breaker = new Breaker() });
 
         using (var first = Call(interceptor, new GrpcScript().Respond("ok")))
+        {
             await first.ResponseAsync;
+        }
 
         using (var second = Call(interceptor, new GrpcScript().Respond("ok"), method: Charge))
+        {
             await second.ResponseAsync;
+        }
 
         Assert.Single(interceptor.Breakers());
     }
@@ -459,10 +466,14 @@ public sealed class GrpcInterceptorTests
         var interceptor = new ResilienceInterceptor(Policy(), new GrpcResilienceOptions { ScopeBy = null }, "orders");
 
         using (var first = Call(interceptor, new GrpcScript().Respond("ok")))
+        {
             await first.ResponseAsync;
+        }
 
         using (var second = Call(interceptor, new GrpcScript().Respond("ok"), method: Ship))
+        {
             await second.ResponseAsync;
+        }
 
         Assert.Equal(["orders"], interceptor.Breakers().Keys);
     }
@@ -474,10 +485,14 @@ public sealed class GrpcInterceptorTests
         var interceptor = new ResilienceInterceptor(Policy() with { Attempts = 1 }, options);
 
         using (var failing = Call(interceptor, new GrpcScript().Fail(StatusCode.Unavailable)))
+        {
             await Assert.ThrowsAsync<RpcException>(async () => await failing.ResponseAsync);
+        }
 
         using (var rejected = Call(interceptor, new GrpcScript().Respond("ok")))
+        {
             await Assert.ThrowsAsync<CallRejectedException>(async () => await rejected.ResponseAsync);
+        }
 
         using var other = Call(interceptor, new GrpcScript().Respond("ok"), method: Ship);
 
@@ -487,11 +502,10 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public void An_interceptor_validates_its_policy_and_its_options_eagerly()
     {
-        Assert.Throws<ResilienceConfigurationException>(
-            () => new ResilienceInterceptor(Policy() with { Attempts = 0 }));
+        Assert.Throws<ResilienceConfigurationException>(() => new ResilienceInterceptor(Policy() with { Attempts = 0 }));
 
-        Assert.Throws<ResilienceConfigurationException>(
-            () => new ResilienceInterceptor(Policy(), new GrpcResilienceOptions { DeadlineSlack = TimeSpan.FromSeconds(-1) }));
+        Assert.Throws<ResilienceConfigurationException>(() =>
+            new ResilienceInterceptor(Policy(), new GrpcResilienceOptions { DeadlineSlack = TimeSpan.FromSeconds(-1) }));
     }
 
     [Fact]
@@ -499,11 +513,10 @@ public sealed class GrpcInterceptorTests
     {
         var interceptor = Interceptor();
 
-        Assert.Throws<NotSupportedException>(
-            () => interceptor.BlockingUnaryCall(
-                "request",
-                new ClientInterceptorContext<string, string>(Get, null, default),
-                static (_, _) => "unreachable"));
+        Assert.Throws<NotSupportedException>(() => interceptor.BlockingUnaryCall(
+            "request",
+            new ClientInterceptorContext<string, string>(Get, null, default),
+            static (_, _) => "unreachable"));
     }
 
     /// <summary>The shipped policy with the backoff taken out, so a suite of retries costs no wall clock.</summary>

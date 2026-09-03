@@ -39,7 +39,9 @@ public sealed class GrpcStreamingTests
         var failure = await Assert.ThrowsAsync<RpcException>(async () =>
         {
             await foreach (var message in call.ResponseStream.ReadAllAsync())
+            {
                 read.Add(message);
+            }
         });
 
         Assert.Equal(StatusCode.Unavailable, failure.StatusCode);
@@ -107,7 +109,9 @@ public sealed class GrpcStreamingTests
         var call = Call(Interceptor(), script);
 
         await foreach (var _ in call.ResponseStream.ReadAllAsync())
+        {
             break;
+        }
 
         // The reader itself is not disposable - IAsyncStreamReader has no such member - so stopping
         // early and disposing the call is how a consumer says they have read enough.
@@ -139,7 +143,9 @@ public sealed class GrpcStreamingTests
         var reading = Task.Run(async () => await Read(call));
 
         while (script.CallCount == 0)
+        {
             await Task.Delay(10, TestContext.Current.CancellationToken);
+        }
 
         await caller.CancelAsync();
 
@@ -222,10 +228,14 @@ public sealed class GrpcStreamingTests
         AsyncServerStreamingCall<string> call;
 
         using (GrpcResilience.SingleShot())
+        {
             call = Call(Interceptor(), script);
+        }
 
         using (call)
+        {
             await Assert.ThrowsAsync<RpcException>(async () => await Read(call));
+        }
 
         Assert.Equal(1, script.CallCount);
     }
@@ -235,8 +245,7 @@ public sealed class GrpcStreamingTests
     {
         var policy = Policy() with { Hedge = Hedge.At() };
 
-        Assert.Throws<ResilienceConfigurationException>(
-            () => Call(Interceptor(policy), new GrpcStreamScript().Stream("a")));
+        Assert.Throws<ResilienceConfigurationException>(() => Call(Interceptor(policy), new GrpcStreamScript().Stream("a")));
     }
 
     [Fact]
@@ -311,7 +320,9 @@ public sealed class GrpcStreamingTests
         var interceptor = Interceptor(Policy() with { Breaker = new Breaker() });
 
         using (var stream = Call(interceptor, new GrpcStreamScript().Stream("a")))
+        {
             await Read(stream);
+        }
 
         Assert.Single(interceptor.Breakers());
         Assert.Equal(["orders.Orders"], interceptor.Breakers().Keys);
@@ -337,7 +348,9 @@ public sealed class GrpcStreamingTests
         var read = new List<string>();
 
         await foreach (var message in call.ResponseStream.ReadAllAsync())
+        {
             read.Add(message);
+        }
 
         return read;
     }

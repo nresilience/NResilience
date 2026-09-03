@@ -61,7 +61,10 @@ public static class ResilienceNestedRetry
     {
         private readonly bool _previous;
 
-        internal NestedRetryScope(bool previous) => _previous = previous;
+        internal NestedRetryScope(bool previous)
+        {
+            _previous = previous;
+        }
 
         /// <summary>Restores the previous flag.</summary>
         public void Dispose() => Current.Value = _previous;

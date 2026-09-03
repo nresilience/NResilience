@@ -20,7 +20,7 @@ public sealed class AdaptiveSlowCallTests
     /// <summary>Slow is three times normal, and half the trip window being slow opens it.</summary>
     private static BreakerSettings Adaptive(FakeTimeProvider time) => new()
     {
-        SlowCalls = SlowCalls.Above(3),
+        SlowCalls = SlowCalls.Above(),
         SlowCallRatio = 0.5,
         MinimumCalls = 20,
         ConsecutiveFailures = 100,
@@ -128,7 +128,7 @@ public sealed class AdaptiveSlowCallTests
     public void Nothing_is_slow_until_the_baseline_has_enough_samples()
     {
         var time = new FakeTimeProvider();
-        var breaker = new Breaker(Adaptive(time) with { SlowCalls = SlowCalls.Above(3) with { MinimumSamples = 50 } });
+        var breaker = new Breaker(Adaptive(time) with { SlowCalls = SlowCalls.Above() with { MinimumSamples = 50 } });
 
         // Forty calls, wildly varying, and not one of them can be called slow: there is nothing yet to
         // call it slow relative to. A cold process does not guess a threshold.
@@ -246,7 +246,7 @@ public sealed class AdaptiveSlowCallTests
     public void A_baseline_read_from_a_high_quantile_is_refused(double quantile)
     {
         var problem = Assert.Throws<ResilienceConfigurationException>(() =>
-            new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above(3) with { Quantile = quantile } }));
+            new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above() with { Quantile = quantile } }));
 
         Assert.Contains(problem.Problems, p => p.Contains("SlowCalls.Quantile", StringComparison.Ordinal));
     }
@@ -261,7 +261,7 @@ public sealed class AdaptiveSlowCallTests
         var problem = Assert.Throws<ResilienceConfigurationException>(() =>
             new Breaker(new BreakerSettings
             {
-                SlowCalls = SlowCalls.Above(3) with { Window = TimeSpan.FromSeconds(30) },
+                SlowCalls = SlowCalls.Above() with { Window = TimeSpan.FromSeconds(30) },
                 TripWindow = TimeSpan.FromSeconds(30),
             }));
 
@@ -271,7 +271,7 @@ public sealed class AdaptiveSlowCallTests
     [Fact]
     public void The_defaults_win_that_race_comfortably()
     {
-        var breaker = new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above(3) });
+        var breaker = new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above() });
 
         Assert.Equal(TimeSpan.FromMinutes(5), breaker.Settings.SlowCalls!.Value.Window);
         Assert.Equal(0.5, breaker.Settings.SlowCalls!.Value.Quantile);
@@ -292,7 +292,7 @@ public sealed class AdaptiveSlowCallTests
         var breaker = new Breaker(new BreakerSettings
         {
             SlowCallThreshold = TimeSpan.FromSeconds(2),
-            SlowCalls = SlowCalls.Above(3),
+            SlowCalls = SlowCalls.Above(),
             Time = time,
         });
 
@@ -318,7 +318,7 @@ public sealed class AdaptiveSlowCallTests
         var breaker = new Breaker(new BreakerSettings
         {
             SlowCallThreshold = TimeSpan.FromMilliseconds(15),
-            SlowCalls = SlowCalls.Above(3),
+            SlowCalls = SlowCalls.Above(),
             Time = time,
         });
 
@@ -347,8 +347,8 @@ public sealed class AdaptiveSlowCallTests
     [Fact]
     public void Naming_a_default_explicitly_is_the_same_configuration_as_leaving_it_alone()
     {
-        var left = SlowCalls.Above(3);
-        var right = SlowCalls.Above(3) with { Quantile = 0.5, Window = TimeSpan.FromMinutes(5), MinimumSamples = 20 };
+        var left = SlowCalls.Above();
+        var right = SlowCalls.Above() with { Quantile = 0.5, Window = TimeSpan.FromMinutes(5), MinimumSamples = 20 };
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
@@ -357,6 +357,6 @@ public sealed class AdaptiveSlowCallTests
     [Fact]
     public void It_describes_itself_the_way_it_was_configured()
     {
-        Assert.Equal("3x p50 over 300s (min 20 samples)", SlowCalls.Above(3).ToString());
+        Assert.Equal("3x p50 over 300s (min 20 samples)", SlowCalls.Above().ToString());
     }
 }

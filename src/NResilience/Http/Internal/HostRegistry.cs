@@ -86,11 +86,13 @@ internal sealed class HostRegistry
 {
     private readonly ScopeRegistry<string, HostScope> _scopes;
 
-    internal HostRegistry(Resilience policy, HttpResilienceOptions options) =>
+    internal HostRegistry(Resilience policy, HttpResilienceOptions options)
+    {
         _scopes = new ScopeRegistry<string, HostScope>(
             host => new HostScope(policy, host, options),
             options.MaxHosts ?? 0,
             StringComparer.OrdinalIgnoreCase);
+    }
 
     internal IEnumerable<HostScope> Scopes => _scopes.Scopes;
 

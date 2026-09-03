@@ -124,11 +124,6 @@ public readonly record struct Recovery
         init => _initialFraction = value;
     }
 
-    /// <summary>The way to configure a ramped recovery.</summary>
-    /// <param name="length">How long the ramp lasts, as a fraction of the break just served. Must be greater than 0.</param>
-    /// <returns>The configuration.</returns>
-    public static Recovery Over(double length = 0.25) => new() { Length = length };
-
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
     ///     explicitly equals one that left it alone.
@@ -140,6 +135,11 @@ public readonly record struct Recovery
         && MinimumLength == other.MinimumLength
         && MaximumLength == other.MaximumLength
         && InitialFraction.Equals(other.InitialFraction);
+
+    /// <summary>The way to configure a ramped recovery.</summary>
+    /// <param name="length">How long the ramp lasts, as a fraction of the break just served. Must be greater than 0.</param>
+    /// <returns>The configuration.</returns>
+    public static Recovery Over(double length = 0.25) => new() { Length = length };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Length, MinimumLength, MaximumLength, InitialFraction);

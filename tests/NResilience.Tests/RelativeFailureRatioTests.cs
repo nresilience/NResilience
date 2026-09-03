@@ -23,7 +23,7 @@ public sealed class RelativeFailureRatioTests
     /// </summary>
     private static BreakerSettings Relative(FakeTimeProvider time) => new()
     {
-        Failures = Failures.Above(5),
+        Failures = Failures.Above(),
         MinimumCalls = 20,
         ConsecutiveFailures = 1000,
         Time = time,
@@ -61,7 +61,7 @@ public sealed class RelativeFailureRatioTests
         var breaker = new Breaker(Relative(time));
 
         // A backend that fails 30% of the time, all day, and always has. Nothing here is unusual.
-        Baseline(breaker, time, ok: 140, failed: 60);
+        Baseline(breaker, time, 140, 60);
         Assert.Equal(BreakerState.Closed, breaker.State);
 
         // Now it fails everything. An absolute ratio anyone could have set for this dependency
@@ -77,7 +77,7 @@ public sealed class RelativeFailureRatioTests
         var time = new FakeTimeProvider();
         var breaker = new Breaker(Relative(time));
 
-        Baseline(breaker, time, ok: 140, failed: 60);
+        Baseline(breaker, time, 140, 60);
 
         // The same 30% again, which is what this dependency is. FailureRatio = 0.5 would be close
         // enough to normal that ordinary variance opens the circuit; 5x its own rate is not.
@@ -98,7 +98,7 @@ public sealed class RelativeFailureRatioTests
         var time = new FakeTimeProvider();
         var breaker = new Breaker(Relative(time));
 
-        Baseline(breaker, time, ok: 200, failed: 0);
+        Baseline(breaker, time, 200, 0);
 
         Sample(breaker, VerdictKind.Ok, 18);
         Sample(breaker, VerdictKind.Transient, 2);
@@ -114,7 +114,7 @@ public sealed class RelativeFailureRatioTests
         var time = new FakeTimeProvider();
         var breaker = new Breaker(Relative(time));
 
-        Baseline(breaker, time, ok: 200, failed: 0);
+        Baseline(breaker, time, 200, 0);
 
         Sample(breaker, VerdictKind.Ok, 19);
         Sample(breaker, VerdictKind.Transient, 1);
@@ -137,15 +137,15 @@ public sealed class RelativeFailureRatioTests
     {
         // 60% of the window failed. Five times a 30% baseline is more than the whole window, so the
         // relative trip alone tolerates it; the absolute ceiling does not, and it wins.
-        Assert.Equal(BreakerState.Open, SixtyPercentAgainstAFlakyBaseline(ceiling: 0.5));
-        Assert.Equal(BreakerState.Closed, SixtyPercentAgainstAFlakyBaseline(ceiling: null));
+        Assert.Equal(BreakerState.Open, SixtyPercentAgainstAFlakyBaseline(0.5));
+        Assert.Equal(BreakerState.Closed, SixtyPercentAgainstAFlakyBaseline(null));
 
         static BreakerState SixtyPercentAgainstAFlakyBaseline(double? ceiling)
         {
             var time = new FakeTimeProvider();
             var breaker = new Breaker(Relative(time) with { FailureRatio = ceiling });
 
-            Baseline(breaker, time, ok: 140, failed: 60);
+            Baseline(breaker, time, 140, 60);
             Sample(breaker, VerdictKind.Ok, 8);
             Sample(breaker, VerdictKind.Transient, 12);
 
@@ -189,7 +189,7 @@ public sealed class RelativeFailureRatioTests
         var time = new FakeTimeProvider();
         var breaker = new Breaker(Relative(time));
 
-        Baseline(breaker, time, ok: 140, failed: 60);
+        Baseline(breaker, time, 140, 60);
         Sample(breaker, VerdictKind.Transient, 20);
         Assert.Equal(BreakerState.Open, breaker.State);
 
@@ -212,7 +212,7 @@ public sealed class RelativeFailureRatioTests
         var time = new FakeTimeProvider();
         var breaker = new Breaker(Relative(time));
 
-        Baseline(breaker, time, ok: 150, failed: 50);
+        Baseline(breaker, time, 150, 50);
 
         Assert.Equal(0.25, breaker.NormalFailureRate);
     }
@@ -241,7 +241,7 @@ public sealed class RelativeFailureRatioTests
         var problem = Assert.Throws<ResilienceConfigurationException>(() =>
             new Breaker(new BreakerSettings
             {
-                Failures = Failures.Above(5) with { Window = TimeSpan.FromMinutes(1) },
+                Failures = Failures.Above() with { Window = TimeSpan.FromMinutes(1) },
                 TripWindow = TimeSpan.FromSeconds(30),
             }));
 
@@ -251,7 +251,7 @@ public sealed class RelativeFailureRatioTests
     [Fact]
     public void The_defaults_win_that_race()
     {
-        var breaker = new Breaker(new BreakerSettings { Failures = Failures.Above(5) });
+        var breaker = new Breaker(new BreakerSettings { Failures = Failures.Above() });
         var relative = breaker.Settings.Failures!.Value;
 
         Assert.Equal(TimeSpan.FromMinutes(5), relative.Window);
@@ -278,7 +278,7 @@ public sealed class RelativeFailureRatioTests
     public void A_floor_that_is_not_a_ratio_is_refused(double floor)
     {
         var problem = Assert.Throws<ResilienceConfigurationException>(() =>
-            new Breaker(new BreakerSettings { Failures = Failures.Above(5) with { Floor = floor } }));
+            new Breaker(new BreakerSettings { Failures = Failures.Above() with { Floor = floor } }));
 
         Assert.Contains(problem.Problems, p => p.Contains("Failures.Floor", StringComparison.Ordinal));
     }
@@ -286,7 +286,7 @@ public sealed class RelativeFailureRatioTests
     [Fact]
     public void An_absolute_and_a_relative_ratio_compose_rather_than_conflict()
     {
-        var breaker = new Breaker(new BreakerSettings { FailureRatio = 0.5, Failures = Failures.Above(5) });
+        var breaker = new Breaker(new BreakerSettings { FailureRatio = 0.5, Failures = Failures.Above() });
 
         // Unlike SlowCallThreshold and SlowCalls, which are the same trip defined two ways, these
         // two are a ceiling and a measurement. Setting both is the recommended configuration.
@@ -297,9 +297,9 @@ public sealed class RelativeFailureRatioTests
     [Fact]
     public void Naming_a_default_explicitly_is_the_same_configuration_as_leaving_it_alone()
     {
-        var left = Failures.Above(5);
+        var left = Failures.Above();
 
-        var right = Failures.Above(5) with
+        var right = Failures.Above() with
         {
             Window = TimeSpan.FromMinutes(5),
             MinimumSamples = 100,
@@ -313,6 +313,6 @@ public sealed class RelativeFailureRatioTests
     [Fact]
     public void It_describes_itself_the_way_it_was_configured()
     {
-        Assert.Equal("5x the rate over 300s (min 100 samples, floor 5%)", Failures.Above(5).ToString());
+        Assert.Equal("5x the rate over 300s (min 100 samples, floor 5%)", Failures.Above().ToString());
     }
 }

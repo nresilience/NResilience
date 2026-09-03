@@ -40,6 +40,7 @@ internal sealed class MethodScopes
 
     /// <summary>What the one scope is reported under. The client's name, where a registration made it.</summary>
     private readonly string _oneKey;
+
     private readonly Func<IMethod, string>? _scopeBy;
     private readonly ConditionalWeakTable<Resilience, Resilience> _singles = new();
 

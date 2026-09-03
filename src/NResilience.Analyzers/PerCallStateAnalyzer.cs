@@ -123,9 +123,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
                 reported = written;
             }
             else
-            {
                 continue;
-            }
 
             context.ReportDiagnostic(Diagnostic.Create(
                 Diagnostics.PerCallEstimator,

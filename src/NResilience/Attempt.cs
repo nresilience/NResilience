@@ -68,7 +68,7 @@ public readonly struct Attempt
         Number = number;
         Duration = duration;
         DelayBefore = delayBefore;
-        _packed = (byte)((byte)kind | (selfImposed ? NResilience.Verdict.SelfImposedFlag : 0));
+        _packed = (byte)((byte)kind | (selfImposed ? Verdict.SelfImposedFlag : 0));
         Exception = exception;
         Remaining = remaining;
         StartOffset = startOffset;
@@ -124,17 +124,17 @@ public readonly struct Attempt
     ///         <see cref="DelayBefore" /> of the attempt that followed it.
     ///     </para>
     /// </summary>
-    public Verdict Verdict => (VerdictKind)(byte)(_packed & ~NResilience.Verdict.SelfImposedFlag) switch
+    public Verdict Verdict => (VerdictKind)(byte)(_packed & ~Verdict.SelfImposedFlag) switch
     {
-        VerdictKind.Ok => NResilience.Verdict.Ok,
-        VerdictKind.Transient => NResilience.Verdict.Transient,
+        VerdictKind.Ok => Verdict.Ok,
+        VerdictKind.Transient => Verdict.Transient,
 
         // The one place the origin flag matters on the way out: a reader of the log can tell a limiter
         // this process runs from a 429 the dependency sent.
-        VerdictKind.Throttled => (_packed & NResilience.Verdict.SelfImposedFlag) != 0
-            ? NResilience.Verdict.Limited()
-            : NResilience.Verdict.Throttled(),
-        _ => NResilience.Verdict.Permanent,
+        VerdictKind.Throttled => (_packed & Verdict.SelfImposedFlag) != 0
+            ? Verdict.Limited()
+            : Verdict.Throttled(),
+        _ => Verdict.Permanent,
     };
 
     /// <summary>The exception this attempt threw, or null when it returned.</summary>
@@ -230,6 +230,10 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
     /// <returns>The attempt.</returns>
     public Attempt this[int index] => _attempts[index];
 
+    IEnumerator<Attempt> IEnumerable<Attempt>.GetEnumerator() => ((IEnumerable<Attempt>)_attempts).GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<Attempt>)_attempts).GetEnumerator();
+
     /// <summary>
     ///     The attempts as a span, for a caller that wants to read the log without an enumerator at
     ///     all.
@@ -248,10 +252,6 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
     /// </summary>
     /// <returns>An enumerator over the attempts.</returns>
     public Enumerator GetEnumerator() => new(_attempts);
-
-    IEnumerator<Attempt> IEnumerable<Attempt>.GetEnumerator() => ((IEnumerable<Attempt>)_attempts).GetEnumerator();
-
-    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<Attempt>)_attempts).GetEnumerator();
 
     /// <summary>
     ///     The log attached to an exception the library rethrew unchanged.

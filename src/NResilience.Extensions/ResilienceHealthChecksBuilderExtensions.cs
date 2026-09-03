@@ -80,8 +80,8 @@ public static class ResilienceHealthChecksBuilderExtensions
                 options,
                 provider.GetService<IResiliencePolicies>(),
                 provider.GetService<ResilienceHandlerRegistry>()),
-            failureStatus: null,
-            tags: tags));
+            null,
+            tags));
 
         return builder;
     }

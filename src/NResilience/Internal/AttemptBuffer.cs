@@ -213,5 +213,4 @@ internal struct AttemptSink
 
         return new AttemptLog(attempts, elapsed);
     }
-
 }

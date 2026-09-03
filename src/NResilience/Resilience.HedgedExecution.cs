@@ -148,15 +148,17 @@ public sealed partial record Resilience
                             var pause = GuardDelay(remaining);
 
                             if (OnEvent is not null)
+                            {
                                 Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
                                     StopReason.DependencyUnavailable);
+                            }
 
                             await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
                             break;
                         }
                     }
 
-                    legs.Add(StartLeg(++started, hedged: false, holdsProbe: probe));
+                    legs.Add(StartLeg(++started, false, probe));
                 }
 
                 var armed = ArmHedge();
@@ -179,7 +181,9 @@ public sealed partial record Resilience
                     var pending = new Task[racing];
 
                     for (var i = 0; i < legs.Count; i++)
+                    {
                         pending[i] = legs[i].Work!;
+                    }
 
                     if (armed is { } fresh)
                         pending[legs.Count] = fresh.Delay;
@@ -213,7 +217,7 @@ public sealed partial record Resilience
 
                     // A hedge is never admitted through the breaker - ArmHedge fires only while it is
                     // closed - so it holds no probe slot and has none to give back.
-                    var hedged = StartLeg(++started, hedged: true, holdsProbe: false);
+                    var hedged = StartLeg(++started, true, false);
                     legs.Add(hedged);
 
                     // Counted here rather than in Admits(), so the denominator of the win rate is the
@@ -221,9 +225,7 @@ public sealed partial record Resilience
                     wins?.Started();
 
                     if (OnEvent is not null)
-                    {
                         Notify(CallEventKind.HedgeStarted, hedged.Number, verdict, Time.GetElapsedTime(start), fired.Threshold, null, null);
-                    }
 
                     continue;
                 }
@@ -358,7 +360,9 @@ public sealed partial record Resilience
             // to hand anybody - but the legs are still cancelled and still cleaned up, because a leg
             // holding a socket does not care why we left.
             for (var i = 0; i < legs.Count; i++)
+            {
                 Abandon(legs[i], Breaker, Time);
+            }
 
             legs.Clear();
 

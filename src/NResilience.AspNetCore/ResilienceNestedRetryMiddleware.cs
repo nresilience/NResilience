@@ -34,7 +34,7 @@ internal sealed class ResilienceNestedRetryMiddleware(RequestDelegate next, Resi
         if (!context.Request.Headers.TryGetValue(options.Header, out var values) || !CarriesMarker(values))
             return next(context);
 
-        var scope = ResilienceNestedRetry.Begin(callerRetrying: true);
+        var scope = ResilienceNestedRetry.Begin(true);
 
         // Not a `using` on an async method: keeping the middleware synchronous keeps a state-machine
         // box off every request. See ResilienceDeadlineMiddleware for the same shape and reasoning.

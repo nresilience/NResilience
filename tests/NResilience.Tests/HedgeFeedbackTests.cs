@@ -32,6 +32,18 @@ public sealed class HedgeFeedbackTests
 
     private static readonly TimeSpan Fast = TimeSpan.FromMilliseconds(10);
 
+    // ---- Helpers ----
+
+    /// <summary>
+    ///     A loop that acts on a single hedge, so the end-to-end tests do not have to drive twenty races
+    ///     through a fake clock to reach a decision.
+    /// </summary>
+    private static WinRate Feedback => WinRate.AtLeast(0.9) with
+    {
+        Window = Window,
+        MinimumSamples = 1,
+    };
+
     // ---- The loop ----
 
     /// <summary>
@@ -64,7 +76,7 @@ public sealed class HedgeFeedbackTests
         var window = New(out var time);
 
         // A third of them win, against a floor of a fifth.
-        var (admitted, allowances) = Simulate(window, time, slices: 8, hedgesPerSlice: 100, winsPerSlice: 33);
+        var (admitted, allowances) = Simulate(window, time, 8, 100, 33);
 
         Assert.All(allowances, allowance => Assert.Equal(1, allowance));
         Assert.Equal(800, admitted);
@@ -81,7 +93,7 @@ public sealed class HedgeFeedbackTests
     {
         var window = New(out var time);
 
-        var (admitted, allowances) = Simulate(window, time, slices: 8, hedgesPerSlice: 100, winsPerSlice: 0);
+        var (admitted, allowances) = Simulate(window, time, 8, 100, 0);
 
         Assert.Equal([1, 0.5, 0.25, 0.125, 0.0625, 0.05, 0.05, 0.05], allowances);
 
@@ -111,11 +123,11 @@ public sealed class HedgeFeedbackTests
         // Three halvings from one losing slice, because the window is four rings deep and that slice
         // is still in it at each of the next three decision points. Evidence that has not rolled out
         // yet is still evidence.
-        Assert.Equal(new[] { 0.5, 0.25, 0.125 }, Walk(window, time, slices: 3));
+        Assert.Equal(new[] { 0.5, 0.25, 0.125 }, Walk(window, time, 3));
 
         // Then it rolls out, the window has nothing left to judge, and the clock hands the allowance
         // back a quarter at a time.
-        Assert.Equal(new[] { 0.375, 0.625, 0.875, 1d }, Walk(window, time, slices: 4));
+        Assert.Equal(new[] { 0.375, 0.625, 0.875, 1d }, Walk(window, time, 4));
     }
 
     /// <summary>
@@ -135,21 +147,22 @@ public sealed class HedgeFeedbackTests
         var window = New(out var time);
 
         // Hedging works: a third of the hedges win, against a floor of a fifth.
-        var working = Simulate(window, time, slices: 8, hedgesPerSlice: 100, winsPerSlice: 33);
+        var working = Simulate(window, time, 8, 100, 33);
 
         Assert.All(working.Allowances, allowance => Assert.Equal(1, allowance));
 
         // The dependency saturates. Every leg is now as slow as every other, so nothing wins. The two
         // slices at full rate are the lag: the window still holds the rings in which hedging worked.
-        var saturated = Simulate(window, time, slices: 8, hedgesPerSlice: 100, winsPerSlice: 0);
+        var saturated = Simulate(window, time, 8, 100, 0);
 
         Assert.Equal([1, 1, 0.5, 0.25, 0.125, 0.0625, 0.05, 0.05], saturated.Allowances);
 
         // It recovers, and the trickle the floor leaves is what notices: five hedges a slice with a
         // third of them winning clears the floor, and then the return adds a quarter at a time.
-        var recovered = Simulate(window, time, slices: 8, hedgesPerSlice: 100, winsPerSlice: 33);
+        var recovered = Simulate(window, time, 8, 100, 33);
 
         Assert.Equal([0.05, 0.3, 0.55, 0.8, 1, 1, 1, 1], recovered.Allowances);
+
         Assert.True(
             recovered.Admitted > saturated.Admitted,
             $"recovered {recovered.Admitted} should exceed the {saturated.Admitted} admitted while saturated");
@@ -164,7 +177,7 @@ public sealed class HedgeFeedbackTests
     {
         var window = New(out var time);
 
-        Simulate(window, time, slices: 1, hedgesPerSlice: 100, winsPerSlice: 0);
+        Simulate(window, time, 1, 100, 0);
         Assert.Equal(0.5, window.Allowance);
 
         // Inside one slice, so no further decision is taken and the allowance stays where it is.
@@ -187,7 +200,9 @@ public sealed class HedgeFeedbackTests
 
         // Admitted and then dropped, ten times over, which would be ten losses if Admits() counted.
         for (var i = 0; i < 10; i++)
+        {
             Assert.True(window.Admits());
+        }
 
         time.Advance(Slice);
 
@@ -205,7 +220,7 @@ public sealed class HedgeFeedbackTests
         var window = New(out var time);
 
         // Nine hedges, none of them winning, against a minimum of ten.
-        Simulate(window, time, slices: 3, hedgesPerSlice: 3, winsPerSlice: 0);
+        Simulate(window, time, 3, 3, 0);
 
         Assert.Equal(1, window.Allowance);
     }
@@ -218,9 +233,9 @@ public sealed class HedgeFeedbackTests
     [Fact]
     public void A_zero_floor_lets_the_retreat_run_past_the_default_one()
     {
-        var window = New(out var time, WinRate.AtLeast(0.2) with { MinimumAllowance = 0, Window = Window });
+        var window = New(out var time, WinRate.AtLeast() with { MinimumAllowance = 0, Window = Window });
 
-        var (_, allowances) = Simulate(window, time, slices: 8, hedgesPerSlice: 100, winsPerSlice: 0);
+        var (_, allowances) = Simulate(window, time, 8, 100, 0);
 
         // Past the 0.05 the default floor holds it at, and still never zero: a geometric retreat does
         // not arrive, it only stops mattering.
@@ -244,7 +259,7 @@ public sealed class HedgeFeedbackTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events, Feedback);
 
-        await WarmAsync(policy, time, times: 20);
+        await WarmAsync(policy, time, 20);
 
         // The hedge starts and the original answers first, which is a loss.
         Assert.Equal(2, await LoseAsync(policy, time));
@@ -271,7 +286,7 @@ public sealed class HedgeFeedbackTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events, Feedback);
 
-        await WarmAsync(policy, time, times: 20);
+        await WarmAsync(policy, time, 20);
 
         Assert.Equal(2, await WinAsync(policy, time));
 
@@ -292,9 +307,9 @@ public sealed class HedgeFeedbackTests
     public async Task Without_the_loop_a_losing_hedge_changes_nothing()
     {
         var time = new FakeTimeProvider();
-        var policy = Hedging(time, out var events, feedback: null);
+        var policy = Hedging(time, out var events, null);
 
-        await WarmAsync(policy, time, times: 20);
+        await WarmAsync(policy, time, 20);
 
         await LoseAsync(policy, time);
         events.Clear();
@@ -316,7 +331,7 @@ public sealed class HedgeFeedbackTests
         var time = new FakeTimeProvider();
         var policy = Hedging(time, out var events, Feedback);
 
-        await WarmAsync(policy, time, times: 20);
+        await WarmAsync(policy, time, 20);
         await LoseAsync(policy, time);
 
         events.Clear();
@@ -360,7 +375,7 @@ public sealed class HedgeFeedbackTests
     [InlineData(double.NaN)]
     public void An_allowance_that_cannot_retreat_is_refused(double allowance)
     {
-        var problem = Refuse(WinRate.AtLeast(0.2) with { MinimumAllowance = allowance });
+        var problem = Refuse(WinRate.AtLeast() with { MinimumAllowance = allowance });
 
         Assert.Contains(problem, p => p.Contains("WinRate.MinimumAllowance", StringComparison.Ordinal));
     }
@@ -369,11 +384,11 @@ public sealed class HedgeFeedbackTests
     public void A_window_and_a_sample_count_have_to_be_positive()
     {
         Assert.Contains(
-            Refuse(WinRate.AtLeast(0.2) with { Window = TimeSpan.Zero }),
+            Refuse(WinRate.AtLeast() with { Window = TimeSpan.Zero }),
             p => p.Contains("WinRate.Window", StringComparison.Ordinal));
 
         Assert.Contains(
-            Refuse(WinRate.AtLeast(0.2) with { MinimumSamples = 0 }),
+            Refuse(WinRate.AtLeast() with { MinimumSamples = 0 }),
             p => p.Contains("WinRate.MinimumSamples", StringComparison.Ordinal));
     }
 
@@ -385,32 +400,21 @@ public sealed class HedgeFeedbackTests
     public void Naming_a_default_changes_nothing()
     {
         Assert.Equal(0.2, WinRate.AtLeast().Minimum);
-        Assert.Equal(WinRate.AtLeast(0.2), WinRate.AtLeast(0.2) with { MinimumSamples = 10 });
-        Assert.NotEqual(WinRate.AtLeast(0.2), WinRate.AtLeast(0.2) with { MinimumSamples = 11 });
+        Assert.Equal(WinRate.AtLeast(), WinRate.AtLeast() with { MinimumSamples = 10 });
+        Assert.NotEqual(WinRate.AtLeast(), WinRate.AtLeast() with { MinimumSamples = 11 });
 
-        Assert.NotEqual(Hedge.At(0.95), Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) });
+        Assert.NotEqual(Hedge.At(), Hedge.At() with { WinRate = WinRate.AtLeast() });
+
         Assert.Equal(
-            Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) },
-            Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) with { Window = TimeSpan.FromMinutes(1) } });
+            Hedge.At() with { WinRate = WinRate.AtLeast() },
+            Hedge.At() with { WinRate = WinRate.AtLeast() with { Window = TimeSpan.FromMinutes(1) } });
     }
-
-    // ---- Helpers ----
-
-    /// <summary>
-    ///     A loop that acts on a single hedge, so the end-to-end tests do not have to drive twenty races
-    ///     through a fake clock to reach a decision.
-    /// </summary>
-    private static WinRate Feedback => WinRate.AtLeast(0.9) with
-    {
-        Window = Window,
-        MinimumSamples = 1,
-    };
 
     private static WinWindow New(out FakeTimeProvider time, WinRate? feedback = null)
     {
         time = new FakeTimeProvider();
 
-        return new WinWindow(feedback ?? WinRate.AtLeast(0.2) with { Window = Window }, time);
+        return new WinWindow(feedback ?? WinRate.AtLeast() with { Window = Window }, time);
     }
 
     /// <summary>
@@ -477,7 +481,7 @@ public sealed class HedgeFeedbackTests
 
     private static List<string> Refuse(WinRate feedback)
     {
-        var policy = Resilience.Default with { Hedge = Hedge.At(0.95) with { WinRate = feedback } };
+        var policy = Resilience.Default with { Hedge = Hedge.At() with { WinRate = feedback } };
 
         return Assert.Throws<ResilienceConfigurationException>(policy.Validate).Problems.ToList();
     }
@@ -492,7 +496,7 @@ public sealed class HedgeFeedbackTests
         {
             Name = "api",
             Time = time,
-            Hedge = Hedge.At(0.95) with { Window = TimeSpan.FromHours(1), WinRate = feedback },
+            Hedge = Hedge.At() with { Window = TimeSpan.FromHours(1), WinRate = feedback },
             OnEvent = recorder.Record,
         };
     }
@@ -514,10 +518,10 @@ public sealed class HedgeFeedbackTests
     ///     One call whose hedge starts and then loses: the first leg is released as soon as a second one
     ///     is running, so the answer comes from the attempt the hedge was racing.
     /// </summary>
-    private static Task<int> LoseAsync(Resilience policy, FakeTimeProvider time) => RaceAsync(policy, time, firstWins: true);
+    private static Task<int> LoseAsync(Resilience policy, FakeTimeProvider time) => RaceAsync(policy, time, true);
 
     /// <summary>One call whose hedge starts and wins, because the first leg never comes back on its own.</summary>
-    private static Task<int> WinAsync(Resilience policy, FakeTimeProvider time) => RaceAsync(policy, time, firstWins: false);
+    private static Task<int> WinAsync(Resilience policy, FakeTimeProvider time) => RaceAsync(policy, time, false);
 
     /// <summary>
     ///     Runs one call whose first attempt blocks, moving the clock from outside so an armed hedge

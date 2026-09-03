@@ -132,11 +132,6 @@ public readonly record struct SlowCalls
         init => _minimumSamples = value;
     }
 
-    /// <summary>The way to configure an adaptive slow-call threshold.</summary>
-    /// <param name="multiple">How much slower than normal counts as slow. Must be greater than 1.</param>
-    /// <returns>The configuration.</returns>
-    public static SlowCalls Above(double multiple = 3.0) => new() { Multiple = multiple };
-
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
     ///     explicitly equals one that left it alone.
@@ -148,6 +143,11 @@ public readonly record struct SlowCalls
         && Quantile.Equals(other.Quantile)
         && Window == other.Window
         && MinimumSamples == other.MinimumSamples;
+
+    /// <summary>The way to configure an adaptive slow-call threshold.</summary>
+    /// <param name="multiple">How much slower than normal counts as slow. Must be greater than 1.</param>
+    /// <returns>The configuration.</returns>
+    public static SlowCalls Above(double multiple = 3.0) => new() { Multiple = multiple };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Multiple, Quantile, Window, MinimumSamples);

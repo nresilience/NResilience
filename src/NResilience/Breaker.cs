@@ -82,8 +82,11 @@ internal enum BreakerTransition : byte
 ///         Each of the two has an absolute counterpart - <see cref="SlowCallThreshold" /> for
 ///         <see cref="SlowCalls" />, <see cref="FailureRatio" /> for <see cref="Failures" /> - and one
 ///         rule covers both pairs, and the policy's <c>AttemptTimeout</c> and <c>AttemptCeiling</c> besides:
-///         <b>a bound may be stated as a constant, measured from the dependency, or both, and when both
-///         the tighter one wins.</b> The measured term never loosens what you wrote.
+///         <b>
+///             a bound may be stated as a constant, measured from the dependency, or both, and when both
+///             the tighter one wins.
+///         </b>
+///         The measured term never loosens what you wrote.
 ///     </para>
 /// </remarks>
 public sealed record BreakerSettings
@@ -100,18 +103,17 @@ public sealed record BreakerSettings
     /// </summary>
     private const double DefaultSlowCallMultiple = 3.0;
 
-    private readonly Failures? _failures;
-    private readonly bool _failuresSet;
-    private readonly SlowCalls? _slowCalls;
-    private readonly bool _slowCallsSet;
-    private readonly TimeProvider? _time;
-
     /// <summary>
     ///     The longest baseline window the library will derive for a trip it defaulted on. Beyond it the
     ///     baseline would no longer describe "normally", so the default steps aside instead - see
     ///     <see cref="DefaultFailures" />.
     /// </summary>
     private static readonly TimeSpan MaxDerivedBaseline = TimeSpan.FromHours(1);
+
+    private readonly Failures? _failures;
+    private readonly bool _failuresSet;
+    private readonly SlowCalls? _slowCalls;
+    private readonly bool _slowCallsSet;
 
     /// <summary>
     ///     Whether this breaker is allowed to measure the dependency and trip on what it measures. True
@@ -330,8 +332,8 @@ public sealed record BreakerSettings
     /// </summary>
     public TimeProvider Time
     {
-        get => _time ?? TimeProvider.System;
-        init => _time = value;
+        get => ConfiguredTime ?? TimeProvider.System;
+        init => ConfiguredTime = value;
     }
 
     /// <summary>
@@ -343,7 +345,7 @@ public sealed record BreakerSettings
     ///     <c>new BreakerSettings { Time = TimeProvider.System }</c> unequal for no reason a caller
     ///     could see.
     /// </remarks>
-    internal TimeProvider? ConfiguredTime => _time;
+    internal TimeProvider? ConfiguredTime { get; private set; }
 
     /// <summary>Checks the settings and throws listing every problem at once.</summary>
     /// <exception cref="ResilienceConfigurationException">The settings cannot be used.</exception>
@@ -513,7 +515,7 @@ public sealed record BreakerSettings
         if (!Adaptive)
             return null;
 
-        var failures = NResilience.Failures.Above(DefaultFailureMultiple);
+        var failures = NResilience.Failures.Above();
 
         // TripWindow has its own message in Validate, and the race check skips itself for the same
         // reason: a second complaint derived from a nonsense value would only be noise.
@@ -534,7 +536,7 @@ public sealed record BreakerSettings
         if (!Adaptive)
             return null;
 
-        var slow = NResilience.SlowCalls.Above(DefaultSlowCallMultiple);
+        var slow = NResilience.SlowCalls.Above();
 
         // Each of these has its own message in Validate; see DefaultFailures.
         if (TripWindow <= TimeSpan.Zero || double.IsNaN(SlowCallRatio) || SlowCallRatio <= 0 || SlowCallRatio > 1)
@@ -593,9 +595,9 @@ public sealed record BreakerSettings
 ///     public Breaker Payments { get; } = new() { Name = "payments" };
 ///     public Breaker Search   { get; } = new() { Name = "search" };
 /// }
-///
+/// 
 /// var payments = Resilience.Http with { Breaker = deps.Payments };
-///
+/// 
 /// app.MapGet("/health/payments", () =>
 ///     deps.Payments.State is BreakerState.Closed ? Results.Ok() : Results.StatusCode(503));
 /// </code>
@@ -637,7 +639,6 @@ public sealed class Breaker
 
     private readonly int[]? _calls;
     private readonly int[]? _failures;
-    private readonly Failures? _relative;
 
     private readonly object _gate = new();
 
@@ -664,6 +665,8 @@ public sealed class Breaker
     /// </summary>
     private readonly Recovery? _recovery;
 
+    private readonly Failures? _relative;
+
     private readonly int[]? _slow;
     private readonly long _startedAt;
     private readonly long _ticksPerBucket;
@@ -675,6 +678,11 @@ public sealed class Breaker
     private long _breakUntil;
     private int _consecutiveFailures;
     private int _consecutiveOpens;
+
+    private long _epoch = -1;
+    private DateTimeOffset _openedAt;
+    private int _probeSuccesses;
+    private int _probesInFlight;
 
     /// <summary>
     ///     The ceiling the evidence puts on the admitted fraction. It starts at 1 - no cap - halves
@@ -696,11 +704,6 @@ public sealed class Breaker
     private long _rampStartedAt;
     private int _rampSuccesses;
     private long _rampTicks;
-
-    private long _epoch = -1;
-    private DateTimeOffset _openedAt;
-    private int _probeSuccesses;
-    private int _probesInFlight;
     private BreakerState _state;
 
     /// <summary>
@@ -1272,8 +1275,8 @@ public sealed class Breaker
             var failures = Sum(_failures!);
 
             return failures >= MinimumRelativeFailures
-                && TripRatio() is { } trip
-                && failures >= fraction * trip * calls;
+                   && TripRatio() is { } trip
+                   && failures >= fraction * trip * calls;
         }
     }
 
@@ -1543,7 +1546,10 @@ public sealed class Breaker
         private readonly long _ticksPerBucket;
         private long _epoch = -1;
 
-        public RateWindow(TimeSpan window) => _ticksPerBucket = Math.Max(window.Ticks / BucketCount, 1);
+        public RateWindow(TimeSpan window)
+        {
+            _ticksPerBucket = Math.Max(window.Ticks / BucketCount, 1);
+        }
 
         public void Record(long now, bool failure)
         {

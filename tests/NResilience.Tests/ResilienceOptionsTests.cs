@@ -205,10 +205,13 @@ public sealed class ResilienceOptionsTests
         var baseline = Resilience.Default with
         {
             Backoff = Backoff.Exponential(
-                TimeSpan.FromMilliseconds(500),
-                TimeSpan.FromSeconds(4),
-                3.0,
-                TimeSpan.FromSeconds(60)) with { Jitter = Jitter.None },
+                    TimeSpan.FromMilliseconds(500),
+                    TimeSpan.FromSeconds(4),
+                    3.0,
+                    TimeSpan.FromSeconds(60)) with
+                {
+                    Jitter = Jitter.None,
+                },
         };
 
         var policy = new ResilienceOptions
@@ -283,7 +286,7 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void A_disabled_measured_section_drops_the_base_policys_measurement()
     {
-        var baseline = Resilience.Default with { Backoff = Backoff.Measured(1) };
+        var baseline = Resilience.Default with { Backoff = Backoff.Measured() };
 
         var policy = new ResilienceOptions
         {
@@ -378,7 +381,7 @@ public sealed class ResilienceOptionsTests
 
         Assert.NotNull(policy.Breaker);
         Assert.NotNull(policy.Hedge);
-        Assert.Equal(AttemptCeiling.Above(3), policy.AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(), policy.AttemptCeiling);
         Assert.NotNull(policy.Breaker!.Settings.SlowCalls);
         Assert.NotNull(policy.Breaker.Settings.Failures);
     }
@@ -629,8 +632,8 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void A_policy_with_no_timeouts_section_still_has_the_default_measured_ceiling()
     {
-        Assert.Equal(AttemptCeiling.Above(3), new ResilienceOptions { Attempts = 3 }.ToPolicy().AttemptCeiling);
-        Assert.Equal(AttemptCeiling.Above(3), new ResilienceOptions { AttemptCeiling = new AttemptCeilingOptions() }.ToPolicy().AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(), new ResilienceOptions { Attempts = 3 }.ToPolicy().AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(), new ResilienceOptions { AttemptCeiling = new AttemptCeilingOptions() }.ToPolicy().AttemptCeiling);
     }
 
     /// <summary>
@@ -763,7 +766,7 @@ public sealed class ResilienceOptionsTests
         Assert.Null(new ResilienceOptions { Breaker = new BreakerOptions() }.ToPolicy().Breaker!.Settings.Recovery);
 
         var on = new ResilienceOptions { Breaker = new BreakerOptions { Recovery = new RecoveryOptions() } };
-        Assert.Equal(Recovery.Over(0.25), on.ToPolicy().Breaker!.Settings.Recovery);
+        Assert.Equal(Recovery.Over(), on.ToPolicy().Breaker!.Settings.Recovery);
 
         var off = new ResilienceOptions { Breaker = new BreakerOptions { Recovery = new RecoveryOptions { Enabled = false } } };
         Assert.Null(off.ToPolicy().Breaker!.Settings.Recovery);
@@ -840,7 +843,7 @@ public sealed class ResilienceOptionsTests
 
         Config(("Hedge:WinRate:Minimum", "0.2")).Bind(options);
 
-        Assert.Equal(WinRate.AtLeast(0.2), options.ToPolicy().Hedge!.Value.WinRate);
+        Assert.Equal(WinRate.AtLeast(), options.ToPolicy().Hedge!.Value.WinRate);
     }
 
     /// <summary><c>"Enabled": false</c> drops a loop the base policy carried.</summary>
@@ -849,7 +852,7 @@ public sealed class ResilienceOptionsTests
     {
         var baseline = Resilience.Default with
         {
-            Hedge = Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) },
+            Hedge = Hedge.At() with { WinRate = WinRate.AtLeast() },
         };
 
         var policy = new ResilienceOptions
@@ -1009,7 +1012,7 @@ public sealed class ResilienceOptionsTests
         var settings = options.ToPolicy().Breaker!.Settings;
 
         Assert.Equal(TimeSpan.FromSeconds(2), settings.SlowCallThreshold);
-        Assert.Equal(SlowCalls.Above(3), settings.SlowCalls);
+        Assert.Equal(SlowCalls.Above(), settings.SlowCalls);
     }
 
     private static TimeSpan Delay(Resilience policy, int attemptNumber) =>

@@ -1,3 +1,5 @@
+using NResilience.Internal;
+
 namespace NResilience;
 
 /// <summary>
@@ -370,7 +372,7 @@ public sealed partial record Resilience
             if (Backoff.MeasuredBase is not { } measured)
                 return null;
 
-            return Internal.ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is { } normal
+            return ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is { } normal
                 ? measured.BaseFor(Backoff.TransientBase, normal)
                 : null;
         }
@@ -567,7 +569,7 @@ public sealed partial record Resilience
             return null;
 
         // Qualified because the property of the same name shadows the type inside this class.
-        var ceiling = NResilience.AttemptCeiling.Above(DefaultTimeoutMultiple);
+        var ceiling = NResilience.AttemptCeiling.Above();
 
         return ceiling.Floor >= AttemptTimeout ? null : ceiling;
     }

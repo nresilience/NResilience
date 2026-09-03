@@ -86,13 +86,15 @@ Assert.Equal(
 
 ## Reach for a ready-made policy
 
-`TestPolicy.Instant` is a `Resilience` value shaped for tests: three attempts, no backoff, and both the deadline and the attempt timeout set to infinite, so a test pays for neither a sleep nor a wall-clock bound it does not care about. `TestPolicy.InstantHttp` is the same shape with `Classify = Classifier.Http`.
+`TestPolicy.Instant` is a `Resilience` value shaped for tests: three attempts, no backoff, and both the deadline and the attempt timeout set to infinite, so a
+test pays for neither a sleep nor a wall-clock bound it does not care about. `TestPolicy.InstantHttp` is the same shape with `Classify = Classifier.Http`.
 
 ```csharp
 var api = TestPolicy.Instant;
 ```
 
-To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.On(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker and its budget all advance together:
+To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.On(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker
+and its budget all advance together:
 
 ```csharp
 var time = new FakeTimeProvider();
@@ -101,7 +103,8 @@ var api = TestPolicy.On(time);
 
 ## Test an HTTP client
 
-Provide a scripted `HttpMessageHandler` as the inner handler to test a resilient `HttpClient` end to end. `ScriptedHttpHandler` serves the script you give it, then repeats the last step for every attempt after that:
+Provide a scripted `HttpMessageHandler` as the inner handler to test a resilient `HttpClient` end to end. `ScriptedHttpHandler` serves the script you give it,
+then repeats the last step for every attempt after that:
 
 ```csharp
 var transport = new ScriptedHttpHandler()
@@ -118,9 +121,12 @@ Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 Assert.Equal(2, transport.CallCount);
 ```
 
-`Respond(status)` and `Respond(status, times)` serve a fixed status code, once or for a run of attempts. `Respond(response)` and `Respond(response, times)` build a fresh `HttpResponseMessage` per attempt, for a response whose content a test reads. `Throw(exception)` and `Throw(exception, times)` throw instead, for the transport failures a classifier has to see.
+`Respond(status)` and `Respond(status, times)` serve a fixed status code, once or for a run of attempts. `Respond(response)` and `Respond(response, times)`
+build a fresh `HttpResponseMessage` per attempt, for a response whose content a test reads. `Throw(exception)` and `Throw(exception, times)` throw instead, for
+the transport failures a classifier has to see.
 
-`CallCount` is how many attempts reached the handler. `Requests` is a snapshot of what each attempt sent, in order: the method, the URI, the headers, and - only when `CaptureBodies` is `true` - the body.
+`CallCount` is how many attempts reached the handler. `Requests` is a snapshot of what each attempt sent, in order: the method, the URI, the headers, and - only
+when `CaptureBodies` is `true` - the body.
 
 ## Documentation
 

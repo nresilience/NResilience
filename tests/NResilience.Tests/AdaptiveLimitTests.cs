@@ -113,7 +113,9 @@ public sealed class AdaptiveLimitTests
         Assert.Equal(3, limiter.InFlight);
 
         using (var refused = limiter.AttemptAcquire())
+        {
             Assert.False(refused.IsAcquired);
+        }
 
         held[0].Dispose();
 
@@ -337,7 +339,9 @@ public sealed class AdaptiveLimitTests
         Serial(limiter, time, Fast, 20);
 
         for (var round = 0; round < 20; round++)
+        {
             Concurrent(limiter, time, Fast, 2);
+        }
 
         Assert.Equal(20, limiter.CurrentLimit);
     }
@@ -375,7 +379,9 @@ public sealed class AdaptiveLimitTests
         Serial(limiter, time, Fast, 20);
 
         for (var round = 0; round < 20; round++)
+        {
             Concurrent(limiter, time, Fast, 6);
+        }
 
         Assert.Equal(6, limiter.CurrentLimit);
     }
@@ -402,13 +408,13 @@ public sealed class AdaptiveLimitTests
         // failure mode the ceiling exists to bound, and it is documented as such.
         Serial(limiter, time, Fast, 20);
 
-        Drive(limiter, time, 10, rounds: 40);
+        Drive(limiter, time, 10, 40);
         var discovered = limiter.CurrentLimit;
 
         Assert.InRange(discovered, 12, 28);
 
         // Half the pods went away.
-        Drive(limiter, time, 5, rounds: 40);
+        Drive(limiter, time, 5, 40);
 
         Assert.InRange(limiter.CurrentLimit, 6, 14);
         Assert.True(limiter.CurrentLimit < discovered);
@@ -565,7 +571,9 @@ public sealed class AdaptiveLimitTests
     private static void Release(IEnumerable<RateLimitLease> leases)
     {
         foreach (var lease in leases)
+        {
             lease.Dispose();
+        }
     }
 
     /// <summary>One call at a time, each taking <paramref name="duration" />. Never saturates the limit.</summary>
@@ -680,8 +688,10 @@ public sealed class AdaptiveLimitTests
         private static string? Tag(ReadOnlySpan<KeyValuePair<string, object?>> tags)
         {
             foreach (var tag in tags)
+            {
                 if (tag.Key == "nresilience.limiter")
                     return tag.Value as string;
+            }
 
             return null;
         }

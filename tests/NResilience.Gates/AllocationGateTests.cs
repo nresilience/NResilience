@@ -56,8 +56,8 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSyncOverhead(Baseline.LibDefaultSyncState, Budgets.FullPolicyWithTimeoutSyncOverhead);
 
     /// <summary>
-    ///     Verifies that callbacks returning <see cref="ValueTask" /> also allocate nothing. 
-    ///     This is measured against a raw <see cref="ValueTask" /> baseline to ensure the 
+    ///     Verifies that callbacks returning <see cref="ValueTask" /> also allocate nothing.
+    ///     This is measured against a raw <see cref="ValueTask" /> baseline to ensure the
     ///     result reflects the executor's overhead rather than the callback's savings.
     /// </summary>
     [Fact]
@@ -65,8 +65,8 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSyncOverheadVersus(Baseline.LibTrivialValueSyncState, Baseline.RawValueSync, Budgets.FullPolicyNoTimeoutSyncOverhead);
 
     /// <summary>
-    ///     Verifies that <see cref="ValueTask" /> callbacks under an attempt timeout allocate the 
-    ///     same single linked source as <see cref="Task" /> callbacks, with no additional 
+    ///     Verifies that <see cref="ValueTask" /> callbacks under an attempt timeout allocate the
+    ///     same single linked source as <see cref="Task" /> callbacks, with no additional
     ///     overhead for the callback shape.
     /// </summary>
     [Fact]
@@ -74,14 +74,14 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSyncOverheadVersus(Baseline.LibDefaultValueSyncState, Baseline.RawValueSync, Budgets.FullPolicyWithTimeoutSyncOverhead);
 
     /// <summary>
-    ///     Validates the purpose of the <see cref="ValueTask" /> overloads. This test compares a 
-    ///     native <see cref="ValueTask" /> callback against one converted with <c>AsTask()</c> 
+    ///     Validates the purpose of the <see cref="ValueTask" /> overloads. This test compares a
+    ///     native <see cref="ValueTask" /> callback against one converted with <c>AsTask()</c>
     ///     using the same policy and pooled source.
     ///     <para>
-    ///         This assertion uses a floor rather than a ceiling. These overloads are extension 
-    ///         methods so that <c>async</c> lambdas still bind to the <see cref="Task" /> form. 
-    ///         If a future instance overload shadows these extension methods, both arms will 
-    ///         measure the conversion cost, and the delta will collapse. This is the only 
+    ///         This assertion uses a floor rather than a ceiling. These overloads are extension
+    ///         methods so that <c>async</c> lambdas still bind to the <see cref="Task" /> form.
+    ///         If a future instance overload shadows these extension methods, both arms will
+    ///         measure the conversion cost, and the delta will collapse. This is the only
     ///         symptom of such a failure.
     ///     </para>
     /// </summary>
@@ -266,6 +266,7 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     [Fact]
     public void The_Admit_hook_stays_within_budget_on_the_suspending_path()
         => AssertSuspendingOverhead(Baseline.LibDefaultAdmit, Budgets.AdmitConfiguredOverhead);
+
     /// <summary>
     ///     The claim the hedging design is argued on: a hedged call allocates, and <b>only</b> a hedged
     ///     call does. The third execution path exists in the assembly whether or not
@@ -329,11 +330,11 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     }
 
     /// <summary>
-    ///     Verifies that the <see cref="ValueTask" /> callback shape adds no overhead to the 
-    ///     state-machine box. Awaiting a <see cref="ValueTask" /> directly in the executor would 
-    ///     add a hoisted awaiter field to the state-machine type, increasing the cost of every 
-    ///     suspending call. To avoid this, the executor passes pending <see cref="ValueTask" /> 
-    ///     objects to the loop as <see cref="Task" /> objects. This test ensures both callback 
+    ///     Verifies that the <see cref="ValueTask" /> callback shape adds no overhead to the
+    ///     state-machine box. Awaiting a <see cref="ValueTask" /> directly in the executor would
+    ///     add a hoisted awaiter field to the state-machine type, increasing the cost of every
+    ///     suspending call. To avoid this, the executor passes pending <see cref="ValueTask" />
+    ///     objects to the loop as <see cref="Task" /> objects. This test ensures both callback
     ///     shapes suspend with the same overhead.
     /// </summary>
     [Fact]

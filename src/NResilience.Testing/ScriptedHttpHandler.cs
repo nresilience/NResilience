@@ -26,11 +26,11 @@ public sealed record SentRequest(HttpMethod Method, Uri? RequestUri, HttpRequest
 /// </example>
 public sealed class ScriptedHttpHandler : HttpMessageHandler
 {
-    private readonly List<Func<HttpResponseMessage>> _steps = [];
-    private readonly List<SentRequest> _requests = [];
     private readonly object _gate = new();
-    private int _index = -1;
+    private readonly List<SentRequest> _requests = [];
+    private readonly List<Func<HttpResponseMessage>> _steps = [];
     private int _callCount;
+    private int _index = -1;
 
     /// <summary>What each attempt sent, in order. A snapshot: the live message is disposed by HttpClient.</summary>
     public IReadOnlyList<SentRequest> Requests
@@ -38,7 +38,9 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
         get
         {
             lock (_gate)
+            {
                 return [.. _requests];
+            }
         }
     }
 
@@ -51,7 +53,7 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
     /// <summary>Serves one response with this status.</summary>
     /// <param name="status">The status code.</param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Respond(HttpStatusCode status) => Respond(status, times: 1);
+    public ScriptedHttpHandler Respond(HttpStatusCode status) => Respond(status, 1);
 
     /// <summary>Serves one response with this status.</summary>
     /// <param name="status">The status code.</param>
@@ -63,7 +65,7 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
     /// <summary>Serves one response built afresh per attempt, so its content can be read each time.</summary>
     /// <param name="response">Builds the response. Called once per attempt that consumes this step.</param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Respond(Func<HttpResponseMessage> response) => Respond(response, times: 1);
+    public ScriptedHttpHandler Respond(Func<HttpResponseMessage> response) => Respond(response, 1);
 
     /// <summary>Serves one response built afresh per attempt, so its content can be read each time.</summary>
     /// <param name="response">Builds the response. Called once per attempt that consumes this step.</param>
@@ -75,18 +77,26 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
         ArgumentOutOfRangeException.ThrowIfLessThan(times, 1);
 
         for (var i = 0; i < times; i++)
+        {
             _steps.Add(response);
+        }
 
         return this;
     }
 
     /// <summary>Throws, for the transport failures a classifier has to see.</summary>
-    /// <param name="exception">Builds the exception. Called once per attempt that consumes this step, so a reused instance never accumulates a shared stack trace or <see cref="Exception.Data" />.</param>
+    /// <param name="exception">
+    ///     Builds the exception. Called once per attempt that consumes this step, so a reused instance never accumulates a shared stack trace or
+    ///     <see cref="Exception.Data" />.
+    /// </param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Throw(Func<Exception> exception) => Throw(exception, times: 1);
+    public ScriptedHttpHandler Throw(Func<Exception> exception) => Throw(exception, 1);
 
     /// <summary>Throws, for the transport failures a classifier has to see.</summary>
-    /// <param name="exception">Builds the exception. Called once per attempt that consumes this step, so a reused instance never accumulates a shared stack trace or <see cref="Exception.Data" />.</param>
+    /// <param name="exception">
+    ///     Builds the exception. Called once per attempt that consumes this step, so a reused instance never accumulates a shared stack trace or
+    ///     <see cref="Exception.Data" />.
+    /// </param>
     /// <param name="times">How many attempts throw this before the script advances.</param>
     /// <returns>This handler.</returns>
     public ScriptedHttpHandler Throw(Func<Exception> exception, int times)
@@ -112,13 +122,18 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
             : null;
 
         var headers = new HttpRequestMessage().Headers;
+
         foreach (var header in request.Headers)
+        {
             headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
 
         var snapshot = new SentRequest(request.Method, request.RequestUri, headers, body);
 
         lock (_gate)
+        {
             _requests.Add(snapshot);
+        }
 
         Interlocked.Increment(ref _callCount);
 

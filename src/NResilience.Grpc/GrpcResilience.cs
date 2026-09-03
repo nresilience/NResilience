@@ -115,7 +115,7 @@ public static class GrpcResilience
     private static class ClassifierHolder
     {
         internal static readonly Classifier Instance =
-            NResilience.Classifier.Default.On<RpcException>(static e => Map(e.StatusCode));
+            Classifier.Default.On<RpcException>(static e => Map(e.StatusCode));
     }
 
     private static class DefaultHolder
@@ -142,7 +142,10 @@ public static class GrpcResilience
     {
         private readonly bool _previous;
 
-        internal SingleShotScope(bool previous) => _previous = previous;
+        internal SingleShotScope(bool previous)
+        {
+            _previous = previous;
+        }
 
         /// <summary>Restores the previous value.</summary>
         public void Dispose() => Current.Value = _previous;

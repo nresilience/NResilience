@@ -26,7 +26,7 @@ public sealed class HttpRateLimitTests
         var limiter = new ScriptedLimiter();
 
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable, times: 2)
+            .Respond(HttpStatusCode.ServiceUnavailable, 2)
             .Respond(HttpStatusCode.OK);
 
         using var provider = Provider(

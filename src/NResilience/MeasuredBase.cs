@@ -165,11 +165,6 @@ public readonly record struct MeasuredBase
         init => _spread = value;
     }
 
-    /// <summary>The way to configure an adaptive backoff base.</summary>
-    /// <param name="multiple">How many normal calls the first retry waits. Must be greater than zero.</param>
-    /// <returns>The configuration.</returns>
-    public static MeasuredBase Of(double multiple = DefaultMultiple) => new() { Multiple = multiple };
-
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
     ///     explicitly equals one that left it alone.
@@ -182,6 +177,11 @@ public readonly record struct MeasuredBase
         && Window == other.Window
         && MinimumSamples == other.MinimumSamples
         && Spread.Equals(other.Spread);
+
+    /// <summary>The way to configure an adaptive backoff base.</summary>
+    /// <param name="multiple">How many normal calls the first retry waits. Must be greater than zero.</param>
+    /// <returns>The configuration.</returns>
+    public static MeasuredBase Of(double multiple = DefaultMultiple) => new() { Multiple = multiple };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Multiple, Quantile, Window, MinimumSamples, Spread);

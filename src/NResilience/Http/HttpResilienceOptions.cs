@@ -97,8 +97,12 @@ public sealed class HttpResilienceOptions
     ///     Whether each outbound attempt carries how long this side is going to wait for it. Off by
     ///     default.
     ///     <para>
-    ///         The value is the attempt's own ceiling - <c>min(<see cref="Resilience.AttemptTimeout" />,
-    ///         time left on the deadline)</c> - in whole milliseconds, written to
+    ///         The value is the attempt's own ceiling -
+    ///         <c>
+    ///             min(<see cref="Resilience.AttemptTimeout" />,
+    ///             time left on the deadline)
+    ///         </c>
+    ///         - in whole milliseconds, written to
     ///         <see cref="DeadlineHeader" />, and recomputed for every attempt and every hedged leg,
     ///         because each one has less of the deadline left than the last. A peer that reads it can
     ///         stop work nobody is waiting for; a peer that ignores it is unaffected.

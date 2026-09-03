@@ -64,9 +64,7 @@ internal sealed class HttpCall(
     internal async Task BufferAsync(CancellationToken cancellationToken)
     {
         if (request.Content is { } content)
-        {
             _body = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        }
     }
 
     /// <summary>

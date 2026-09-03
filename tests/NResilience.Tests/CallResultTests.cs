@@ -167,13 +167,13 @@ public sealed class CallResultTests
     }
 
     /// <summary>
-    ///     Verifies that a value returned by an earlier attempt is preserved even if a later 
-    ///     attempt throws. <see cref="CallResult{T}.Value" /> ensures that a result judged as 
-    ///     a failure is still available, which is critical for disposing resources like 
+    ///     Verifies that a value returned by an earlier attempt is preserved even if a later
+    ///     attempt throws. <see cref="CallResult{T}.Value" /> ensures that a result judged as
+    ///     a failure is still available, which is critical for disposing resources like
     ///     <c>HttpResponseMessage</c>.
     ///     <para>
-    ///         The executor threads the attempt's result through the invoker. Using a <c>ref</c> 
-    ///         parameter instead of <c>out</c> prevents the slot from being cleared at the start 
+    ///         The executor threads the attempt's result through the invoker. Using a <c>ref</c>
+    ///         parameter instead of <c>out</c> prevents the slot from being cleared at the start
     ///         of each attempt.
     ///     </para>
     /// </summary>
@@ -254,14 +254,18 @@ public sealed class CallResultTests
         var enumerated = new List<int>();
 
         foreach (var attempt in log)
+        {
             enumerated.Add(attempt.Number);
+        }
 
-        var viaInterface = ((IEnumerable<Attempt>)log).Select(a => a.Number).ToList();
+        var viaInterface = log.Select(a => a.Number).ToList();
 
         var viaSpan = new List<int>();
 
         foreach (var attempt in log.AsSpan())
+        {
             viaSpan.Add(attempt.Number);
+        }
 
         Assert.Equal([1, 2, 3], enumerated);
         Assert.Equal(enumerated, viaInterface);
@@ -283,12 +287,16 @@ public sealed class CallResultTests
 
         // Warm the path before measuring it.
         foreach (var attempt in log)
+        {
             total += attempt.Number;
+        }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
 
         foreach (var attempt in log)
+        {
             total += attempt.Number;
+        }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 

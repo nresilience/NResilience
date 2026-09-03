@@ -212,13 +212,19 @@ public sealed class BackoffTests
     public void A_round_trip_through_the_readable_properties_preserves_the_curve(int transientMs, int throttledMs, double factor)
     {
         var original = Backoff.Exponential(
-            TimeSpan.FromMilliseconds(transientMs),
-            TimeSpan.FromMilliseconds(throttledMs),
-            factor,
-            TimeSpan.FromSeconds(45)) with { Jitter = Jitter.None };
+                TimeSpan.FromMilliseconds(transientMs),
+                TimeSpan.FromMilliseconds(throttledMs),
+                factor,
+                TimeSpan.FromSeconds(45)) with
+            {
+                Jitter = Jitter.None,
+            };
 
         var rebuilt = Backoff.Exponential(original.TransientBase, original.ThrottledBase, original.Factor, original.Max)
-            with { Jitter = original.Jitter };
+            with
+            {
+                Jitter = original.Jitter,
+            };
 
         Assert.Equal(original, rebuilt);
         Assert.Equal(Delay(original, Verdict.Transient, 4), Delay(rebuilt, Verdict.Transient, 4));

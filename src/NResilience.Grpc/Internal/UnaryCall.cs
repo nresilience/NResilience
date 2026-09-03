@@ -33,14 +33,14 @@ internal sealed class UnaryCall<TRequest, TResponse>
     private readonly Method<TRequest, TResponse> _method;
     private readonly GrpcResilienceOptions _options;
 
+    private readonly TRequest _request;
+
     /// <summary>
     ///     The call-scoped source. Linked to the caller's token so the executor's own attempt sources
     ///     chain off it, and cancelled by <see cref="Dispose" /> so a caller who drops the call before
     ///     it completes stops the retry loop rather than leaving it running behind them.
     /// </summary>
     private readonly CancellationTokenSource _running;
-
-    private readonly TRequest _request;
 
     /// <summary>Whether the marker is stamped and read. Retrying calls only, as for HTTP.</summary>
     private readonly bool _stamping;
@@ -60,8 +60,7 @@ internal sealed class UnaryCall<TRequest, TResponse>
 
     internal UnaryCall(
         TRequest request,
-        ClientInterceptorContext<TRequest, TResponse> context,
-        Interceptor.AsyncUnaryCallContinuation<TRequest, TResponse> continuation,
+        ClientInterceptorContext<TRequest, TResponse> context, Interceptor.AsyncUnaryCallContinuation<TRequest, TResponse> continuation,
         Resilience policy,
         GrpcResilienceOptions options,
         bool retrying)

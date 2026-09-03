@@ -22,11 +22,11 @@ namespace NResilience.Tests;
 /// </summary>
 public sealed class DoomedAttemptTests
 {
-    /// <summary>What a healthy call to this dependency costs, in every test here.</summary>
-    private static readonly TimeSpan Normal = TimeSpan.FromMilliseconds(400);
-
     /// <summary>Enough successes to put <c>Breaker.NormalLatency</c> above <c>SlowCalls.MinimumSamples</c>.</summary>
     private const int WarmCalls = 25;
+
+    /// <summary>What a healthy call to this dependency costs, in every test here.</summary>
+    private static readonly TimeSpan Normal = TimeSpan.FromMilliseconds(400);
 
     // ---- The feature ----
 
@@ -46,7 +46,7 @@ public sealed class DoomedAttemptTests
         // never below.
         Assert.InRange(policy.Breaker!.NormalLatency!.Value, Normal, Normal * 1.15);
 
-        var result = await FailAsync(policy, time, spend: TimeSpan.FromMilliseconds(450));
+        var result = await FailAsync(policy, time, TimeSpan.FromMilliseconds(450));
 
         Assert.False(result.IsSuccess);
         Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
@@ -68,7 +68,7 @@ public sealed class DoomedAttemptTests
 
         Assert.Null(policy.Breaker!.NormalLatency);
 
-        var result = await FailAsync(policy, time, spend: TimeSpan.FromMilliseconds(450));
+        var result = await FailAsync(policy, time, TimeSpan.FromMilliseconds(450));
 
         Assert.False(result.IsSuccess);
 
@@ -89,11 +89,11 @@ public sealed class DoomedAttemptTests
         var time = new FakeTimeProvider();
         var policy = Measured(time);
 
-        await WarmAsync(policy, time, calls: 5);
+        await WarmAsync(policy, time, 5);
 
         Assert.Null(policy.Breaker!.NormalLatency);
 
-        var result = await FailAsync(policy, time, spend: TimeSpan.FromMilliseconds(450));
+        var result = await FailAsync(policy, time, TimeSpan.FromMilliseconds(450));
 
         Assert.Equal(2, result.Attempts.Count);
     }
@@ -137,7 +137,7 @@ public sealed class DoomedAttemptTests
 
         await WarmAsync(policy, time);
 
-        var result = await FailAsync(policy, time, spend: TimeSpan.FromMilliseconds(450), deadline: TimeSpan.FromMilliseconds(1000));
+        var result = await FailAsync(policy, time, TimeSpan.FromMilliseconds(450), TimeSpan.FromMilliseconds(1000));
 
         Assert.Equal(2, result.Attempts.Count);
     }
@@ -154,7 +154,7 @@ public sealed class DoomedAttemptTests
 
         await WarmAsync(policy, time);
 
-        var result = await FailAsync(policy, time, spend: TimeSpan.FromHours(1), deadline: Timeout.InfiniteTimeSpan);
+        var result = await FailAsync(policy, time, TimeSpan.FromHours(1), Timeout.InfiniteTimeSpan);
 
         Assert.Equal(3, result.Attempts.Count);
     }
@@ -177,7 +177,7 @@ public sealed class DoomedAttemptTests
 
         // Given a deadline rather than awaited outright: a retry the estimate failed to refuse would
         // park on a 600 ms backoff nobody is going to advance, and a hung run says less than a failure.
-        var call = FailAsync(policy, time, spend: TimeSpan.FromMilliseconds(600), deadline: TimeSpan.FromMilliseconds(1500));
+        var call = FailAsync(policy, time, TimeSpan.FromMilliseconds(600), TimeSpan.FromMilliseconds(1500));
         var result = await call.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);

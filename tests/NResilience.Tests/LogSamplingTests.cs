@@ -26,7 +26,9 @@ public sealed class LogSamplingTests
 
         // Two through the cold start, then one in four: 2 + 3 of the remaining twelve.
         for (var i = 0; i < 14; i++)
+        {
             listener(Succeeded());
+        }
 
         Assert.Equal(5, Count(logger, 1004));
     }
@@ -40,7 +42,9 @@ public sealed class LogSamplingTests
         // Nine successes and one attempt record. A shared counter would keep the attempt record
         // because it happened to be tenth; a per-record counter keeps neither.
         for (var i = 0; i < 9; i++)
+        {
             listener(Succeeded());
+        }
 
         listener(CallEvent.Create(CallEventKind.Attempt, "api", 1, Verdict.Ok));
 
@@ -54,7 +58,9 @@ public sealed class LogSamplingTests
         var listener = ResilienceLogging.Listener(logger, new ResilienceLoggingOptions(), new FakeTimeProvider());
 
         for (var i = 0; i < 50; i++)
+        {
             listener(Succeeded());
+        }
 
         Assert.Equal(50, Count(logger, 1004));
     }
@@ -66,7 +72,9 @@ public sealed class LogSamplingTests
         var listener = Listener(logger, LogSampling.OneIn(1) with { MinimumSamples = 0 }, new FakeTimeProvider());
 
         for (var i = 0; i < 50; i++)
+        {
             listener(Succeeded());
+        }
 
         Assert.Equal(50, Count(logger, 1004));
     }
@@ -87,7 +95,9 @@ public sealed class LogSamplingTests
         listener(CallEvent.Create(CallEventKind.BreakerOpened, "api", 3));
 
         for (var i = 0; i < 5; i++)
+        {
             listener(Succeeded());
+        }
 
         Assert.Equal(5, Count(logger, 1004));
 
@@ -95,7 +105,9 @@ public sealed class LogSamplingTests
         time.Advance(TimeSpan.FromSeconds(31));
 
         for (var i = 0; i < 5; i++)
+        {
             listener(Succeeded());
+        }
 
         Assert.Equal(5, Count(logger, 1004));
     }
@@ -115,7 +127,7 @@ public sealed class LogSamplingTests
         time.Advance(TimeSpan.FromSeconds(20));
 
         // A breaker still refusing calls is still an incident, so the window moves with it.
-        listener(CallEvent.Create(CallEventKind.RejectedByBreaker, "api", 1, reason: StopReason.DependencyUnavailable));
+        listener(CallEvent.Create(CallEventKind.RejectedByBreaker, "api", reason: StopReason.DependencyUnavailable));
         time.Advance(TimeSpan.FromSeconds(20));
 
         listener(Succeeded());
@@ -142,7 +154,9 @@ public sealed class LogSamplingTests
         listener(CallEvent.Create(CallEventKind.BreakerOpened, "api", 3));
 
         for (var i = 0; i < 5; i++)
+        {
             listener(Succeeded());
+        }
 
         Assert.DoesNotContain(logger.Collector.GetSnapshot(), r => r.Id.Id == 1013);
         Assert.Equal(5, Count(logger, 1004));
@@ -196,8 +210,7 @@ public sealed class LogSamplingTests
     {
         var options = new ResilienceLoggingOptions { Sampling = LogSampling.OneIn(0) };
 
-        var thrown = Assert.Throws<ResilienceConfigurationException>(
-            () => ResilienceLogging.Listener(new FakeLogger(), options));
+        var thrown = Assert.Throws<ResilienceConfigurationException>(() => ResilienceLogging.Listener(new FakeLogger(), options));
 
         Assert.Contains("LogSampling.KeepOneIn", thrown.Message, StringComparison.Ordinal);
     }
@@ -214,8 +227,7 @@ public sealed class LogSamplingTests
             },
         };
 
-        var thrown = Assert.Throws<ResilienceConfigurationException>(
-            () => ResilienceLogging.Listener(new FakeLogger(), options));
+        var thrown = Assert.Throws<ResilienceConfigurationException>(() => ResilienceLogging.Listener(new FakeLogger(), options));
 
         Assert.Equal(3, thrown.Problems.Count);
     }
@@ -224,10 +236,10 @@ public sealed class LogSamplingTests
     public void Equality_is_over_the_effective_configuration()
     {
         Assert.Equal(
-            LogSampling.OneIn(20),
-            LogSampling.OneIn(20) with { IncidentWindow = TimeSpan.FromMinutes(1), MinimumSamples = 20 });
+            LogSampling.OneIn(),
+            LogSampling.OneIn() with { IncidentWindow = TimeSpan.FromMinutes(1), MinimumSamples = 20 });
 
-        Assert.NotEqual(LogSampling.OneIn(20), LogSampling.OneIn(10));
+        Assert.NotEqual(LogSampling.OneIn(), LogSampling.OneIn(10));
     }
 
     [Fact]
@@ -255,7 +267,9 @@ public sealed class LogSamplingTests
         var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
 
         for (var i = 0; i < 9; i++)
+        {
             api.OnEvent!(Succeeded());
+        }
 
         Assert.DoesNotContain(provider.Collector.GetSnapshot(), r => r.Id.Id == 1004);
     }

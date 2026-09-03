@@ -39,6 +39,7 @@ public sealed class TelemetryCompositionTests
         {
             ShouldListenTo = source => source.Name == ResilienceTelemetry.ActivitySourceName,
             Sample = (ref _) => ActivitySamplingResult.AllDataAndRecorded,
+
             // Concurrent: the listener is process-wide and ActivityStopped fires on whichever
             // thread stops the activity, so a parallel test class's spans land here too.
             ActivityStopped = spans.Enqueue,
@@ -108,6 +109,7 @@ public sealed class TelemetryCompositionTests
         {
             ShouldListenTo = source => source.Name == ResilienceTelemetry.ActivitySourceName,
             Sample = (ref _) => ActivitySamplingResult.AllDataAndRecorded,
+
             // Concurrent: see the first test. This bag also receives spans from other test
             // classes running in parallel, so the assertions below filter rather than count.
             ActivityStopped = spans.Enqueue,
@@ -152,6 +154,7 @@ public sealed class TelemetryCompositionTests
         {
             ShouldListenTo = source => source.Name == ResilienceTelemetry.ActivitySourceName,
             Sample = (ref _) => ActivitySamplingResult.AllDataAndRecorded,
+
             // Concurrent: see the first test.
             ActivityStopped = spans.Enqueue,
         };

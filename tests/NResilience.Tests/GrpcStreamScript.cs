@@ -157,7 +157,9 @@ internal sealed class ScriptedStreamCall
             var cancelled = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             await using (cancellationToken.Register(() => cancelled.TrySetResult(true)))
+            {
                 await cancelled.Task.ConfigureAwait(false);
+            }
 
             throw new RpcException(new Status(StatusCode.Cancelled, "Call canceled by the client."));
         }

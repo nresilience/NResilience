@@ -26,6 +26,13 @@ public sealed class ValueGate : IValueTaskSource<int>
 
     private ManualResetValueTaskSourceCore<int> _core;
 
+    public int GetResult(short token) => _core.GetResult(token);
+
+    public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
+
+    public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) =>
+        _core.OnCompleted(continuation, state, token, flags);
+
     /// <summary>Never suspends, and is backed by a pooled source rather than by a value.</summary>
     public static ValueTask<int> CompleteAsync(CancellationToken cancellationToken)
     {
@@ -44,11 +51,4 @@ public sealed class ValueGate : IValueTaskSource<int>
 
     /// <summary>Always suspends. Task-backed, so the arm prices the executor rather than the conversion.</summary>
     public static ValueTask<int> SuspendAsync(CancellationToken cancellationToken) => new(Gate.SuspendAsync(cancellationToken));
-
-    public int GetResult(short token) => _core.GetResult(token);
-
-    public ValueTaskSourceStatus GetStatus(short token) => _core.GetStatus(token);
-
-    public void OnCompleted(Action<object?> continuation, object? state, short token, ValueTaskSourceOnCompletedFlags flags) =>
-        _core.OnCompleted(continuation, state, token, flags);
 }

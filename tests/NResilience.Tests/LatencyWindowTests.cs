@@ -20,7 +20,7 @@ public sealed class LatencyWindowTests
     {
         var window = New(out _);
 
-        Assert.Null(window.Threshold(minimumSamples: 20));
+        Assert.Null(window.Threshold(20));
         Assert.Equal(0, window.Samples);
     }
 
@@ -33,20 +33,20 @@ public sealed class LatencyWindowTests
     {
         var window = New(out _);
 
-        Record(window, TimeSpan.FromMilliseconds(10), times: 19);
-        Assert.Null(window.Threshold(minimumSamples: 20));
+        Record(window, TimeSpan.FromMilliseconds(10), 19);
+        Assert.Null(window.Threshold(20));
 
         window.Record(TimeSpan.FromMilliseconds(10));
-        Assert.NotNull(window.Threshold(minimumSamples: 20));
+        Assert.NotNull(window.Threshold(20));
     }
 
     [Fact]
     public void A_uniform_distribution_reports_the_value_it_is_made_of()
     {
         var window = New(out _);
-        Record(window, TimeSpan.FromMilliseconds(100), times: 1_000);
+        Record(window, TimeSpan.FromMilliseconds(100), 1_000);
 
-        var threshold = window.Threshold(minimumSamples: 20);
+        var threshold = window.Threshold(20);
 
         Assert.NotNull(threshold);
         Assert.InRange(threshold.Value, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(112.5));
@@ -59,18 +59,18 @@ public sealed class LatencyWindowTests
     [Fact]
     public void The_quantile_tells_the_body_from_the_tail()
     {
-        var p95 = New(out var time, quantile: 0.95);
-        var p99 = new LatencyWindow(quantile: 0.99, Window, time);
+        var p95 = New(out var time, 0.95);
+        var p99 = new LatencyWindow(0.99, Window, time);
 
         foreach (var window in new[] { p95, p99 })
         {
-            Record(window, TimeSpan.FromMilliseconds(10), times: 95);
-            Record(window, TimeSpan.FromSeconds(1), times: 5);
+            Record(window, TimeSpan.FromMilliseconds(10), 95);
+            Record(window, TimeSpan.FromSeconds(1), 5);
         }
 
         // 95 of 100 samples are 10 ms, so the 95th is one of them and the 99th is in the tail.
-        Assert.InRange(p95.Threshold(minimumSamples: 20)!.Value, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(11.25));
-        Assert.InRange(p99.Threshold(minimumSamples: 20)!.Value, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.125));
+        Assert.InRange(p95.Threshold(20)!.Value, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(11.25));
+        Assert.InRange(p99.Threshold(20)!.Value, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.125));
     }
 
     /// <summary>
@@ -93,8 +93,8 @@ public sealed class LatencyWindowTests
         var value = TimeSpan.FromTicks(micros * TimeSpan.TicksPerMicrosecond);
         var window = New(out _);
 
-        Record(window, value, times: 50);
-        var threshold = window.Threshold(minimumSamples: 1);
+        Record(window, value, 50);
+        var threshold = window.Threshold(1);
 
         Assert.NotNull(threshold);
         Assert.True(threshold.Value >= value, $"{threshold} was below {value}");
@@ -109,14 +109,14 @@ public sealed class LatencyWindowTests
     public void Samples_age_out_when_the_window_has_passed()
     {
         var window = New(out var time);
-        Record(window, TimeSpan.FromMilliseconds(10), times: 100);
+        Record(window, TimeSpan.FromMilliseconds(10), 100);
 
-        Assert.NotNull(window.Threshold(minimumSamples: 20));
+        Assert.NotNull(window.Threshold(20));
 
         time.Advance(Window);
 
         Assert.Equal(0, window.Samples);
-        Assert.Null(window.Threshold(minimumSamples: 20));
+        Assert.Null(window.Threshold(20));
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class LatencyWindowTests
         // One slice's worth of traffic, four times over, advancing between each.
         for (var slice = 0; slice < 4; slice++)
         {
-            Record(window, TimeSpan.FromMilliseconds(10), times: 100);
+            Record(window, TimeSpan.FromMilliseconds(10), 100);
             time.Advance(Slice);
         }
 
@@ -140,14 +140,14 @@ public sealed class LatencyWindowTests
     {
         var window = New(out var time);
 
-        Record(window, TimeSpan.FromMilliseconds(10), times: 500);
-        Assert.InRange(window.Threshold(minimumSamples: 20)!.Value, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(11.25));
+        Record(window, TimeSpan.FromMilliseconds(10), 500);
+        Assert.InRange(window.Threshold(20)!.Value, TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(11.25));
 
         // A full window later, none of the fast traffic is still counted.
         time.Advance(Window);
-        Record(window, TimeSpan.FromMilliseconds(100), times: 500);
+        Record(window, TimeSpan.FromMilliseconds(100), 500);
 
-        Assert.InRange(window.Threshold(minimumSamples: 20)!.Value, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(112.5));
+        Assert.InRange(window.Threshold(20)!.Value, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(112.5));
     }
 
     /// <summary>
@@ -159,7 +159,7 @@ public sealed class LatencyWindowTests
     public void A_uniform_slowdown_moves_the_threshold_rather_than_the_fraction_above_it()
     {
         var fast = New(out var time);
-        var slow = new LatencyWindow(quantile: 0.95, Window, time);
+        var slow = new LatencyWindow(0.95, Window, time);
 
         for (var i = 0; i < 1_000; i++)
         {
@@ -169,7 +169,7 @@ public sealed class LatencyWindowTests
             slow.Record(value * 10);
         }
 
-        var ratio = slow.Threshold(minimumSamples: 20)!.Value / fast.Threshold(minimumSamples: 20)!.Value;
+        var ratio = slow.Threshold(20)!.Value / fast.Threshold(20)!.Value;
 
         Assert.InRange(ratio, 9.0, 11.0);
     }
@@ -178,9 +178,9 @@ public sealed class LatencyWindowTests
     public void A_duration_past_the_top_bucket_is_clamped_rather_than_thrown()
     {
         var window = New(out _);
-        Record(window, TimeSpan.FromHours(1), times: 50);
+        Record(window, TimeSpan.FromHours(1), 50);
 
-        var threshold = window.Threshold(minimumSamples: 1);
+        var threshold = window.Threshold(1);
 
         // Clamped into the top bucket, which is the one case the answer comes out below the value.
         Assert.NotNull(threshold);
@@ -197,7 +197,7 @@ public sealed class LatencyWindowTests
 
         window.Record(TimeSpan.Zero);
         Assert.Equal(1, window.Samples);
-        Assert.Equal(TimeSpan.FromTicks(TimeSpan.TicksPerMicrosecond), window.Threshold(minimumSamples: 1));
+        Assert.Equal(TimeSpan.FromTicks(TimeSpan.TicksPerMicrosecond), window.Threshold(1));
     }
 
     [Fact]
@@ -213,7 +213,9 @@ public sealed class LatencyWindowTests
         Parallel.For(0, 8, _ =>
         {
             for (var i = 0; i < 1_000; i++)
+            {
                 window.Record(TimeSpan.FromMilliseconds(10));
+            }
         });
 
         Assert.Equal(8_001, window.Samples);
@@ -224,12 +226,12 @@ public sealed class LatencyWindowTests
     {
         var time = new FakeTimeProvider();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(quantile: 0, Window, time));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(quantile: 1, Window, time));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(quantile: double.NaN, Window, time));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(quantile: 0.95, TimeSpan.Zero, time));
-        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(quantile: 0.95, TimeSpan.FromSeconds(-1), time));
-        Assert.Throws<ArgumentNullException>(() => new LatencyWindow(quantile: 0.95, Window, null!));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(0, Window, time));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(1, Window, time));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(double.NaN, Window, time));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(0.95, TimeSpan.Zero, time));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new LatencyWindow(0.95, TimeSpan.FromSeconds(-1), time));
+        Assert.Throws<ArgumentNullException>(() => new LatencyWindow(0.95, Window, null!));
     }
 
     [Fact]
@@ -241,7 +243,7 @@ public sealed class LatencyWindowTests
         time.Advance(Window * 10);
 
         Assert.Equal(0, window.Samples);
-        Assert.Null(window.Threshold(minimumSamples: 1));
+        Assert.Null(window.Threshold(1));
 
         window.Record(TimeSpan.FromMilliseconds(10));
         Assert.Equal(1, window.Samples);
@@ -263,7 +265,7 @@ public sealed class LatencyWindowTests
 
             separate.Record(duration);
 
-            Assert.Equal(separate.Threshold(minimumSamples: 20), combined.RecordAndThreshold(duration, minimumSamples: 20));
+            Assert.Equal(separate.Threshold(20), combined.RecordAndThreshold(duration, 20));
         }
 
         Assert.Equal(separate.Samples, combined.Samples);
@@ -278,6 +280,8 @@ public sealed class LatencyWindowTests
     private static void Record(LatencyWindow window, TimeSpan duration, int times)
     {
         for (var i = 0; i < times; i++)
+        {
             window.Record(duration);
+        }
     }
 }

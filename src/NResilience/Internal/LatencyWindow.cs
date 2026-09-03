@@ -306,7 +306,9 @@ internal sealed class LatencyWindow
             var ring = _rings[live[i]];
 
             for (var bucket = 0; bucket < Buckets; bucket++)
+            {
                 total += ring[bucket];
+            }
         }
 
         if (total == 0)
@@ -325,7 +327,9 @@ internal sealed class LatencyWindow
         for (var bucket = 0; bucket < Buckets; bucket++)
         {
             for (var i = 0; i < rings; i++)
+            {
                 cumulative += _rings[live[i]][bucket];
+            }
 
             if (cumulative >= rank)
                 return new Answer(epoch, UpperBoundOf(bucket), samples);

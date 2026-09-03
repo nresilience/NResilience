@@ -133,18 +133,20 @@ public sealed class CancellationPropagationTests
     public async Task A_response_superseded_by_a_retry_is_disposed()
     {
         await using var server = await LoopbackHttp.StartAsync(
-            new LoopbackResponse(HttpStatusCode.ServiceUnavailable, Body: "fail"u8.ToArray()),
-            new LoopbackResponse(HttpStatusCode.OK, Body: "ok"u8.ToArray()));
+            new LoopbackResponse(HttpStatusCode.ServiceUnavailable, "fail"u8.ToArray()),
+            new LoopbackResponse(HttpStatusCode.OK, "ok"u8.ToArray()));
 
         // The tracking handler wraps the real transport and observes the lifetime of the response
         // content the transport produces.
         var innerTracking = new TrackingHandler(new SocketsHttpHandler());
+
         using var resilience = new ResilienceHandler(innerTracking, Resilience.Http with
         {
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
             Deadline = Timeout.InfiniteTimeSpan,
         });
+
         using var client = new HttpClient(resilience, true);
 
         using var response = await client.GetAsync(server.BaseUri);
@@ -201,6 +203,7 @@ public sealed class CancellationPropagationTests
         internal TrackingContent(HttpContent inner)
         {
             _inner = inner;
+
             foreach (var header in inner.Headers)
             {
                 Headers.Add(header.Key, header.Value);

@@ -159,11 +159,6 @@ public readonly record struct AttemptCeiling
         init => _floor = value;
     }
 
-    /// <summary>The way to configure an adaptive attempt ceiling.</summary>
-    /// <param name="multiple">How many times the measured tail an attempt may take. Must be greater than 1.</param>
-    /// <returns>The configuration.</returns>
-    public static AttemptCeiling Above(double multiple = 3.0) => new() { Multiple = multiple };
-
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
     ///     explicitly equals one that left it alone.
@@ -176,6 +171,11 @@ public readonly record struct AttemptCeiling
         && Window == other.Window
         && MinimumSamples == other.MinimumSamples
         && Floor == other.Floor;
+
+    /// <summary>The way to configure an adaptive attempt ceiling.</summary>
+    /// <param name="multiple">How many times the measured tail an attempt may take. Must be greater than 1.</param>
+    /// <returns>The configuration.</returns>
+    public static AttemptCeiling Above(double multiple = 3.0) => new() { Multiple = multiple };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Multiple, Quantile, Window, MinimumSamples, Floor);

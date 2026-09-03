@@ -43,14 +43,13 @@ public readonly record struct Backoff
     private readonly Func<NextAttempt, TimeSpan>? _custom;
     private readonly double _factor;
 
-    private readonly BackoffKind _kind;
     private readonly TimeSpan _max;
     private readonly TimeSpan _throttledBase;
     private readonly TimeSpan _transientBase;
 
     private Backoff(BackoffKind kind, TimeSpan transientBase, TimeSpan throttledBase, double factor, TimeSpan max, Func<NextAttempt, TimeSpan>? custom)
     {
-        _kind = kind;
+        Kind = kind;
         _transientBase = transientBase;
         _throttledBase = throttledBase;
         _factor = factor;
@@ -99,7 +98,7 @@ public readonly record struct Backoff
     public double Factor => Normalized()._factor;
 
     /// <summary>The backoff curve. <c>default(Backoff)</c> is <see cref="BackoffKind.Exponential" />.</summary>
-    public BackoffKind Kind => _kind;
+    public BackoffKind Kind { get; }
 
     /// <summary>The hard cap on any single delay, or <see cref="Timeout.InfiniteTimeSpan" /> for none.</summary>
     public TimeSpan Max => Normalized()._max;
@@ -147,7 +146,10 @@ public readonly record struct Backoff
         double factor = DefaultFactor,
         TimeSpan? max = null)
         => Exponential(transientBase, throttledBase, factor, max)
-            with { MeasuredBase = NResilience.MeasuredBase.Of(multiple) };
+            with
+            {
+                MeasuredBase = NResilience.MeasuredBase.Of(multiple),
+            };
 
     /// <summary>The same delay every time.</summary>
     /// <param name="delay">The delay.</param>
@@ -199,7 +201,7 @@ public readonly record struct Backoff
     {
         var effective = Normalized();
 
-        if (effective._kind == BackoffKind.Custom)
+        if (effective.Kind == BackoffKind.Custom)
         {
             var custom = effective._custom!(next);
             return custom > TimeSpan.Zero ? custom : TimeSpan.Zero;
@@ -222,7 +224,7 @@ public readonly record struct Backoff
         if (@base <= TimeSpan.Zero)
             return TimeSpan.Zero;
 
-        var ticks = effective._kind == BackoffKind.Constant
+        var ticks = effective.Kind == BackoffKind.Constant
             ? @base.Ticks
             : @base.Ticks * Math.Pow(effective._factor, Math.Max(0, next.Number - 2));
 
@@ -251,7 +253,7 @@ public readonly record struct Backoff
     {
         var effective = Normalized();
 
-        if (effective._kind == BackoffKind.Exponential && (double.IsNaN(effective._factor) || effective._factor <= 0))
+        if (effective.Kind == BackoffKind.Exponential && (double.IsNaN(effective._factor) || effective._factor <= 0))
             problems.Add($"Backoff factor must be greater than zero; it is {effective._factor}.");
 
         if (effective._transientBase < TimeSpan.Zero)
@@ -272,10 +274,10 @@ public readonly record struct Backoff
             // into either would be a value the caller cannot predict from what they wrote. Refused
             // rather than ignored, because silently doing nothing is how a caller ends up believing
             // their backoff tracks the dependency when it does not.
-            if (effective._kind != BackoffKind.Exponential)
+            if (effective.Kind != BackoffKind.Exponential)
             {
                 problems.Add(
-                    $"Backoff.MeasuredBase is only supported on an exponential curve; this one is {effective._kind}. " +
+                    $"Backoff.MeasuredBase is only supported on an exponential curve; this one is {effective.Kind}. " +
                     "Use Backoff.Measured(...) to build one, or drop MeasuredBase to keep the curve as written.");
             }
         }
@@ -287,7 +289,7 @@ public readonly record struct Backoff
     ///     sets a positive one - and reads as <see cref="Default" />.
     /// </summary>
     private Backoff Normalized() =>
-        _kind == BackoffKind.Exponential && _factor == 0
+        Kind == BackoffKind.Exponential && _factor == 0
             ? new Backoff(BackoffKind.Exponential, DefaultTransientBase, DefaultThrottledBase, DefaultFactor, DefaultMax, null)
             {
                 Jitter = Jitter,

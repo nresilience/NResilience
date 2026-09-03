@@ -269,7 +269,7 @@ public sealed class RetryTests
             Time = time,
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,
-            Deadline = TimeSpan.FromTicks((200 * TimeSpan.TicksPerMillisecond) + (TimeSpan.TicksPerMillisecond / 2)),
+            Deadline = TimeSpan.FromTicks(200 * TimeSpan.TicksPerMillisecond + TimeSpan.TicksPerMillisecond / 2),
             Attempts = 3,
             Budget = null,
         };
@@ -319,6 +319,7 @@ public sealed class RetryTests
             if (++calls < 3)
             {
                 var pending = new TaskCompletionSource();
+
                 await using (ct.Register(() => pending.TrySetCanceled(ct)))
                 {
                     time.Advance(TimeSpan.FromMilliseconds(50));

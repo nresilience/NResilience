@@ -1,33 +1,33 @@
 <Solution>
   <Folder Name="/Analyzers/">
-    <Project Path="src/NResilience.Analyzers/NResilience.Analyzers.csproj" />
-    <Project Path="src/NResilience.CodeFixes/NResilience.CodeFixes.csproj" />
+    <Project Path="src/NResilience.Analyzers/NResilience.Analyzers.csproj"/>
+    <Project Path="src/NResilience.CodeFixes/NResilience.CodeFixes.csproj"/>
   </Folder>
   <Folder Name="/Bench/">
-    <Project Path="bench/NResilience.Baseline/NResilience.Baseline.csproj" />
-    <Project Path="bench/NResilience.Probes.Polly/NResilience.Probes.Polly.csproj" />
-    <Project Path="bench/NResilience.Probes/NResilience.Probes.csproj" />
+    <Project Path="bench/NResilience.Baseline/NResilience.Baseline.csproj"/>
+    <Project Path="bench/NResilience.Probes.Polly/NResilience.Probes.Polly.csproj"/>
+    <Project Path="bench/NResilience.Probes/NResilience.Probes.csproj"/>
   </Folder>
   <Folder Name="/Samples/">
-    <Project Path="samples/Samples.Grpc/Samples.Grpc.csproj" />
-    <Project Path="samples/Samples.Http/Samples.Http.csproj" />
-    <Project Path="samples/Samples.QuickStart/Samples.QuickStart.csproj" />
-    <Project Path="samples/Samples.Worker/Samples.Worker.csproj" />
+    <Project Path="samples/Samples.Grpc/Samples.Grpc.csproj"/>
+    <Project Path="samples/Samples.Http/Samples.Http.csproj"/>
+    <Project Path="samples/Samples.QuickStart/Samples.QuickStart.csproj"/>
+    <Project Path="samples/Samples.Worker/Samples.Worker.csproj"/>
   </Folder>
   <Folder Name="/Tests/">
-    <Project Path="tests/NResilience.Analyzers.Tests/NResilience.Analyzers.Tests.csproj" />
-    <Project Path="tests/NResilience.AotProbe/NResilience.AotProbe.csproj" />
-    <Project Path="tests/NResilience.Docs/NResilience.Docs.csproj" />
-    <Project Path="tests/NResilience.Gates/NResilience.Gates.csproj" />
-    <Project Path="tests/NResilience.Tests/NResilience.Tests.csproj" />
-    <Project Path="tests/NResilience.IntegrationTests/NResilience.IntegrationTests.csproj" />
+    <Project Path="tests/NResilience.Analyzers.Tests/NResilience.Analyzers.Tests.csproj"/>
+    <Project Path="tests/NResilience.AotProbe/NResilience.AotProbe.csproj"/>
+    <Project Path="tests/NResilience.Docs/NResilience.Docs.csproj"/>
+    <Project Path="tests/NResilience.Gates/NResilience.Gates.csproj"/>
+    <Project Path="tests/NResilience.Tests/NResilience.Tests.csproj"/>
+    <Project Path="tests/NResilience.IntegrationTests/NResilience.IntegrationTests.csproj"/>
   </Folder>
   <Folder Name="/Tools/">
-    <Project Path="tools/NResilience.DocSnippets/NResilience.DocSnippets.csproj" />
+    <Project Path="tools/NResilience.DocSnippets/NResilience.DocSnippets.csproj"/>
   </Folder>
-  <Project Path="src/NResilience.AspNetCore/NResilience.AspNetCore.csproj" />
-  <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj" />
-  <Project Path="src/NResilience.Grpc/NResilience.Grpc.csproj" />
-  <Project Path="src/NResilience.Testing/NResilience.Testing.csproj" />
-  <Project Path="src/NResilience/NResilience.csproj" />
+  <Project Path="src/NResilience.AspNetCore/NResilience.AspNetCore.csproj"/>
+  <Project Path="src/NResilience.Extensions/NResilience.Extensions.csproj"/>
+  <Project Path="src/NResilience.Grpc/NResilience.Grpc.csproj"/>
+  <Project Path="src/NResilience.Testing/NResilience.Testing.csproj"/>
+  <Project Path="src/NResilience/NResilience.csproj"/>
 </Solution>

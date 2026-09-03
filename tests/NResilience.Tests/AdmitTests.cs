@@ -60,6 +60,7 @@ public sealed class AdmitTests
 
         Assert.Equal(0, calls);
         Assert.Equal(3, result.Attempts.Count);
+
         Assert.All(result.Attempts, attempt =>
         {
             Assert.Equal(VerdictKind.Throttled, attempt.Verdict.Kind);

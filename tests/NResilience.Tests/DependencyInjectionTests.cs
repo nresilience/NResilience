@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using NResilience.Extensions;
+using NResilience.Internal;
 
 namespace NResilience.Tests;
 
@@ -303,7 +304,7 @@ public sealed class DependencyInjectionTests
         var policies = Build(s => s.AddResilience("once", Resilience.Default with { Attempts = 1 }));
 
         Assert.Same(RetryBudget.Automatic, policies["once"].Budget);
-        Assert.Null(NResilience.Internal.ExecutionState.BudgetFor(policies["once"]));
+        Assert.Null(ExecutionState.BudgetFor(policies["once"]));
     }
 
     /// <summary>

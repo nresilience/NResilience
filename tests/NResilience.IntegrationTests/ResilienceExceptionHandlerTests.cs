@@ -80,7 +80,7 @@ public sealed class ResilienceExceptionHandlerTests
     [Fact]
     public async Task A_rate_limited_exception_maps_to_503_with_retry_after()
     {
-        await using var app = await App(exception: new RateLimitedException(retryAfter: TimeSpan.FromSeconds(1), limiter: "orders"));
+        await using var app = await App(exception: new RateLimitedException(TimeSpan.FromSeconds(1), "orders"));
 
         using var client = new HttpClient();
         using var response = await client.GetAsync(app.Uri);
@@ -93,7 +93,7 @@ public sealed class ResilienceExceptionHandlerTests
     [Fact]
     public async Task Retry_after_is_whole_seconds_rounded_up()
     {
-        await using var app = await App(exception: new RateLimitedException(retryAfter: TimeSpan.FromSeconds(2.5), limiter: "orders"));
+        await using var app = await App(exception: new RateLimitedException(TimeSpan.FromSeconds(2.5), "orders"));
 
         using var client = new HttpClient();
         using var response = await client.GetAsync(app.Uri);
@@ -117,8 +117,8 @@ public sealed class ResilienceExceptionHandlerTests
     public async Task A_status_code_can_be_changed()
     {
         await using var app = await App(
-            configure: o => o.RateLimitedStatusCode = StatusCodes.Status429TooManyRequests,
-            exception: new RateLimitedException());
+            o => o.RateLimitedStatusCode = StatusCodes.Status429TooManyRequests,
+            new RateLimitedException());
 
         using var client = new HttpClient();
         using var response = await client.GetAsync(app.Uri);
@@ -133,7 +133,7 @@ public sealed class ResilienceExceptionHandlerTests
         // UseExceptionHandler's middleware construction, rather than on the first request. Either
         // way it fires loudly: a status that is not a status is refused rather than written.
         await Assert.ThrowsAsync<OptionsValidationException>(async () =>
-            await App(configure: o => o.DeadlineStatusCode = 42));
+            await App(o => o.DeadlineStatusCode = 42));
     }
 
     [Fact]
@@ -156,8 +156,8 @@ public sealed class ResilienceExceptionHandlerTests
         // the extension member. The downstream stalls every response; each attempt is stopped by
         // its own ceiling and retried until the deadline runs out, so the call ends on a genuinely
         // populated log - attempts that really ran, over time that really passed.
-        await using var downstream = await LoopbackHttp.StartAsync(
-            (_, _) => Task.FromResult(new LoopbackResponse(HttpStatusCode.OK, Delay: TimeSpan.FromSeconds(30))));
+        await using var downstream =
+            await LoopbackHttp.StartAsync((_, _) => Task.FromResult(new LoopbackResponse(HttpStatusCode.OK, Delay: TimeSpan.FromSeconds(30))));
 
         var policy = Resilience.Http with
         {
@@ -173,7 +173,7 @@ public sealed class ResilienceExceptionHandlerTests
             Breaker = null,
         };
 
-        await using var app = await App(configure: o => o.IncludeAttemptDetails = true, policy: policy, downstream: downstream);
+        await using var app = await App(o => o.IncludeAttemptDetails = true, policy: policy, downstream: downstream);
 
         using var client = new HttpClient();
         using var response = await client.GetAsync(app.Uri);

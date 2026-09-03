@@ -61,8 +61,10 @@ public sealed partial record Resilience
         // same error at the call site. That eagerness is one reason this method is a plain method
         // returning an iterator rather than an iterator itself.
         if (Hedge is not null)
+        {
             throw new ResilienceConfigurationException(
                 "A policy with Hedge cannot run a streaming call: a hedge is a concurrent second copy of a value-returning attempt, and two interleaved enumerables is a buffering problem, not a hedge. Use a policy without Hedge for RunAsync over IAsyncEnumerable<T>; the same policy still runs calls.");
+        }
 
         // A policy that imposes nothing hands back the source's own enumerable. Whether that is
         // re-enumerable is then the source's business, and the enumeration-time token is not
@@ -95,8 +97,10 @@ public sealed partial record Resilience
         ExecutionState.EnsureValidated(this);
 
         if (Hedge is not null)
+        {
             throw new ResilienceConfigurationException(
                 "A policy with Hedge cannot run a streaming call: a hedge is a concurrent second copy of a value-returning attempt, and two interleaved enumerables is a buffering problem, not a hedge. Use a policy without Hedge for RunAsync over IAsyncEnumerable<T>; the same policy still runs calls.");
+        }
 
         if (IsPassthrough)
             return source(state, cancellationToken);
@@ -201,8 +205,10 @@ public sealed partial record Resilience
                     var pause = GuardDelay(Remaining(Time, start, deadline));
 
                     if (OnEvent is not null)
+                    {
                         Notify(CallEventKind.RejectedByBreaker, log.Count + 1, verdict, Time.GetElapsedTime(start), pause, error, null,
                             StopReason.DependencyUnavailable);
+                    }
 
                     await Delay(Time, pause, cancellationToken).ConfigureAwait(false);
                     break;
@@ -259,7 +265,7 @@ public sealed partial record Resilience
 
                 try
                 {
-                    Verdict decision = Verdict.Ok;
+                    var decision = Verdict.Ok;
 
                     if (Admit is { } admit)
                     {
@@ -320,9 +326,7 @@ public sealed partial record Resilience
                         }
                     }
                     else
-                    {
                         verdict = decision;
-                    }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -444,7 +448,9 @@ public sealed partial record Resilience
                 yield return value;
 
                 while (await enumerator!.MoveNextAsync().ConfigureAwait(false))
+                {
                     yield return enumerator.Current;
+                }
             }
             finally
             {

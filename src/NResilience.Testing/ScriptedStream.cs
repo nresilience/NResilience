@@ -23,7 +23,7 @@ public static class ScriptedStream
     /// var streams = ScriptedStream.For&lt;int&gt;(time)
     ///     .YieldsAfter(TimeSpan.FromSeconds(5), 0)   // attempt 1: times out before the first element
     ///     .Yields(1, 2, 3);                          // attempt 2: retried into on the first element
-    ///
+    /// 
     /// await foreach (var item in policy.RunAsync(streams.Next, cancellationToken))
     ///     Consume(item);
     /// </code>
@@ -53,13 +53,13 @@ public sealed class ScriptedStream<T>
 {
     private readonly List<Step> _steps = [];
     private readonly TimeProvider _time;
+    private int _disposed;
+    private bool _hasPendingDelay;
+    private int _live;
 
     private TimeSpan _pendingDelay;
-    private bool _hasPendingDelay;
 
     private int _served;
-    private int _live;
-    private int _disposed;
 
     internal ScriptedStream(TimeProvider time)
     {
@@ -189,11 +189,13 @@ public sealed class ScriptedStream<T>
         var index = Interlocked.Increment(ref _served) - 1;
 
         if (index >= _steps.Count)
+        {
             throw new InvalidOperationException(
                 $"The scripted stream has {_steps.Count} step(s) and attempt {index + 1} asked for one more." +
                 (_hasPendingDelay && _pendingDelay > TimeSpan.Zero
                     ? " A trailing Delay() was scripted with no Yields(), Empty(), Throws() or FaultsAfter() after it, so it is not a step."
                     : " Script the attempts the policy will actually make - retries included."));
+        }
 
         return new ServedSource(this, _steps[index], cancellationToken);
     }
@@ -251,13 +253,12 @@ public sealed class ScriptedStream<T>
     private sealed class ServedEnumerator(ScriptedStream<T> owner, Step step, CancellationToken token, CancellationTokenSource? linked)
         : IAsyncEnumerator<T>
     {
+        private int _disposed;
         private int _index;
-
-        private bool _started;
 
         private bool _midFaultThrown;
 
-        private int _disposed;
+        private bool _started;
 
         public T Current { get; private set; } = default!;
 

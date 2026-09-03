@@ -31,15 +31,15 @@ public sealed class AdaptiveDefaultsTests
     {
         var settings = new BreakerSettings();
 
-        Assert.Equal(SlowCalls.Above(3), settings.SlowCalls);
-        Assert.Equal(Failures.Above(5), settings.Failures);
+        Assert.Equal(SlowCalls.Above(), settings.SlowCalls);
+        Assert.Equal(Failures.Above(), settings.Failures);
     }
 
     [Fact]
     public void A_default_policy_measures_its_own_attempt_ceiling()
     {
-        Assert.Equal(AttemptCeiling.Above(3), Resilience.Default.AttemptCeiling);
-        Assert.Equal(AttemptCeiling.Above(3), Resilience.Http.AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(), Resilience.Default.AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(), Resilience.Http.AttemptCeiling);
     }
 
     /// <summary>Each of the three is turned off by writing <c>null</c> over it, and nothing else.</summary>
@@ -87,10 +87,10 @@ public sealed class AdaptiveDefaultsTests
         var policy = Resilience.Default with
         {
             AttemptTimeout = Timeout.InfiniteTimeSpan,
-            AttemptCeiling = AttemptCeiling.Above(3),
+            AttemptCeiling = AttemptCeiling.Above(),
         };
 
-        Assert.Equal(AttemptCeiling.Above(3), policy.AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(), policy.AttemptCeiling);
         policy.Validate();
     }
 
@@ -110,7 +110,7 @@ public sealed class AdaptiveDefaultsTests
         policy.Validate();
 
         Assert.Throws<ResilienceConfigurationException>(() =>
-            (policy with { AttemptCeiling = AttemptCeiling.Above(3) }).Validate());
+            (policy with { AttemptCeiling = AttemptCeiling.Above() }).Validate());
     }
 
     /// <summary>
@@ -164,7 +164,7 @@ public sealed class AdaptiveDefaultsTests
 
         settings.Validate();
 
-        Assert.Equal(SlowCalls.Above(3), settings.SlowCalls);
+        Assert.Equal(SlowCalls.Above(), settings.SlowCalls);
 
         (settings with { SlowCalls = SlowCalls.Above(4) }).Validate();
     }
@@ -180,7 +180,7 @@ public sealed class AdaptiveDefaultsTests
 
         settings.Validate();
 
-        Assert.Equal(Failures.Above(5), settings.Failures);
+        Assert.Equal(Failures.Above(), settings.Failures);
     }
 
     // ---- What the defaults buy ----
@@ -314,8 +314,8 @@ public sealed class AdaptiveDefaultsTests
             (Resilience.Http with
             {
                 Adaptive = false,
-                AttemptCeiling = AttemptCeiling.Above(3),
-                Hedge = Hedge.At(0.95),
+                AttemptCeiling = AttemptCeiling.Above(),
+                Hedge = Hedge.At(),
             }).Validate());
 
         Assert.Contains(problem.Problems, p => p.Contains("AttemptCeiling is set", StringComparison.Ordinal));
@@ -329,8 +329,8 @@ public sealed class AdaptiveDefaultsTests
             new Breaker(new BreakerSettings
             {
                 Adaptive = false,
-                SlowCalls = SlowCalls.Above(3),
-                Failures = Failures.Above(5),
+                SlowCalls = SlowCalls.Above(),
+                Failures = Failures.Above(),
             }));
 
         Assert.Contains(problem.Problems, p => p.Contains("SlowCalls is set", StringComparison.Ordinal));

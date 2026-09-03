@@ -35,8 +35,6 @@ internal sealed class ScopeRegistry<TKey, TScope>
     where TKey : notnull
     where TScope : Scoped
 {
-    private readonly ConcurrentDictionary<TKey, TScope> _scopes;
-
     /// <summary>
     ///     Held in a field rather than built per lookup, so the <c>GetOrAdd</c> on the miss path
     ///     allocates no delegate and captures nothing.
@@ -45,6 +43,8 @@ internal sealed class ScopeRegistry<TKey, TScope>
 
     /// <summary>The cap, or zero for an unbounded registry.</summary>
     private readonly int _max;
+
+    private readonly ConcurrentDictionary<TKey, TScope> _scopes;
 
     private int _sweeping;
 
@@ -110,7 +110,7 @@ internal sealed class ScopeRegistry<TKey, TScope>
 
         try
         {
-            var target = count - _max + (_max / 8);
+            var target = count - _max + _max / 8;
 
             foreach (var (key, scope) in _scopes)
             {

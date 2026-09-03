@@ -4,13 +4,13 @@ using System.Net;
 using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Grpc.Core;
+using Grpc.Core.Interceptors;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
-using Grpc.Core;
-using Grpc.Core.Interceptors;
 using NResilience.Extensions;
 using NResilience.Grpc;
 using NResilience.Http;
@@ -153,7 +153,7 @@ internal static class Program
         // runtime - `loser is IAsyncDisposable` - which is exactly the shape a trimmer can break. No
         // hedge fires here (the callback is instant and the floor is 10 ms); what is being checked is
         // that the path compiles, runs, and returns the callback's answer.
-        var hedged = instant with { Hedge = Hedge.At(0.95) };
+        var hedged = instant with { Hedge = Hedge.At() };
         value = await hedged.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("library: the hedged execution path runs under AOT", value == Gate.Value);
 
@@ -184,7 +184,9 @@ internal static class Program
         var streamed = Resilience.Default.RunAsync(static ct => StreamGate.SuspendAsync(ct));
 
         await foreach (var item in streamed.ConfigureAwait(false))
+        {
             streamSum += item;
+        }
 
         failures += Check("library: the streaming path runs under AOT", streamSum == StreamGate.Items * StreamGate.Value);
 
@@ -649,7 +651,10 @@ internal static class Program
 
         failures += Check("the gRPC classifier resolves under AOT", GrpcResilience.Classifier.ClassifyException(unavailable).Kind == VerdictKind.Transient);
         failures += Check("a gRPC answer is permanent under AOT", GrpcResilience.Classifier.ClassifyException(notFound).Kind == VerdictKind.Permanent);
-        failures += Check("gRPC resource exhaustion is throttling under AOT", GrpcResilience.Classifier.ClassifyException(exhausted).Kind == VerdictKind.Throttled);
+
+        failures += Check("gRPC resource exhaustion is throttling under AOT",
+            GrpcResilience.Classifier.ClassifyException(exhausted).Kind == VerdictKind.Throttled);
+
         failures += Check("the gRPC preset validates under AOT", GrpcResilience.Default.Classify.Equals(GrpcResilience.Classifier));
 
         var method = new Method<string, string>(
@@ -745,7 +750,9 @@ internal static class Program
                    "request", new ClientInterceptorContext<string, string>(streamMethod, null, default), StreamContinuation))
         {
             while (await stream.ResponseStream.MoveNext(CancellationToken.None).ConfigureAwait(false))
+            {
                 received++;
+            }
         }
 
         // The streaming path is the one that hands a live enumerator across the boundary, and the
@@ -754,26 +761,6 @@ internal static class Program
         failures += Check("a gRPC server stream is retried to its first message under AOT", streams == 2 && received == 2);
 
         return failures;
-    }
-
-    /// <summary>A scripted response stream for the probe: fails before its first message, or streams.</summary>
-    private sealed class ProbeStream(string[]? messages) : IAsyncStreamReader<string>
-    {
-        private int _index = -1;
-
-        public string Current => messages![_index];
-
-        public Task<bool> MoveNext(CancellationToken cancellationToken)
-        {
-            if (messages is null)
-                return Task.FromException<bool>(new RpcException(new Status(StatusCode.Unavailable, "probe")));
-
-            if (_index + 1 >= messages.Length)
-                return Task.FromResult(false);
-
-            _index++;
-            return Task.FromResult(true);
-        }
     }
 
     private static async Task<int> BudgetsAsync()
@@ -903,6 +890,26 @@ internal static class Program
 
     private static void Log(string message) => Console.WriteLine(message);
 
+    /// <summary>A scripted response stream for the probe: fails before its first message, or streams.</summary>
+    private sealed class ProbeStream(string[]? messages) : IAsyncStreamReader<string>
+    {
+        private int _index = -1;
+
+        public string Current => messages![_index];
+
+        public Task<bool> MoveNext(CancellationToken cancellationToken)
+        {
+            if (messages is null)
+                return Task.FromException<bool>(new RpcException(new Status(StatusCode.Unavailable, "probe")));
+
+            if (_index + 1 >= messages.Length)
+                return Task.FromResult(false);
+
+            _index++;
+            return Task.FromResult(true);
+        }
+    }
+
     /// <summary>
     ///     Collects event IDs and categories. A real provider rather than a fake logger, because what is
     ///     being checked is that the generated record travels the whole way to one under AOT.
@@ -970,5 +977,4 @@ internal static class Program
             }
         }
     }
-
 }

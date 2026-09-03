@@ -58,8 +58,8 @@ public readonly record struct Hedge
     private const double DefaultSuppressAt = 0.5;
 
     private readonly int? _maxConcurrent;
-    private readonly int? _minimumSamples;
     private readonly TimeSpan? _minimumDelay;
+    private readonly int? _minimumSamples;
     private readonly double? _suppressAt;
     private readonly TimeSpan? _window;
 
@@ -182,19 +182,6 @@ public readonly record struct Hedge
     public WinRate? WinRate { get; init; }
 
     /// <summary>
-    ///     The way to configure hedging. There is deliberately no fixed-delay form - see the type's own
-    ///     documentation for why that omission is the feature.
-    /// </summary>
-    /// <param name="quantile">
-    ///     The quantile of recent latency to hedge at, between 0.5 and 1 exclusive. This is also the
-    ///     extra load: hedging at 0.95 costs about 5%.
-    /// </param>
-    /// <param name="maxConcurrent">How many attempts may be in flight at once, counting the first.</param>
-    /// <returns>The configuration.</returns>
-    public static Hedge At(double quantile = 0.95, int maxConcurrent = DefaultMaxConcurrent) =>
-        new() { Quantile = quantile, MaxConcurrent = maxConcurrent };
-
-    /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a hedge that names a default
     ///     explicitly equals one that left it alone.
     /// </summary>
@@ -208,6 +195,19 @@ public readonly record struct Hedge
         && Window == other.Window
         && SuppressAt.Equals(other.SuppressAt)
         && Nullable.Equals(WinRate, other.WinRate);
+
+    /// <summary>
+    ///     The way to configure hedging. There is deliberately no fixed-delay form - see the type's own
+    ///     documentation for why that omission is the feature.
+    /// </summary>
+    /// <param name="quantile">
+    ///     The quantile of recent latency to hedge at, between 0.5 and 1 exclusive. This is also the
+    ///     extra load: hedging at 0.95 costs about 5%.
+    /// </param>
+    /// <param name="maxConcurrent">How many attempts may be in flight at once, counting the first.</param>
+    /// <returns>The configuration.</returns>
+    public static Hedge At(double quantile = 0.95, int maxConcurrent = DefaultMaxConcurrent) =>
+        new() { Quantile = quantile, MaxConcurrent = maxConcurrent };
 
     /// <inheritdoc />
     public override int GetHashCode() =>

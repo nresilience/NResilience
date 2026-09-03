@@ -43,7 +43,8 @@ public sealed class SocketCrossCheckTests(ITestOutputHelper output)
     public static bool OnWindows => OperatingSystem.IsWindows();
 
     [Fact(
-        Skip = "Polly's arm does not measure repeatably on Windows - it read below the fused executor it wraps, which is not a result a machine can have. See OnWindows.",
+        Skip =
+            "Polly's arm does not measure repeatably on Windows - it read below the fused executor it wraps, which is not a result a machine can have. See OnWindows.",
         SkipWhen = nameof(OnWindows))]
     public async Task Real_socket_io_agrees_with_the_yield_gate()
     {

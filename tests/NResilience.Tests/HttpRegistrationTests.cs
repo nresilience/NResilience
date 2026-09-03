@@ -118,7 +118,7 @@ public sealed class HttpRegistrationTests
     public async Task A_client_can_use_a_policy_registered_by_name()
     {
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable, times: 3)
+            .Respond(HttpStatusCode.ServiceUnavailable, 3)
             .Respond(HttpStatusCode.OK);
 
         using var provider = Provider(

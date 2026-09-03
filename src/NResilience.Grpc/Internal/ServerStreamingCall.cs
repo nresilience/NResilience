@@ -7,8 +7,12 @@ namespace NResilience.Grpc.Internal;
 ///     One logical server-streaming call: the policy's streaming path runs around it, and this is
 ///     the thing that answers for it afterwards.
 ///     <para>
-///         The semantic is the core library's, unchanged: an attempt is <i>start the call and pull
-///         one message</i>, and the first message is the success point. Before it, a stream is
+///         The semantic is the core library's, unchanged: an attempt is
+///         <i>
+///             start the call and pull
+///             one message
+///         </i>
+///         , and the first message is the success point. Before it, a stream is
 ///         indistinguishable from a call - a reset, a deadline, a throttling reply - and the
 ///         classifier judges it. After it, every fault belongs to the consumer, because a retry
 ///         would duplicate messages they have already acted on.
@@ -54,14 +58,14 @@ internal sealed class ServerStreamingCall<TRequest, TResponse>
     private readonly Method<TRequest, TResponse> _method;
     private readonly GrpcResilienceOptions _options;
 
+    private readonly TRequest _request;
+
     /// <summary>
     ///     The call-scoped source. Cancelled by <see cref="Dispose" />, so a consumer who drops the
     ///     call - the ordinary way to stop reading a stream early - stops the enumeration rather than
     ///     leaving it running behind them.
     /// </summary>
     private readonly CancellationTokenSource _running;
-
-    private readonly TRequest _request;
 
     /// <summary>Whether the marker is stamped and read. Retrying calls only, as for HTTP.</summary>
     private readonly bool _stamping;
@@ -71,12 +75,11 @@ internal sealed class ServerStreamingCall<TRequest, TResponse>
 
     private bool _callDisposed;
     private volatile bool _complete;
-    private bool _sourceDisposed;
-    private bool _streamDone;
-    private bool _streamStarted;
 
     /// <summary>The reader the call object hands out, so disposing the call can stop it.</summary>
     private ResponseStream? _reader;
+
+    private bool _sourceDisposed;
 
     /// <summary>
     ///     The last attempt's status and trailers, read as that attempt is torn down - which is the
@@ -84,12 +87,14 @@ internal sealed class ServerStreamingCall<TRequest, TResponse>
     /// </summary>
     private Status? _status;
 
+    private bool _streamDone;
+    private bool _streamStarted;
+
     private Metadata? _trailers;
 
     internal ServerStreamingCall(
         TRequest request,
-        ClientInterceptorContext<TRequest, TResponse> context,
-        Interceptor.AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation,
+        ClientInterceptorContext<TRequest, TResponse> context, Interceptor.AsyncServerStreamingCallContinuation<TRequest, TResponse> continuation,
         Resilience policy,
         GrpcResilienceOptions options,
         bool retrying)
@@ -250,7 +255,9 @@ internal sealed class ServerStreamingCall<TRequest, TResponse>
         // Safe here and nowhere earlier: the policy's iterator has been disposed by the caller of
         // this method, so nothing is going to ask this source for another linked token.
         lock (_gate)
+        {
             _streamDone = true;
+        }
 
         DisposeSource();
     }
@@ -502,14 +509,18 @@ internal sealed class ServerStreamingCall<TRequest, TResponse>
             _enumerator ??= stream.GetAsyncEnumerator(cancellationToken);
 
             lock (_gate)
+            {
                 _reading = true;
+            }
 
             try
             {
                 if (await _enumerator.MoveNextAsync().ConfigureAwait(false))
                 {
                     lock (_gate)
+                    {
                         _reading = false;
+                    }
 
                     return true;
                 }

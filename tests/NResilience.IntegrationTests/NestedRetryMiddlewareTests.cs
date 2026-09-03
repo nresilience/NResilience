@@ -135,8 +135,7 @@ public sealed class NestedRetryMiddlewareTests
     {
         // The middle hop of a three-hop chain: this service received a marker from a retrying
         // caller, and its own outbound call is the one whose amplification was invisible until now.
-        await using var downstream = await LoopbackHttp.StartAsync(
-            (_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "ok")));
+        await using var downstream = await LoopbackHttp.StartAsync((_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "ok")));
 
         var events = new List<CallEventKind>();
         var policy = Resilience.Http with { OnEvent = e => events.Add(e.Kind) };
@@ -176,8 +175,7 @@ public sealed class NestedRetryMiddlewareTests
         // The negative control: same setup, no inbound header, and the outbound call reports no
         // nesting - which is what makes the positive test a claim about the marker rather than
         // about the setup.
-        await using var downstream = await LoopbackHttp.StartAsync(
-            (_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "ok")));
+        await using var downstream = await LoopbackHttp.StartAsync((_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "ok")));
 
         var events = new List<CallEventKind>();
         var policy = Resilience.Http with { OnEvent = e => events.Add(e.Kind) };

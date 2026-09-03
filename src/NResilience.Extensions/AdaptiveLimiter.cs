@@ -17,7 +17,7 @@ namespace NResilience.Extensions;
 /// <example>
 ///     <code>
 /// using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 });
-///
+/// 
 /// await policy.RunAsync(async ct =>
 /// {
 ///     using RateLimitLease lease = await limiter.AcquireOrThrowAsync(ct);
@@ -135,7 +135,9 @@ public sealed class AdaptiveLimiter : RateLimiter
         get
         {
             lock (_gate)
+            {
                 return (int)_limit;
+            }
         }
     }
 
@@ -145,7 +147,9 @@ public sealed class AdaptiveLimiter : RateLimiter
         get
         {
             lock (_gate)
+            {
                 return _inFlight;
+            }
         }
     }
 
@@ -161,7 +165,9 @@ public sealed class AdaptiveLimiter : RateLimiter
         get
         {
             lock (_gate)
+            {
                 return _inFlight > 0 || _queuedPermits > 0 ? null : _time.GetElapsedTime(_idleSince);
+            }
         }
     }
 
@@ -169,6 +175,7 @@ public sealed class AdaptiveLimiter : RateLimiter
     public override RateLimiterStatistics GetStatistics()
     {
         lock (_gate)
+        {
             return new RateLimiterStatistics
             {
                 CurrentAvailablePermits = Math.Max(0, (int)_limit - _inFlight),
@@ -176,6 +183,7 @@ public sealed class AdaptiveLimiter : RateLimiter
                 TotalSuccessfulLeases = _totalSuccessful,
                 TotalFailedLeases = _totalFailed,
             };
+        }
     }
 
     /// <inheritdoc />
@@ -261,8 +269,10 @@ public sealed class AdaptiveLimiter : RateLimiter
             throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount, "A permit count cannot be negative.");
 
         if (permitCount > _maximum)
+        {
             throw new ArgumentOutOfRangeException(nameof(permitCount), permitCount,
                 $"The limiter can never grant {permitCount} permits at once; its Maximum is {(int)_maximum}.");
+        }
     }
 
     /// <summary>Takes permits if the current limit has room. Caller holds <see cref="_gate" />.</summary>

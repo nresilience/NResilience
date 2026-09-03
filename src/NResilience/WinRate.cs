@@ -153,11 +153,6 @@ public readonly record struct WinRate
         init => _minimumAllowance = value;
     }
 
-    /// <summary>The way to configure win-rate feedback.</summary>
-    /// <param name="minimum">The fraction of hedges that has to win. Must be in <c>(0, 1)</c>.</param>
-    /// <returns>The configuration.</returns>
-    public static WinRate AtLeast(double minimum = DefaultMinimum) => new() { Minimum = minimum };
-
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
     ///     explicitly equals one that left it alone.
@@ -169,6 +164,11 @@ public readonly record struct WinRate
         && Window == other.Window
         && MinimumSamples == other.MinimumSamples
         && MinimumAllowance.Equals(other.MinimumAllowance);
+
+    /// <summary>The way to configure win-rate feedback.</summary>
+    /// <param name="minimum">The fraction of hedges that has to win. Must be in <c>(0, 1)</c>.</param>
+    /// <returns>The configuration.</returns>
+    public static WinRate AtLeast(double minimum = DefaultMinimum) => new() { Minimum = minimum };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Minimum, Window, MinimumSamples, MinimumAllowance);
@@ -224,7 +224,7 @@ public readonly record struct WinRate
     /// <returns>The relaxed allowance, capped at 1.</returns>
     internal double Relaxed(double allowance, long slices)
     {
-        var relaxed = allowance + (ReturnStep * slices);
+        var relaxed = allowance + ReturnStep * slices;
 
         return relaxed >= 1 || double.IsNaN(relaxed) ? 1 : relaxed;
     }

@@ -64,7 +64,7 @@ internal sealed class ResilienceExceptionHandler(IOptions<ResilienceExceptionHan
 
         await context.Response
             .WriteAsJsonAsync(problem, ResilienceProblemJsonContext.Default.ResilienceProblemDetails,
-                contentType: "application/problem+json", cancellationToken)
+                "application/problem+json", cancellationToken)
             .ConfigureAwait(false);
 
         return true;

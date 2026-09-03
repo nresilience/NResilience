@@ -1,9 +1,7 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
-using NResilience.Extensions;
 using NResilience.Testing;
 
 namespace NResilience.Tests;
@@ -18,6 +16,7 @@ public sealed class HealthCheckTests
     public async Task A_registered_policys_breaker_is_reported()
     {
         var breaker = new Breaker();
+
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilience());
@@ -36,7 +35,8 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task An_adaptive_breaker_reports_the_latency_it_measured()
     {
-        var breaker = new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above(3) });
+        var breaker = new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above() });
+
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilience());
@@ -62,6 +62,7 @@ public sealed class HealthCheckTests
     public async Task An_open_breaker_is_degraded_rather_than_unhealthy()
     {
         var breaker = Tripped();
+
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilience());
@@ -108,7 +109,8 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task A_retry_budgets_utilization_is_reported()
     {
-        var budget = RetryBudget.Of(fraction: 0.1, minimumPerSecond: 1);
+        var budget = RetryBudget.Of(0.1, 1);
+
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Budget = budget })
             .AddHealthChecks().AddResilience());
@@ -122,7 +124,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task An_exhausted_retry_budget_is_degraded()
     {
-        var budget = RetryBudget.Of(fraction: 0.1, minimumPerSecond: 1);
+        var budget = RetryBudget.Of(0.1, 1);
 
         // Drain it. The bucket banks ten seconds of the floor rate, so this empties it.
         while (budget.TrySpend())
@@ -169,7 +171,7 @@ public sealed class HealthCheckTests
         using var provider = Provider(services =>
         {
             services.AddHttpClient("api")
-                .AddResilience(policy: TestPolicy.InstantHttp)
+                .AddResilience(TestPolicy.InstantHttp)
                 .ConfigurePrimaryHttpMessageHandler(() => transport);
 
             services.AddHealthChecks().AddResilience();
@@ -193,7 +195,7 @@ public sealed class HealthCheckTests
         using var provider = Provider(services =>
         {
             services.AddHttpClient("api")
-                .AddResilience(policy: TestPolicy.InstantHttp)
+                .AddResilience(TestPolicy.InstantHttp)
                 .ConfigurePrimaryHttpMessageHandler(() => transport);
 
             services.AddHealthChecks().AddResilience(configure: o => o.IncludeHttpClients = false);
@@ -209,6 +211,7 @@ public sealed class HealthCheckTests
     public async Task A_breaker_from_a_static_field_can_be_watched_explicitly()
     {
         var breaker = Tripped();
+
         using var provider = Provider(services => services
             .AddHealthChecks().AddResilience(configure: o => o.Watch("payments", breaker)));
 
@@ -241,7 +244,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task The_check_registers_under_a_name_of_your_choosing()
     {
-        using var provider = Provider(services => services.AddHealthChecks().AddResilience(name: "nresilience"));
+        using var provider = Provider(services => services.AddHealthChecks().AddResilience("nresilience"));
 
         var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync();
 
@@ -283,7 +286,7 @@ public sealed class HealthCheckTests
             ProbeSuccesses = 1,
             BreakDuration = TimeSpan.FromSeconds(10),
             BreakJitter = Jitter.None,
-            Recovery = Recovery.Over(0.25),
+            Recovery = Recovery.Over(),
         });
 
         breaker.TryEnter(out _, out _);

@@ -4,7 +4,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NResilience;
 using NResilience.Grpc;
@@ -15,6 +14,7 @@ using Samples.Grpc;
 var server = WebApplication.CreateSlimBuilder();
 
 server.Logging.ClearProviders();
+
 server.WebHost.ConfigureKestrel(static options =>
 {
     // Port 0, h2c: gRPC needs HTTP/2, and cleartext keeps the sample free of certificate setup.
@@ -46,6 +46,7 @@ services
             AttemptTimeout = TimeSpan.FromSeconds(2),
             OnEvent = e => Console.WriteLine($"  {e}"),
         },
+
         // ChargeCard takes money. One attempt, whatever the transport says.
         options => options.IsRepeatable = static method => method.Name != "ChargeCard");
 
@@ -81,7 +82,9 @@ Console.WriteLine("A server stream is retried until its first message, and never
 using (var watch = client.Watch(new GetRequest { Id = "1" }))
 {
     await foreach (var update in watch.ResponseStream.ReadAllAsync())
+    {
         Console.WriteLine($"  -> {update.Event}");
+    }
 }
 
 Console.WriteLine($"  the stream took {FlakyOrders.Watches} attempt(s) to start, and none after it");
@@ -93,7 +96,9 @@ FlakyOrders.Reset();
 try
 {
     using (GrpcResilience.SingleShot())
+    {
         await client.GetAsync(new GetRequest { Id = "1" });
+    }
 }
 catch (RpcException failure)
 {
@@ -145,7 +150,9 @@ internal sealed class FlakyOrders : Orders.OrdersBase
             throw new RpcException(new Status(StatusCode.Unavailable, "the watch stream is not ready"));
 
         foreach (var name in new[] { "picked", "packed", "shipped" })
+        {
             await responseStream.WriteAsync(new WatchReply { Event = name }, context.CancellationToken);
+        }
     }
 
     public override Task<ChargeReply> ChargeCard(ChargeRequest request, ServerCallContext context)

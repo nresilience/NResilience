@@ -78,6 +78,7 @@ public sealed class ChaosTests
     public async Task An_injected_outcome_is_judged_by_the_result_rules_rather_than_thrown()
     {
         var chaos = new Chaos { Enabled = true, FaultRate = 1 };
+
         var work = chaos.Inject(
             static _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)),
             static () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
@@ -131,9 +132,9 @@ public sealed class ChaosTests
     [Fact]
     public async Task A_seeded_profile_injects_the_same_calls_every_run()
     {
-        var first = await CountInjections(seed: 1234);
-        var second = await CountInjections(seed: 1234);
-        var other = await CountInjections(seed: 9876);
+        var first = await CountInjections(1234);
+        var second = await CountInjections(1234);
+        var other = await CountInjections(9876);
 
         Assert.Equal(first, second);
         Assert.NotEmpty(first);
@@ -145,7 +146,7 @@ public sealed class ChaosTests
         {
             var chaos = new Chaos { Enabled = true, FaultRate = 0.5, Seed = seed };
             var injected = new List<int>();
-            var work = chaos.Inject<int>(_ => Task.FromResult(0));
+            var work = chaos.Inject(_ => Task.FromResult(0));
 
             for (var i = 0; i < 40; i++)
             {
@@ -167,7 +168,7 @@ public sealed class ChaosTests
     public async Task A_rate_of_one_half_injects_roughly_half()
     {
         var chaos = new Chaos { Enabled = true, FaultRate = 0.5, Seed = 42 };
-        var work = chaos.Inject<int>(static _ => Task.FromResult(0));
+        var work = chaos.Inject(static _ => Task.FromResult(0));
         var injected = 0;
 
         for (var i = 0; i < 2_000; i++)
@@ -213,7 +214,7 @@ public sealed class ChaosTests
     public async Task The_ValueTask_shape_is_wrapped_too()
     {
         var chaos = new Chaos { Enabled = true, FaultRate = 1 };
-        var work = chaos.Inject<int>(static _ => new ValueTask<int>(1));
+        var work = chaos.Inject(static _ => new ValueTask<int>(1));
 
         await Assert.ThrowsAsync<IOException>(async () => await work(CancellationToken.None));
     }

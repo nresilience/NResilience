@@ -102,8 +102,7 @@ public sealed class DeadlineMiddlewareTests
     {
         // The second hop, which must never be reached: a caller who has already given up does not get
         // a dependency contacted on their behalf.
-        await using var downstream = await LoopbackHttp.StartAsync(
-            (_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "reached")));
+        await using var downstream = await LoopbackHttp.StartAsync((_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "reached")));
 
         var policy = Resilience.Http with
         {
@@ -158,8 +157,7 @@ public sealed class DeadlineMiddlewareTests
     [Fact]
     public async Task The_second_hop_is_told_less_than_the_first_was()
     {
-        await using var downstream = await LoopbackHttp.StartAsync(
-            (_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "ok")));
+        await using var downstream = await LoopbackHttp.StartAsync((_, _) => Task.FromResult(LoopbackResponse.Text(HttpStatusCode.OK, "ok")));
 
         var policy = Resilience.Http with
         {

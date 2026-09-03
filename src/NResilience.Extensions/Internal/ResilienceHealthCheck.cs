@@ -24,7 +24,9 @@ internal sealed class ResilienceHealthCheck(
         if (policies is ResiliencePolicies registered)
         {
             foreach (var guard in registered.Guards())
+            {
                 Inspect(guard.Name, guard.Breaker, guard.Budget, data, ref tally);
+            }
         }
 
         if (options.IncludeHttpClients && handlers is not null)
@@ -32,15 +34,21 @@ internal sealed class ResilienceHealthCheck(
             foreach (var entry in handlers.Live())
             {
                 foreach (var breaker in entry.Value.BreakersByHost())
+                {
                     Inspect($"{entry.Key}:{breaker.Key}", breaker.Value, null, data, ref tally);
+                }
 
                 foreach (var budget in entry.Value.BudgetsByHost())
+                {
                     Inspect($"{entry.Key}:{budget.Key}", null, budget.Value, data, ref tally);
+                }
             }
         }
 
         foreach (var watched in options.Watched)
+        {
             Inspect(watched.Name, watched.Breaker, watched.Budget, data, ref tally);
+        }
 
         // HealthStatus orders Unhealthy (0) before Degraded (1) before Healthy (2), so the worst
         // status is the smallest one.

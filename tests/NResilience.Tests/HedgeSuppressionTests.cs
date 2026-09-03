@@ -39,8 +39,8 @@ public sealed class HedgeSuppressionTests
         var breaker = Breaking(time);
         var policy = Hedging(time, breaker, out var events);
 
-        await WarmAsync(policy, time, times: 20);
-        await FailAsync(policy, times: 8);
+        await WarmAsync(policy, time, 20);
+        await FailAsync(policy, 8);
 
         Assert.Equal(BreakerState.Closed, breaker.State);
 
@@ -62,8 +62,8 @@ public sealed class HedgeSuppressionTests
         var breaker = Breaking(time);
         var policy = Hedging(time, breaker, out var events);
 
-        await WarmAsync(policy, time, times: 20);
-        await FailAsync(policy, times: 2);
+        await WarmAsync(policy, time, 20);
+        await FailAsync(policy, 2);
 
         var race = await RaceAsync(policy, time);
 
@@ -81,10 +81,10 @@ public sealed class HedgeSuppressionTests
     {
         var time = new FakeTimeProvider();
         var breaker = Breaking(time);
-        var policy = Hedging(time, breaker, out var events, suppressAt: 1);
+        var policy = Hedging(time, breaker, out var events, 1);
 
-        await WarmAsync(policy, time, times: 20);
-        await FailAsync(policy, times: 8);
+        await WarmAsync(policy, time, 20);
+        await FailAsync(policy, 8);
 
         var race = await RaceAsync(policy, time);
 
@@ -101,11 +101,11 @@ public sealed class HedgeSuppressionTests
     public async Task A_single_failure_is_not_an_elevated_rate()
     {
         var time = new FakeTimeProvider();
-        var breaker = Breaking(time, minimumCalls: 2);
+        var breaker = Breaking(time, 2);
         var policy = Hedging(time, breaker, out var events, minimumSamples: 2);
 
-        await WarmAsync(policy, time, times: 2);
-        await FailAsync(policy, times: 1);
+        await WarmAsync(policy, time, 2);
+        await FailAsync(policy, 1);
 
         var race = await RaceAsync(policy, time);
 
@@ -134,8 +134,8 @@ public sealed class HedgeSuppressionTests
 
         var policy = Hedging(time, breaker, out var events);
 
-        await WarmAsync(policy, time, times: 20);
-        await FailAsync(policy, times: 8);
+        await WarmAsync(policy, time, 20);
+        await FailAsync(policy, 8);
 
         var race = await RaceAsync(policy, time);
 
@@ -164,12 +164,12 @@ public sealed class HedgeSuppressionTests
         for (var i = 0; i < 100; i++)
         {
             time.Advance(TimeSpan.FromSeconds(1));
-            await WarmAsync(policy, time, times: 1);
+            await WarmAsync(policy, time, 1);
         }
 
         Assert.NotNull(breaker.NormalFailureRate);
 
-        await FailAsync(policy, times: 4);
+        await FailAsync(policy, 4);
 
         // 4 failures over 5 minutes is a 3.8% baseline, so the trip point is 19% and the suppression
         // point half of that; the same 4 failures over 30 seconds is 12% of the trip window.
@@ -193,7 +193,7 @@ public sealed class HedgeSuppressionTests
     [InlineData(double.NaN)]
     public void A_suppression_point_outside_the_unit_interval_is_refused(double suppressAt)
     {
-        var policy = Resilience.Default with { Hedge = Hedge.At(0.95) with { SuppressAt = suppressAt } };
+        var policy = Resilience.Default with { Hedge = Hedge.At() with { SuppressAt = suppressAt } };
 
         var problem = Assert.Throws<ResilienceConfigurationException>(policy.Validate);
 
@@ -207,9 +207,9 @@ public sealed class HedgeSuppressionTests
     [Fact]
     public void Naming_the_default_suppression_point_changes_nothing()
     {
-        Assert.Equal(0.5, Hedge.At(0.95).SuppressAt);
-        Assert.Equal(Hedge.At(0.95), Hedge.At(0.95) with { SuppressAt = 0.5 });
-        Assert.NotEqual(Hedge.At(0.95), Hedge.At(0.95) with { SuppressAt = 1 });
+        Assert.Equal(0.5, Hedge.At().SuppressAt);
+        Assert.Equal(Hedge.At(), Hedge.At() with { SuppressAt = 0.5 });
+        Assert.NotEqual(Hedge.At(), Hedge.At() with { SuppressAt = 1 });
     }
 
     // ---- Helpers ----
@@ -241,7 +241,7 @@ public sealed class HedgeSuppressionTests
         var recorder = new EventRecorder();
         events = recorder;
 
-        var hedge = Hedge.At(0.95) with { Window = Window };
+        var hedge = Hedge.At() with { Window = Window };
 
         if (suppressAt is { } fraction)
             hedge = hedge with { SuppressAt = fraction };
@@ -281,7 +281,9 @@ public sealed class HedgeSuppressionTests
         var once = policy with { Attempts = 1, Hedge = null, OnEvent = null };
 
         for (var i = 0; i < times; i++)
+        {
             await once.TryRunAsync(_ => Task.FromException<int>(new IOException()));
+        }
     }
 
     /// <summary>

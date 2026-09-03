@@ -23,7 +23,7 @@ namespace NResilience;
 ///     <code>
 /// // Inbound: the deadline a caller sent us, for the length of this request.
 /// using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(200));
-///
+/// 
 /// // Anything running inside the scope with UseAmbientDeadline set is bounded by whichever of the
 /// // two deadlines is tighter.
 /// var policy = Resilience.Default with { UseAmbientDeadline = true };
@@ -154,7 +154,10 @@ public static class ResilienceDeadline
     {
         private readonly Ambient? _previous;
 
-        internal DeadlineScope(Ambient? previous) => _previous = previous;
+        internal DeadlineScope(Ambient? previous)
+        {
+            _previous = previous;
+        }
 
         /// <summary>Restores the previous ambient deadline.</summary>
         public void Dispose() => Current.Value = _previous;

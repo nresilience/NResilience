@@ -12,9 +12,9 @@ namespace NResilience.Internal;
 ///         identity, which the record's equality cannot see.
 ///     </para>
 ///     <para>
-///     The automatic per-policy retry budget lives here for the same reason, and the table's lifetime
-///     gives it exactly the scope the design needs: it is created on the policy's first execution and
-///     collected with the policy, so it is private to that instance without a field ever holding it.
+///         The automatic per-policy retry budget lives here for the same reason, and the table's lifetime
+///         gives it exactly the scope the design needs: it is created on the policy's first execution and
+///         collected with the policy, so it is private to that instance without a field ever holding it.
 ///     </para>
 /// </summary>
 internal sealed class ExecutionState
@@ -39,7 +39,7 @@ internal sealed class ExecutionState
 
     private readonly RetryBudget? _automaticBudget;
 
-    private readonly LatencyWindow? _latency;
+    private readonly LatencyWindow? _backoffBase;
 
     private readonly LatencyWindow? _ceiling;
 
@@ -49,21 +49,21 @@ internal sealed class ExecutionState
     /// </summary>
     private readonly AttemptCeiling? _ceilingSettings;
 
-    private readonly LatencyWindow? _backoffBase;
+    private readonly LatencyWindow? _latency;
 
     private readonly WinWindow? _winRate;
-
-    /// <summary>
-    ///     The last measured ceiling reported for this policy instance, in ticks. Zero until one is,
-    ///     which no real ceiling can be.
-    /// </summary>
-    private long _lastCeilingTicks;
 
     /// <summary>
     ///     The last measured backoff base reported for this policy instance, in ticks. Zero until one
     ///     is, which no real base can be.
     /// </summary>
     private long _lastBackoffBaseTicks;
+
+    /// <summary>
+    ///     The last measured ceiling reported for this policy instance, in ticks. Zero until one is,
+    ///     which no real ceiling can be.
+    /// </summary>
+    private long _lastCeilingTicks;
 
     private ExecutionState(Resilience policy)
     {

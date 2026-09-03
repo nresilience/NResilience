@@ -17,7 +17,7 @@ namespace NResilience.Testing;
 /// <example>
 ///     <code>
 /// var chaos = new Chaos { Enabled = true, FaultRate = 0.1, LatencyRate = 0.2, Latency = TimeSpan.FromSeconds(2) };
-///
+/// 
 /// var result = await policy.TryRunAsync(chaos.Inject(ct => dependency.CallAsync(ct)), cancellationToken);
 /// </code>
 /// </example>
