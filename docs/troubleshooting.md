@@ -208,4 +208,15 @@ See [Configuration](di/configuration.md) for the bindable shape and [Logging in 
 
 Each policy logs under `NResilience.<name>`, so you can silence one client without touching the others. To turn the listener off for a policy, set `"Logging": "Off"` in its section.
 
-See [Filter per policy](di/logging.md#filter-per-policy).
+To keep the detail without the volume, sample the steady state instead: `services.AddResilienceLogging(o => o.Sampling = LogSampling.OneIn(20))` writes one traffic record in twenty while a policy is healthy and every record for a minute after its breaker opens.
+
+See [Filter per policy](di/logging.md#filter-per-policy) and [Sample the steady state](features/logging.md#sample-the-steady-state).
+
+### Symptom: A retry sequence is missing records in the middle.
+
+> [!CAUTION] Quick fix
+> If `Sampling` is set, set `KeepOneIn` to `1` for the run: `services.AddResilienceLogging(o => o.Sampling = LogSampling.OneIn(1))`.
+
+Sampling drops the traffic-proportional records - the per-attempt records, the per-call records and the hedge records - while the policy is healthy, and nothing counts what it dropped. Breaker transitions, rejections and first sightings are never sampled, so a gap that stops at the attempt records is this and not a lost event.
+
+See [Sample the steady state](features/logging.md#sample-the-steady-state).

@@ -31,7 +31,13 @@ Three noise types use three different mechanisms, because each has a different s
 - **Footguns** (`OrphanedWork` and `NestedRetry`) are configuration errors, not events. Each warns the first time it is detected for a policy and stays quiet after, because a repeated warning adds no information.
 - **Unretried exception types** are first-sighting events. Event 1007 names an exception type the first time a policy declines to retry it. HTTP status codes are classified from responses and arrive without exceptions, so they follow the quiet path even for the ten thousandth 404.
 
-The suppression state is why the listener is stateful: it holds the per-policy, per-reason window and the first-sighting flags. This is also why at most one log listener attaches per policy, and the first one attached wins.
+Sampling is the only opt-in mechanism because it is the only one that loses information. The other three are shaped by the noise they throttle; sampling is shaped by the fact that a profile is chosen at registration and an incident does not trigger a redeploy. It keeps one traffic record in `KeepOneIn` while the policy is healthy, and every record for `IncidentWindow` after a breaker opens or starts refusing calls.
+
+The count is **exact rather than random**, so a test asserting what a policy logged has no seed in it and two processes at the same traffic write the same number of lines. The window opens **from the event rather than from the written record**, so an incident whose warning the sink is not carrying still restores the detail. And the window is opened by three IDs rather than by everything at `Warning`: `OrphanedWork`, `NestedRetry` and `NotRetriedFirstSighting` recur for the life of the process, and a window they hold open is sampling turned off implicitly.
+
+The failure mode is the honest one: sampling drops records rather than demoting them, and nothing counts what it dropped. That is the trade, and `KeepOneIn = 1` is the way out of it for a run that has to be complete.
+
+The suppression state is why the listener is stateful: it holds the per-policy, per-reason window, the first-sighting flags and the sampling counters. This is also why at most one log listener attaches per policy, and the first one attached wins.
 
 ## What the records do not carry
 

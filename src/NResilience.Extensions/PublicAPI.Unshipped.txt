@@ -148,6 +148,15 @@ NResilience.Extensions.IResiliencePolicies.Names.get -> System.Collections.Gener
 NResilience.Extensions.IResiliencePolicies.TryGet(string! name, out NResilience.Resilience! policy) -> bool
 NResilience.Extensions.IResiliencePolicies.this[string! name].get -> NResilience.Resilience!
 NResilience.Extensions.Limit
+NResilience.Extensions.LogSampling
+NResilience.Extensions.LogSampling.Equals(NResilience.Extensions.LogSampling other) -> bool
+NResilience.Extensions.LogSampling.IncidentWindow.get -> System.TimeSpan
+NResilience.Extensions.LogSampling.IncidentWindow.init -> void
+NResilience.Extensions.LogSampling.KeepOneIn.get -> int
+NResilience.Extensions.LogSampling.KeepOneIn.init -> void
+NResilience.Extensions.LogSampling.LogSampling() -> void
+NResilience.Extensions.LogSampling.MinimumSamples.get -> int
+NResilience.Extensions.LogSampling.MinimumSamples.init -> void
 NResilience.Extensions.RateLimitOptions
 NResilience.Extensions.RateLimitOptions.Adaptive.get -> NResilience.Extensions.AdaptiveLimitOptions?
 NResilience.Extensions.RateLimitOptions.Adaptive.set -> void
@@ -210,6 +219,8 @@ NResilience.Extensions.ResilienceLoggingOptions.Profile.set -> void
 NResilience.Extensions.ResilienceLoggingOptions.RepeatWindow.get -> System.TimeSpan
 NResilience.Extensions.ResilienceLoggingOptions.RepeatWindow.set -> void
 NResilience.Extensions.ResilienceLoggingOptions.ResilienceLoggingOptions() -> void
+NResilience.Extensions.ResilienceLoggingOptions.Sampling.get -> NResilience.Extensions.LogSampling?
+NResilience.Extensions.ResilienceLoggingOptions.Sampling.set -> void
 NResilience.Extensions.ResilienceOptions
 NResilience.Extensions.ResilienceOptions.Adaptive.get -> bool?
 NResilience.Extensions.ResilienceOptions.Adaptive.set -> void
@@ -269,11 +280,14 @@ NResilience.Extensions.WinRateOptions.WinRateOptions() -> void
 NResilience.Extensions.WinRateOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.WinRateOptions.Window.set -> void
 const Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExtensions.DefaultName = "resilience" -> string!
+const NResilience.Extensions.LogSampling.DefaultKeepOneIn = 20 -> int
 const NResilience.Extensions.ResilienceLogging.CategoryPrefix = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.ActivitySourceName = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.MeterName = "NResilience" -> string!
 override NResilience.Extensions.AdaptiveLimiter.GetStatistics() -> System.Threading.RateLimiting.RateLimiterStatistics!
 override NResilience.Extensions.AdaptiveLimiter.IdleDuration.get -> System.TimeSpan?
+override NResilience.Extensions.LogSampling.GetHashCode() -> int
+override NResilience.Extensions.LogSampling.ToString() -> string!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, Microsoft.Extensions.Configuration.IConfiguration! section) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Action<NResilience.Extensions.RateLimitOptions!>! configure) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
 static Microsoft.Extensions.DependencyInjection.RateLimitHttpClientBuilderExtensions.AddRateLimit(this Microsoft.Extensions.DependencyInjection.IHttpClientBuilder! builder, System.Threading.RateLimiting.RateLimiter! limiter, string? name = null) -> Microsoft.Extensions.DependencyInjection.IHttpClientBuilder!
@@ -290,6 +304,9 @@ static NResilience.Extensions.Limit.Adaptive(NResilience.Extensions.AdaptiveLimi
 static NResilience.Extensions.Limit.Concurrency(int permits, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
 static NResilience.Extensions.Limit.PerSecond(int permits, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
 static NResilience.Extensions.Limit.PerWindow(int permits, System.TimeSpan window, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!
+static NResilience.Extensions.LogSampling.OneIn(int keepOneIn = 20) -> NResilience.Extensions.LogSampling
+static NResilience.Extensions.LogSampling.operator !=(NResilience.Extensions.LogSampling left, NResilience.Extensions.LogSampling right) -> bool
+static NResilience.Extensions.LogSampling.operator ==(NResilience.Extensions.LogSampling left, NResilience.Extensions.LogSampling right) -> bool
 static NResilience.Extensions.RateLimiterExtensions.AcquireOrThrowAsync(this System.Threading.RateLimiting.RateLimiter! limiter, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Threading.RateLimiting.RateLimitLease!>
 static NResilience.Extensions.RateLimiterExtensions.AcquireOrThrowAsync(this System.Threading.RateLimiting.RateLimiter! limiter, string? name, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Threading.RateLimiting.RateLimitLease!>
 static NResilience.Extensions.RateLimiterExtensions.AcquireOrThrowAsync<TKey>(this System.Threading.RateLimiting.PartitionedRateLimiter<TKey>! limiter, TKey key, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<System.Threading.RateLimiting.RateLimitLease!>
@@ -302,3 +319,4 @@ static NResilience.Extensions.ResilienceTelemetry.ActivitySource.get -> System.D
 static NResilience.Extensions.ResilienceTelemetry.Listener.get -> System.Action<NResilience.CallEvent>!
 static NResilience.Extensions.ResilienceTelemetry.Meter.get -> System.Diagnostics.Metrics.Meter!
 static NResilience.Extensions.ResilienceTelemetry.WithTelemetry(this NResilience.Resilience! policy) -> NResilience.Resilience!
+~override NResilience.Extensions.LogSampling.Equals(object obj) -> bool

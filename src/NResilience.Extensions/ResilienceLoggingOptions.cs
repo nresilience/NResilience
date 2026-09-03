@@ -31,7 +31,7 @@ public enum ResilienceLogProfile
 }
 
 /// <summary>
-///     The knobs on the log listener. Four members, because the fifth thing anybody wants is the
+///     The knobs on the log listener. Five members, because the sixth thing anybody wants is the
 ///     platform's category filter and that is not this library's to own.
 /// </summary>
 /// <example>
@@ -57,6 +57,17 @@ public sealed class ResilienceLoggingOptions
     ///     for one failure and the one the caller cares about is the last.
     /// </summary>
     public bool IncludeStackTracesOnRetry { get; set; }
+
+    /// <summary>
+    ///     Keeps a share of the traffic-proportional records while the policy is healthy and all of
+    ///     them for a window after an incident, or null to keep every record. Off by default.
+    ///     <para>
+    ///         <c>LogSampling.OneIn(20)</c> is a complete configuration. It changes what is written, not
+    ///         what level it is written at, so it composes with <see cref="Profile" /> and with the
+    ///         platform's category filter rather than replacing either.
+    ///     </para>
+    /// </summary>
+    public LogSampling? Sampling { get; set; }
 
     /// <summary>
     ///     The level for one record, or null to keep <see cref="Profile" />'s.

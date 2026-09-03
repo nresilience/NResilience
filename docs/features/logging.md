@@ -106,6 +106,36 @@ The feature exists to handle pathological states; three noise types use three di
 - **Footguns.** `OrphanedWork` and `NestedRetry` are configuration errors. Each warns the first time it is detected for a policy and remains quiet thereafter.
 - **Unretried exception types.** Event 1007 names an exception type the first time a policy declines to retry it. HTTP status codes are classified from responses and arrive without exceptions, so they follow the quiet path even for the ten thousandth 404.
 
+## Sample the steady state
+
+The most valuable records occur during an incident, but the cost is the steady-state volume. A profile is chosen at registration and cannot make this trade, so `Sampling` handles it per call instead: **opt-in**, off until you set it.
+
+<!-- snippet: logging-sampling -->
+```csharp
+// One call in twenty is written while the policy is healthy, and every record for a minute
+// after its breaker opens or starts refusing calls. The first 20 of each record are written
+// in full whatever happens, so a development run logs exactly as it did before.
+services.AddResilienceLogging(o => o.Sampling = LogSampling.OneIn(keepOneIn: 20));
+```
+<!-- endsnippet -->
+
+`LogSampling.OneIn(20)` keeps one traffic record in twenty while the policy is healthy and every record for a minute after an incident. Three knobs, and the first is the only one most callers set.
+
+| Property | Default | What it does |
+| :--- | :--- | :--- |
+| `KeepOneIn` | none - you supply it | One traffic record in this many is kept while the policy is healthy. `1` is no sampling. |
+| `IncidentWindow` | 1 minute | How long after an incident every record is kept, measured from the most recent one. |
+| `MinimumSamples` | 20 | How many of each record are written in full before sampling starts. |
+
+**What is sampled** is the records whose volume is proportional to traffic: events 1000-1005 and the three hedge records, 1022-1024. Breaker transitions, first sightings, rejections, adapted estimates and policy resolution are never sampled - each is already one line per event rather than one line per call.
+
+**What opens the window** is a breaker opening (1013) or a call refused by a breaker or by the retry budget (1010, 1011). Footguns and first-sighting exception types do not, because they recur for the life of the process and a window they hold open is sampling turned off without saying so. The window opens on the event rather than on the written record, so an incident whose warning your filter is not carrying still restores the detail.
+
+The counting is exact rather than random: every twentieth record, counted per record and per policy. Two processes at the same traffic write the same number of lines, and an HTTP client with a policy per host samples each host on its own.
+
+> [!IMPORTANT]
+> Sampling drops records. Unlike the rejection repeat window it does not demote them, and no count of what it dropped reaches the log. When you need one call followed attempt by attempt - a reproduction, an integration test - set `KeepOneIn` to `1` for the run.
+
 ## Correlate interleaved records
 
 A busy process interleaves `Debug` records from many concurrent calls of the same policy. The records carry no call identity, so use trace and span IDs to line them up.

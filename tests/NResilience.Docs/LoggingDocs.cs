@@ -117,6 +117,25 @@ public sealed class LoggingDocs
     }
 
     [Fact]
+    public void Sampling_keeps_a_share_of_the_steady_state()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+
+        // <snippet:logging-sampling>
+        // One call in twenty is written while the policy is healthy, and every record for a minute
+        // after its breaker opens or starts refusing calls. The first 20 of each record are written
+        // in full whatever happens, so a development run logs exactly as it did before.
+        services.AddResilienceLogging(o => o.Sampling = LogSampling.OneIn(keepOneIn: 20));
+
+        // </snippet:logging-sampling>
+
+        services.AddResilience(name: "payments", policy: Resilience.Http);
+
+        Assert.NotNull(@object: services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()[name: "payments"].OnEvent);
+    }
+
+    [Fact]
     public void Interleaved_records_correlate_on_the_trace_id()
     {
         var services = new ServiceCollection();

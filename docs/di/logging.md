@@ -65,6 +65,8 @@ Set the profile per policy from a section, or for the whole process with `AddRes
 
 An explicit `WithLogging` call in a `configure` callback overrides the automatic listener added by a container.
 
+`AddResilienceLogging` also sets the process-wide knobs a section does not carry, including sampling: `services.AddResilienceLogging(o => o.Sampling = LogSampling.OneIn(20))` keeps one twentieth of the steady state and all of an incident. A section that overrides `Logging` for one policy keeps those knobs. See [Sample the steady state](../features/logging.md#sample-the-steady-state).
+
 ## Provenance
 
 Binding a configuration section is silently partial. Event 1020 reports the effective policy once per resolution at `Debug`; a reload produces a new entry, showing exactly what changed.

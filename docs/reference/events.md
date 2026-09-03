@@ -75,6 +75,8 @@ The `OnEvent` listener runs synchronously on the [executor's](index.md) thread.
 
 These are the `ILogger` records a registered policy writes. An event ID is a contract the moment an alert is built on it, so the numbers below are stable and gated by a test. See [Logging in DI](../di/logging.md) for how to filter them.
 
+Every record is written every time unless you opt into [sampling](../features/logging.md#sample-the-steady-state), which thins IDs 1000-1005 and 1022-1024 while the policy is healthy and leaves the rest alone.
+
 | ID | Name | `Default` | `Verbose` | Message |
 | :--- | :--- | :--- | :--- | :--- |
 | 1000 | `AttemptSucceeded` | `Trace` | `Information` | `{Policy} attempt {Attempt} succeeded in {ElapsedMs} ms` |

@@ -255,6 +255,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             {
                 Profile = profile,
                 RepeatWindow = _logging.RepeatWindow,
+                Sampling = _logging.Sampling,
                 IncludeStackTracesOnRetry = _logging.IncludeStackTracesOnRetry,
                 Level = _logging.Level,
             };

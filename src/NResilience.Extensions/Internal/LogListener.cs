@@ -21,6 +21,13 @@ internal sealed class LogListener
     /// </summary>
     private const int MaxKeys = 64;
 
+    /// <summary>
+    ///     How many record IDs the sampling counters cover, starting at
+    ///     <see cref="Log.Codes.AttemptSucceeded" />. An ID past the end is never sampled, which is the
+    ///     safe direction: a record the counters cannot reach is written rather than dropped.
+    /// </summary>
+    private const int SamplingSlots = 32;
+
     private readonly ILogger _logger;
     private readonly ResilienceLoggingOptions _options;
 
@@ -32,11 +39,40 @@ internal sealed class LogListener
     /// <summary>Rejection windows, keyed by policy name and reason - so one bad host does not silence another.</summary>
     private readonly ConcurrentDictionary<string, Window> _windows = new(StringComparer.Ordinal);
 
+    /// <summary>
+    ///     Read once at construction rather than per event: a null here is the whole cost of the feature
+    ///     for a caller who did not configure it.
+    /// </summary>
+    private readonly LogSampling? _sampling;
+
+    /// <summary>How many of each sampled record this listener has seen. Null when sampling is off.</summary>
+    private readonly long[]? _counts;
+
+    /// <summary>When the current incident window closes, as a <see cref="TimeProvider.GetTimestamp" /> value.</summary>
+    private long _incidentUntil;
+
     internal LogListener(ILogger logger, ResilienceLoggingOptions options, TimeProvider? time = null)
     {
         _logger = logger;
         _options = options;
         _time = time ?? TimeProvider.System;
+
+        if (options.Sampling is { } sampling)
+        {
+            var problems = new List<string>();
+            sampling.Validate(problems);
+
+            if (problems.Count > 0)
+                throw new ResilienceConfigurationException(problems);
+
+            // KeepOneIn of 1 keeps everything, so it costs nothing to notice that here and take the
+            // same path as no sampling at all.
+            if (sampling.KeepOneIn > 1)
+            {
+                _sampling = sampling;
+                _counts = new long[SamplingSlots];
+            }
+        }
     }
 
     /// <summary>The listener, as the delegate <see cref="Resilience.OnEvent" /> takes.</summary>
@@ -280,8 +316,79 @@ internal sealed class LogListener
         if (_options.Level is { } custom)
             level = custom(id, e) ?? level;
 
-        return level == LogLevel.None || !_logger.IsEnabled(level) ? null : level;
+        // The window is opened from the event rather than from the written record, and before the
+        // enabled check, so an incident whose warning the sink is not carrying still turns sampling
+        // off for the minute that follows it.
+        if (_sampling is { } sampling && IsIncident(id.Id))
+        {
+            var window = (long)(sampling.IncidentWindow.TotalSeconds * _time.TimestampFrequency);
+            Interlocked.Exchange(ref _incidentUntil, _time.GetTimestamp() + window);
+        }
+
+        if (level == LogLevel.None || !_logger.IsEnabled(level))
+            return null;
+
+        return _sampling is { } active && !Keep(active, id.Id) ? null : level;
     }
+
+    /// <summary>
+    ///     Whether sampling keeps this record. A record that is not proportional to traffic is never
+    ///     sampled, and inside an incident window nothing is.
+    /// </summary>
+    /// <remarks>
+    ///     The count is exact rather than random - every <c>KeepOneIn</c>th record, counted per record -
+    ///     so a test asserting what a policy logged does not have a seed in it, and two processes at the
+    ///     same traffic write the same number of lines. It counts records the sink would have carried
+    ///     rather than events, so raising the category filter does not change what survives sampling.
+    /// </remarks>
+    private bool Keep(in LogSampling sampling, int id)
+    {
+        var slot = id - Log.Codes.AttemptSucceeded;
+
+        if (!IsTraffic(id) || (uint)slot >= (uint)_counts!.Length)
+            return true;
+
+        if (_time.GetTimestamp() < Interlocked.Read(ref _incidentUntil))
+            return true;
+
+        var seen = Interlocked.Increment(ref _counts[slot]);
+
+        return seen <= sampling.MinimumSamples || seen % sampling.KeepOneIn == 0;
+    }
+
+    /// <summary>
+    ///     What opens the incident window: the breaker opening, and either rejection reason. Three IDs
+    ///     rather than "everything at <c>Warning</c>", because the other three warnings do not end.
+    ///     <see cref="Log.Codes.OrphanedWork" /> and <see cref="Log.Codes.NestedRetry" /> are
+    ///     configuration errors that recur on every call, and
+    ///     <see cref="Log.Codes.NotRetriedFirstSighting" /> is raised for a dependency answering "no"
+    ///     steadily and correctly - each of them would hold the window open for the life of the process
+    ///     and turn sampling off without saying so.
+    /// </summary>
+    private static bool IsIncident(int id) =>
+        id is Log.Codes.BreakerOpened
+            or Log.Codes.RejectedDependencyUnavailable
+            or Log.Codes.RejectedBudgetExhausted;
+
+    /// <summary>
+    ///     The records whose volume is proportional to traffic, and so the only ones sampling touches.
+    ///     Everything left out is already one line per event rather than one line per call: the
+    ///     transitions, the first sightings, the adapted estimates, the rejection warnings the repeat
+    ///     window already throttles, and the terminal failures the caller is about to see thrown.
+    /// </summary>
+    private static bool IsTraffic(int id) => id switch
+    {
+        Log.Codes.AttemptSucceeded => true,
+        Log.Codes.AttemptFailed => true,
+        Log.Codes.AttemptLimited => true,
+        Log.Codes.Retrying => true,
+        Log.Codes.CallSucceeded => true,
+        Log.Codes.CallSucceededAfterRetries => true,
+        Log.Codes.HedgeStarted => true,
+        Log.Codes.HedgeWon => true,
+        Log.Codes.HedgeDiscarded => true,
+        _ => false,
+    };
 
     /// <summary>
     ///     A record's level is set by what its volume is proportional to: traffic is <c>Trace</c> or
