@@ -232,7 +232,13 @@ public sealed class Classifier
             }
         }
 
-        ResultJudge<T>.Cache = new ResultJudge<T>.Entry(this, judge);
+        // Published with a barrier, so a reader on another thread cannot observe the reference
+        // before the Owner and Judge fields it was constructed with. Same rule as LatencyWindow's
+        // memo, which publishes the same shape of immutable single-slot answer the same way; this
+        // is the cold path, so the barrier costs nothing measurable. The read stays a plain load:
+        // `cached.Owner` is an address-dependent load off `cached` and is ordered on every
+        // architecture the library targets.
+        Volatile.Write(ref ResultJudge<T>.Cache, new ResultJudge<T>.Entry(this, judge));
         return judge is null ? Verdict.Ok : judge(value);
     }
 

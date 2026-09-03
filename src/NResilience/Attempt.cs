@@ -4,7 +4,14 @@ using System.Text;
 namespace NResilience;
 
 /// <summary>Why a call stopped.</summary>
-public enum StopReason
+/// <remarks>
+///     Byte-backed for the same reason as <see cref="CallEventKind" />: it is stored in
+///     <see cref="CallEvent" />, which is copied by value into every listener on every event, and it
+///     is a local live across the attempt <c>await</c> in all four execution loops. See that enum for
+///     the rule the library applies - the backing type follows where the enum is stored, not whether
+///     it is public.
+/// </remarks>
+public enum StopReason : byte
 {
     /// <summary>An attempt returned a result the classifier called <see cref="VerdictKind.Ok" />.</summary>
     Succeeded,

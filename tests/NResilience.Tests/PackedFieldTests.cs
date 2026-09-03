@@ -116,8 +116,10 @@ public sealed class PackedFieldTests
     }
 
     /// <summary>
-    ///     <see cref="StopReason.Succeeded" /> is the zero of its enum, so a biased byte is what keeps it
-    ///     distinguishable from "nothing has stopped yet".
+    ///     <see cref="StopReason.Succeeded" /> is the zero of its enum, so "the call succeeded" has to
+    ///     stay distinguishable from "nothing has stopped yet". A byte-backed enum behind a
+    ///     <c>StopReason?</c> gets that from the nullable's own has-value byte, in two bytes; the biased
+    ///     byte this replaced got it in one, and had to reserve a value to do so.
     /// </summary>
     [Fact]
     public void The_first_stop_reason_is_not_mistaken_for_no_reason()
@@ -127,29 +129,30 @@ public sealed class PackedFieldTests
     }
 
     /// <summary>
-    ///     <see cref="CallEvent.Kind" /> is stored in a byte, so every member of the enum has to fit in
-    ///     one. This is the assertion that fails when the twenty-first kind is added past 255.
+    ///     Both enums stored in a <see cref="CallEvent" /> are byte-backed, which is what keeps the struct
+    ///     at 64 bytes and makes a 256th member a compile error rather than a test failure. This asserts
+    ///     the backing type itself, because it is the declaration a future change would quietly widen.
     /// </summary>
     [Fact]
-    public void Every_event_kind_fits_the_byte_it_is_stored_in()
+    public void The_enums_a_call_event_stores_are_byte_backed()
     {
-        foreach (var kind in Enum.GetValues<CallEventKind>())
-        {
-            Assert.InRange((int)kind, 0, byte.MaxValue);
-            Assert.Equal(kind, CallEvent.Create(kind).Kind);
-        }
+        Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(CallEventKind)));
+        Assert.Equal(typeof(byte), Enum.GetUnderlyingType(typeof(StopReason)));
     }
 
     /// <summary>
-    ///     And every <see cref="StopReason" /> has to fit in a byte with one value to spare, because the
-    ///     event stores it biased by one.
+    ///     And every member of each still round-trips through the struct that stores it.
     /// </summary>
     [Fact]
-    public void Every_stop_reason_fits_the_byte_it_is_stored_in()
+    public void Every_event_kind_and_stop_reason_round_trips()
     {
+        foreach (var kind in Enum.GetValues<CallEventKind>())
+        {
+            Assert.Equal(kind, CallEvent.Create(kind).Kind);
+        }
+
         foreach (var reason in Enum.GetValues<StopReason>())
         {
-            Assert.InRange((int)reason, 0, byte.MaxValue - 1);
             Assert.Equal(reason, CallEvent.Create(CallEventKind.Succeeded, reason: reason).Reason);
         }
     }

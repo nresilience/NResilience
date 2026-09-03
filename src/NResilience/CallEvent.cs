@@ -4,7 +4,16 @@ namespace NResilience;
 ///     What happened. One enum, so a listener can <c>switch</c> on it rather than subscribe to a
 ///     family of differently-shaped argument types.
 /// </summary>
-public enum CallEventKind
+/// <remarks>
+///     Byte-backed because it is stored in <see cref="CallEvent" />, which is copied by value into
+///     every listener on every event. The backing type of an enum in this library follows where the
+///     enum is <i>stored</i>, not whether it is public: the cold ones - <see cref="BreakerState" />,
+///     <see cref="Jitter" />, <see cref="BackoffKind" /> - stay <c>int</c>-backed, because they live
+///     in per-policy configuration that is copied once. Declaring the width here rather than
+///     narrowing at the storage site also makes "a 256th member does not fit" a compile error
+///     instead of a test.
+/// </remarks>
+public enum CallEventKind : byte
 {
     /// <summary>
     ///     An attempt finished, whatever the verdict. Exactly one of these fires per attempt, and it
@@ -183,11 +192,12 @@ public enum CallEventKind
 ///     <see cref="Result" />, which boxes a value-type result and is populated only when a listener is
 ///     actually attached.
 ///     <para>
-///         Its size is what a raised event costs to copy, so the three fields that would naturally be
-///         nullable value types - <see cref="Delay" />, <see cref="Reason" /> and
-///         <see cref="NResilience.Verdict.RetryAfter" /> inside <see cref="Verdict" /> - are stored
-///         biased-by-one instead, and <see cref="Kind" /> is stored as a byte. Every public property
-///         keeps the type a listener expects; the struct measures 64 bytes rather than 88.
+///         Its size is what a raised event costs to copy, so <see cref="Delay" /> and
+///         <see cref="NResilience.Verdict.RetryAfter" /> inside <see cref="Verdict" /> - both of which
+///         would naturally be nullable value types - are stored biased-by-one behind properties of the
+///         original type. <see cref="Reason" /> needs no such trick: <see cref="StopReason" /> is
+///         byte-backed, so <c>StopReason?</c> is two bytes and packs into what would otherwise be
+///         padding. The struct measures 64 bytes rather than 88.
 ///     </para>
 /// </remarks>
 public readonly struct CallEvent
@@ -201,17 +211,16 @@ public readonly struct CallEvent
     private readonly long _delayPlusOne;
 
     /// <summary>
-    ///     <see cref="Kind" /> narrowed to the byte it fits in. The enum stays <c>int</c>-backed, which is
-    ///     what a <c>switch</c> over it in a listener sees; only the storage is a byte, so it packs
-    ///     alongside <see cref="_reasonPlusOne" /> in what would otherwise be padding.
+    ///     <see cref="Kind" /> and <see cref="Reason" />, declared together and ahead of the reference
+    ///     fields on purpose: both are byte-wide - <see cref="StopReason" /> is byte-backed, so
+    ///     <c>StopReason?</c> measures two bytes - and the runtime's layout only folds them into the
+    ///     padding after <see cref="_delayPlusOne" /> when they are adjacent. Split them across the
+    ///     declaration order and the struct measures 72 bytes rather than 64. Measured, not reasoned.
     /// </summary>
-    private readonly byte _kind;
+    private readonly CallEventKind _kind;
 
-    /// <summary>
-    ///     <see cref="Reason" /> biased by one, so that <c>0</c> is "nothing has stopped yet" and the
-    ///     field needs no separate has-value byte.
-    /// </summary>
-    private readonly byte _reasonPlusOne;
+    /// <inheritdoc cref="_kind" />
+    private readonly StopReason? _reason;
 
     internal CallEvent(
         CallEventKind kind,
@@ -224,7 +233,7 @@ public readonly struct CallEvent
         object? result,
         StopReason? reason)
     {
-        _kind = (byte)kind;
+        _kind = kind;
         PolicyName = policyName;
         AttemptNumber = attemptNumber;
         Verdict = verdict;
@@ -232,11 +241,11 @@ public readonly struct CallEvent
         _delayPlusOne = delay is { } pause ? Math.Max(pause.Ticks, 0) + 1 : 0;
         Exception = exception;
         Result = result;
-        _reasonPlusOne = reason is { } stopped ? (byte)((byte)stopped + 1) : (byte)0;
+        _reason = reason;
     }
 
     /// <summary>What happened.</summary>
-    public CallEventKind Kind => (CallEventKind)_kind;
+    public CallEventKind Kind => _kind;
 
     /// <summary><see cref="Resilience.Name" />, so one listener can serve many policies.</summary>
     public string? PolicyName { get; }
@@ -302,7 +311,7 @@ public readonly struct CallEvent
     ///         "we are retrying too hard".
     ///     </para>
     /// </summary>
-    public StopReason? Reason => _reasonPlusOne == 0 ? null : (StopReason)(_reasonPlusOne - 1);
+    public StopReason? Reason => _reason;
 
     /// <summary>
     ///     True for the two refusals - <see cref="CallEventKind.RejectedByBreaker" /> and
