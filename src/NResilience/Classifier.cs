@@ -159,8 +159,14 @@ public sealed class Classifier
 
         for (var i = 0; i < rules.Length; i++)
         {
-            if (rules[i].ExceptionType.IsInstanceOfType(exception))
-                return rules[i].Judge(exception);
+            var rule = rules[i];
+
+            if (rule.ExceptionType.IsInstanceOfType(exception))
+            {
+                // A fixed rule already holds the verdict it would hand back; calling its judge to be
+                // told the constant beside it is a delegate invoke for nothing.
+                return rule.Constant ?? rule.Judge(exception);
+            }
         }
 
         return _unrecognized;
@@ -260,7 +266,10 @@ public sealed class Classifier
 
         public string Description { get; } = description;
 
-        /// <summary>Set only by <see cref="Fixed" />, purely so <c>ToString</c> can print it.</summary>
+        /// <summary>
+        ///     Set only by <see cref="Fixed" />: the verdict the judge would return, so
+        ///     <see cref="ClassifyException" /> can skip the call and <c>ToString</c> can print it.
+        /// </summary>
         public Verdict? Constant { get; private init; }
 
         /// <summary>

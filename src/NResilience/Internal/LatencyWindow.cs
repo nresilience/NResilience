@@ -340,5 +340,12 @@ internal sealed class LatencyWindow
     ///     beside a sample count from another. One small object per slice - not per call, and not on any
     ///     path the allocation gates measure.
     /// </summary>
-    private sealed record Answer(long Epoch, TimeSpan Threshold, int Samples);
+    private sealed class Answer(long epoch, TimeSpan threshold, int samples)
+    {
+        public long Epoch { get; } = epoch;
+
+        public TimeSpan Threshold { get; } = threshold;
+
+        public int Samples { get; } = samples;
+    }
 }

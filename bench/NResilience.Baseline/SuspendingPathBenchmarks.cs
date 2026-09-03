@@ -28,6 +28,19 @@ public class SuspendingPathBenchmarks
     [Benchmark(Description = "lib: Default")]
     public ValueTask<int> LibDefault() => ShippingScenarios.DefaultSuspending();
 
+    /// <summary>
+    ///     The two defaults that are on without being asked for. Each is <c>Default</c> with one of
+    ///     them removed, so the delta against <see cref="LibDefault" /> in the same sweep is what the
+    ///     feature costs a call that never needed it - the number the core review could not measure
+    ///     honestly by hand.
+    /// </summary>
+    [Benchmark(Description = "lib: Default, no attempt ceiling")]
+    public ValueTask<int> LibDefaultNoCeiling() => ShippingScenarios.DefaultNoCeilingSuspending();
+
+    /// <inheritdoc cref="LibDefaultNoCeiling" />
+    [Benchmark(Description = "lib: Default, no retry budget")]
+    public ValueTask<int> LibDefaultNoBudget() => ShippingScenarios.DefaultNoBudgetSuspending();
+
     [Benchmark(Description = "lib: TryRunAsync, Default")]
     public ValueTask<CallResult<int>> LibTryRun() => ShippingScenarios.TryRunDefaultSuspending();
 

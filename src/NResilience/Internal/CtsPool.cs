@@ -24,7 +24,7 @@ internal static class CtsPool
 {
     [ThreadStatic] private static CancellationTokenSource? t_pooled;
 
-    public static bool IsPoolable(TimeProvider time) => ReferenceEquals(time, TimeProvider.System);
+    private static bool IsPoolable(TimeProvider time) => ReferenceEquals(time, TimeProvider.System);
 
     public static CancellationTokenSource Rent(TimeProvider time)
     {

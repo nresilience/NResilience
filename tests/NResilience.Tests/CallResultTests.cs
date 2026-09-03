@@ -236,4 +236,63 @@ public sealed class CallResultTests
 
         Assert.InRange(result.Attempts[0].Remaining, TimeSpan.FromSeconds(29), TimeSpan.FromSeconds(30));
     }
+
+    [Fact]
+    public async Task The_log_reads_the_same_three_ways()
+    {
+        var calls = 0;
+
+        var result = await (TestPolicy.Instant with { Attempts = 3 }).TryRunAsync(ct =>
+        {
+            return ++calls < 3
+                ? Task.FromException<int>(new IOException())
+                : Task.FromResult(calls);
+        });
+
+        var log = result.Attempts;
+
+        var enumerated = new List<int>();
+
+        foreach (var attempt in log)
+            enumerated.Add(attempt.Number);
+
+        var viaInterface = ((IEnumerable<Attempt>)log).Select(a => a.Number).ToList();
+
+        var viaSpan = new List<int>();
+
+        foreach (var attempt in log.AsSpan())
+            viaSpan.Add(attempt.Number);
+
+        Assert.Equal([1, 2, 3], enumerated);
+        Assert.Equal(enumerated, viaInterface);
+        Assert.Equal(enumerated, viaSpan);
+        Assert.Equal(log.Count, log.AsSpan().Length);
+    }
+
+    /// <summary>
+    ///     <c>foreach</c> over a log binds to the struct enumerator, so reading the history costs
+    ///     nothing. The interface enumerator is still there for LINQ, and still allocates.
+    /// </summary>
+    [Fact]
+    public async Task Enumerating_the_log_allocates_nothing()
+    {
+        var result = await (TestPolicy.Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromResult(1));
+        var log = result.Attempts;
+
+        var total = 0;
+
+        // Warm the path before measuring it.
+        foreach (var attempt in log)
+            total += attempt.Number;
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+
+        foreach (var attempt in log)
+            total += attempt.Number;
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0, allocated);
+        Assert.True(total > 0);
+    }
 }

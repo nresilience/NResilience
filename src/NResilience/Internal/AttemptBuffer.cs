@@ -136,7 +136,7 @@ internal struct AttemptSink
     public int Count { get; private set; }
 
     public void Record(long startOffsetTicks, long elapsedTicks, VerdictKind verdict, bool selfImposed, Exception? error,
-        AttemptFlags flags = AttemptFlags.None)
+        AttemptFlags flags)
     {
         var index = Count++;
 

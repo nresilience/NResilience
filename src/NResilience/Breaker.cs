@@ -593,9 +593,9 @@ public sealed record BreakerSettings
 ///     public Breaker Payments { get; } = new() { Name = "payments" };
 ///     public Breaker Search   { get; } = new() { Name = "search" };
 /// }
-/// 
+///
 /// var payments = Resilience.Http with { Breaker = deps.Payments };
-/// 
+///
 /// app.MapGet("/health/payments", () =>
 ///     deps.Payments.State is BreakerState.Closed ? Results.Ok() : Results.StatusCode(503));
 /// </code>

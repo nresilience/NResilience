@@ -62,20 +62,11 @@ public readonly struct CallResult<T>
         if (IsSuccess)
             return Value!;
 
-        ThrowFailure(Exception, StopReason, Attempts);
+        CallFailure.Rethrow(Exception, StopReason, Attempts);
 
-        // Unreachable: ThrowFailure is [DoesNotReturn], which the compiler's definite-return
-        // analysis does not consult.
+        // Unreachable: Rethrow is [DoesNotReturn], which the compiler's definite-return analysis
+        // does not consult.
         return default!;
-    }
-
-    [DoesNotReturn]
-    internal static void ThrowFailure(Exception? exception, StopReason stopReason, AttemptLog attempts)
-    {
-        if (exception is not null)
-            ExceptionDispatchInfo.Capture(exception).Throw();
-
-        throw new CallRejectedException(stopReason, attempts);
     }
 }
 
@@ -106,6 +97,23 @@ public readonly struct CallResult
     public void ThrowIfFailed()
     {
         if (!IsSuccess)
-            CallResult<bool>.ThrowFailure(Exception, StopReason, Attempts);
+            CallFailure.Rethrow(Exception, StopReason, Attempts);
+    }
+}
+
+/// <summary>
+///     Reports the failure a <see cref="CallResult{T}" /> or <see cref="CallResult" /> is carrying.
+///     Non-generic because it uses no type parameter, and the void form would otherwise have to reach
+///     into an arbitrary instantiation to find it.
+/// </summary>
+internal static class CallFailure
+{
+    [DoesNotReturn]
+    internal static void Rethrow(Exception? exception, StopReason stopReason, AttemptLog attempts)
+    {
+        if (exception is not null)
+            ExceptionDispatchInfo.Capture(exception).Throw();
+
+        throw new CallRejectedException(stopReason, attempts);
     }
 }

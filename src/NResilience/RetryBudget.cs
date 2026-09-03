@@ -11,10 +11,10 @@ namespace NResilience;
 ///         budget expressed as a fraction bounds the aggregate - with every client independently holding to
 ///         10%, total amplification is 1.1×.
 ///     </para>
-    /// <para>
-    ///         The retry budget is enabled by default. Presets use <see cref="Automatic" />, which
-    ///         resolves to a budget private to each policy instance.
-    ///     </para>
+///     <para>
+///         The retry budget is enabled by default. Presets use <see cref="Automatic" />, which resolves
+///         to a budget private to each policy instance.
+///     </para>
 /// </summary>
 /// <remarks>
 ///     <para>

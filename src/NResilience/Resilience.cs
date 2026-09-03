@@ -317,19 +317,22 @@ public sealed partial record Resilience
     ///         A value above <see cref="AttemptTimeout" /> indicates that the clamp is currently bounding the attempt.
     ///     </para>
     ///     <para>
-    ///         This is the primary value to monitor on a dashboard. Reading it validates the policy,
-    ///         just as executing it does.
+    ///         This is the primary value to monitor on a dashboard. Reading it validates the policy when
+    ///         a ceiling is configured, just as executing it does.
     ///     </para>
     /// </summary>
     /// <remarks>
     ///     The estimate is private to the policy instance. The HTTP handler derives one policy per host,
     ///     so each host's ceiling is measured independently.
     ///     <para>
-    ///         Reading this validates the policy; a policy with an invalid configuration throws
-    ///         <see cref="ResilienceConfigurationException" /> here.
+    ///         Validation is a side effect of looking the estimate up, so it happens only on the path
+    ///         that looks one up: with <see cref="AttemptCeiling" /> unset this returns <c>null</c>
+    ///         without validating anything.
     ///     </para>
     /// </remarks>
-    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
+    /// <exception cref="ResilienceConfigurationException">
+    ///     A ceiling is configured and the policy cannot be executed.
+    /// </exception>
     public TimeSpan? MeasuredAttemptCeiling => Measured();
 
     /// <summary>
@@ -344,14 +347,22 @@ public sealed partial record Resilience
     ///     </para>
     ///     <para>
     ///         The value to put on a dashboard beside the configured base: the gap between the two is
-    ///         how wrong the constant was. Reading it validates the policy, just as executing it does.
+    ///         how wrong the constant was. Reading it validates the policy when a base is being
+    ///         measured, just as executing it does.
     ///     </para>
     /// </summary>
     /// <remarks>
     ///     The estimate is private to the policy instance. The HTTP handler derives one policy per host,
     ///     so each host's base is measured independently.
+    ///     <para>
+    ///         Validation is a side effect of looking the estimate up, so it happens only on the path
+    ///         that looks one up: with <see cref="NResilience.Backoff.MeasuredBase" /> unset this returns
+    ///         <c>null</c> without validating anything.
+    ///     </para>
     /// </remarks>
-    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
+    /// <exception cref="ResilienceConfigurationException">
+    ///     A base is being measured and the policy cannot be executed.
+    /// </exception>
     public TimeSpan? MeasuredBackoffBase
     {
         get

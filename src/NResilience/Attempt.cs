@@ -230,10 +230,28 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
     /// <returns>The attempt.</returns>
     public Attempt this[int index] => _attempts[index];
 
-    /// <inheritdoc />
-    public IEnumerator<Attempt> GetEnumerator() => ((IEnumerable<Attempt>)_attempts).GetEnumerator();
+    /// <summary>
+    ///     The attempts as a span, for a caller that wants to read the log without an enumerator at
+    ///     all.
+    /// </summary>
+    /// <remarks>
+    ///     Legal here because the log is a class holding the array: handing a span out is not the same
+    ///     as being one, which is what the <c>ref struct</c> note on this type is about.
+    /// </remarks>
+    /// <returns>The attempts, in the order they finished.</returns>
+    public ReadOnlySpan<Attempt> AsSpan() => _attempts;
 
-    IEnumerator IEnumerable.GetEnumerator() => _attempts.GetEnumerator();
+    /// <summary>
+    ///     The allocation-free enumerator, so <c>foreach</c> over a log costs nothing. The
+    ///     <see cref="IEnumerable{T}" /> overloads below are still there for LINQ and for a caller
+    ///     holding the interface.
+    /// </summary>
+    /// <returns>An enumerator over the attempts.</returns>
+    public Enumerator GetEnumerator() => new(_attempts);
+
+    IEnumerator<Attempt> IEnumerable<Attempt>.GetEnumerator() => ((IEnumerable<Attempt>)_attempts).GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => ((IEnumerable<Attempt>)_attempts).GetEnumerator();
 
     /// <summary>
     ///     The log attached to an exception the library rethrew unchanged.
@@ -311,4 +329,24 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
         value.TotalSeconds >= 1
             ? $"{value.TotalSeconds:0.##}s"
             : $"{value.TotalMilliseconds:0.#}ms";
+
+    /// <summary>Enumerates an <see cref="AttemptLog" /> without allocating. The <c>List&lt;T&gt;</c> shape.</summary>
+    public struct Enumerator
+    {
+        private readonly Attempt[] _attempts;
+        private int _index;
+
+        internal Enumerator(Attempt[] attempts)
+        {
+            _attempts = attempts;
+            _index = -1;
+        }
+
+        /// <summary>The attempt at the current position.</summary>
+        public readonly Attempt Current => _attempts[_index];
+
+        /// <summary>Advances to the next attempt.</summary>
+        /// <returns>False once the log is exhausted.</returns>
+        public bool MoveNext() => ++_index < _attempts.Length;
+    }
 }

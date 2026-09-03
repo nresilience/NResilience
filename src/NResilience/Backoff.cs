@@ -88,21 +88,21 @@ public readonly record struct Backoff
     ///     <see cref="BackoffKind.Custom" /> curves because they compute their own delays.
     /// </summary>
     public TimeSpan TransientBase => Normalized()._transientBase;
- 
+
     /// <summary>
     ///     Base delay for a <see cref="VerdictKind.Throttled" /> failure. Returns zero for a
     ///     <see cref="BackoffKind.Custom" /> curve because it computes its own delays.
     /// </summary>
     public TimeSpan ThrottledBase => Normalized()._throttledBase;
- 
+
     /// <summary>Growth per attempt. A value of 2 doubles the delay each time; 1 makes it constant.</summary>
     public double Factor => Normalized()._factor;
- 
+
     /// <summary>The backoff curve. <c>default(Backoff)</c> is <see cref="BackoffKind.Exponential" />.</summary>
     public BackoffKind Kind => _kind;
 
     /// <summary>The hard cap on any single delay, or <see cref="Timeout.InfiniteTimeSpan" /> for none.</summary>
-    public TimeSpan Max => _kind == BackoffKind.Custom ? _max : Normalized()._max;
+    public TimeSpan Max => Normalized()._max;
 
     /// <summary>
     ///     Exponential backoff with separate base delays per retryable verdict, because throttling and

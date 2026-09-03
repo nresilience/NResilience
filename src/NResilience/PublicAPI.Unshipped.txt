@@ -24,9 +24,14 @@ NResilience.AttemptCeiling.Quantile.init -> void
 NResilience.AttemptCeiling.Window.get -> System.TimeSpan
 NResilience.AttemptCeiling.Window.init -> void
 NResilience.AttemptLog
+NResilience.AttemptLog.AsSpan() -> System.ReadOnlySpan<NResilience.Attempt>
 NResilience.AttemptLog.Count.get -> int
 NResilience.AttemptLog.Elapsed.get -> System.TimeSpan
-NResilience.AttemptLog.GetEnumerator() -> System.Collections.Generic.IEnumerator<NResilience.Attempt>!
+NResilience.AttemptLog.Enumerator
+NResilience.AttemptLog.Enumerator.Current.get -> NResilience.Attempt
+NResilience.AttemptLog.Enumerator.Enumerator() -> void
+NResilience.AttemptLog.Enumerator.MoveNext() -> bool
+NResilience.AttemptLog.GetEnumerator() -> NResilience.AttemptLog.Enumerator
 NResilience.AttemptLog.this[int index].get -> NResilience.Attempt
 NResilience.AttemptTimeoutException
 NResilience.AttemptTimeoutException.AttemptTimeoutException() -> void

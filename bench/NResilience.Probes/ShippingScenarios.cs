@@ -129,6 +129,27 @@ public static class ShippingScenarios
         Hedge = Hedge.At(0.95),
     };
 
+    /// <summary>
+    ///     <see cref="Lib.Resilience.Default" /> with the measured attempt ceiling turned off. Paired
+    ///     with <see cref="DefaultSuspending" /> in the same sweep, this is what the defaulted-on
+    ///     ceiling costs a call that never needed it: the per-attempt estimate lookup and the recorded
+    ///     sample, priced against the identical policy without them.
+    /// </summary>
+    public static readonly Resilience DefaultWithoutCeiling = Resilience.Default with
+    {
+        AttemptCeiling = null,
+    };
+
+    /// <summary>
+    ///     <see cref="Lib.Resilience.Default" /> with the retry budget turned off, for the same reason
+    ///     <see cref="DefaultWithoutCeiling" /> exists. <see cref="Lib.RetryBudget.None" /> rather than
+    ///     <c>null</c> so the arm names the disabled state the way a caller would.
+    /// </summary>
+    public static readonly Resilience DefaultWithoutBudget = Resilience.Default with
+    {
+        Budget = Lib.RetryBudget.None,
+    };
+
     // ---- Suspending path: the path every real I/O call takes. ----
 
     public static ValueTask<int> NoneSuspending() => Resilience.None.RunAsync(SuspendCallback);
@@ -160,6 +181,12 @@ public static class ShippingScenarios
     public static ValueTask<int> DefaultLoggingSuspending() => DefaultWithLogging.RunAsync(SuspendCallback);
 
     public static ValueTask<int> DefaultHedgeSuspending() => DefaultWithHedge.RunAsync(SuspendCallback);
+
+    /// <summary>What <see cref="Lib.Resilience.AttemptCeiling" /> being on by default costs, per call.</summary>
+    public static ValueTask<int> DefaultNoCeilingSuspending() => DefaultWithoutCeiling.RunAsync(SuspendCallback);
+
+    /// <summary>What <see cref="Lib.RetryBudget.Automatic" /> being on by default costs, per call.</summary>
+    public static ValueTask<int> DefaultNoBudgetSuspending() => DefaultWithoutBudget.RunAsync(SuspendCallback);
 
     // ---- Synchronous fast path: where the 0-byte budgets live. ----
 

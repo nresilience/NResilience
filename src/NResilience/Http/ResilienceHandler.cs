@@ -148,7 +148,7 @@ public sealed class ResilienceHandler : DelegatingHandler
 
         // A hedged policy runs the callback concurrently and disposes every response it discards, so the
         // call must not also dispose "the previous one" - there is no such thing when attempts overlap.
-        var call = new HttpCall(request, _send, retrying, disposeSuperseded: policy.Hedge is null, deadline: StampFor(policy));
+        var call = new HttpCall(request, _send, retrying, concurrent: policy.Hedge is not null, deadline: StampFor(policy));
 
         if (retrying)
             await call.BufferAsync(cancellationToken).ConfigureAwait(false);

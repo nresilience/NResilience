@@ -12,34 +12,38 @@ namespace NResilience.Http.Internal;
 /// <param name="request">The caller's request.</param>
 /// <param name="send">The transport.</param>
 /// <param name="clone">Whether each attempt gets its own copy of the request.</param>
-/// <param name="disposeSuperseded">
-///     Whether this call disposes the response an attempt supersedes.
+/// <param name="concurrent">
+///     Whether attempts can overlap - true for a hedged call, false for a sequential one.
 ///     <para>
-///         True for a sequential call, where nothing else knows that a discarded result owns a socket.
-///         <b>False for a hedged one</b>, where it would be wrong twice over: attempts overlap, so
-///         "the previous response" is not a single thing, and a leg starting while a sibling's response
-///         is on its way back to the caller would dispose the very response that is about to be
-///         returned. A hedged call disposes what it discards in the executor instead, which is the only
-///         place that knows which answer won.
+///         It decides two things. A sequential call disposes the response an attempt supersedes,
+///         because nothing else knows that a discarded result owns a socket; a hedged one must not,
+///         where it would be wrong twice over: attempts overlap, so "the previous response" is not a
+///         single thing, and a leg starting while a sibling's response is on its way back to the caller
+///         would dispose the very response that is about to be returned. A hedged call disposes what it
+///         discards in the executor instead, which is the only place that knows which answer won.
+///     </para>
+///     <para>
+///         It also decides whether <see cref="Clone" /> takes its lock; see <c>_gate</c>.
 ///     </para>
 /// </param>
-    /// <param name="deadline">
-    ///     Tells the peer what this side is waiting for, or null when
-    ///     <see cref="HttpResilienceOptions.PropagateDeadline" /> is off. Written per attempt, as each
-    ///     attempt has less of the deadline remaining.
-    /// </param>
+/// <param name="deadline">
+///     Tells the peer what this side is waiting for, or null when
+///     <see cref="HttpResilienceOptions.PropagateDeadline" /> is off. Written per attempt, as each
+///     attempt has less of the deadline remaining.
+/// </param>
 internal sealed class HttpCall(
     HttpRequestMessage request,
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
     bool clone,
-    bool disposeSuperseded = true,
+    bool concurrent = false,
     DeadlineStamp? deadline = null)
 {
     /// <summary>
-    ///     Guards <see cref="Clone" />. Reading an <c>HttpHeaders</c> collection parses its values lazily
-    ///     and caches them, so enumerating one is a mutation - and a hedged call clones the same request
-    ///     from two threads at once. Uncontended on every sequential call, which is the price of not
-    ///     having a second, subtly different clone path for hedging.
+    ///     Guards <see cref="Clone" /> on a hedged call. Reading an <c>HttpHeaders</c> collection parses
+    ///     its values lazily and caches them, so enumerating one is a mutation - and a hedged call clones
+    ///     the same request from two threads at once. A sequential call clones on one thread at a time
+    ///     and skips the lock, which is what <c>concurrent</c> is for: one clone path, taken with or
+    ///     without the gate.
     /// </summary>
     private readonly object _gate = new();
 
@@ -61,11 +65,7 @@ internal sealed class HttpCall(
     {
         if (request.Content is { } content)
         {
-#if NET8_0_OR_GREATER
             _body = await content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-#else
-            _body = await content.ReadAsByteArrayAsync().ConfigureAwait(false);
-#endif
         }
     }
 
@@ -75,7 +75,7 @@ internal sealed class HttpCall(
     /// <remarks>
     ///     The superseded response is disposed here rather than by the executor, because the executor
     ///     does not know that a discarded result owns a socket - except on the hedged path, which does
-    ///     and therefore switches this off; see <c>disposeSuperseded</c>. Disposing it at the start of the
+    ///     and therefore switches this off; see <c>concurrent</c>. Disposing it at the start of the
     ///     <i>next</i> attempt rather than at the end of this one is what keeps the final response -
     ///     the one handed back to the caller, whether it succeeded or is a 503 the policy ran out of
     ///     attempts on - alive.
@@ -88,7 +88,7 @@ internal sealed class HttpCall(
     /// </remarks>
     internal async Task<HttpResponseMessage> SendAsync(CancellationToken cancellationToken)
     {
-        if (disposeSuperseded)
+        if (!concurrent)
         {
             _previous?.Dispose();
             _previous = null;
@@ -110,7 +110,7 @@ internal sealed class HttpCall(
         {
             var response = await send(attempt, cancellationToken).ConfigureAwait(false);
 
-            if (disposeSuperseded)
+            if (!concurrent)
                 _previous = response;
 
             return response;
@@ -125,6 +125,9 @@ internal sealed class HttpCall(
     /// <summary>A fresh request carrying everything the original did.</summary>
     internal HttpRequestMessage Clone()
     {
+        if (!concurrent)
+            return CloneCore();
+
         lock (_gate)
         {
             return CloneCore();
