@@ -153,6 +153,35 @@ public sealed class BudgetTests
         Assert.Equal(TimeSpan.FromMilliseconds(500), budget.RetryAfterHint());
     }
 
+    /// <summary>
+    ///     The hint is refilled before it is read, like every other reader of the bucket. The executor
+    ///     asks for it <i>after</i> serving the guarded rejection delay, so a hint computed from the
+    ///     token count as it stood before that pause would tell the caller to wait for time that has
+    ///     already elapsed.
+    /// </summary>
+    [Fact]
+    public void A_hint_accounts_for_the_time_that_has_passed_since_the_refusal()
+    {
+        var time = new FakeTimeProvider();
+        var budget = RetryBudget.Of(minimumPerSecond: 2, time: time);
+
+        while (budget.TrySpend())
+        {
+        }
+
+        Assert.Equal(TimeSpan.FromMilliseconds(500), budget.RetryAfterHint());
+
+        // The guarded rejection pause. Half a token has accrued at 2/s, so half the wait is gone.
+        time.Advance(TimeSpan.FromMilliseconds(250));
+
+        Assert.Equal(TimeSpan.FromMilliseconds(250), budget.RetryAfterHint());
+
+        // Long enough that a whole token is back, and there is nothing left to wait for.
+        time.Advance(TimeSpan.FromMilliseconds(250));
+
+        Assert.Equal(TimeSpan.Zero, budget.RetryAfterHint());
+    }
+
     [Fact]
     public void A_budget_with_no_floor_has_no_honest_hint_to_give()
     {

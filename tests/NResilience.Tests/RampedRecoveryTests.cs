@@ -28,7 +28,7 @@ public sealed class RampedRecoveryTests
     {
         for (var i = 0; i < count; i++)
         {
-            Assert.True(breaker.TryEnter(out _), "admission was refused before the test expected it");
+            Assert.True(breaker.TryEnter(out _, out _), "admission was refused before the test expected it");
             breaker.Record(kind, duration);
         }
     }
@@ -48,7 +48,7 @@ public sealed class RampedRecoveryTests
 
         for (var i = 0; i < calls; i++)
         {
-            if (!breaker.TryEnter(out _))
+            if (!breaker.TryEnter(out _, out _))
                 continue;
 
             admitted++;
@@ -377,17 +377,17 @@ public sealed class RampedRecoveryTests
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(10));
 
-        Assert.True(breaker.TryEnter(out var halfOpened));
+        Assert.True(breaker.TryEnter(out var halfOpened, out _));
         Assert.Equal(BreakerTransition.HalfOpened, halfOpened);
         Assert.Equal(BreakerTransition.None, breaker.Record(VerdictKind.Ok, TimeSpan.Zero));
 
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
         Assert.Equal(BreakerTransition.Closed, breaker.Record(VerdictKind.Ok, TimeSpan.Zero));
         Assert.Equal(BreakerState.Recovering, breaker.State);
 
         // Riding the ramp out raises nothing further.
         time.Advance(TimeSpan.FromSeconds(5));
-        Assert.True(breaker.TryEnter(out var completed));
+        Assert.True(breaker.TryEnter(out var completed, out _));
         Assert.Equal(BreakerTransition.None, completed);
         Assert.Equal(BreakerState.Closed, breaker.State);
     }
@@ -492,7 +492,7 @@ public sealed class RampedRecoveryTests
 
             for (var call = 0; call < Offered; call++)
             {
-                if (!breaker.TryEnter(out _))
+                if (!breaker.TryEnter(out _, out _))
                     continue;
 
                 admitted++;

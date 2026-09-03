@@ -22,7 +22,7 @@ public sealed class BreakerTests
     {
         for (var i = 0; i < count; i++)
         {
-            Assert.True(breaker.TryEnter(out _), "admission was refused before the test expected it");
+            Assert.True(breaker.TryEnter(out _, out _), "admission was refused before the test expected it");
             breaker.Record(kind, duration);
         }
     }
@@ -41,7 +41,7 @@ public sealed class BreakerTests
         Sample(breaker, VerdictKind.Transient);
 
         Assert.Equal(BreakerState.Open, breaker.State);
-        Assert.False(breaker.TryEnter(out _));
+        Assert.False(breaker.TryEnter(out _, out _));
         Assert.NotNull(breaker.OpenedAt);
     }
 
@@ -194,7 +194,7 @@ public sealed class BreakerTests
         // polling every second would starve recovery.
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
     }
 
     [Fact]
@@ -206,11 +206,11 @@ public sealed class BreakerTests
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
 
         // One probe at a time by default. The alternative is handing a client fleet's accumulated
         // retries straight back to a dependency that is still broken.
-        Assert.False(breaker.TryEnter(out _));
+        Assert.False(breaker.TryEnter(out _, out _));
     }
 
     [Fact]
@@ -244,7 +244,7 @@ public sealed class BreakerTests
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(1));
 
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
         breaker.Record(VerdictKind.Ok, TimeSpan.FromSeconds(30));
 
         // A 200 that took 30 s is not evidence the dependency recovered.
@@ -266,7 +266,7 @@ public sealed class BreakerTests
         Sample(breaker, VerdictKind.Transient, 5);
 
         time.Advance(TimeSpan.FromSeconds(10));
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
         breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
 
         // The second break is 20 s, not 10 s. Its absence is why breakers flap on a fixed cadence
@@ -295,7 +295,7 @@ public sealed class BreakerTests
         for (var open = 0; open < 5; open++)
         {
             time.Advance(TimeSpan.FromSeconds(20));
-            Assert.True(breaker.TryEnter(out _));
+            Assert.True(breaker.TryEnter(out _, out _));
             breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
         }
 
@@ -315,7 +315,7 @@ public sealed class BreakerTests
 
         Sample(breaker, VerdictKind.Transient, 5);
         time.Advance(TimeSpan.FromSeconds(10));
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
         breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
 
         // Reopened, so the next break is 20 s. Recover properly, and the growth is forgotten.
@@ -404,7 +404,7 @@ public sealed class BreakerTests
             Sample(breaker, VerdictKind.Transient);
             time.Advance(TimeSpan.FromSeconds(10));
 
-            Assert.True(breaker.TryEnter(out _));
+            Assert.True(breaker.TryEnter(out _, out _));
             breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
 
             // The second break is 20 s nominal, so equal jitter puts it in [10 s, 20 s]. Jittering
@@ -432,7 +432,7 @@ public sealed class BreakerTests
         time.Advance(TimeSpan.FromDays(1));
 
         Assert.Equal(BreakerState.Isolated, breaker.State);
-        Assert.False(breaker.TryEnter(out _));
+        Assert.False(breaker.TryEnter(out _, out _));
     }
 
     [Fact]
@@ -446,7 +446,7 @@ public sealed class BreakerTests
 
         Assert.Equal(BreakerState.Closed, breaker.State);
         Assert.Null(breaker.OpenedAt);
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
     }
 
     // ---- Configuration ----

@@ -304,13 +304,26 @@ public sealed partial record Resilience
 
         while (true)
         {
+            // Whether this attempt's admission consumed one of the breaker's probe slots, and so owes
+            // it back. Set by the admission below, cleared by RecordAttempt once the breaker has been
+            // told about the attempt - Record returns the slot itself - and honoured by the finally
+            // for every path that never gets that far: a spent deadline, a cancelled caller, a
+            // BeforeAttempt hook that threw. Without it the breaker wedges in HalfOpen forever.
+            //
+            // It replaces an earlier `recorded` flag, at the same one byte of state-machine box, and
+            // the two are not the same question. "Did anything record?" cannot tell an attempt a
+            // closed breaker waved through - which took no slot - from a probe that took one; and the
+            // breaker's own state at release time cannot either, because by then it may have opened
+            // and half-opened around a slot that belongs to a different call. See Breaker.TryEnter.
+            var probe = false;
+
             // Admission. Checked per attempt rather than once per operation, because the breaker
             // samples attempts - so a first attempt that trips it must stop the second, which is
             // the whole point of having tripped. It is also why "does the breaker see attempts or
             // whole operations?" has one answer here instead of depending on composition order.
             if (Breaker is { } breaker)
             {
-                var admitted = breaker.TryEnter(out var admission);
+                var admitted = breaker.TryEnter(out var admission, out probe);
 
                 // Raised outside the breaker's lock, on purpose: a listener is arbitrary user code
                 // and one slow listener holding that lock would serialize every call through the
@@ -332,18 +345,10 @@ public sealed partial record Resilience
                 }
             }
 
-            // The breaker admitted this attempt. If the attempt never reaches the recording point -
-            // because the deadline expired, the caller cancelled, or the BeforeAttempt hook threw -
-            // the probe slot it consumed must be returned or the breaker wedges in HalfOpen forever.
-            // The flag is set when Record is called, and the finally below releases only when it
-            // was not. A bool live across the await costs one byte in the state-machine box; the
-            // alternative is a liveness bug.
-            var recorded = false;
-
             // Whether the ceiling this attempt was given came from the deadline rather than from
             // AttemptTimeout. Set when that ceiling fires, and read below instead of the clock, which
             // buys a stop condition that does not depend on two clocks agreeing. Measured at zero: it
-            // is a third bool live across the await and lands in the padding `recorded` and `hasValue`
+            // is a third bool live across the await and lands in the padding `probe` and `hasValue`
             // already leave, so the suspending budgets do not move.
             var deadlineSpent = false;
 
@@ -385,7 +390,7 @@ public sealed partial record Resilience
                 // `effective != AttemptTimeout` no longer means "the deadline won", and hoisting the
                 // ceiling itself across the attempt await would cost every caller 8 bytes of
                 // state-machine box where a fourth bool costs none - it lands in the padding
-                // `recorded`, `hasValue` and `deadlineSpent` already leave.
+                // `probe`, `hasValue` and `deadlineSpent` already leave.
                 var deadlineCeiling = deadline != Timeout.InfiniteTimeSpan && effective != ceiling;
 
                 CancellationTokenSource? timer = null;
@@ -486,7 +491,7 @@ public sealed partial record Resilience
                 }
 
                 var next = AfterAttempt(
-                    ref log, ref recorded, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
+                    ref log, ref probe, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
                     verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
@@ -516,8 +521,10 @@ public sealed partial record Resilience
             }
             finally
             {
-                if (Breaker is { } b && !recorded)
-                    b.ReleaseProbe();
+                // Only for an admission that actually took a slot, and only while it still owes
+                // one. See Breaker.ReleaseProbe for why the breaker's own state cannot decide this.
+                if (probe)
+                    Breaker!.ReleaseProbe();
             }
         }
 
@@ -593,9 +600,13 @@ public sealed partial record Resilience
 
         while (true)
         {
+            // Whether this attempt's admission took one of the breaker's probe slots, and so owes it
+            // back. See ExecuteAsync for why the release needs this rather than the breaker's state.
+            var probe = false;
+
             if (Breaker is { } breaker)
             {
-                var admitted = breaker.TryEnter(out var admission);
+                var admitted = breaker.TryEnter(out var admission, out probe);
 
                 if (admission != BreakerTransition.None && OnEvent is not null)
                     NotifyBreaker(admission, log.Count + 1, Time.GetElapsedTime(start));
@@ -614,12 +625,10 @@ public sealed partial record Resilience
                 }
             }
 
-            var recorded = false;
-
             // Whether the ceiling this attempt was given came from the deadline rather than from
             // AttemptTimeout. Set when that ceiling fires, and read below instead of the clock, which
             // buys a stop condition that does not depend on two clocks agreeing. Measured at zero: it
-            // is a third bool live across the await and lands in the padding `recorded` and `hasValue`
+            // is a third bool live across the await and lands in the padding `probe` and `hasValue`
             // already leave, so the suspending budgets do not move.
             var deadlineSpent = false;
 
@@ -734,7 +743,7 @@ public sealed partial record Resilience
                 }
 
                 var next = AfterAttempt(
-                    ref log, ref recorded, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
+                    ref log, ref probe, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
                     verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
@@ -764,8 +773,10 @@ public sealed partial record Resilience
             }
             finally
             {
-                if (Breaker is { } b && !recorded)
-                    b.ReleaseProbe();
+                // Only for an admission that actually took a slot, and only while it still owes
+                // one. See Breaker.ReleaseProbe for why the breaker's own state cannot decide this.
+                if (probe)
+                    Breaker!.ReleaseProbe();
             }
         }
 
@@ -833,9 +844,9 @@ public sealed partial record Resilience
     /// </summary>
     /// <typeparam name="T">What the callback returns, or <c>VoidResult</c>.</typeparam>
     /// <param name="log">The inline attempt log, which this appends to.</param>
-    /// <param name="recorded">
-    ///     Set to true when the breaker was told about this attempt, so the loop's <c>finally</c> knows
-    ///     not to return the probe slot a second time.
+    /// <param name="probe">
+    ///     Cleared when the breaker is told about this attempt, because <see cref="Breaker.Record" />
+    ///     returns the probe slot itself - so the loop's <c>finally</c> knows not to return it twice.
     /// </param>
     /// <param name="start">Timestamp the whole call started at.</param>
     /// <param name="attemptStart">Timestamp this attempt started at.</param>
@@ -863,7 +874,7 @@ public sealed partial record Resilience
     /// <returns>What the loop does next.</returns>
     private NextStep AfterAttempt<T>(
         ref AttemptSink log,
-        ref bool recorded,
+        ref bool probe,
         long start,
         long attemptStart,
         TimeSpan deadline,
@@ -880,7 +891,7 @@ public sealed partial record Resilience
         out StopReason reason)
     {
         RecordAttempt(
-            ref log, ref recorded, start, Time.GetElapsedTime(start, attemptStart).Ticks, Time.GetElapsedTime(attemptStart),
+            ref log, ref probe, start, Time.GetElapsedTime(start, attemptStart).Ticks, Time.GetElapsedTime(attemptStart),
             timed, effective, verdict, error, in value, hasValue, AttemptFlags.None);
 
         return Decide(log.Count, start, deadline, deadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken, out wait, out reason);
@@ -898,7 +909,7 @@ public sealed partial record Resilience
     /// </summary>
     /// <typeparam name="T">What the callback returns, or <c>VoidResult</c>.</typeparam>
     /// <param name="log">The inline attempt log, which this appends to.</param>
-    /// <param name="recorded">Set to true when the breaker was told about this attempt.</param>
+    /// <param name="probe">Cleared when the breaker is told about this attempt, which returns the slot itself.</param>
     /// <param name="start">Timestamp the whole call started at.</param>
     /// <param name="startOffsetTicks">How far into the call this attempt started.</param>
     /// <param name="duration">How long the attempt ran.</param>
@@ -911,7 +922,7 @@ public sealed partial record Resilience
     /// <param name="flags">Whether this attempt was a hedge, and whether it was discarded.</param>
     private void RecordAttempt<T>(
         ref AttemptSink log,
-        ref bool recorded,
+        ref bool probe,
         long start,
         long startOffsetTicks,
         TimeSpan duration,
@@ -971,7 +982,9 @@ public sealed partial record Resilience
         if (Breaker is { } sampled)
         {
             var outcome = sampled.Record(verdict.Kind, duration);
-            recorded = true;
+
+            // Record released the slot, if this attempt was holding one.
+            probe = false;
 
             if (outcome != BreakerTransition.None && OnEvent is not null)
                 NotifyBreaker(outcome, log.Count, Time.GetElapsedTime(start));

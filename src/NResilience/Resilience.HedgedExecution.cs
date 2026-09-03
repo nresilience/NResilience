@@ -118,9 +118,14 @@ public sealed partial record Resilience
                         break;
                     }
 
+                    // Whether this round's admission took one of the breaker's probe slots. It travels
+                    // with the leg, because a discarded leg is cleaned up long after this point and the
+                    // breaker's state by then cannot say whether this call took a slot.
+                    var probe = false;
+
                     if (Breaker is { } breaker)
                     {
-                        var admitted = breaker.TryEnter(out var admission);
+                        var admitted = breaker.TryEnter(out var admission, out probe);
 
                         if (admission != BreakerTransition.None && OnEvent is not null)
                             NotifyBreaker(admission, log.Count + 1, Time.GetElapsedTime(start));
@@ -139,7 +144,7 @@ public sealed partial record Resilience
                         }
                     }
 
-                    legs.Add(StartLeg(++started, hedged: false));
+                    legs.Add(StartLeg(++started, hedged: false, holdsProbe: probe));
                 }
 
                 var armed = ArmHedge();
@@ -181,7 +186,9 @@ public sealed partial record Resilience
                         continue;
                     }
 
-                    var hedged = StartLeg(++started, hedged: true);
+                    // A hedge is never admitted through the breaker - ArmHedge fires only while it is
+                    // closed - so it holds no probe slot and has none to give back.
+                    var hedged = StartLeg(++started, hedged: true, holdsProbe: false);
                     legs.Add(hedged);
 
                     // Counted here rather than in Admits(), so the denominator of the win rate is the
@@ -232,12 +239,26 @@ public sealed partial record Resilience
                     hasValue = true;
                 }
 
-                var recorded = false;
+                // This leg's own answer, not the accumulated one. The two differ whenever a sibling
+                // already produced a value and this leg threw: the accumulated pair still holds the
+                // sibling's, and recording it here would raise a CallEventKind.Attempt carrying one
+                // leg's result beside another's exception. The sequential loops cannot reach that
+                // state, because they clear both before every attempt.
+                //
+                // A local because `in` cannot take a property access, and it costs nothing: nothing
+                // is awaited between here and the call, so it never joins the state-machine box.
+                var answer = outcome.Value;
+
+                // Round-tripped through a local because RecordAttempt takes it by ref: the breaker
+                // returns this leg's probe slot, if it held one, and clears the flag.
+                var probeHeld = leg.HoldsProbe;
 
                 RecordAttempt(
-                    ref log, ref recorded, start, Time.GetElapsedTime(start, leg.StartTimestamp).Ticks, outcome.Duration,
-                    leg.Timed, leg.Effective, verdict, error, in value, hasValue,
+                    ref log, ref probeHeld, start, Time.GetElapsedTime(start, leg.StartTimestamp).Ticks, outcome.Duration,
+                    leg.Timed, leg.Effective, verdict, error, in answer, outcome.HasValue,
                     leg.Hedged ? AttemptFlags.Hedged : AttemptFlags.None);
+
+                leg.HoldsProbe = probeHeld;
 
                 if (verdict.Kind == VerdictKind.Ok)
                 {
@@ -390,12 +411,13 @@ public sealed partial record Resilience
 
         // Creates a leg and starts it. The sources exist before the body runs, because the body is what
         // a discard has to be able to interrupt.
-        HedgeLeg<T> StartLeg(int number, bool hedged)
+        HedgeLeg<T> StartLeg(int number, bool hedged, bool holdsProbe)
         {
             var leg = new HedgeLeg<T>
             {
                 Number = number,
                 Hedged = hedged,
+                HoldsProbe = holdsProbe,
                 StartTimestamp = Time.GetTimestamp(),
             };
 
@@ -560,10 +582,13 @@ public sealed partial record Resilience
         for (var i = 0; i < legs.Count; i++)
         {
             var leg = legs[i];
-            var recorded = false;
+
+            // A discarded attempt is not sampled, so RecordAttempt returns before the breaker and
+            // leaves the flag alone - which is what lets Abandon below return the slot, if any.
+            var probe = leg.HoldsProbe;
 
             RecordAttempt(
-                ref log, ref recorded, start, Time.GetElapsedTime(start, leg.StartTimestamp).Ticks, Time.GetElapsedTime(leg.StartTimestamp),
+                ref log, ref probe, start, Time.GetElapsedTime(start, leg.StartTimestamp).Ticks, Time.GetElapsedTime(leg.StartTimestamp),
                 leg.Timed, leg.Effective, Verdict.Ok, null, in none, false,
                 (leg.Hedged ? AttemptFlags.Hedged : AttemptFlags.None) | AttemptFlags.Discarded);
 
@@ -598,7 +623,10 @@ public sealed partial record Resilience
     /// </summary>
     /// <typeparam name="T">What the callback returns, or <c>VoidResult</c>.</typeparam>
     /// <param name="leg">The leg.</param>
-    /// <param name="breaker">The breaker that admitted it, if any.</param>
+    /// <param name="breaker">
+    ///     The breaker the round was admitted by, if any. Its probe slot is returned only for the leg
+    ///     that could be holding one - see the <c>finally</c> below.
+    /// </param>
     /// <param name="time">The clock.</param>
     /// <returns>A task nobody awaits.</returns>
     /// <remarks>
@@ -623,9 +651,13 @@ public sealed partial record Resilience
         }
         finally
         {
-            // The leg consumed a probe slot on the way in and never recorded an outcome, so the slot has
-            // to go back or a half-open breaker wedges forever.
-            breaker?.ReleaseProbe();
+            // A leg that took a probe slot on the way in and never recorded an outcome has to give it
+            // back, or a half-open breaker wedges forever. A leg that took none must stay silent: it
+            // finishes arbitrarily later, and by then the breaker may have opened and half-opened
+            // around a slot that belongs to another call. See HedgeLeg.HoldsProbe.
+            if (leg.HoldsProbe)
+                breaker?.ReleaseProbe();
+
             ReleaseLeg(leg, time);
         }
     }

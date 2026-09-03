@@ -29,6 +29,19 @@ internal sealed class HedgeLeg<T>
     internal bool Hedged { get; init; }
 
     /// <summary>
+    ///     Whether this leg's admission consumed one of the breaker's probe slots, and so owes it back
+    ///     if the leg never reaches the recording point.
+    ///     <para>
+    ///         Only the first leg of a round is admitted at all, and only a half-open breaker hands a
+    ///         slot out - so this is false for every hedge, and false for a first leg a closed breaker
+    ///         waved through. It has to be recorded here rather than inferred later, because a
+    ///         discarded leg may finish long after the breaker has opened and half-opened around a slot
+    ///         that belongs to somebody else's call.
+    ///     </para>
+    /// </summary>
+    internal bool HoldsProbe { get; set; }
+
+    /// <summary>
     ///     When this leg started, on the policy's clock. Stamped when the leg is created and stamped
     ///     again once its <see cref="Resilience.BeforeAttempt" /> hook has run, so a slow hook is not
     ///     charged to the dependency - the same point the sequential loops measure from.

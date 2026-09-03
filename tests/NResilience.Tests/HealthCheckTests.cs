@@ -45,7 +45,7 @@ public sealed class HealthCheckTests
 
         for (var i = 0; i < 20; i++)
         {
-            Assert.True(breaker.TryEnter(out _));
+            Assert.True(breaker.TryEnter(out _, out _));
             breaker.Record(VerdictKind.Ok, TimeSpan.FromMilliseconds(40));
         }
 
@@ -286,11 +286,11 @@ public sealed class HealthCheckTests
             Recovery = Recovery.Over(0.25),
         });
 
-        breaker.TryEnter(out _);
+        breaker.TryEnter(out _, out _);
         breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
 
         time.Advance(TimeSpan.FromSeconds(10));
-        breaker.TryEnter(out _);
+        breaker.TryEnter(out _, out _);
         breaker.Record(VerdictKind.Ok, TimeSpan.Zero);
 
         Assert.Equal(BreakerState.Recovering, breaker.State);
@@ -310,7 +310,7 @@ public sealed class HealthCheckTests
     {
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1 });
 
-        breaker.TryEnter(out _);
+        breaker.TryEnter(out _, out _);
         breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
 
         return breaker;

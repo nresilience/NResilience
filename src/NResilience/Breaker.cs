@@ -887,7 +887,8 @@ public sealed class Breaker
 
     /// <summary>
     ///     Admission. True means the call may proceed, and in the half-open state consumes one of the
-    ///     probe slots - so every true must be followed by exactly one <see cref="Record" />.
+    ///     probe slots - so every true must be followed by exactly one <see cref="Record" />, or by
+    ///     <see cref="ReleaseProbe" /> when <paramref name="probe" /> came back true.
     /// </summary>
     /// <param name="transition">
     ///     The state change this admission caused, for the caller to report. Reported by the caller
@@ -895,9 +896,17 @@ public sealed class Breaker
     ///     listener is arbitrary user code: raising inside the lock would let one slow listener
     ///     serialize every call through the breaker.
     /// </param>
-    internal bool TryEnter(out BreakerTransition transition)
+    /// <param name="probe">
+    ///     Whether this admission consumed a probe slot, which only the half-open state hands out. It
+    ///     is the caller's obligation to give one back - see <see cref="ReleaseProbe" /> - and knowing
+    ///     it here is the only reliable way: a closed breaker consumes nothing, and by the time an
+    ///     attempt finishes the breaker may have opened and half-opened again, so the state at release
+    ///     time cannot answer "did I take one of these?".
+    /// </param>
+    internal bool TryEnter(out BreakerTransition transition, out bool probe)
     {
         transition = BreakerTransition.None;
+        probe = false;
 
         lock (_gate)
         {
@@ -919,6 +928,7 @@ public sealed class Breaker
                     _probeSuccesses = 0;
                     _probesInFlight = 1;
                     transition = BreakerTransition.HalfOpened;
+                    probe = true;
                     return true;
 
                 case BreakerState.HalfOpen:
@@ -926,6 +936,7 @@ public sealed class Breaker
                         return false;
 
                     _probesInFlight++;
+                    probe = true;
                     return true;
 
                 case BreakerState.Recovering:
@@ -980,18 +991,28 @@ public sealed class Breaker
     ///     deadline before it reached the recording point.
     /// </summary>
     /// <remarks>
-    ///     Without this, a probe admitted while half-open but never recorded leaves
-    ///     <see cref="_probesInFlight" /> at its cap and the breaker wedged in <see cref="BreakerState.HalfOpen" />
-    ///     forever: every subsequent <see cref="TryEnter" /> sees the slots full and refuses, and the
-    ///     breaker has no clock-driven path back to <see cref="BreakerState.Open" /> that would reset them.
+    ///     <para>
+    ///         Without this, a probe admitted while half-open but never recorded leaves
+    ///         <see cref="_probesInFlight" /> at its cap and the breaker wedged in <see cref="BreakerState.HalfOpen" />
+    ///         forever: every subsequent <see cref="TryEnter" /> sees the slots full and refuses, and the
+    ///         breaker has no clock-driven path back to <see cref="BreakerState.Open" /> that would reset them.
+    ///     </para>
+    ///     <para>
+    ///         <b>Call this only for an admission whose <c>probe</c> came back true.</b> The state check
+    ///         below cannot stand in for that: it says what the breaker is doing <i>now</i>, and the
+    ///         call being cleaned up was admitted some time ago. An attempt admitted through a closed
+    ///         breaker took no slot at all, and if the breaker has opened and half-opened since, a
+    ///         release here would hand back a slot that a different call is holding - letting one more
+    ///         probe through than <see cref="BreakerSettings.HalfOpenProbes" /> allows.
+    ///     </para>
     /// </remarks>
     internal void ReleaseProbe()
     {
         lock (_gate)
         {
-            // RecordCore already released the slot when it ran, and a probe that closed or re-opened
-            // the breaker moved the state away from HalfOpen. This guard makes the release a no-op
-            // for any path that did record, so the executor can call it unconditionally in its finally.
+            // Belt and braces for the caller's obligation above: a probe that closed or re-opened the
+            // breaker moved the state away from HalfOpen and RecordCore already released its slot, so
+            // this keeps that ordering from double-releasing.
             if (_state == BreakerState.HalfOpen && _probesInFlight > 0)
                 _probesInFlight--;
         }

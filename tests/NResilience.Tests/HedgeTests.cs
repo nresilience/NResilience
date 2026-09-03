@@ -237,6 +237,104 @@ public sealed class HedgeTests
     }
 
     /// <summary>
+    ///     A discarded leg gives back the probe slot it took, and only the slot it took. Only the first
+    ///     leg of a round goes through the breaker's admission; a hedge never does, because hedges fire
+    ///     only while the breaker is closed and a closed breaker hands out no probe slots. So the
+    ///     clean-up after a discarded hedge must not release one - the slot it would return belongs to
+    ///     whichever call is probing by then.
+    /// </summary>
+    /// <remarks>
+    ///     The window is narrow and entirely real: a hedge discarded while the breaker was closed, whose
+    ///     callback ignores its cancellation token, finishing after the breaker has opened, served its
+    ///     break, and admitted somebody else's probe. What it costs is an extra call through a half-open
+    ///     breaker - the one thing <see cref="BreakerSettings.HalfOpenProbes" /> exists to bound.
+    /// </remarks>
+    [Fact]
+    public async Task A_discarded_hedge_does_not_release_a_probe_slot_it_never_took()
+    {
+        var time = new FakeTimeProvider();
+
+        var breaker = new Breaker(new BreakerSettings
+        {
+            ConsecutiveFailures = 1,
+            BreakDuration = TimeSpan.FromSeconds(1),
+            BreakJitter = Jitter.None,
+            HalfOpenProbes = 1,
+
+            // Two, so a successful probe does not close the breaker and end the half-open state this
+            // test is measuring.
+            ProbeSuccesses = 2,
+            Time = time,
+        });
+
+        var policy = Hedging(time, out _, p => p with { Breaker = breaker });
+        var single = policy with { Attempts = 1, Hedge = null };
+
+        await WarmAsync(policy, time, Fast, times: 40);
+
+        // A hedged race whose losing leg ignores its token and is still running afterwards. Its
+        // clean-up is parked on that leg, and is what will eventually try to release a slot.
+        var stranded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loser = new Closeable();
+        var calls = 0;
+
+        var race = policy.TryRunAsync(async ct =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                await stranded.Task.WaitAsync(CancellationToken.None);
+                return loser;
+            }
+
+            return new Closeable();
+        }).AsTask();
+
+        await PumpAsync(time, race);
+        Assert.True((await race).IsSuccess);
+        Assert.Equal(2, calls);
+
+        // Trip the breaker and wait out the break, so the next admission becomes the probe.
+        await RunAsync(single, _ => throw new IOException("down"), time);
+        Assert.Equal(BreakerState.Open, breaker.State);
+        time.Advance(TimeSpan.FromSeconds(2));
+
+        // Take the single probe slot and hold it. The callback signals rather than the test polling
+        // BreakerState: an open breaker whose break has elapsed already *reports* HalfOpen, so polling
+        // that would race ahead of the admission that actually consumes the slot.
+        var probing = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var admitted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var probe = single.TryRunAsync(async _ =>
+        {
+            admitted.SetResult();
+            await probing.Task;
+            return 1;
+        }).AsTask();
+
+        await admitted.Task;
+        Assert.Equal(BreakerState.HalfOpen, breaker.State);
+
+        // The slot is taken, so nothing else gets through.
+        Assert.Equal(StopReason.DependencyUnavailable, (await RunAsync(single, _ => Task.FromResult(1), time)).StopReason);
+
+        // Now let the stranded leg finish. Its clean-up runs, disposes what it produced, and - before
+        // the fix - handed back a probe slot it never held.
+        stranded.TrySetResult();
+
+        for (var i = 0; i < 200 && !loser.Closed; i++)
+            await Task.Delay(1);
+
+        Assert.True(loser.Closed, "the discarded leg's clean-up never ran, so the test proved nothing");
+        await Task.Delay(20);
+
+        // The probe is still the only call in flight, so the breaker still refuses everything else.
+        Assert.Equal(StopReason.DependencyUnavailable, (await RunAsync(single, _ => Task.FromResult(1), time)).StopReason);
+
+        probing.TrySetResult();
+        await probe;
+    }
+
+    /// <summary>
     ///     A hedge you cannot see is a hedge you cannot tune, so the discarded leg is in the log - and
     ///     in the log as nothing else, because nothing classified it.
     /// </summary>
@@ -269,6 +367,75 @@ public sealed class HedgeTests
         // The second entry started before the first one finished, so the log says when rather than
         // pretending there was a backoff between them.
         Assert.Contains(", at ", attempts.ToString(), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     An attempt's event reports that attempt. Legs overlap, so the loop is holding the last value
+    ///     <i>any</i> leg produced while a later one comes back - and a leg that threw must not be
+    ///     reported carrying its sibling's answer.
+    /// </summary>
+    /// <remarks>
+    ///     The invariant is that no <see cref="CallEventKind.Attempt" /> event ever carries an
+    ///     <see cref="CallEvent.Exception" /> and a <see cref="CallEvent.Result" /> at the same time.
+    ///     The sequential loops get it for free, because they clear both before every attempt; the
+    ///     hedged loop has to pass the leg's own outcome rather than the accumulated one.
+    /// </remarks>
+    [Fact]
+    public async Task An_attempt_event_reports_its_own_leg_and_not_a_siblings_answer()
+    {
+        var time = new FakeTimeProvider();
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var calls = 0;
+
+        // A zero is an answer the policy refuses, so the hedge produces a *value* and a failure at
+        // once - which is what puts a result in the loop's hands while the other leg is still running.
+        var policy = Hedging(time, out var events, p => p with
+        {
+            // Two, so the round cannot arm a third leg while the first one is still blocked.
+            Attempts = 2,
+            Classify = Classifier.RetryEverything.OnResult<int>(static v => v == 0 ? Verdict.Transient : Verdict.Ok),
+        });
+
+        await WarmAsync(policy, time, Fast, times: 40);
+        events.Clear();
+
+        var call = policy.TryRunAsync(async ct =>
+        {
+            if (Interlocked.Increment(ref calls) == 1)
+            {
+                // The first leg: still running when the hedge answers, and it throws rather than
+                // returning, so it has no value of its own.
+                await gate.Task.WaitAsync(CancellationToken.None);
+                throw new IOException("the slow leg failed");
+            }
+
+            return 0;
+        }).AsTask();
+
+        await PumpAsync(time, call);
+        gate.TrySetResult();
+
+        var result = await call;
+
+        Assert.Equal(2, calls);
+
+        var attempts = events.OfKind(CallEventKind.Attempt);
+        Assert.Equal(2, attempts.Count);
+
+        // The hedge answered first, so it is recorded first, and it is the one with a result.
+        Assert.Null(attempts[0].Exception);
+        Assert.Equal(0, attempts[0].Result);
+
+        // The leg that threw. Before the fix this carried the hedge's zero.
+        Assert.IsType<IOException>(attempts[1].Exception);
+        Assert.Null(attempts[1].Result);
+
+        Assert.All(attempts, e => Assert.False(e.Exception is not null && e.Result is not null, $"{e} carries both an exception and a result"));
+
+        // The accumulated value is still what the caller is handed: a failed answer is an answer.
+        Assert.False(result.IsSuccess);
+        Assert.True(result.HasValue);
+        Assert.Equal(0, result.Value);
     }
 
     /// <summary>
@@ -785,6 +952,23 @@ public sealed class HedgeTests
         gate.TrySetResult();
 
         return new Race(await call, calls);
+    }
+
+    /// <summary>
+    ///     Runs one call and moves the fake clock until it lands. A guarded rejection is not instant, so
+    ///     a test that simply awaited one would hang.
+    /// </summary>
+    private static async Task<CallResult<int>> RunAsync(Resilience policy, Func<CancellationToken, Task<int>> work, FakeTimeProvider time)
+    {
+        var call = policy.TryRunAsync(work).AsTask();
+
+        while (!call.IsCompleted)
+        {
+            time.Advance(TimeSpan.FromMilliseconds(100));
+            await Task.Delay(1);
+        }
+
+        return await call;
     }
 
     /// <summary>

@@ -31,7 +31,7 @@ public sealed class AdaptiveSlowCallTests
     {
         for (var i = 0; i < count; i++)
         {
-            Assert.True(breaker.TryEnter(out _), "admission was refused before the test expected it");
+            Assert.True(breaker.TryEnter(out _, out _), "admission was refused before the test expected it");
             breaker.Record(kind, duration);
         }
     }
@@ -177,7 +177,7 @@ public sealed class AdaptiveSlowCallTests
         Assert.Equal(BreakerState.Open, breaker.State);
 
         time.Advance(TimeSpan.FromSeconds(16));
-        Assert.True(breaker.TryEnter(out _));
+        Assert.True(breaker.TryEnter(out _, out _));
 
         // The trip window was cleared when the breaker opened. The baseline was not - it is a
         // measurement of the dependency, not a decision about it - so a 2 s probe against a 50 ms

@@ -33,7 +33,7 @@ public sealed class RelativeFailureRatioTests
     {
         for (var i = 0; i < count; i++)
         {
-            Assert.True(breaker.TryEnter(out _), "admission was refused before the test expected it");
+            Assert.True(breaker.TryEnter(out _, out _), "admission was refused before the test expected it");
             breaker.Record(kind, TimeSpan.Zero);
         }
     }

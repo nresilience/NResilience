@@ -212,6 +212,11 @@ public sealed class RetryBudget
 
         lock (_gate)
         {
+            // Refilled first, like every other reader of _tokens. The executor asks for this hint
+            // *after* serving the guarded rejection delay, so without the refill the answer would be
+            // the shortfall as it stood 100 ms ago and the hint would overstate.
+            Refill();
+
             var needed = 1 - _tokens;
             return needed <= 0 ? TimeSpan.Zero : TimeSpan.FromSeconds(needed / _refillPerSecond);
         }

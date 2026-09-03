@@ -184,9 +184,13 @@ public sealed partial record Resilience
 
         while (true)
         {
+            // Whether this iteration's admission took one of the breaker's probe slots. See the
+            // sequential loop for why the release needs this rather than the breaker's own state.
+            var probe = false;
+
             if (Breaker is { } breaker)
             {
-                var admitted = breaker.TryEnter(out var admission);
+                var admitted = breaker.TryEnter(out var admission, out probe);
 
                 if (admission != BreakerTransition.None && OnEvent is not null)
                     NotifyBreaker(admission, log.Count + 1, Time.GetElapsedTime(start));
@@ -205,7 +209,6 @@ public sealed partial record Resilience
                 }
             }
 
-            var recorded = false;
             var deadlineSpent = false;
 
             try
@@ -402,7 +405,7 @@ public sealed partial record Resilience
                 }
 
                 var next = AfterAttempt(
-                    ref log, ref recorded, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
+                    ref log, ref probe, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
                     verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
@@ -432,8 +435,8 @@ public sealed partial record Resilience
             }
             finally
             {
-                if (Breaker is { } b && !recorded)
-                    b.ReleaseProbe();
+                if (probe)
+                    Breaker!.ReleaseProbe();
             }
         }
 
