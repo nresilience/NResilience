@@ -153,20 +153,20 @@ public sealed class AdaptiveDefaultsTests
     }
 
     /// <summary>
-    ///     The two are the same trip defined two ways, and <c>Validate</c> refuses both at once. A
-    ///     caller who named the absolute one therefore turns the default relative one off by naming it.
+    ///     The two are the same trip defined two ways, and they compose the way every constant in this
+    ///     library composes with the measurement that refines it - so naming the absolute one leaves the
+    ///     default relative one in place, and setting both is a configuration rather than an error.
     /// </summary>
     [Fact]
-    public void An_absolute_slow_call_threshold_replaces_the_default_relative_one()
+    public void An_absolute_slow_call_threshold_composes_with_the_default_relative_one()
     {
         var settings = new BreakerSettings { SlowCallThreshold = TimeSpan.FromSeconds(2) };
 
         settings.Validate();
 
-        Assert.Null(settings.SlowCalls);
+        Assert.Equal(SlowCalls.Above(3), settings.SlowCalls);
 
-        Assert.Throws<ResilienceConfigurationException>(() =>
-            (settings with { SlowCalls = SlowCalls.Above(4) }).Validate());
+        (settings with { SlowCalls = SlowCalls.Above(4) }).Validate();
     }
 
     /// <summary>

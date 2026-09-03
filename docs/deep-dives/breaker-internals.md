@@ -115,7 +115,9 @@ An outage contaminates the baseline as it fills it, exactly as a brownout contam
 
 ### Composition, and why this one is not exclusive
 
-`SlowCalls` and `SlowCallThreshold` are the same trip defined two ways, and `Validate` refuses both. `Failures` and `FailureRatio` are a measurement and a ceiling, and setting both is the recommended configuration: the effective trip point is `min(FailureRatio, max(AbsoluteFloor, baseline * Multiple))`. The relative trip can only fire sooner than the absolute one, which is the house rule for every adaptive feature in the library - an estimator may tighten a guard and never loosen one.
+Both pairs follow one rule: a measurement may tighten a constant and never loosen one. `SlowCalls` and `SlowCallThreshold` are the same trip defined two ways, and the effective threshold is `min(SlowCallThreshold, Multiple * baseline)` - a call is slow when it is above either. `Failures` and `FailureRatio` are the same trip in ratio form, and the effective trip point is `min(FailureRatio, max(AbsoluteFloor, baseline * Multiple))`. In both, the constant is a ceiling the estimator can only lower, which is the house rule for every adaptive feature in the library.
+
+The baseline is recorded whether or not a constant is also set. It is a measurement of the dependency rather than a decision about it, so `Breaker.NormalLatency` reads the same either way, and a breaker whose constant was chosen badly can still be seen to be wrong.
 
 ### Cost, and what clears it
 

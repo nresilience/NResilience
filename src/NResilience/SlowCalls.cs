@@ -11,6 +11,11 @@ namespace NResilience;
 ///         production, and re-pick every time it changes.
 ///     </para>
 ///     <para>
+///         <b>This can only trip sooner.</b> When <see cref="BreakerSettings.SlowCallThreshold" /> is
+///         also set the two compose, and an attempt is slow when it is above either threshold - the
+///         same rule <see cref="Failures" /> and <see cref="BreakerSettings.FailureRatio" /> follow.
+///     </para>
+///     <para>
 ///         <b>Normal is measured over a much longer window than the breaker trips over</b>, and it is a
 ///         <i>low</i> quantile of that window. Both halves are load-bearing, and getting either wrong
 ///         produces a breaker that cannot open at all - see the type's remarks.

@@ -571,8 +571,8 @@ public sealed class BreakerOptions
     ///     measured normal latency instead of a constant, which the breaker has on by default. A section
     ///     of its own, so it is only needed to change a property - <c>"SlowCalls": { "Multiple": 5 }</c>
     ///     - or to turn the trip off, which is <c>"SlowCalls": { "Enabled": false }</c>. Setting
-    ///     <see cref="SlowCallThreshold" /> also turns it off, because the two are the same trip defined
-    ///     two ways; setting both this and <see cref="SlowCallThreshold" /> is refused.
+    ///     <see cref="SlowCallThreshold" /> as well composes rather than colliding: an attempt is slow
+    ///     when it is above either threshold.
     /// </summary>
     public SlowCallOptions? SlowCalls { get; set; }
 

@@ -54,15 +54,15 @@ public sealed class DoomedAttemptTests
     }
 
     /// <summary>
-    ///     The same policy with nothing measuring the dependency: the breaker's slow-call trip is the
-    ///     absolute kind, so there is no baseline, and the loop behaves exactly as it did before this
+    ///     The same policy with nothing measuring the dependency: the breaker's slow-call trip has been
+    ///     turned off, so there is no baseline, and the loop behaves exactly as it did before this
     ///     feature existed. The doomed attempt runs, and the caller learns the same thing 50 ms later.
     /// </summary>
     [Fact]
     public async Task Without_an_estimate_the_doomed_attempt_still_runs()
     {
         var time = new FakeTimeProvider();
-        var policy = Measured(time, new BreakerSettings { SlowCallThreshold = TimeSpan.FromSeconds(5), Time = time });
+        var policy = Measured(time, new BreakerSettings { SlowCalls = null, Time = time });
 
         await WarmAsync(policy, time);
 

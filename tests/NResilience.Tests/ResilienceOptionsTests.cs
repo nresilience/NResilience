@@ -785,9 +785,9 @@ public sealed class ResilienceOptionsTests
         Assert.Null(settings.Failures);
     }
 
-    /// <summary>An absolute threshold in a section replaces the default relative trip, as it does in code.</summary>
+    /// <summary>An absolute threshold in a section composes with the default relative trip, as it does in code.</summary>
     [Fact]
-    public void An_absolute_slow_call_threshold_in_a_section_replaces_the_default_relative_trip()
+    public void An_absolute_slow_call_threshold_in_a_section_composes_with_the_default_relative_trip()
     {
         var options = new ResilienceOptions();
 
@@ -796,7 +796,7 @@ public sealed class ResilienceOptionsTests
         var settings = options.ToPolicy().Breaker!.Settings;
 
         Assert.Equal(TimeSpan.FromSeconds(2), settings.SlowCallThreshold);
-        Assert.Null(settings.SlowCalls);
+        Assert.Equal(SlowCalls.Above(3), settings.SlowCalls);
     }
 
     private static TimeSpan Delay(Resilience policy, int attemptNumber) =>

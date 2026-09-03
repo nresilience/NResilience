@@ -196,7 +196,7 @@ There is deliberately no way to make the measured ceiling longer than `AttemptTi
 
 `Enabled` is `false` for no breaker at all - the only way a later configuration layer can remove one an earlier layer added.
 
-The two relative trips are on by default, as they are on `BreakerSettings`, and a subsection turns one off the same way `Timeouts` does: `"SlowCalls": { "Enabled": false }` or `"Failures": { "Enabled": false }`. Setting `SlowCallThreshold` also turns `SlowCalls` off, because the two are the same trip defined two ways. `"Recovery": { "Enabled": false }` turns the ramp back off.
+The two relative trips are on by default, as they are on `BreakerSettings`, and a subsection turns one off the same way `Timeouts` does: `"SlowCalls": { "Enabled": false }` or `"Failures": { "Enabled": false }`. Setting `SlowCallThreshold` as well composes with `SlowCalls` rather than replacing it: a call is slow when it is above either threshold. `"Recovery": { "Enabled": false }` turns the ramp back off.
 
 ## `AddRateLimit` on `IHttpClientBuilder`
 

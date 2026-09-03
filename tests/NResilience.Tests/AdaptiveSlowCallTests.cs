@@ -209,11 +209,27 @@ public sealed class AdaptiveSlowCallTests
     public void A_breaker_with_no_adaptive_trip_has_no_baseline_to_report()
     {
         var time = new FakeTimeProvider();
-        var breaker = new Breaker(new BreakerSettings { SlowCallThreshold = TimeSpan.FromSeconds(2), Time = time });
+        var breaker = new Breaker(new BreakerSettings { SlowCalls = null, Time = time });
 
         Sample(breaker, VerdictKind.Ok, 100, TimeSpan.FromMilliseconds(10));
 
         Assert.Null(breaker.NormalLatency);
+    }
+
+    /// <summary>
+    ///     A constant does not stop the breaker measuring. The baseline is a measurement of the
+    ///     dependency rather than a decision about it, so it is there to read whether or not anybody
+    ///     named a millisecond figure alongside it.
+    /// </summary>
+    [Fact]
+    public void A_breaker_given_a_constant_still_reports_its_baseline()
+    {
+        var time = new FakeTimeProvider();
+        var breaker = new Breaker(new BreakerSettings { SlowCallThreshold = TimeSpan.FromSeconds(2), Time = time });
+
+        Sample(breaker, VerdictKind.Ok, 100, TimeSpan.FromMilliseconds(10));
+
+        Assert.NotNull(breaker.NormalLatency);
     }
 
     // ---- Configuration ----
@@ -262,17 +278,58 @@ public sealed class AdaptiveSlowCallTests
         Assert.Equal(20, breaker.Settings.SlowCalls!.Value.MinimumSamples);
     }
 
+    /// <summary>
+    ///     One rule for every bound in the library: state it as a constant, measure it, or both, and
+    ///     when both the tighter one wins. Here the measured term is the tighter one - a dependency
+    ///     whose median is 10 ms is slow at 30 ms, long before the 2-second constant - so the breaker
+    ///     opens on a brownout the constant would have sat closed through.
+    /// </summary>
     [Fact]
-    public void A_constant_and_an_adaptive_threshold_are_the_same_trip_and_may_not_both_be_set()
+    public void A_constant_and_a_measured_threshold_compose_and_the_tighter_one_wins()
     {
-        var problem = Assert.Throws<ResilienceConfigurationException>(() =>
-            new Breaker(new BreakerSettings
-            {
-                SlowCallThreshold = TimeSpan.FromSeconds(2),
-                SlowCalls = SlowCalls.Above(3),
-            }));
+        var time = new FakeTimeProvider();
 
-        Assert.Contains(problem.Problems, p => p.Contains("not both", StringComparison.Ordinal));
+        var breaker = new Breaker(new BreakerSettings
+        {
+            SlowCallThreshold = TimeSpan.FromSeconds(2),
+            SlowCalls = SlowCalls.Above(3),
+            Time = time,
+        });
+
+        Sample(breaker, VerdictKind.Ok, 30, TimeSpan.FromMilliseconds(10));
+
+        Assert.Equal(BreakerState.Closed, breaker.State);
+
+        // Well under the 2-second constant, and well over three times the 10 ms baseline.
+        Sample(breaker, VerdictKind.Ok, 30, TimeSpan.FromMilliseconds(100));
+
+        Assert.Equal(BreakerState.Open, breaker.State);
+    }
+
+    /// <summary>
+    ///     And the other direction: a constant below the measured threshold is the one that bounds the
+    ///     trip, so naming one can only make the breaker open sooner.
+    /// </summary>
+    [Fact]
+    public void A_constant_below_the_measured_threshold_is_the_one_that_binds()
+    {
+        var time = new FakeTimeProvider();
+
+        var breaker = new Breaker(new BreakerSettings
+        {
+            SlowCallThreshold = TimeSpan.FromMilliseconds(15),
+            SlowCalls = SlowCalls.Above(3),
+            Time = time,
+        });
+
+        Sample(breaker, VerdictKind.Ok, 30, TimeSpan.FromMilliseconds(10));
+
+        Assert.Equal(BreakerState.Closed, breaker.State);
+
+        // Under three times the 10 ms baseline, and over the constant.
+        Sample(breaker, VerdictKind.Ok, 30, TimeSpan.FromMilliseconds(20));
+
+        Assert.Equal(BreakerState.Open, breaker.State);
     }
 
     [Theory]

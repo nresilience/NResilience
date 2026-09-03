@@ -78,6 +78,13 @@ internal enum BreakerTransition : byte
 ///         healthy cases behave exactly as a consecutive-failures breaker does. Set either to
 ///         <c>null</c> to turn it off.
 ///     </para>
+///     <para>
+///         Each of the two has an absolute counterpart - <see cref="SlowCallThreshold" /> for
+///         <see cref="SlowCalls" />, <see cref="FailureRatio" /> for <see cref="Failures" /> - and one
+///         rule covers both pairs, and the policy's <c>AttemptTimeout</c> and <c>Timeouts</c> besides:
+///         <b>a bound may be stated as a constant, measured from the dependency, or both, and when both
+///         the tighter one wins.</b> The measured term never loosens what you wrote.
+///     </para>
 /// </remarks>
 public sealed record BreakerSettings
 {
@@ -128,11 +135,10 @@ public sealed record BreakerSettings
     ///     <para>
     ///         The breaker measures the baseline itself, from the outcomes it already samples, so nothing
     ///         has to be guessed up front and nothing has to be re-tuned when the dependency's error rate
-    ///         changes. Unlike <see cref="SlowCalls" /> and <see cref="SlowCallThreshold" />, this
-    ///         composes with its absolute counterpart rather than replacing it: when
-    ///         <see cref="FailureRatio" /> is also set, the relative trip can only fire sooner, never
-    ///         later. See <see cref="NResilience.Failures" /> for why the absolute floor and the long
-    ///         window are both required rather than cosmetic.
+    ///         changes. It composes with its absolute counterpart the way every measured term in the
+    ///         library does: when <see cref="FailureRatio" /> is also set, the relative trip can only
+    ///         fire sooner, never later. See <see cref="NResilience.Failures" /> for why the absolute
+    ///         floor and the long window are both required rather than cosmetic.
     ///     </para>
     /// </summary>
     /// <remarks>
@@ -169,8 +175,9 @@ public sealed record BreakerSettings
     ///     <para>
     ///         This is the number an operator has to pick per dependency, in milliseconds, before that
     ///         dependency has ever run in production. <see cref="SlowCalls" /> is the same trip expressed
-    ///         as a multiple of measured normal latency, which is the form that ports. Set one or the
-    ///         other, not both.
+    ///         as a multiple of measured normal latency, which is the form that ports. Setting both is
+    ///         supported and composes: an attempt is slow when it is above either threshold, so naming a
+    ///         constant here tightens the trip rather than replacing the measured one.
     ///     </para>
     /// </summary>
     public TimeSpan? SlowCallThreshold { get; init; }
@@ -191,8 +198,9 @@ public sealed record BreakerSettings
     ///     On by default at <c>SlowCalls.Above(3)</c>, because a dependency answering <c>200 OK</c> in
     ///     thirty seconds is the most common way one fails and an error-rate breaker sits closed through
     ///     the whole incident. Set it to <c>null</c> to turn the brownout trip off; set it to a value to
-    ///     change it. Setting <see cref="SlowCallThreshold" /> also turns the default off, because the
-    ///     two are the same trip defined two ways and the caller named the absolute one.
+    ///     change it. Naming <see cref="SlowCallThreshold" /> does not turn it off: the two are the same
+    ///     trip defined two ways, and they compose, so an attempt is slow when it is above either
+    ///     threshold.
     ///     <para>
     ///         The default is invisible until the breaker has a baseline -
     ///         <see cref="NResilience.SlowCalls.MinimumSamples" /> successful attempts over
@@ -328,13 +336,6 @@ public sealed record BreakerSettings
 
         if (SlowCalls is { } adaptive)
         {
-            if (SlowCallThreshold is not null)
-            {
-                problems.Add(
-                    $"Set {nameof(SlowCallThreshold)} or {nameof(SlowCalls)}, not both; they are the same trip " +
-                    "defined two ways. Keep SlowCalls unless the dependency has a real, externally-fixed budget.");
-            }
-
             adaptive.Validate(problems);
 
             // Only worth asking once the two values it is measured against are themselves sane; each of
@@ -476,12 +477,6 @@ public sealed record BreakerSettings
     /// <remarks>The baseline widens for the reason <see cref="DefaultFailures" /> gives.</remarks>
     private SlowCalls? DefaultSlowCalls()
     {
-        // The caller named the absolute form of this trip, so the relative default steps aside rather
-        // than colliding with it in Validate. They are the same trip defined two ways, and the one
-        // that was written down wins.
-        if (SlowCallThreshold is not null)
-            return null;
-
         var slow = NResilience.SlowCalls.Above(DefaultSlowCallMultiple);
 
         // Each of these has its own message in Validate; see DefaultFailures.
@@ -1060,16 +1055,24 @@ public sealed class Breaker
     /// </remarks>
     private bool IsSlow(TimeSpan duration)
     {
-        if (Settings.SlowCallThreshold is { } threshold)
-            return duration >= threshold;
+        var threshold = Settings.SlowCallThreshold;
 
-        if (_normal is null)
-            return false;
+        if (_normal is { } baseline)
+        {
+            var adaptive = _adaptive!.Value;
 
-        var adaptive = _adaptive!.Value;
-        var normal = _normal.RecordAndThreshold(duration, adaptive.MinimumSamples);
+            // Recorded whether or not an absolute threshold is also set: the baseline is a measurement
+            // of the dependency, not a decision about it, and a breaker that stopped measuring because
+            // somebody named a constant could never start again.
+            if (baseline.RecordAndThreshold(duration, adaptive.MinimumSamples) is { } measured)
+            {
+                var relative = adaptive.ThresholdFor(measured);
 
-        return normal is { } measured && duration >= adaptive.ThresholdFor(measured);
+                threshold = threshold is { } absolute && absolute < relative ? absolute : relative;
+            }
+        }
+
+        return threshold is { } effective && duration >= effective;
     }
 
     private static bool IsWindowed(BreakerSettings settings) =>

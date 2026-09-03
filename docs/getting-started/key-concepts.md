@@ -71,6 +71,20 @@ The effective ceiling for an attempt is the smallest of the `AttemptTimeout`, th
 
 For more information, see [Deadlines and attempt timeouts](../features/deadlines.md).
 
+## Constants and measurements compose
+
+That last bound is an instance of one rule, and it holds everywhere in the library:
+
+> A bound can be stated as a constant, measured from the dependency, or both. When both, the tighter one wins - the measured term never loosens what you wrote.
+
+| Constant | Measured | Effect together |
+| --- | --- | --- |
+| `AttemptTimeout` | `Timeouts` | The attempt is cut at whichever is shorter. |
+| `Breaker.SlowCallThreshold` | `Breaker.SlowCalls` | A call is slow when it is above either. |
+| `Breaker.FailureRatio` | `Breaker.Failures` | The breaker trips at whichever ratio is lower. |
+
+The measured half of each pair is on by default and stays invisible until it has a baseline, so a cold process behaves exactly as one with only the constants would.
+
 ## Verdicts
 
 Calls return a value or throw. The library then decides whether to retry, give up, or treat the failure as permanent. A **classifier** maps each outcome to a **verdict**.

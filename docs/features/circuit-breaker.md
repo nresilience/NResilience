@@ -55,7 +55,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 | `MinimumCalls` | 20 | The minimum number of calls required before a ratio-based trip is evaluated. |
 | `Window` | 30 s | The sliding window over which rates are measured. |
 | `SlowCallThreshold` | null | A constant latency threshold; any attempt slower than this counts as a slow call. |
-| `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default. Setting `SlowCallThreshold` replaces it; setting both is rejected. |
+| `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default, and composes with `SlowCallThreshold`: a call is slow when it is above either. |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls within the window that trips the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles on each consecutive open. |
@@ -90,7 +90,9 @@ The breaker samples individual **attempts**, and only `Transient` outcomes count
 
 ## Trip on brownouts without guessing a number
 
-**On by default.** `SlowCallThreshold` asks for a millisecond figure per dependency - before that dependency has ever run in production, and again every time its latency changes. `SlowCalls` asks for a multiple instead and measures the rest itself, so it is what an unconfigured breaker trips on. `SlowCalls = null` turns it off; `SlowCallThreshold` states the absolute figure instead.
+**On by default.** `SlowCallThreshold` asks for a millisecond figure per dependency - before that dependency has ever run in production, and again every time its latency changes. `SlowCalls` asks for a multiple instead and measures the rest itself, so it is what an unconfigured breaker trips on. `SlowCalls = null` turns it off.
+
+Set both when the dependency has a real, externally fixed budget you never want exceeded. They [compose](../getting-started/key-concepts.md#constants-and-measurements-compose) the way every constant and its measurement do: a call is slow when it is above either, so the constant is a ceiling the measured term can tighten but never loosen.
 
 <!-- snippet: breaker-adaptive-slow-calls -->
 ```csharp

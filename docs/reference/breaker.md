@@ -46,7 +46,7 @@ The `BreakerState` enum defines the breaker's states:
 | `MinimumCalls` | 20 | The minimum number of sampled calls in the window before a rate-based trip is evaluated. |
 | `Window` | 30 s | The sliding window duration over which rates are measured. |
 | `SlowCallThreshold` | `null` | A constant duration above which an attempt counts as "slow", even if it succeeded. |
-| `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default; set it to `null` to turn it off, or set `SlowCallThreshold` to state the absolute figure instead. Setting both is rejected. See [`SlowCalls`](#slowcalls). |
+| `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default; set it to `null` to turn it off. Composes with `SlowCallThreshold`: a call is slow when it is above either. See [`SlowCalls`](#slowcalls). |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that will trip the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set it equal to `BreakDuration` to disable growth. |
@@ -127,7 +127,7 @@ The `BreakerState` enum defines the breaker's states:
 - **Sampling**: Only successful attempts feed the baseline. A `Transient`, `Throttled`, or `Permanent` outcome says nothing about how long the dependency takes to do the work.
 - **The baseline is separate from the trip window**: it is not cleared when the breaker opens, closes, or is `Reset`.
 - **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Quantile` times `SlowCalls.Window` is less than twice `SlowCallRatio` times `Window`. Such a breaker cannot open on latency at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold).
-- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.Window` needs it to, and no brownout trip is defaulted on at all once that requirement passes an hour, or when `SlowCallThreshold` names the absolute form instead. All three apply to the default only - a `SlowCalls` you wrote is used as written, or rejected.
+- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.Window` needs it to, and no brownout trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `SlowCalls` you wrote is used as written, or rejected.
 - **Cost**: one `LatencyWindow` per breaker, about 3.4 KB, allocated whenever `SlowCalls` is set - which, at the defaults, is always.
 
 For a detailed explanation of the logic, see [Breaker internals](../deep-dives/breaker-internals.md).
