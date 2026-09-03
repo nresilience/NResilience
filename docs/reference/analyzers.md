@@ -17,7 +17,7 @@ Installing `NResilience` gives you seven diagnostics automatically. They ship in
 | [NRES005](#nres005) | A breaker, retry budget, policy scope, or gRPC interceptor is created per call. | Reliability | Warning |
 | [NRES006](#nres006) | A resilient `HttpClient` is created per call. | Reliability | Info |
 | [NRES007](#nres007) | The callback does not need to be `async`. | Performance | Info |
-| [NRES008](#nres008) | A policy configuring `Hedge` or `Timeouts` is created per call. | Reliability | Info |
+| [NRES008](#nres008) | A policy configuring `Hedge` or `AttemptCeiling` is created per call. | Reliability | Info |
 
 Rules `NRES001` and `NRES002` include automated code fixes.
 
@@ -137,7 +137,7 @@ For the allocation details, see [where the allocations are](../deep-dives/alloca
 
 ## NRES008: Policy with a latency estimate created per call
 
-[`Hedge`](../features/hedging.md) and [`Timeouts`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) both measure a quantile of recent latency, and that estimate is held per policy **instance** - which is the scope the feature wants, because one host's p95 is not another's. A policy rebuilt on every call therefore starts cold every time, never reaches `MinimumSamples`, and the feature silently does nothing.
+[`Hedge`](../features/hedging.md) and [`AttemptCeiling`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) both measure a quantile of recent latency, and that estimate is held per policy **instance** - which is the scope the feature wants, because one host's p95 is not another's. A policy rebuilt on every call therefore starts cold every time, never reaches `MinimumSamples`, and the feature silently does nothing.
 
 ```csharp
 // Reported: a new policy, and so a new latency estimate, on every call.
@@ -151,7 +151,7 @@ static readonly Resilience Search = Resilience.Http with { Hedge = Hedge.At(0.95
 
 Two limits are deliberate:
 
-- The rule reports a policy that **sets** `Hedge` or `Timeouts` in the expression the compiler can see. `Api with { Deadline = budget }`, where the estimator was configured on `Api`, is not reported - establishing that would mean following the referenced symbol, and a rule that is merely usually right about a shape this common is a rule people turn off. Because `Timeouts` is on in every preset but `Resilience.None`, that unreported shape has a cold estimate too: it falls back to `AttemptTimeout`, exactly as the reported one does.
+- The rule reports a policy that **sets** `Hedge` or `AttemptCeiling` in the expression the compiler can see. `Api with { Deadline = budget }`, where the estimator was configured on `Api`, is not reported - establishing that would mean following the referenced symbol, and a rule that is merely usually right about a shape this common is a rule people turn off. Because `AttemptCeiling` is on in every preset but `Resilience.None`, that unreported shape has a cold estimate too: it falls back to `AttemptTimeout`, exactly as the reported one does.
 - Setting either property to `null` is not reported. That removes the feature rather than configuring one, and it is how the HTTP handler builds its own single-shot policy.
 
 If you need a per-request bound on a policy that carries an estimator, prefer `ResilienceDeadline.Begin` with `UseAmbientDeadline` over deriving a policy per request. See [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop).

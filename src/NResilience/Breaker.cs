@@ -81,7 +81,7 @@ internal enum BreakerTransition : byte
 ///     <para>
 ///         Each of the two has an absolute counterpart - <see cref="SlowCallThreshold" /> for
 ///         <see cref="SlowCalls" />, <see cref="FailureRatio" /> for <see cref="Failures" /> - and one
-///         rule covers both pairs, and the policy's <c>AttemptTimeout</c> and <c>Timeouts</c> besides:
+///         rule covers both pairs, and the policy's <c>AttemptTimeout</c> and <c>AttemptCeiling</c> besides:
 ///         <b>a bound may be stated as a constant, measured from the dependency, or both, and when both
 ///         the tighter one wins.</b> The measured term never loosens what you wrote.
 ///     </para>
@@ -119,7 +119,7 @@ public sealed record BreakerSettings
     /// <summary>
     ///     Optional rate-based trip, evaluated alongside the consecutive counter. Null disables it, and
     ///     nothing rate-based - including <see cref="SlowCallThreshold" /> - is evaluated until
-    ///     <see cref="MinimumCalls" /> outcomes have landed in <see cref="Window" />.
+    ///     <see cref="MinimumCalls" /> outcomes have landed in <see cref="TripWindow" />.
     ///     <para>
     ///         This is an absolute rate, which is the number that ports nowhere: 5% is catastrophic for a
     ///         payments API and a quiet day for a flaky search backend. <see cref="Failures" /> is the same
@@ -161,8 +161,18 @@ public sealed record BreakerSettings
     /// <summary>How many sampled calls a rate-based trip needs before it means anything.</summary>
     public int MinimumCalls { get; init; } = 20;
 
-    /// <summary>The sliding window the rates are measured over.</summary>
-    public TimeSpan Window { get; init; } = TimeSpan.FromSeconds(30);
+    /// <summary>
+    ///     The sliding window the trip ratios are measured over: how much recent history the breaker
+    ///     decides on.
+    ///     <para>
+    ///         Not to be confused with <see cref="NResilience.SlowCalls.Window" /> and
+    ///         <see cref="NResilience.Failures.Window" />, which are the <i>baseline</i> windows the two
+    ///         relative trips measure "normal" over. Those are ten times longer by default and serve the
+    ///         opposite purpose: this window is what reacts quickly, and a baseline is what has to
+    ///         outlast the incident it is measuring.
+    ///     </para>
+    /// </summary>
+    public TimeSpan TripWindow { get; init; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     ///     Trip on brownouts, not just errors: a constant above which an attempt counts against
@@ -328,8 +338,8 @@ public sealed record BreakerSettings
         if (MinimumCalls < 1)
             problems.Add($"{nameof(MinimumCalls)} must be at least 1; it is {MinimumCalls}.");
 
-        if (Window <= TimeSpan.Zero)
-            problems.Add($"{nameof(Window)} must be positive; it is {Window}.");
+        if (TripWindow <= TimeSpan.Zero)
+            problems.Add($"{nameof(TripWindow)} must be positive; it is {TripWindow}.");
 
         if (SlowCallThreshold is { } slow && slow <= TimeSpan.Zero)
             problems.Add($"{nameof(SlowCallThreshold)} must be positive, or null for no slow-call trip; it is {slow}.");
@@ -340,7 +350,7 @@ public sealed record BreakerSettings
 
             // Only worth asking once the two values it is measured against are themselves sane; each of
             // those has its own message, and a second one derived from a NaN would only be noise.
-            if (Window > TimeSpan.Zero && SlowCallRatio > 0 && SlowCallRatio <= 1)
+            if (TripWindow > TimeSpan.Zero && SlowCallRatio > 0 && SlowCallRatio <= 1)
                 ValidateRace(adaptive, problems);
         }
 
@@ -350,7 +360,7 @@ public sealed record BreakerSettings
 
             // Only worth asking once the two values it is measured against are themselves sane; each
             // of those has its own message, and a second one derived from a NaN would only be noise.
-            if (Window > TimeSpan.Zero && relative.Multiple > 1 && relative.Window > TimeSpan.Zero)
+            if (TripWindow > TimeSpan.Zero && relative.Multiple > 1 && relative.Window > TimeSpan.Zero)
                 ValidateRace(relative, problems);
         }
 
@@ -387,8 +397,8 @@ public sealed record BreakerSettings
     ///     <para>
     ///         A total brownout starts moving the baseline once it accounts for more than
     ///         <c>1 - SlowCalls.Quantile</c> of <see cref="NResilience.SlowCalls.Window" />, so the baseline
-    ///         survives for <c>Quantile × Window</c>. The trip needs <see cref="SlowCallRatio" /> of
-    ///         <see cref="Window" /> to fill with slow calls, which takes <c>SlowCallRatio × Window</c>.
+    ///         survives for <c>SlowCalls.Quantile × SlowCalls.Window</c>. The trip needs <see cref="SlowCallRatio" /> of
+    ///         <see cref="TripWindow" /> to fill with slow calls, which takes <c>SlowCallRatio × TripWindow</c>.
     ///         Lose that race and the breaker cannot open on latency at all - it does not open late, it
     ///         never opens, because the baseline catches up and the calls stop being slow.
     ///     </para>
@@ -400,16 +410,16 @@ public sealed record BreakerSettings
     private void ValidateRace(SlowCalls adaptive, List<string> problems)
     {
         var survives = adaptive.Quantile * adaptive.Window.TotalSeconds;
-        var fills = SlowCallRatio * Window.TotalSeconds;
+        var fills = SlowCallRatio * TripWindow.TotalSeconds;
 
         if (survives >= 2 * fills)
             return;
 
         problems.Add(
             $"{nameof(SlowCalls)}.Quantile x {nameof(SlowCalls)}.Window ({survives:0.##}s) must be at least twice " +
-            $"{nameof(SlowCallRatio)} x {nameof(Window)} ({fills:0.##}s), or a brownout moves the baseline before the " +
+            $"{nameof(SlowCallRatio)} x {nameof(TripWindow)} ({fills:0.##}s), or a brownout moves the baseline before the " +
             $"window fills with slow calls and the breaker can never open on latency. Lengthen {nameof(SlowCalls)}.Window, " +
-            $"lower {nameof(SlowCalls)}.Quantile, or shorten {nameof(Window)}.");
+            $"lower {nameof(SlowCalls)}.Quantile, or shorten {nameof(TripWindow)}.");
     }
 
     /// <summary>
@@ -423,7 +433,7 @@ public sealed record BreakerSettings
     ///         reads <c>Multiple x</c> that. The trip window's own ratio cannot exceed 1, so once the
     ///         baseline reaches <c>1 / Multiple</c> the breaker cannot open on the error rate at all -
     ///         which takes <c>Failures.Window / Multiple</c> seconds. The trip window needs
-    ///         <see cref="Window" /> to turn over.
+    ///         <see cref="TripWindow" /> to turn over.
     ///     </para>
     ///     <para>
     ///         A factor of two is the margin, the same one <see cref="SlowCalls" /> is held to, and the
@@ -435,23 +445,23 @@ public sealed record BreakerSettings
     private void ValidateRace(Failures relative, List<string> problems)
     {
         var survives = relative.Window.TotalSeconds / relative.Multiple;
-        var fills = Window.TotalSeconds;
+        var fills = TripWindow.TotalSeconds;
 
         if (survives >= 2 * fills)
             return;
 
         problems.Add(
             $"{nameof(Failures)}.Window / {nameof(Failures)}.Multiple ({survives:0.##}s) must be at least twice " +
-            $"{nameof(Window)} ({fills:0.##}s), or an outage raises the baseline before the trip window fills with " +
+            $"{nameof(TripWindow)} ({fills:0.##}s), or an outage raises the baseline before the trip window fills with " +
             $"failures and the breaker can never open on the error rate. Lengthen {nameof(Failures)}.Window, lower " +
-            $"{nameof(Failures)}.Multiple, or shorten {nameof(Window)}.");
+            $"{nameof(Failures)}.Multiple, or shorten {nameof(TripWindow)}.");
     }
 
     /// <summary>The relative failure trip a caller who never mentioned one gets.</summary>
     /// <returns>The configuration, or null when the library declines to default one on.</returns>
     /// <remarks>
     ///     <see cref="NResilience.Failures.Window" />'s own default wins the contamination race
-    ///     <see cref="ValidateRace(Failures, List{string})" /> checks at <see cref="Window" />'s default
+    ///     <see cref="ValidateRace(Failures, List{string})" /> checks at <see cref="TripWindow" />'s default
     ///     and only there, so a default the caller did not write widens its baseline to whatever the
     ///     configured trip window needs. The library does not refuse a configuration on account of a
     ///     value the caller never named - and past <see cref="MaxDerivedBaseline" /> a baseline stops
@@ -461,12 +471,12 @@ public sealed record BreakerSettings
     {
         var failures = NResilience.Failures.Above(DefaultFailureMultiple);
 
-        // Window has its own message in Validate, and the race check skips itself for the same
+        // TripWindow has its own message in Validate, and the race check skips itself for the same
         // reason: a second complaint derived from a nonsense value would only be noise.
-        if (Window <= TimeSpan.Zero)
+        if (TripWindow <= TimeSpan.Zero)
             return failures;
 
-        if (Baseline(2 * DefaultFailureMultiple * Window.Ticks, failures.Window) is not { } baseline)
+        if (Baseline(2 * DefaultFailureMultiple * TripWindow.Ticks, failures.Window) is not { } baseline)
             return null;
 
         return baseline == failures.Window ? failures : failures with { Window = baseline };
@@ -480,10 +490,10 @@ public sealed record BreakerSettings
         var slow = NResilience.SlowCalls.Above(DefaultSlowCallMultiple);
 
         // Each of these has its own message in Validate; see DefaultFailures.
-        if (Window <= TimeSpan.Zero || double.IsNaN(SlowCallRatio) || SlowCallRatio <= 0 || SlowCallRatio > 1)
+        if (TripWindow <= TimeSpan.Zero || double.IsNaN(SlowCallRatio) || SlowCallRatio <= 0 || SlowCallRatio > 1)
             return slow;
 
-        if (Baseline(2 * SlowCallRatio * Window.Ticks / slow.Quantile, slow.Window) is not { } baseline)
+        if (Baseline(2 * SlowCallRatio * TripWindow.Ticks / slow.Quantile, slow.Window) is not { } baseline)
             return null;
 
         return baseline == slow.Window ? slow : slow with { Window = baseline };
@@ -622,7 +632,7 @@ public sealed class Breaker
     /// <summary>
     ///     The ceiling the evidence puts on the admitted fraction. It starts at 1 - no cap - halves
     ///     whenever an admitted call comes back slow, and climbs by one
-    ///     <see cref="NResilience.Recovery.Initial" /> behind every
+    ///     <see cref="NResilience.Recovery.InitialFraction" /> behind every
     ///     <see cref="BreakerSettings.ProbeSuccesses" /> that come back fast. The clock is the other
     ///     half, and the effective fraction is the lower of the two.
     /// </summary>
@@ -663,7 +673,7 @@ public sealed class Breaker
         Settings.Validate();
         _time = Settings.Time;
         _startedAt = _time.GetTimestamp();
-        _ticksPerBucket = Math.Max(Settings.Window.Ticks / BucketCount, 1);
+        _ticksPerBucket = Math.Max(Settings.TripWindow.Ticks / BucketCount, 1);
 
         // The window arrays exist only when something reads them. A breaker whose relative trips have
         // both been turned off, leaving only the consecutive counter, is three fields and no
@@ -977,7 +987,7 @@ public sealed class Breaker
                 //
                 // With a ramp there is a third answer, and it is the right one: "up, and not ready"
                 // is the state the ramp exists to express. The probe counts, the ramp starts, and it
-                // stalls at Recovery.Initial until the traffic it admits comes back fast. That
+                // stalls at Recovery.InitialFraction until the traffic it admits comes back fast. That
                 // trickle is also the traffic the dependency needs in order to warm, which re-opening
                 // would deny it - and it is bounded, unlike the close a slow probe must never cause.
                 if (slow && _recovery is null)
@@ -1286,9 +1296,9 @@ public sealed class Breaker
     ///     <para>
     ///         AIMD, with the same asymmetry the adaptive limiter uses and for the same reason: evidence
     ///         that a dependency is coping is weak and evidence that it is not is strong. A slow call
-    ///         halves the admitted fraction on the spot, floored at <see cref="NResilience.Recovery.Initial" />;
+    ///         halves the admitted fraction on the spot, floored at <see cref="NResilience.Recovery.InitialFraction" />;
     ///         <see cref="BreakerSettings.ProbeSuccesses" /> fast ones in a row add one
-    ///         <see cref="NResilience.Recovery.Initial" /> back, capped at 1, where the clock takes the
+    ///         <see cref="NResilience.Recovery.InitialFraction" /> back, capped at 1, where the clock takes the
     ///         decision back. Additive rather than doubling on the way up because a ramp that overshoots
     ///         saturates the dependency, and a saturated dependency stops warming - which is the failure
     ///         the whole feature exists to avoid.
@@ -1305,7 +1315,7 @@ public sealed class Breaker
     {
         if (slow)
         {
-            _rampAdmit = Math.Max(_recovery!.Value.Initial, Admission(now) / 2);
+            _rampAdmit = Math.Max(_recovery!.Value.InitialFraction, Admission(now) / 2);
             _rampSuccesses = 0;
             return;
         }
@@ -1313,7 +1323,7 @@ public sealed class Breaker
         if (++_rampSuccesses < Settings.ProbeSuccesses)
             return;
 
-        _rampAdmit = Math.Min(1, _rampAdmit + _recovery!.Value.Initial);
+        _rampAdmit = Math.Min(1, _rampAdmit + _recovery!.Value.InitialFraction);
         _rampSuccesses = 0;
     }
 
@@ -1334,7 +1344,7 @@ public sealed class Breaker
     /// </remarks>
     private double Admission(long now)
     {
-        var initial = _recovery!.Value.Initial;
+        var initial = _recovery!.Value.InitialFraction;
         var elapsed = now - _rampStartedAt;
         var clock = _rampTicks <= 0 ? 1 : initial + (1 - initial) * ((double)elapsed / _rampTicks);
 

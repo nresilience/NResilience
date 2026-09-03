@@ -113,7 +113,7 @@ public static class ResilienceTelemetry
         "The concurrency limit an adaptive limiter has settled on, recorded when it changes. Watching this fall is watching the dependency tell you it is queueing.");
 
     /// <summary>
-    ///     Recorded when the per-attempt ceiling measured by <see cref="Resilience.Timeouts" /> changes.
+    ///     Recorded when the per-attempt ceiling measured by <see cref="Resilience.AttemptCeiling" /> changes.
     ///     <para>
     ///         This is a histogram because the estimate is private to each policy instance. A ceiling
     ///         that does not move is not reported, and a ceiling clamped to

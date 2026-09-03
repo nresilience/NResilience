@@ -47,14 +47,14 @@ This also applies when too little time remains. If the circuit breaker measures 
 
 ## Measure the attempt ceiling instead of guessing it
 
-**On by default.** `AttemptTimeout` alone is a number you pick per dependency before it runs, and update whenever it changes. `Timeouts` measures the ceiling from the dependency's own latency instead, by default at `AttemptTimeouts.Above(3)` - three times the recent p95. `Timeouts = null` leaves `AttemptTimeout` as the only per-attempt ceiling.
+**On by default.** `AttemptTimeout` alone is a number you pick per dependency before it runs, and update whenever it changes. `AttemptCeiling` measures the ceiling from the dependency's own latency instead, by default at `AttemptCeiling.Above(3)` - three times the recent p95. `AttemptCeiling = null` leaves `AttemptTimeout` as the only per-attempt ceiling.
 
 <!-- snippet: deadline-measured-ceiling -->
 ```csharp
 var api = Resilience.Http with
 {
     AttemptTimeout = TimeSpan.FromSeconds(value: 5), // the ceiling. Never exceeded.
-    Timeouts = AttemptTimeouts.Above(multiple: 3), // and usually far below it: 3x the recent p95.
+    AttemptCeiling = AttemptCeiling.Above(multiple: 3), // and usually far below it: 3x the recent p95.
 };
 
 // The measured term can only lower the ceiling, so AttemptTimeout stops being a guess about how
@@ -66,7 +66,7 @@ var api = Resilience.Http with
 
 The effective ceiling is the minimum of `AttemptTimeout`, the time remaining on the deadline, and the measured quantile multiplied by `Multiple`. Because the measured term only lowers the ceiling, the feature is safe to leave on: `AttemptTimeout` remains the ultimate ceiling, and a dependency slow enough that the measurement exceeds it simply gets the default behavior.
 
-`AttemptTimeouts.Above(3)` is a complete configuration. The properties you can change:
+`AttemptCeiling.Above(3)` is a complete configuration. The properties you can change:
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
@@ -79,11 +79,11 @@ The effective ceiling is the minimum of `AttemptTimeout`, the time remaining on 
 Four behaviors are worth knowing:
 
 - **A cold process does not guess.** Below `MinimumSamples` there is no measured term and the attempt gets `AttemptTimeout` unchanged.
-- **It only tightens a ceiling you set.** A policy whose `AttemptTimeout` is `Timeout.InfiniteTimeSpan` gets no default measured ceiling: you said the deadline was the only per-attempt bound, and there is nothing there to tighten. Writing `Timeouts` yourself there is a different instruction - "bound me by the dependency's latency and nothing else" - and it is honored.
+- **It only tightens a ceiling you set.** A policy whose `AttemptTimeout` is `Timeout.InfiniteTimeSpan` gets no default measured ceiling: you said the deadline was the only per-attempt bound, and there is nothing there to tighten. Writing `AttemptCeiling` yourself there is a different instruction - "bound me by the dependency's latency and nothing else" - and it is honored.
 - **Only successful attempts are sampled.** A ceiling tight enough to cancel calls that would have succeeded starves its own estimator, so the policy reverts to `AttemptTimeout` rather than tightening further.
 - **The estimate is per policy instance.** The HTTP handler derives one policy per host, so each host's ceiling is measured from that host's own latency.
 
-Read the current value from `MeasuredAttemptTimeout`, or watch the `nresilience.attempt.timeout` histogram, which is recorded when the number moves. Both report the measured ceiling before `AttemptTimeout` clamps it, so a value above your `AttemptTimeout` is the reading that says the clamp is now what bounds the attempt.
+Read the current value from `MeasuredAttemptCeiling`, or watch the `nresilience.attempt.timeout` histogram, which is recorded when the number moves. Both report the measured ceiling before `AttemptTimeout` clamps it, so a value above your `AttemptTimeout` is the reading that says the clamp is now what bounds the attempt.
 
 > [!NOTE]
 > When [hedging](hedging.md) is configured too, the ceiling is measured from at least the hedge's own quantile. A ceiling below the hedge threshold would cancel the first leg at the moment the second was due to start, and you would have bought a feature that never fires.
@@ -92,11 +92,11 @@ Read the current value from `MeasuredAttemptTimeout`, or watch the `nresilience.
 
 Two different requirements hide behind "we need an exact timeout", and they have different answers.
 
-**A hard upper bound** - "this call must never take longer than 3 seconds" - is `Deadline`, and a measured ceiling never touches it. The effective ceiling is `min(AttemptTimeout, time left, measured)`, so the time left always clamps and the measured term only ever operates *inside* the deadline. Your bound is exact to the tick whether or not `Timeouts` is set, and the measured term can only ever cancel an attempt **earlier** than you configured, never later.
+**A hard upper bound** - "this call must never take longer than 3 seconds" - is `Deadline`, and a measured ceiling never touches it. The effective ceiling is `min(AttemptTimeout, time left, measured)`, so the time left always clamps and the measured term only ever operates *inside* the deadline. Your bound is exact to the tick whether or not `AttemptCeiling` is set, and the measured term can only ever cancel an attempt **earlier** than you configured, never later.
 
 Counter-intuitively, a tight SLA is the strongest case *for* measuring the ceiling. Take a 3-second deadline, three attempts, and a dependency whose p95 is 40 ms:
 
-| | With `AttemptTimeout = 10 s` alone | With `Timeouts = AttemptTimeouts.Above(3)` |
+| | With `AttemptTimeout = 10 s` alone | With `AttemptCeiling = AttemptCeiling.Above(3)` |
 | :--- | :--- | :--- |
 | First attempt hangs | Capped at `min(10 s, 3 s left)` = 3 s | Cancelled at ~120 ms |
 | Attempts you actually get | **One.** The deadline is gone. | **Three**, all inside ~660 ms |
@@ -117,19 +117,19 @@ var api = Resilience.Http with
     // And this endpoint legitimately takes up to 2 s sometimes, so no attempt may be
     // cancelled before then. Adaptation is confined to [2 s, 5 s]: it can trim the dead time
     // above 2 s and can never cut into the allowance below it.
-    Timeouts = AttemptTimeouts.Above(multiple: 3) with { Floor = TimeSpan.FromSeconds(value: 2) },
+    AttemptCeiling = AttemptCeiling.Above(multiple: 3) with { Floor = TimeSpan.FromSeconds(value: 2) },
 };
 ```
 <!-- endsnippet -->
 
-Note that a `Floor` at or above `AttemptTimeout` is refused at validation. That combination pins the ceiling to exactly `AttemptTimeout`, which makes `Timeouts` do nothing at all, and the library refuses configurations that silently have no effect - so the honest way to say "an exact attempt timeout, always" is `Timeouts = null`. An `AttemptTimeout` at or below the default 50 ms `Floor` works the same way: the default steps aside rather than turning your policy into an error.
+Note that a `Floor` at or above `AttemptTimeout` is refused at validation. That combination pins the ceiling to exactly `AttemptTimeout`, which makes `AttemptCeiling` do nothing at all, and the library refuses configurations that silently have no effect - so the honest way to say "an exact attempt timeout, always" is `AttemptCeiling = null`. An `AttemptTimeout` at or below the default 50 ms `Floor` works the same way: the default steps aside rather than turning your policy into an error.
 
 ### Bounding one request, not one policy
 
-`Timeouts` measures across calls, so the estimate lives on the policy instance. If you need a bound that differs per request, publish it rather than deriving a policy per request:
+`AttemptCeiling` measures across calls, so the estimate lives on the policy instance. If you need a bound that differs per request, publish it rather than deriving a policy per request:
 
 - `ResilienceDeadline.Begin(remaining)` with `UseAmbientDeadline` gives that request an exact deadline, resolved once as `min(Deadline, remaining)`. See [propagating the deadline](#propagate-the-deadline-across-a-hop).
-- Deriving `policy with { Deadline = ... }` per request also works, but the latency estimate is keyed by the policy instance - so a policy built per request is permanently cold and `Timeouts` silently does nothing. It fails safe, back to `AttemptTimeout`, but it fails quietly. [`NRES008`](../reference/analyzers.md#nres008) reports the cases the compiler can see.
+- Deriving `policy with { Deadline = ... }` per request also works, but the latency estimate is keyed by the policy instance - so a policy built per request is permanently cold and `AttemptCeiling` silently does nothing. It fails safe, back to `AttemptTimeout`, but it fails quietly. [`NRES008`](../reference/analyzers.md#nres008) reports the cases the compiler can see.
 
 ## Propagate the deadline across a hop
 
@@ -232,6 +232,6 @@ If a token is cancelled while an attempt is already succeeding, NResilience does
 
 ## Work that ignores the token
 
-Timeouts work through the cancellation token, so callbacks must observe it to be terminated. The required `CancellationToken` parameter on every execution overload, the analyzers, and the `OrphanedWork` event are the safeguards against callbacks that ignore cancellation.
+Both bounds work through the cancellation token, so callbacks must observe it to be terminated. The required `CancellationToken` parameter on every execution overload, the analyzers, and the `OrphanedWork` event are the safeguards against callbacks that ignore cancellation.
 
 For the full picture, see [The cancellation contract](../deep-dives/cancellation.md).

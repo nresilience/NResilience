@@ -200,7 +200,7 @@ public sealed class DoomedAttemptTests
 
             // The measured per-attempt ceiling is a different feature reading a different quantile, and
             // an attempt that is cancelled early would change the arithmetic these tests are about.
-            Timeouts = null,
+            AttemptCeiling = null,
         };
 
     /// <summary>

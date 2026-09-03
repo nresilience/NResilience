@@ -53,7 +53,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 | `FailureRatio` | null | An optional rate-based trip condition, evaluated alongside the consecutive failure counter. |
 | `Failures` | `Failures.Above(5)` | The same trip, expressed as a multiple of the dependency's own measured error rate. On by default. Composes with `FailureRatio`, which stays the ceiling. |
 | `MinimumCalls` | 20 | The minimum number of calls required before a ratio-based trip is evaluated. |
-| `Window` | 30 s | The sliding window over which rates are measured. |
+| `TripWindow` | 30 s | The sliding window the trip ratios are measured over - not to be confused with the baseline `Window` inside `SlowCalls` and `Failures`. |
 | `SlowCallThreshold` | null | A constant latency threshold; any attempt slower than this counts as a slow call. |
 | `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default, and composes with `SlowCallThreshold`: a call is slow when it is above either. |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls within the window that trips the breaker. |
@@ -75,7 +75,7 @@ var breaker = new Breaker(settings: new BreakerSettings
     SlowCallThreshold = TimeSpan.FromSeconds(value: 2), // anything slower counts against
     SlowCallRatio = 0.5, // half the window being slow trips it
     MinimumCalls = 20, // below this, a ratio means nothing
-    Window = TimeSpan.FromSeconds(value: 30),
+    TripWindow = TimeSpan.FromSeconds(value: 30), // the history the ratios are measured over
     BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
     MaxBreakDuration = TimeSpan.FromMinutes(value: 2),
     ProbeSuccesses = 2, // two good probes to close, not one
@@ -121,9 +121,9 @@ The breaker keeps a baseline of how long a successful call takes - by default th
 Two settings make this work, both with defaults you can leave alone:
 
 - `Quantile` (default 0.5, capped there) is the quantile that counts as normal. A brownout only starts moving the median once it accounts for more than half the baseline window.
-- `Window` (default 5 minutes) is how far back the baseline reaches - 10 times the trip window, so the trip window fills with slow calls long before the baseline notices them.
+- `Window` (default 5 minutes) is how far back the baseline reaches - 10 times `TripWindow`, so the trip window fills with slow calls long before the baseline notices them.
 
-`BreakerSettings.Validate` rejects combinations where the baseline would move first - such a breaker never opens on latency at all. That rejection is for a baseline you configured; the *default* baseline widens with a longer `Window` instead, because a value you did not write must not turn your configuration into an error. See [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold) for the arithmetic.
+`BreakerSettings.Validate` rejects combinations where the baseline would move first - such a breaker never opens on latency at all. That rejection is for a baseline you configured; the *default* baseline widens with a longer `TripWindow` instead, because a value you did not write must not turn your configuration into an error. See [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold) for the arithmetic.
 
 Only successful attempts feed the baseline, and the baseline survives an open, a close, and a `Reset` - it measures the dependency, it does not decide anything about it. That is what makes a slow probe against a still-degraded dependency recognizable as one.
 
@@ -203,7 +203,7 @@ Two successful probes indicate the dependency can serve some traffic. Closing th
 // more of each period cold. The ramp gives it a trickle it can actually serve.
 var breaker = new Breaker(settings: new BreakerSettings
 {
-    Recovery = Recovery.Over(fraction: 0.25), // ramp back over a quarter of the break served
+    Recovery = Recovery.Over(length: 0.25), // ramp back over a quarter of the break served
     BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
 })
 {
@@ -212,9 +212,9 @@ var breaker = new Breaker(settings: new BreakerSettings
 ```
 <!-- endsnippet -->
 
-The ramp's length is derived from the break duration just served, clamped between `Minimum` and `Maximum`. Its pace depends on the performance of admitted calls: a slow call halves the admitted fraction, and `ProbeSuccesses` consecutive fast calls increase it, with the clock providing an upper bound. A single failure during the ramp re-opens the breaker with an increased break duration.
+The ramp's length is derived from the break duration just served, clamped between `MinimumLength` and `MaximumLength`. Its pace depends on the performance of admitted calls: a slow call halves the admitted fraction, and `ProbeSuccesses` consecutive fast calls increase it, with the clock providing an upper bound. A single failure during the ramp re-opens the breaker with an increased break duration.
 
-**The failure mode.** A ramp against a dependency that answers but remains slow will not complete: it stays at `Initial`, and `State` reports `Recovering` indefinitely. This is reported as degraded to the [health check](../di/health-checks.md). This is deliberate; it indicates the dependency is up but not ready, and re-opening would deny the trickle of traffic it needs to warm. Alert on a breaker recovering for longer than its break. See [Breaker internals](../deep-dives/breaker-internals.md#the-recovery-cliff).
+**The failure mode.** A ramp against a dependency that answers but remains slow will not complete: it stays at `InitialFraction`, and `State` reports `Recovering` indefinitely. This is reported as degraded to the [health check](../di/health-checks.md). This is deliberate; it indicates the dependency is up but not ready, and re-opening would deny the trickle of traffic it needs to warm. Alert on a breaker recovering for longer than its break. See [Breaker internals](../deep-dives/breaker-internals.md#the-recovery-cliff).
 
 ## Handle refused calls
 

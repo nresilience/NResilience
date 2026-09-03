@@ -108,7 +108,7 @@ internal static class Diagnostics
         "'{0}' is set on a policy created inside '{1}', so every call builds a new one; the latency estimate is private to the policy instance, so it never reaches MinimumSamples and '{0}' silently does nothing",
         Reliability,
         DiagnosticSeverity.Info,
-        "Hedge and Timeouts both measure a quantile of recent latency, and that estimate is held per policy " +
+        "Hedge and AttemptCeiling both measure a quantile of recent latency, and that estimate is held per policy " +
         "instance - which is the scope the feature wants, because one host's p95 is not another's. A policy " +
         "rebuilt per call therefore starts cold every time, and both features are documented to do nothing " +
         "until they have MinimumSamples: the hedge never fires and the measured attempt ceiling never lowers " +

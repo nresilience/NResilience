@@ -128,7 +128,7 @@ public sealed class HedgeSuppressionTests
             FailureRatio = null,
             Failures = null,
             SlowCalls = null,
-            Window = Window,
+            TripWindow = Window,
             Time = time,
         });
 
@@ -226,7 +226,7 @@ public sealed class HedgeSuppressionTests
             Failures = null,
             SlowCalls = null,
             MinimumCalls = minimumCalls,
-            Window = Window,
+            TripWindow = Window,
             Time = time,
         });
 

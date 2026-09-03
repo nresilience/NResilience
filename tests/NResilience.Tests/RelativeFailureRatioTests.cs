@@ -242,7 +242,7 @@ public sealed class RelativeFailureRatioTests
             new Breaker(new BreakerSettings
             {
                 Failures = Failures.Above(5) with { Window = TimeSpan.FromMinutes(1) },
-                Window = TimeSpan.FromSeconds(30),
+                TripWindow = TimeSpan.FromSeconds(30),
             }));
 
         Assert.Contains(problem.Problems, p => p.Contains("never open on the error rate", StringComparison.Ordinal));

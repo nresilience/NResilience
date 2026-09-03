@@ -159,7 +159,7 @@ public sealed class BreakerTests
             ConsecutiveFailures = 100,
             FailureRatio = 0.5,
             MinimumCalls = 4,
-            Window = TimeSpan.FromSeconds(30),
+            TripWindow = TimeSpan.FromSeconds(30),
         });
 
         Sample(breaker, VerdictKind.Transient, 3);

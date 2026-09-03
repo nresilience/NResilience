@@ -262,7 +262,7 @@ public sealed class AdaptiveSlowCallTests
             new Breaker(new BreakerSettings
             {
                 SlowCalls = SlowCalls.Above(3) with { Window = TimeSpan.FromSeconds(30) },
-                Window = TimeSpan.FromSeconds(30),
+                TripWindow = TimeSpan.FromSeconds(30),
             }));
 
         Assert.Contains(problem.Problems, p => p.Contains("never open on latency", StringComparison.Ordinal));

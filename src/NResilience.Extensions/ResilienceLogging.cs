@@ -173,7 +173,7 @@ public static class ResilienceLogging
             {
                 text.Append(ratio.ToString("0.##%", CultureInfo.InvariantCulture))
                     .Append(" of ").Append(settings.MinimumCalls.ToString(CultureInfo.InvariantCulture))
-                    .Append(" calls over ").Append(Duration(settings.Window));
+                    .Append(" calls over ").Append(Duration(settings.TripWindow));
             }
             else
             {

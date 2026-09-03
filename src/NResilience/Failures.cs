@@ -96,7 +96,7 @@ public readonly record struct Failures
 
     /// <summary>
     ///     How much history the baseline covers. Default 5 minutes - ten times
-    ///     <see cref="BreakerSettings.Window" />'s default, and the same span
+    ///     <see cref="BreakerSettings.TripWindow" />'s default, and the same span
     ///     <see cref="SlowCalls.Window" /> uses.
     ///     <para>
     ///         Deliberately long. It is the memory of how often this dependency fails when it is
@@ -130,7 +130,7 @@ public readonly record struct Failures
     ///     The error rate the relative trip never fires below, whatever the baseline was. Default
     ///     <c>0.05</c>.
     ///     <para>
-    ///         The mirror of <see cref="AttemptTimeouts.Floor" />, and it exists for the same reason: a
+    ///         The mirror of <see cref="AttemptCeiling.Floor" />, and it exists for the same reason: a
     ///         dependency that essentially never fails has a baseline near zero, and any multiple of
     ///         near-zero is one unlucky call. The floor is the "nothing is wrong here" line.
     ///     </para>

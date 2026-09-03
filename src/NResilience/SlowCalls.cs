@@ -42,7 +42,7 @@ namespace NResilience;
 ///     </para>
 ///     <para>
 ///         <b>Why a longer window.</b> The trip needs <see cref="BreakerSettings.SlowCallRatio" /> of
-///         <see cref="BreakerSettings.Window" /> to fill with slow calls <i>before</i> the baseline
+///         <see cref="BreakerSettings.TripWindow" /> to fill with slow calls <i>before</i> the baseline
 ///         moves. That is a race between two clocks, and
 ///         <see cref="BreakerSettings.Validate" /> refuses configurations that lose it: the baseline must
 ///         take at least twice as long to contaminate as the trip window takes to fill. At the defaults -
@@ -106,7 +106,7 @@ public readonly record struct SlowCalls
 
     /// <summary>
     ///     How much history the baseline covers. Default 5 minutes - ten times
-    ///     <see cref="BreakerSettings.Window" />'s default.
+    ///     <see cref="BreakerSettings.TripWindow" />'s default.
     ///     <para>
     ///         This is deliberately long. It is the memory of what healthy looked like, and it has to
     ///         outlast the degradation it is measuring; the trip window is what reacts quickly.

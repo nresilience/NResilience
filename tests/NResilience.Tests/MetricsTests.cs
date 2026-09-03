@@ -144,7 +144,7 @@ public sealed class MetricsTests
             Name = "t-ceiling",
             Attempts = 1,
             AttemptTimeout = TimeSpan.FromSeconds(30),
-            Timeouts = AttemptTimeouts.Above(3) with { Window = TimeSpan.FromHours(1) },
+            AttemptCeiling = AttemptCeiling.Above(3) with { Window = TimeSpan.FromHours(1) },
         }).WithTelemetry();
 
         for (var i = 0; i < 40; i++)

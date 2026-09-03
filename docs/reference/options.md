@@ -105,14 +105,14 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 `ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone".
 
-**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `Timeouts`, `Breaker`, `Hedge`.
+**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
 
 ### Every section has an `Enabled`
 
-`Budget`, `Timeouts`, `Breaker`, `Hedge`, and the `Failures`, `SlowCalls` and `Recovery` subsections
+`Budget`, `AttemptCeiling`, `Breaker`, `Hedge`, and the `Failures`, `SlowCalls` and `Recovery` subsections
 of `Breaker` each take a nullable `bool Enabled`:
 
 | Value | Meaning |
@@ -173,9 +173,9 @@ For more information on the configuration structure, see [Configuration](../di/c
 
 There is deliberately no fixed-delay setting. A constant threshold is the failure mode the adaptive one exists to avoid, and it would be one JSON key away if it existed at all.
 
-## `AttemptTimeoutsOptions`
+## `AttemptCeilingOptions`
 
-`AttemptTimeoutsOptions` provides the bindable shape of [`AttemptTimeouts`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), which the default policy has on. Every property has a working default, so the section is only needed to change one - or to turn the feature off, which is `"Timeouts": { "Enabled": false }`.
+`AttemptCeilingOptions` provides the bindable shape of [`AttemptCeiling`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), which the default policy has on. Every property has a working default, so the section is only needed to change one - or to turn the feature off, which is `"AttemptCeiling": { "Enabled": false }`.
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
@@ -196,7 +196,7 @@ There is deliberately no way to make the measured ceiling longer than `AttemptTi
 
 `Enabled` is `false` for no breaker at all - the only way a later configuration layer can remove one an earlier layer added.
 
-The two relative trips are on by default, as they are on `BreakerSettings`, and a subsection turns one off the same way `Timeouts` does: `"SlowCalls": { "Enabled": false }` or `"Failures": { "Enabled": false }`. Setting `SlowCallThreshold` as well composes with `SlowCalls` rather than replacing it: a call is slow when it is above either threshold. `"Recovery": { "Enabled": false }` turns the ramp back off.
+The two relative trips are on by default, as they are on `BreakerSettings`, and a subsection turns one off the same way `AttemptCeiling` does: `"SlowCalls": { "Enabled": false }` or `"Failures": { "Enabled": false }`. Setting `SlowCallThreshold` as well composes with `SlowCalls` rather than replacing it: a call is slow when it is above either threshold. `"Recovery": { "Enabled": false }` turns the ramp back off.
 
 ## `AddRateLimit` on `IHttpClientBuilder`
 

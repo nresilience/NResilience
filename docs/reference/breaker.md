@@ -44,7 +44,7 @@ The `BreakerState` enum defines the breaker's states:
 | `FailureRatio` | `null` | An optional rate-based trip threshold in the range (0, 1]. This is evaluated alongside the consecutive failure counter. |
 | `Failures` | `Failures.Above(5)` | The same trip, expressed as a multiple of the dependency's own measured error rate. On by default; set it to `null` to turn it off. Composes with `FailureRatio`, which stays the ceiling when both are set. See [`Failures`](#failures). |
 | `MinimumCalls` | 20 | The minimum number of sampled calls in the window before a rate-based trip is evaluated. |
-| `Window` | 30 s | The sliding window duration over which rates are measured. |
+| `TripWindow` | 30 s | The sliding window the trip ratios are measured over. Distinct from the `Window` on `Failures` and `SlowCalls`, which are the baseline windows those trips measure "normal" over. |
 | `SlowCallThreshold` | `null` | A constant duration above which an attempt counts as "slow", even if it succeeded. |
 | `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default; set it to `null` to turn it off. Composes with `SlowCallThreshold`: a call is slow when it is above either. See [`SlowCalls`](#slowcalls). |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that will trip the breaker. |
@@ -60,7 +60,7 @@ The `BreakerState` enum defines the breaker's states:
 ### Implementation details
 
 - **Evaluation**: Rate-based trips (including both slow-call forms) are not evaluated until `MinimumCalls` have occurred within the window.
-- **Resource Efficiency**: Window arrays are only allocated if a rate-based trip is configured. A breaker relying solely on consecutive failures requires no arrays.
+- **Resource Efficiency**: trip-window arrays are only allocated if a rate-based trip is configured. A breaker relying solely on consecutive failures requires no arrays.
 - **Sampling**: The breaker samples individual attempts. Only `Transient` outcomes are counted as evidence of failure.
 - **Jitter**: The break duration is jittered once, at the moment the breaker opens, and the growth per consecutive open is computed from the nominal duration rather than the jittered one. `RetryAfterHint` and `CallRejectedException.RetryAfter` report the break actually being served.
 
@@ -82,8 +82,8 @@ The `BreakerState` enum defines the breaker's states:
 - **The baseline is separate from the trip window**: it is not cleared when the breaker opens, closes, or is `Reset`.
 - **Trip point**: `min(FailureRatio, max(AbsoluteFloor, NormalFailureRate * Multiple))`, clamped to 1. The relative trip can only fire sooner than `FailureRatio`, never later.
 - **Two failures minimum**: a relative trip needs at least two failures in the window whatever the ratio says, because at the default floor a single failure in a 20-call window is already 5%. An absolute `FailureRatio` is not held to that.
-- **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Failures.Window` divided by `Multiple` is less than twice `Window`. Such a breaker cannot open on the error rate at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-relative-failure-ratio).
-- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.Window` needs it to, and no relative trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `Failures` you wrote is used as written, or rejected.
+- **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Failures.Window` divided by `Multiple` is less than twice `TripWindow`. Such a breaker cannot open on the error rate at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-relative-failure-ratio).
+- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.TripWindow` needs it to, and no relative trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `Failures` you wrote is used as written, or rejected.
 - **Cost**: two `int[10]` rings per breaker, allocated whenever `Failures` is set - which, at the defaults, is always.
 
 ## `Recovery`
@@ -92,20 +92,20 @@ The `BreakerState` enum defines the breaker's states:
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
-| `Fraction` | N/A | How much of the break just served the ramp lasts. Must be greater than 0. |
-| `Minimum` | 1 s | The shortest ramp, however brief the break was. |
-| `Maximum` | 30 s | The longest ramp, however long the break was. The bound on what the feature can cost. |
-| `Initial` | 0.05 | The fraction of calls the ramp admits when it starts, and the floor it never drops below. Must be in (0, 1). |
-| `Over(double fraction = 0.25)` | N/A | The static factory. |
+| `Length` | N/A | How long the ramp lasts, as a fraction of the break just served. Must be greater than 0. |
+| `MinimumLength` | 1 s | The shortest ramp, however brief the break was. |
+| `MaximumLength` | 30 s | The longest ramp, however long the break was. The bound on what the feature can cost. |
+| `InitialFraction` | 0.05 | The fraction of *calls* the ramp admits when it starts, and the floor it never drops below. Must be in (0, 1). |
+| `Over(double length = 0.25)` | N/A | The static factory. |
 
 ### Implementation details
 
-- **Admission**: the admitted fraction is the lower of a clock term, which climbs from `Initial` to 1 across the ramp, and an evidence term. Calls outside it are refused exactly as an open breaker refuses them, through the same guarded rejection pause, with `StopReason.DependencyUnavailable`.
+- **Admission**: the admitted fraction is the lower of a clock term, which climbs from `InitialFraction` to 1 across the ramp, and an evidence term. Calls outside it are refused exactly as an open breaker refuses them, through the same guarded rejection pause, with `StopReason.DependencyUnavailable`.
 - **Evenly spaced, not random**: admission uses deficit accounting rather than a coin flip, so a ramp admits an even share of what it is offered. The fleet is already de-correlated by `BreakJitter`, which decides when each pod's ramp starts.
-- **Evidence is AIMD**: the admitted fraction is adjusted using an additive-increase/multiplicative-decrease (AIMD) approach: a slow call halves the fraction (floored at `Initial`), and `ProbeSuccesses` consecutive fast calls increase it by `Initial` (capped at 1). This prevents the ramp from overshooting and saturating the dependency.
+- **Evidence is AIMD**: the admitted fraction is adjusted using an additive-increase/multiplicative-decrease (AIMD) approach: a slow call halves the fraction (floored at `InitialFraction`), and `ProbeSuccesses` consecutive fast calls increase it by `InitialFraction` (capped at 1). This prevents the ramp from overshooting and saturating the dependency.
 - **Failure**: one `Transient` outcome during the ramp re-opens the breaker, without waiting for the trip conditions a closed breaker is held to. The break it re-opens with is the grown one, because nothing has closed the breaker cleanly yet.
 - **Slow calls during a ramp** stall it rather than counting towards the slow-call trip. Slow is the expected reading while a dependency warms, and tripping on it would make the stall unreachable.
-- **A slow probe** starts the ramp rather than re-opening the breaker when `Recovery` is set, and the ramp then stalls at `Initial`. Without a ramp there is no third answer available and a slow probe re-opens, as it always has.
+- **A slow probe** starts the ramp rather than re-opening the breaker when `Recovery` is set, and the ramp then stalls at `InitialFraction`. Without a ramp there is no third answer available and a slow probe re-opens, as it always has.
 - **Telemetry**: `BreakerClosed` is raised when the ramp starts, not when it completes - that is where the breaker stops refusing everything. `RetryAfter` is `null` for a refusal during a ramp, because the caller's next call is likely to be admitted.
 - **`Reset`** closes without a ramp. It is administrative, and warming a dependency an operator has vouched for is not part of what "reset" means.
 - **Cost**: five fields on the breaker, no allocation, and no executor contact - a ramp refusal takes the branch an open breaker's refusal already takes.
@@ -126,8 +126,8 @@ The `BreakerState` enum defines the breaker's states:
 
 - **Sampling**: Only successful attempts feed the baseline. A `Transient`, `Throttled`, or `Permanent` outcome says nothing about how long the dependency takes to do the work.
 - **The baseline is separate from the trip window**: it is not cleared when the breaker opens, closes, or is `Reset`.
-- **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Quantile` times `SlowCalls.Window` is less than twice `SlowCallRatio` times `Window`. Such a breaker cannot open on latency at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold).
-- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.Window` needs it to, and no brownout trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `SlowCalls` you wrote is used as written, or rejected.
+- **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Quantile` times `SlowCalls.Window` is less than twice `SlowCallRatio` times `TripWindow`. Such a breaker cannot open on latency at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-adaptive-slow-call-threshold).
+- **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.TripWindow` needs it to, and no brownout trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `SlowCalls` you wrote is used as written, or rejected.
 - **Cost**: one `LatencyWindow` per breaker, about 3.4 KB, allocated whenever `SlowCalls` is set - which, at the defaults, is always.
 
 For a detailed explanation of the logic, see [Breaker internals](../deep-dives/breaker-internals.md).

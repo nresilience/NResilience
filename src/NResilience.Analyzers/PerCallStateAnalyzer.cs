@@ -13,7 +13,7 @@ namespace NResilience.Analyzers;
 ///     of each per key and keeps none of them, and a client that is rebuilt per call has no per-host
 ///     anything. All of them read as configured resilience and provide none.
 ///     <para>
-///         NRES008 is the same failure one level in. <c>Hedge</c> and <c>Timeouts</c> hold no state of
+///         NRES008 is the same failure one level in. <c>Hedge</c> and <c>AttemptCeiling</c> hold no state of
 ///         their own - they are values - but the latency estimate they measure against is keyed by the
 ///         policy <i>instance</i>, so a policy rebuilt per call is a feature that never fires. It is a
 ///         rule of its own rather than a third case of NRES005 because the subject is the policy rather
@@ -77,7 +77,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    ///     Reported for a policy that <i>sets</i> <c>Hedge</c> or <c>Timeouts</c> inside a method, which
+    ///     Reported for a policy that <i>sets</i> <c>Hedge</c> or <c>AttemptCeiling</c> inside a method, which
     ///     is the case the compiler can be sure about.
     /// </summary>
     /// <remarks>
@@ -105,7 +105,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
 
             var name = property.Property.Name;
 
-            if (name != "Hedge" && name != "Timeouts")
+            if (name != "Hedge" && name != "AttemptCeiling")
                 continue;
 
             // `Hedge = null` removes the feature rather than configuring one, and the HTTP handler's own

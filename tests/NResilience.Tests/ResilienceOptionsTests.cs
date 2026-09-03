@@ -328,7 +328,7 @@ public sealed class ResilienceOptionsTests
 
         Assert.NotNull(policy.Breaker);
         Assert.NotNull(policy.Hedge);
-        Assert.Equal(AttemptTimeouts.Above(3), policy.Timeouts);
+        Assert.Equal(AttemptCeiling.Above(3), policy.AttemptCeiling);
         Assert.NotNull(policy.Breaker!.Settings.SlowCalls);
         Assert.NotNull(policy.Breaker.Settings.Failures);
     }
@@ -339,11 +339,11 @@ public sealed class ResilienceOptionsTests
     ///     now means a threshold nobody could have intended, so the message is the migration note.
     /// </summary>
     [Theory]
-    [InlineData("Timeouts:Multiple", "Timeouts")]
+    [InlineData("AttemptCeiling:Multiple", "AttemptCeiling")]
     [InlineData("Budget:Fraction", "Budget")]
     [InlineData("Breaker:SlowCalls:Multiple", "SlowCalls")]
     [InlineData("Breaker:Failures:Multiple", "Failures")]
-    [InlineData("Breaker:Recovery:Fraction", "Recovery")]
+    [InlineData("Breaker:Recovery:Length", "Recovery")]
     public void A_retired_off_switch_names_the_one_that_replaced_it(string key, string section)
     {
         var options = new ResilienceOptions();
@@ -419,15 +419,15 @@ public sealed class ResilienceOptionsTests
 
     /// <summary>
     ///     The same arrangement for the adaptive attempt ceiling: the presence of the section arms it
-    ///     and every default is usable, so <c>"Timeouts": {}</c> is a complete configuration.
+    ///     and every default is usable, so <c>"AttemptCeiling": {}</c> is a complete configuration.
     /// </summary>
     [Fact]
     public void An_empty_timeouts_section_is_a_complete_configuration()
     {
         var options = new ResilienceOptions();
-        Config(("Timeouts:Quantile", "0.9")).Bind(options);
+        Config(("AttemptCeiling:Quantile", "0.9")).Bind(options);
 
-        var timeouts = Assert.NotNull(options.ToPolicy().Timeouts);
+        var timeouts = Assert.NotNull(options.ToPolicy().AttemptCeiling);
 
         Assert.Equal(3, timeouts.Multiple);
         Assert.Equal(0.9, timeouts.Quantile);
@@ -442,13 +442,13 @@ public sealed class ResilienceOptionsTests
         var options = new ResilienceOptions();
 
         Config(
-            ("Timeouts:Multiple", "4"),
-            ("Timeouts:Quantile", "0.99"),
-            ("Timeouts:Window", "00:10:00"),
-            ("Timeouts:MinimumSamples", "75"),
-            ("Timeouts:Floor", "00:00:00.020")).Bind(options);
+            ("AttemptCeiling:Multiple", "4"),
+            ("AttemptCeiling:Quantile", "0.99"),
+            ("AttemptCeiling:Window", "00:10:00"),
+            ("AttemptCeiling:MinimumSamples", "75"),
+            ("AttemptCeiling:Floor", "00:00:00.020")).Bind(options);
 
-        var timeouts = Assert.NotNull(options.ToPolicy().Timeouts);
+        var timeouts = Assert.NotNull(options.ToPolicy().AttemptCeiling);
 
         Assert.Equal(4, timeouts.Multiple);
         Assert.Equal(0.99, timeouts.Quantile);
@@ -464,8 +464,8 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void A_policy_with_no_timeouts_section_still_has_the_default_measured_ceiling()
     {
-        Assert.Equal(AttemptTimeouts.Above(3), new ResilienceOptions { Attempts = 3 }.ToPolicy().Timeouts);
-        Assert.Equal(AttemptTimeouts.Above(3), new ResilienceOptions { Timeouts = new AttemptTimeoutsOptions() }.ToPolicy().Timeouts);
+        Assert.Equal(AttemptCeiling.Above(3), new ResilienceOptions { Attempts = 3 }.ToPolicy().AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(3), new ResilienceOptions { AttemptCeiling = new AttemptCeilingOptions() }.ToPolicy().AttemptCeiling);
     }
 
     /// <summary>
@@ -477,9 +477,9 @@ public sealed class ResilienceOptionsTests
     {
         var options = new ResilienceOptions();
 
-        Config(("Timeouts:Enabled", "false")).Bind(options);
+        Config(("AttemptCeiling:Enabled", "false")).Bind(options);
 
-        Assert.Null(options.ToPolicy().Timeouts);
+        Assert.Null(options.ToPolicy().AttemptCeiling);
     }
 
     /// <summary>
@@ -508,7 +508,7 @@ public sealed class ResilienceOptionsTests
         {
             Breaker = new BreakerOptions
             {
-                SlowCalls = new SlowCallOptions
+                SlowCalls = new SlowCallsOptions
                 {
                     Multiple = 4,
                     Quantile = 0.25,
@@ -551,7 +551,7 @@ public sealed class ResilienceOptionsTests
         {
             Breaker = new BreakerOptions
             {
-                Failures = new FailureOptions
+                Failures = new FailuresOptions
                 {
                     Multiple = 3,
                     Window = TimeSpan.FromMinutes(10),
@@ -575,17 +575,17 @@ public sealed class ResilienceOptionsTests
         var options = new ResilienceOptions();
 
         Config(
-            ("Breaker:Recovery:Fraction", "0.5"),
-            ("Breaker:Recovery:Minimum", "00:00:02"),
-            ("Breaker:Recovery:Maximum", "00:01:00"),
-            ("Breaker:Recovery:Initial", "0.1")).Bind(options);
+            ("Breaker:Recovery:Length", "0.5"),
+            ("Breaker:Recovery:MinimumLength", "00:00:02"),
+            ("Breaker:Recovery:MaximumLength", "00:01:00"),
+            ("Breaker:Recovery:InitialFraction", "0.1")).Bind(options);
 
         var recovery = options.ToPolicy().Breaker!.Settings.Recovery!.Value;
 
-        Assert.Equal(0.5, recovery.Fraction);
-        Assert.Equal(TimeSpan.FromSeconds(2), recovery.Minimum);
-        Assert.Equal(TimeSpan.FromMinutes(1), recovery.Maximum);
-        Assert.Equal(0.1, recovery.Initial);
+        Assert.Equal(0.5, recovery.Length);
+        Assert.Equal(TimeSpan.FromSeconds(2), recovery.MinimumLength);
+        Assert.Equal(TimeSpan.FromMinutes(1), recovery.MaximumLength);
+        Assert.Equal(0.1, recovery.InitialFraction);
     }
 
     /// <summary>

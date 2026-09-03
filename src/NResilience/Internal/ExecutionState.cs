@@ -41,7 +41,7 @@ internal sealed class ExecutionState
 
     private readonly LatencyWindow? _latency;
 
-    private readonly LatencyWindow? _timeouts;
+    private readonly LatencyWindow? _ceiling;
 
     /// <summary>
     ///     The last measured ceiling reported for this policy instance, in ticks. Zero until one is,
@@ -65,8 +65,8 @@ internal sealed class ExecutionState
         // two want opposite things from the same distribution. A hedge reads a high quantile of a short
         // window so the threshold moves with the dependency; a ceiling reads a high quantile of a long
         // one so it does not. See LatencyWindow's remarks: this is the case they flagged.
-        _timeouts = policy.Timeouts is { } timeouts
-            ? new LatencyWindow(timeouts.Quantile, timeouts.Window, policy.Time)
+        _ceiling = policy.AttemptCeiling is { } ceiling
+            ? new LatencyWindow(ceiling.Quantile, ceiling.Window, policy.Time)
             : null;
     }
 
@@ -117,13 +117,13 @@ internal sealed class ExecutionState
     ///     Resolved at each of the two points that need it - once before an attempt to read the ceiling,
     ///     once after a successful one to record it - rather than hoisted into a local by the caller. A
     ///     reference held across the attempt <c>await</c> would be a field in every caller's
-    ///     state-machine box whether or not <see cref="Resilience.Timeouts" /> was ever configured, and
+    ///     state-machine box whether or not <see cref="Resilience.AttemptCeiling" /> was ever configured, and
     ///     this feature is not allowed to cost the callers who did not ask for it. The steady-state read
     ///     is the per-thread reference comparison <see cref="StateFor" /> primes; a continuation that
     ///     resumed on another pool thread pays one lock-free table lookup instead, and no allocation
     ///     either way.
     /// </remarks>
-    public static LatencyWindow? TimeoutsFor(Resilience policy) => StateFor(policy)._timeouts;
+    public static LatencyWindow? AttemptCeilingFor(Resilience policy) => StateFor(policy)._ceiling;
 
     /// <summary>
     ///     Whether this measured ceiling differs from the last one reported for this policy instance,

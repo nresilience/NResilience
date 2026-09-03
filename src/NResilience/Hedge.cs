@@ -118,7 +118,7 @@ public readonly record struct Hedge
 
     /// <summary>
     ///     How much history the latency estimate covers. Default 30 s, the same as
-    ///     <see cref="BreakerSettings.Window" />.
+    ///     <see cref="BreakerSettings.TripWindow" />.
     ///     <para>
     ///         Shorter follows a dependency's changing latency sooner and holds fewer samples to estimate
     ///         from; longer is steadier and slower to react. The estimate is at most a quarter of this

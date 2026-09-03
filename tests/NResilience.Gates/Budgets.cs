@@ -14,7 +14,7 @@ namespace NResilience.Gates;
 ///     charge. No budget was widened for it; the design's open question 1 allowed 64 B of headroom for
 ///     the breaker and budget and this used an eighth of it. The breaker costs nothing in the box at all, because the
 ///     policy holding it is already a field.
-    ///     The adaptive attempt ceiling (<c>Resilience.Timeouts</c>) does not increase allocations on any path.
+    ///     The adaptive attempt ceiling (<c>Resilience.AttemptCeiling</c>) does not increase allocations on any path.
     ///     <c>Ceiling()</c> resolves the latency window at each of the two points that need it rather than
     ///     hoisting it into a local, so the reference never joins the state-machine box. Additionally, the
     ///     four call sites compute <c>deadlineCeiling</c> as a <c>bool</c> beside the ceiling instead of keeping

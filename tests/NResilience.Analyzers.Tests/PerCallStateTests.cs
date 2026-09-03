@@ -324,7 +324,7 @@ public sealed class PerCallStateTests
     /// <summary>
     ///     The same for a measured attempt ceiling, which fails the same way and just as quietly: the
     ///     attempt gets the configured AttemptTimeout, which is exactly what it would have got without
-    ///     Timeouts configured at all.
+    ///     AttemptCeiling configured at all.
     /// </summary>
     [Fact]
     public void A_policy_with_a_measured_ceiling_built_per_call_is_reported()
@@ -332,12 +332,12 @@ public sealed class PerCallStateTests
         var reported = Assert.Single(Harness.Run(Harness.InFile("""
                                                                 internal static class Dependencies
                                                                 {
-                                                                    internal static Resilience Api() => Resilience.Http with { Timeouts = AttemptTimeouts.Above(3) };
+                                                                    internal static Resilience Api() => Resilience.Http with { AttemptCeiling = AttemptCeiling.Above(3) };
                                                                 }
                                                                 """)));
 
         Assert.Equal("NRES008", reported.Id);
-        Assert.Contains("'Timeouts'", reported.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("'AttemptCeiling'", reported.GetMessage(), StringComparison.Ordinal);
     }
 
     /// <summary>The shape the docs teach, and the reason the rule excludes field initializers.</summary>
@@ -348,7 +348,7 @@ public sealed class PerCallStateTests
                                                     internal static class Dependencies
                                                     {
                                                         internal static readonly Resilience Api =
-                                                            Resilience.Http with { Timeouts = AttemptTimeouts.Above(3) };
+                                                            Resilience.Http with { AttemptCeiling = AttemptCeiling.Above(3) };
                                                     }
                                                     """)));
     }
@@ -400,7 +400,7 @@ public sealed class PerCallStateTests
                                                     internal static class Dependencies
                                                     {
                                                         internal static readonly Resilience Api =
-                                                            Resilience.Http with { Timeouts = AttemptTimeouts.Above(3) };
+                                                            Resilience.Http with { AttemptCeiling = AttemptCeiling.Above(3) };
 
                                                         internal static Resilience ForRequest(TimeSpan budget) =>
                                                             Api with { Deadline = budget, UseAmbientDeadline = true };
@@ -416,7 +416,7 @@ public sealed class PerCallStateTests
                                                              internal static class Dependencies
                                                              {
                                                                  internal static Resilience Api() =>
-                                                                     new Resilience { Attempts = 2, Timeouts = AttemptTimeouts.Above(3) };
+                                                                     new Resilience { Attempts = 2, AttemptCeiling = AttemptCeiling.Above(3) };
                                                              }
                                                              """)));
     }
@@ -433,7 +433,7 @@ public sealed class PerCallStateTests
                                                                  internal static Resilience Api() => Resilience.Http with
                                                                  {
                                                                      Hedge = Hedge.At(0.95),
-                                                                     Timeouts = AttemptTimeouts.Above(3),
+                                                                     AttemptCeiling = AttemptCeiling.Above(3),
                                                                  };
                                                              }
                                                              """)));

@@ -139,7 +139,7 @@ public sealed class Features
         var api = Resilience.Http with
         {
             AttemptTimeout = TimeSpan.FromSeconds(value: 5), // the ceiling. Never exceeded.
-            Timeouts = AttemptTimeouts.Above(multiple: 3), // and usually far below it: 3x the recent p95.
+            AttemptCeiling = AttemptCeiling.Above(multiple: 3), // and usually far below it: 3x the recent p95.
         };
 
         // The measured term can only lower the ceiling, so AttemptTimeout stops being a guess about how
@@ -148,7 +148,7 @@ public sealed class Features
         // configured 5 s, because 3x its p95 is above that and the clamp is what wins.
         // </snippet:deadline-measured-ceiling>
 
-        var policy = api with { Time = time, Attempts = 1, Timeouts = AttemptTimeouts.Above(multiple: 3) with { Window = TimeSpan.FromHours(value: 1) } };
+        var policy = api with { Time = time, Attempts = 1, AttemptCeiling = AttemptCeiling.Above(multiple: 3) with { Window = TimeSpan.FromHours(value: 1) } };
 
         // Twenty successful calls at 40 ms is what an estimate needs before it bounds anything.
         for (var i = 0; i < 20; i++)
@@ -162,7 +162,7 @@ public sealed class Features
         }
 
         // Three times the measured p95, and two orders of magnitude under the configured 5 s.
-        Assert.InRange(actual: policy.MeasuredAttemptTimeout!.Value, low: TimeSpan.FromMilliseconds(value: 120), high: TimeSpan.FromMilliseconds(value: 135));
+        Assert.InRange(actual: policy.MeasuredAttemptCeiling!.Value, low: TimeSpan.FromMilliseconds(value: 120), high: TimeSpan.FromMilliseconds(value: 135));
     }
 
     [Fact]
@@ -181,11 +181,11 @@ public sealed class Features
             // And this endpoint legitimately takes up to 2 s sometimes, so no attempt may be
             // cancelled before then. Adaptation is confined to [2 s, 5 s]: it can trim the dead time
             // above 2 s and can never cut into the allowance below it.
-            Timeouts = AttemptTimeouts.Above(multiple: 3) with { Floor = TimeSpan.FromSeconds(value: 2) },
+            AttemptCeiling = AttemptCeiling.Above(multiple: 3) with { Floor = TimeSpan.FromSeconds(value: 2) },
         };
         // </snippet:deadline-sla-floor>
 
-        var policy = api with { Time = time, Attempts = 1, Timeouts = api.Timeouts!.Value with { Window = TimeSpan.FromHours(value: 1) } };
+        var policy = api with { Time = time, Attempts = 1, AttemptCeiling = api.AttemptCeiling!.Value with { Window = TimeSpan.FromHours(value: 1) } };
 
         // Twenty fast calls, so the raw measurement is about 120 ms - far below the floor.
         for (var i = 0; i < 20; i++)
@@ -199,7 +199,7 @@ public sealed class Features
         }
 
         // The floor is what the attempt gets, not the measurement.
-        Assert.Equal(expected: TimeSpan.FromSeconds(value: 2), actual: policy.MeasuredAttemptTimeout);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 2), actual: policy.MeasuredAttemptCeiling);
     }
 
     [Fact]

@@ -4,7 +4,7 @@ namespace NResilience;
 ///     A per-attempt ceiling expressed relative to how long a call to this dependency normally takes,
 ///     rather than as a constant somebody has to guess.
 ///     <para>
-///         <c>AttemptTimeouts.Above(3)</c> means "three times the recent p95". That number ports across
+///         <c>AttemptCeiling.Above(3)</c> means "three times the recent p95". That number ports across
 ///         dependencies, across environments and across a dependency's own capacity changes;
 ///         <c>10 s</c> does not, which is why <see cref="Resilience.AttemptTimeout" /> is a number every
 ///         operator has to pick per dependency, before that dependency has ever run in production, and
@@ -23,7 +23,7 @@ namespace NResilience;
 /// var api = Resilience.Http with
 /// {
 ///     AttemptTimeout = TimeSpan.FromSeconds(5),   // the ceiling. Never exceeded.
-///     Timeouts = AttemptTimeouts.Above(3),        // and usually far below it: 3x the recent p95.
+///     AttemptCeiling = AttemptCeiling.Above(3),        // and usually far below it: 3x the recent p95.
 /// };
 /// </code>
 /// </example>
@@ -32,7 +32,7 @@ namespace NResilience;
 ///         <b>Why a high quantile, and why a long window.</b> A timeout wants the tail - the question is
 ///         "how long does a call that is going to succeed take, at worst", and reading that from the
 ///         median would cancel half the healthy calls. It also wants that tail to resist moving, which is
-///         why the window is ten times <see cref="BreakerSettings.Window" />'s default: a short window
+///         why the window is ten times <see cref="BreakerSettings.TripWindow" />'s default: a short window
 ///         would let one bad minute raise the ceiling for the next one.
 ///     </para>
 ///     <para>
@@ -52,13 +52,13 @@ namespace NResilience;
 ///     </para>
 ///     <para>
 ///         Every property but <see cref="Multiple" /> has a working default, so
-///         <c>AttemptTimeouts.Above(3)</c> is a complete configuration and
-///         <c>AttemptTimeouts.Above(3) with { Window = ... }</c> is the way to change one. The defaults
+///         <c>AttemptCeiling.Above(3)</c> is a complete configuration and
+///         <c>AttemptCeiling.Above(3) with { Window = ... }</c> is the way to change one. The defaults
 ///         are supplied on read rather than by a constructor, for the reason <see cref="Hedge" /> gives:
 ///         a struct's default instance is the one thing a constructor cannot reach.
 ///     </para>
 /// </remarks>
-public readonly record struct AttemptTimeouts
+public readonly record struct AttemptCeiling
 {
     /// <summary>
     ///     The quantile of recent successful latency the ceiling is measured from when
@@ -116,7 +116,7 @@ public readonly record struct AttemptTimeouts
 
     /// <summary>
     ///     How much history the estimate covers. Default 5 minutes - ten times
-    ///     <see cref="BreakerSettings.Window" />'s default, and the same span
+    ///     <see cref="BreakerSettings.TripWindow" />'s default, and the same span
     ///     <see cref="SlowCalls.Window" /> uses.
     ///     <para>
     ///         Deliberately long. It is the memory of what a slow-but-healthy call looked like, and a
@@ -162,7 +162,7 @@ public readonly record struct AttemptTimeouts
     /// <summary>The way to configure an adaptive attempt ceiling.</summary>
     /// <param name="multiple">How many times the measured tail an attempt may take. Must be greater than 1.</param>
     /// <returns>The configuration.</returns>
-    public static AttemptTimeouts Above(double multiple = 3.0) => new() { Multiple = multiple };
+    public static AttemptCeiling Above(double multiple = 3.0) => new() { Multiple = multiple };
 
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
@@ -170,7 +170,7 @@ public readonly record struct AttemptTimeouts
     /// </summary>
     /// <param name="other">The other configuration.</param>
     /// <returns>True when both would behave identically.</returns>
-    public bool Equals(AttemptTimeouts other) =>
+    public bool Equals(AttemptCeiling other) =>
         Multiple.Equals(other.Multiple)
         && Quantile.Equals(other.Quantile)
         && Window == other.Window
@@ -196,26 +196,26 @@ public readonly record struct AttemptTimeouts
         if (double.IsNaN(Multiple) || double.IsInfinity(Multiple) || Multiple <= 1)
         {
             problems.Add(
-                $"Timeouts.Multiple must be greater than 1; it is {Multiple}. " +
-                "Use AttemptTimeouts.Above(3) for an attempt allowed three times the recent p95.");
+                $"AttemptCeiling.Multiple must be greater than 1; it is {Multiple}. " +
+                "Use AttemptCeiling.Above(3) for an attempt allowed three times the recent p95.");
         }
 
         if (double.IsNaN(Quantile) || Quantile < MinQuantile || Quantile > MaxQuantile)
         {
             problems.Add(
-                $"Timeouts.Quantile must be in [{MinQuantile}, {MaxQuantile}]; it is {Quantile}. " +
+                $"AttemptCeiling.Quantile must be in [{MinQuantile}, {MaxQuantile}]; it is {Quantile}. " +
                 "A ceiling has to be measured from the tail: the median describes the calls you want " +
                 "to keep, and a quantile above the cap rests on too few samples per slice to be steady.");
         }
 
         if (Window <= TimeSpan.Zero)
-            problems.Add($"Timeouts.Window must be positive; it is {Window}.");
+            problems.Add($"AttemptCeiling.Window must be positive; it is {Window}.");
 
         if (MinimumSamples < 1)
-            problems.Add($"Timeouts.MinimumSamples must be at least 1; it is {MinimumSamples}.");
+            problems.Add($"AttemptCeiling.MinimumSamples must be at least 1; it is {MinimumSamples}.");
 
         if (Floor <= TimeSpan.Zero)
-            problems.Add($"Timeouts.Floor must be positive; it is {Floor}.");
+            problems.Add($"AttemptCeiling.Floor must be positive; it is {Floor}.");
     }
 
     /// <summary>

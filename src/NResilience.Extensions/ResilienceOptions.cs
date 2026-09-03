@@ -37,7 +37,7 @@ namespace NResilience.Extensions;
 /// <remarks>
 ///     <para>
 ///         <b>Every feature is a section, and every section has an <c>Enabled</c>.</b>
-///         <see cref="Backoff" />, <see cref="Budget" />, <see cref="Timeouts" />, <see cref="Breaker" />
+///         <see cref="Backoff" />, <see cref="Budget" />, <see cref="AttemptCeiling" />, <see cref="Breaker" />
 ///         and <see cref="Hedge" /> are objects whose keys are the property names of the type each one
 ///         configures. Writing <c>"Enabled": false</c> in any of them turns that feature off, whatever
 ///         else the section says - which is the only way an <c>appsettings.Production.json</c> can
@@ -96,12 +96,12 @@ public sealed class ResilienceOptions
     public BudgetOptions? Budget { get; set; }
 
     /// <summary>
-    ///     The measured per-attempt ceiling, which <see cref="Resilience.Timeouts" /> has on by default.
+    ///     The measured per-attempt ceiling, which <see cref="Resilience.AttemptCeiling" /> has on by default.
     ///     Every property has a working default, so this section is only needed to change one -
-    ///     <c>"Timeouts": { "Multiple": 5 }</c> - or to turn the feature off, which is
-    ///     <c>"Timeouts": { "Enabled": false }</c>.
+    ///     <c>"AttemptCeiling": { "Multiple": 5 }</c> - or to turn the feature off, which is
+    ///     <c>"AttemptCeiling": { "Enabled": false }</c>.
     /// </summary>
-    public AttemptTimeoutsOptions? Timeouts { get; set; }
+    public AttemptCeilingOptions? AttemptCeiling { get; set; }
 
     /// <summary>
     ///     The circuit breaker. A breaker is a live object; this is the configuration one is built from.
@@ -183,8 +183,8 @@ public sealed class ResilienceOptions
         if (Hedge is { } hedge)
             policy = policy with { Hedge = hedge.Enabled is false ? null : hedge.ToHedge() };
 
-        if (Timeouts is { } timeouts)
-            policy = policy with { Timeouts = timeouts.Enabled is false ? null : timeouts.ToTimeouts() };
+        if (AttemptCeiling is { } ceiling)
+            policy = policy with { AttemptCeiling = ceiling.Enabled is false ? null : ceiling.ToAttemptCeiling() };
 
         return policy;
     }
@@ -426,17 +426,17 @@ public sealed class HedgeOptions
 }
 
 /// <summary>
-///     The bindable shape of an <see cref="NResilience.AttemptTimeouts" />.
+///     The bindable shape of an <see cref="NResilience.AttemptCeiling" />.
 /// </summary>
 /// <remarks>
 ///     There is no way to make the measured ceiling longer than <see cref="ResilienceOptions.AttemptTimeout" />.
 ///     This ensures the feature cannot unexpectedly increase the attempt duration.
 /// </remarks>
-public sealed class AttemptTimeoutsOptions
+public sealed class AttemptCeilingOptions
 {
     /// <summary>
     ///     Whether the measured ceiling bounds attempts. On by default, so this is only needed to turn
-    ///     it off - <c>"Timeouts": { "Enabled": false }</c> leaves
+    ///     it off - <c>"AttemptCeiling": { "Enabled": false }</c> leaves
     ///     <see cref="ResilienceOptions.AttemptTimeout" /> as the only per-attempt bound.
     /// </summary>
     public bool? Enabled { get; set; }
@@ -447,46 +447,46 @@ public sealed class AttemptTimeoutsOptions
     /// </summary>
     public double? Multiple { get; set; }
 
-    /// <summary><see cref="NResilience.AttemptTimeouts.Quantile" />.</summary>
+    /// <summary><see cref="NResilience.AttemptCeiling.Quantile" />.</summary>
     public double? Quantile { get; set; }
 
-    /// <summary><see cref="NResilience.AttemptTimeouts.Window" />.</summary>
+    /// <summary><see cref="NResilience.AttemptCeiling.Window" />.</summary>
     public TimeSpan? Window { get; set; }
 
-    /// <summary><see cref="NResilience.AttemptTimeouts.MinimumSamples" />.</summary>
+    /// <summary><see cref="NResilience.AttemptCeiling.MinimumSamples" />.</summary>
     public int? MinimumSamples { get; set; }
 
-    /// <summary><see cref="NResilience.AttemptTimeouts.Floor" />.</summary>
+    /// <summary><see cref="NResilience.AttemptCeiling.Floor" />.</summary>
     public TimeSpan? Floor { get; set; }
 
-    /// <summary>Converts the options to an <see cref="NResilience.AttemptTimeouts" /> value, using defaults for any unset properties.</summary>
+    /// <summary>Converts the options to an <see cref="NResilience.AttemptCeiling" /> value, using defaults for any unset properties.</summary>
     /// <returns>The configuration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which used to be the off switch.</exception>
-    public AttemptTimeouts ToTimeouts()
+    public AttemptCeiling ToAttemptCeiling()
     {
         if (Multiple is 0)
         {
             throw RetiredOffSwitch.For(
-                "Timeouts",
+                "AttemptCeiling",
                 nameof(Multiple),
                 "Zero times the recent p95 is not a ceiling anyone could mean.");
         }
 
-        var timeouts = AttemptTimeouts.Above(Multiple ?? 3.0);
+        var ceiling = AttemptCeiling.Above(Multiple ?? 3.0);
 
         if (Quantile is { } quantile)
-            timeouts = timeouts with { Quantile = quantile };
+            ceiling = ceiling with { Quantile = quantile };
 
         if (Window is { } window)
-            timeouts = timeouts with { Window = window };
+            ceiling = ceiling with { Window = window };
 
         if (MinimumSamples is { } samples)
-            timeouts = timeouts with { MinimumSamples = samples };
+            ceiling = ceiling with { MinimumSamples = samples };
 
         if (Floor is { } floor)
-            timeouts = timeouts with { Floor = floor };
+            ceiling = ceiling with { Floor = floor };
 
-        return timeouts;
+        return ceiling;
     }
 }
 
@@ -526,13 +526,17 @@ public sealed class BreakerOptions
     ///     <c>"Failures": { "Enabled": false }</c>. Composes with <see cref="FailureRatio" />, which
     ///     stays the ceiling when both are set.
     /// </summary>
-    public FailureOptions? Failures { get; set; }
+    public FailuresOptions? Failures { get; set; }
 
     /// <summary><see cref="BreakerSettings.MinimumCalls" /> - the sample below which the ratio means nothing.</summary>
     public int? MinimumCalls { get; set; }
 
-    /// <summary><see cref="BreakerSettings.Window" />.</summary>
-    public TimeSpan? Window { get; set; }
+    /// <summary>
+    ///     <see cref="BreakerSettings.TripWindow" /> - the window the trip ratios are measured over.
+    ///     Distinct from the <c>Window</c> inside <see cref="Failures" /> and <see cref="SlowCalls" />,
+    ///     which are the baseline windows those trips measure "normal" over.
+    /// </summary>
+    public TimeSpan? TripWindow { get; set; }
 
     /// <summary><see cref="BreakerSettings.BreakDuration" />.</summary>
     public TimeSpan? BreakDuration { get; set; }
@@ -549,7 +553,7 @@ public sealed class BreakerOptions
     /// <summary>
     ///     <see cref="BreakerSettings.Recovery" /> - hand the traffic back over a ramp rather than a
     ///     cliff. A section of its own, so <c>"Recovery": {}</c> turns it on at its defaults,
-    ///     <c>"Recovery": { "Fraction": 0.5 }</c> changes the one number, and
+    ///     <c>"Recovery": { "Length": 0.5 }</c> changes the one number, and
     ///     <c>"Recovery": { "Enabled": false }</c> turns it back off.
     /// </summary>
     public RecoveryOptions? Recovery { get; set; }
@@ -574,7 +578,7 @@ public sealed class BreakerOptions
     ///     <see cref="SlowCallThreshold" /> as well composes rather than colliding: an attempt is slow
     ///     when it is above either threshold.
     /// </summary>
-    public SlowCallOptions? SlowCalls { get; set; }
+    public SlowCallsOptions? SlowCalls { get; set; }
 
     /// <summary><see cref="BreakerSettings.SlowCallRatio" />.</summary>
     public double? SlowCallRatio { get; set; }
@@ -608,8 +612,8 @@ public sealed class BreakerOptions
         if (MinimumCalls is { } minimum)
             settings = settings with { MinimumCalls = minimum };
 
-        if (Window is { } window)
-            settings = settings with { Window = window };
+        if (TripWindow is { } tripWindow)
+            settings = settings with { TripWindow = tripWindow };
 
         if (BreakDuration is { } breakDuration)
             settings = settings with { BreakDuration = breakDuration };
@@ -649,7 +653,7 @@ public sealed class BreakerOptions
 ///         complete configuration, and <c>"Enabled": false</c> is how a section turns the trip off.
 ///     </para>
 /// </summary>
-public sealed class FailureOptions
+public sealed class FailuresOptions
 {
     /// <summary>
     ///     Whether the relative failure trip is armed. On by default, so this is only needed to turn it
@@ -705,7 +709,8 @@ public sealed class FailureOptions
 ///     The bindable shape of a <see cref="NResilience.Recovery" />.
 ///     <para>
 ///         A section rather than flat properties, so <c>"Recovery": {}</c> is a complete configuration
-///         and <c>"Enabled": false</c> is how a section that is present turns the ramp off again.
+///         and <c>"Enabled": false</c> is how a section that is present turns the ramp off again. The
+///         keys are <see cref="NResilience.Recovery" />'s own property names.
 ///     </para>
 /// </summary>
 public sealed class RecoveryOptions
@@ -717,43 +722,44 @@ public sealed class RecoveryOptions
     public bool? Enabled { get; set; }
 
     /// <summary>
-    ///     <see cref="NResilience.Recovery.Fraction" />. Defaults to 0.25, and must be above zero -
-    ///     <c>"Enabled": false</c> is how a section turns the ramp off.
+    ///     <see cref="NResilience.Recovery.Length" /> - how long the ramp lasts, as a fraction of the
+    ///     break just served. Defaults to 0.25, and must be above zero - <c>"Enabled": false</c> is how
+    ///     a section turns the ramp off.
     /// </summary>
-    public double? Fraction { get; set; }
+    public double? Length { get; set; }
 
-    /// <summary><see cref="NResilience.Recovery.Minimum" />.</summary>
-    public TimeSpan? Minimum { get; set; }
+    /// <summary><see cref="NResilience.Recovery.MinimumLength" />.</summary>
+    public TimeSpan? MinimumLength { get; set; }
 
-    /// <summary><see cref="NResilience.Recovery.Maximum" />.</summary>
-    public TimeSpan? Maximum { get; set; }
+    /// <summary><see cref="NResilience.Recovery.MaximumLength" />.</summary>
+    public TimeSpan? MaximumLength { get; set; }
 
-    /// <summary><see cref="NResilience.Recovery.Initial" />.</summary>
-    public double? Initial { get; set; }
+    /// <summary><see cref="NResilience.Recovery.InitialFraction" /> - the fraction of calls the ramp starts by admitting.</summary>
+    public double? InitialFraction { get; set; }
 
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
-    /// <exception cref="ResilienceConfigurationException"><see cref="Fraction" /> is zero, which used to be the off switch.</exception>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Length" /> is zero, which used to be the off switch.</exception>
     public Recovery ToRecovery()
     {
-        if (Fraction is 0)
+        if (Length is 0)
         {
             throw RetiredOffSwitch.For(
                 "Recovery",
-                nameof(Fraction),
+                nameof(Length),
                 "A ramp lasting none of the break is not a ramp anyone could mean.");
         }
 
-        var recovery = NResilience.Recovery.Over(Fraction ?? 0.25);
+        var recovery = NResilience.Recovery.Over(Length ?? 0.25);
 
-        if (Minimum is { } minimum)
-            recovery = recovery with { Minimum = minimum };
+        if (MinimumLength is { } minimum)
+            recovery = recovery with { MinimumLength = minimum };
 
-        if (Maximum is { } maximum)
-            recovery = recovery with { Maximum = maximum };
+        if (MaximumLength is { } maximum)
+            recovery = recovery with { MaximumLength = maximum };
 
-        if (Initial is { } initial)
-            recovery = recovery with { Initial = initial };
+        if (InitialFraction is { } initial)
+            recovery = recovery with { InitialFraction = initial };
 
         return recovery;
     }
@@ -766,7 +772,7 @@ public sealed class RecoveryOptions
 ///         complete configuration, and <c>"Enabled": false</c> is how a section turns the trip off.
 ///     </para>
 /// </summary>
-public sealed class SlowCallOptions
+public sealed class SlowCallsOptions
 {
     /// <summary>
     ///     Whether the brownout trip is armed. On by default, so this is only needed to turn it off.

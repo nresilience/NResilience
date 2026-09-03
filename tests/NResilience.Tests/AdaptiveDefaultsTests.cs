@@ -38,8 +38,8 @@ public sealed class AdaptiveDefaultsTests
     [Fact]
     public void A_default_policy_measures_its_own_attempt_ceiling()
     {
-        Assert.Equal(AttemptTimeouts.Above(3), Resilience.Default.Timeouts);
-        Assert.Equal(AttemptTimeouts.Above(3), Resilience.Http.Timeouts);
+        Assert.Equal(AttemptCeiling.Above(3), Resilience.Default.AttemptCeiling);
+        Assert.Equal(AttemptCeiling.Above(3), Resilience.Http.AttemptCeiling);
     }
 
     /// <summary>Each of the three is turned off by writing <c>null</c> over it, and nothing else.</summary>
@@ -50,7 +50,7 @@ public sealed class AdaptiveDefaultsTests
 
         Assert.Null(settings.SlowCalls);
         Assert.Null(settings.Failures);
-        Assert.Null((Resilience.Default with { Timeouts = null }).Timeouts);
+        Assert.Null((Resilience.Default with { AttemptCeiling = null }).AttemptCeiling);
     }
 
     /// <summary>
@@ -60,8 +60,8 @@ public sealed class AdaptiveDefaultsTests
     [Fact]
     public void The_passthrough_preset_measures_nothing()
     {
-        Assert.Null(Resilience.None.Timeouts);
-        Assert.Null(Resilience.None.MeasuredAttemptTimeout);
+        Assert.Null(Resilience.None.AttemptCeiling);
+        Assert.Null(Resilience.None.MeasuredAttemptCeiling);
     }
 
     // ---- What a default must never do: bound a call nobody bounded ----
@@ -76,8 +76,8 @@ public sealed class AdaptiveDefaultsTests
     {
         var policy = Resilience.Default with { AttemptTimeout = Timeout.InfiniteTimeSpan };
 
-        Assert.Null(policy.Timeouts);
-        Assert.Null(policy.MeasuredAttemptTimeout);
+        Assert.Null(policy.AttemptCeiling);
+        Assert.Null(policy.MeasuredAttemptCeiling);
     }
 
     /// <summary>Writing it is a different statement, and that one is honoured.</summary>
@@ -87,17 +87,17 @@ public sealed class AdaptiveDefaultsTests
         var policy = Resilience.Default with
         {
             AttemptTimeout = Timeout.InfiniteTimeSpan,
-            Timeouts = AttemptTimeouts.Above(3),
+            AttemptCeiling = AttemptCeiling.Above(3),
         };
 
-        Assert.Equal(AttemptTimeouts.Above(3), policy.Timeouts);
+        Assert.Equal(AttemptCeiling.Above(3), policy.AttemptCeiling);
         policy.Validate();
     }
 
     // ---- What a default must never do: refuse a configuration the caller could write ----
 
     /// <summary>
-    ///     A 20 ms ceiling is below <c>AttemptTimeouts.Floor</c>, so the measured term could never lower
+    ///     A 20 ms ceiling is below <c>AttemptCeiling.Floor</c>, so the measured term could never lower
     ///     anything - which <c>Validate</c> refuses when the caller wrote both. Here the caller wrote
     ///     one, so the default steps aside rather than turning their policy into an error.
     /// </summary>
@@ -106,11 +106,11 @@ public sealed class AdaptiveDefaultsTests
     {
         var policy = Resilience.Default with { AttemptTimeout = TimeSpan.FromMilliseconds(20) };
 
-        Assert.Null(policy.Timeouts);
+        Assert.Null(policy.AttemptCeiling);
         policy.Validate();
 
         Assert.Throws<ResilienceConfigurationException>(() =>
-            (policy with { Timeouts = AttemptTimeouts.Above(3) }).Validate());
+            (policy with { AttemptCeiling = AttemptCeiling.Above(3) }).Validate());
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public sealed class AdaptiveDefaultsTests
     [InlineData(300)]
     public void A_trip_window_the_default_baselines_could_not_outlast_widens_them(int windowSeconds)
     {
-        var settings = new BreakerSettings { Window = TimeSpan.FromSeconds(windowSeconds) };
+        var settings = new BreakerSettings { TripWindow = TimeSpan.FromSeconds(windowSeconds) };
 
         // The check the race would otherwise fail, stated the way BreakerSettings.Validate states it.
         settings.Validate();
@@ -144,7 +144,7 @@ public sealed class AdaptiveDefaultsTests
     [Fact]
     public void A_trip_window_too_long_to_have_a_baseline_gets_no_default_relative_trip()
     {
-        var settings = new BreakerSettings { Window = TimeSpan.FromMinutes(45) };
+        var settings = new BreakerSettings { TripWindow = TimeSpan.FromMinutes(45) };
 
         settings.Validate();
 

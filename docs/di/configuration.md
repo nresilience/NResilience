@@ -63,14 +63,14 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `Deadline`, `AttemptTimeout` | Time bounds for the call. Use `"-00:00:00.0010000"` for `Timeout.InfiniteTimeSpan`. |
 | `Backoff` | A `BackoffOptions` section: `TransientBase`, `ThrottledBase`, `Max`, `Factor`, `Jitter`. |
 | `Budget` | A `BudgetOptions` section: `Enabled`, `Fraction`, `MinimumPerSecond`, `Shared`. |
-| `Timeouts` | An `AttemptTimeoutsOptions` section. On by default; `"Timeouts": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |
+| `AttemptCeiling` | An `AttemptCeilingOptions` section. On by default; `"AttemptCeiling": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |
 | `Breaker` | A `BreakerOptions` section. Omit it, or write `"Enabled": false`, for no circuit breaker. |
 | `Hedge` | A `HedgeOptions` section. Omit it, or write `"Enabled": false`, for no hedging. |
 | `Telemetry` | Set to `false` to opt this policy out of the telemetry meter. |
 
 ## Every feature is a section, and every section has `Enabled`
 
-`Backoff`, `Budget`, `Timeouts`, `Breaker` and `Hedge` are objects whose keys are the property names
+`Backoff`, `Budget`, `AttemptCeiling`, `Breaker` and `Hedge` are objects whose keys are the property names
 of the type each one configures, so there is no second spelling to learn. `"Enabled": false` turns a
 feature off wherever it appears:
 
@@ -87,34 +87,18 @@ feature off wherever it appears:
 <!-- endsnippet -->
 
 That is the only way to remove a feature a base file turned on, because configuration providers
-merge sections and never delete a key. It replaces the per-feature magic numbers that used to stand
-in for the `null` a section cannot say - `"Multiple": 0`, `"Fraction": 0` and `"BudgetFraction": 0`
-now fail at registration with a message naming `"Enabled": false`.
+merge sections and never delete a key. It replaces per-feature magic numbers; values like `"Multiple": 0`, `"Fraction": 0` and `"BudgetFraction": 0`
+fail at registration with a message naming `"Enabled": false`.
 
 `Backoff` has no `Enabled`, because a policy always has a backoff curve.
-
-### Migrating an existing file
-
-| Was | Is now |
-| :--- | :--- |
-| `"TransientBaseDelay"`, `"ThrottledBaseDelay"`, `"MaxDelay"`, `"BackoffFactor"`, `"Jitter"` | `"Backoff": { "TransientBase", "ThrottledBase", "Max", "Factor", "Jitter" }` |
-| `"BudgetFraction"`, `"BudgetMinimumPerSecond"`, `"SharedBudget"` | `"Budget": { "Fraction", "MinimumPerSecond", "Shared" }` |
-| `"BudgetFraction": 0` | `"Budget": { "Enabled": false }` |
-| `"Timeouts": { "Multiple": 0 }` | `"Timeouts": { "Enabled": false }` |
-| `"Breaker": { "SlowCalls": { "Multiple": 0 } }` | `"Breaker": { "SlowCalls": { "Enabled": false } }` |
-| `"Breaker": { "Failures": { "Multiple": 0 } }` | `"Breaker": { "Failures": { "Enabled": false } }` |
-| `"Breaker": { "Recovery": { "Fraction": 0 } }` | `"Breaker": { "Recovery": { "Enabled": false } }` |
-
-A retired key binds to nothing, and a retired off switch throws at registration naming the one that
-replaced it - so neither failure is silent.
-
-The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `Window`, `BreakDuration`, `MaxBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `Recovery` is a subsection of its own - `"Recovery": {}` turns the [recovery ramp](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) on at its defaults, `"Recovery": { "Fraction": 0.5 }` changes it, and `"Enabled": false` turns it back off. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
+ 
+The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `TripWindow`, `BreakDuration`, `MaxBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `Recovery` is a subsection of its own - `"Recovery": {}` turns the [recovery ramp](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) on at its defaults, `"Recovery": { "Length": 0.5 }` changes it, and `"Enabled": false` turns it back off. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
 
 `Breaker:SlowCalls` is a nested section rather than a flat property, and the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number) it configures is on by default. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. `"SlowCalls": { "Enabled": false }` turns the trip off. Naming `SlowCallThreshold` as well composes rather than colliding - a call is slow when it is above either threshold.
 
 `Breaker:Failures` is a nested section on the same pattern, and the [relative failure trip](../features/circuit-breaker.md#trip-on-errors-without-guessing-a-rate) it configures is on by default too. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Window`, `MinimumSamples`, and `AbsoluteFloor`, with `"Failures": { "Enabled": false }` turning the trip off. Set `FailureRatio` as well when you have a rate you never want exceeded - it becomes the ceiling, and the relative trip can only fire sooner.
 
-`Timeouts` is likewise a nested section, configuring the [measured attempt ceiling](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) the default policy already carries. It accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Floor`, with `"Timeouts": { "Enabled": false }` turning the measured term off. It never lengthens `AttemptTimeout` - the measured term can only lower the ceiling - so the two settings compose rather than compete.
+`AttemptCeiling` is likewise a nested section, configuring the [measured attempt ceiling](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) the default policy already carries. It accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Floor`, with `"AttemptCeiling": { "Enabled": false }` turning the measured term off. It never lengthens `AttemptTimeout` - the measured term can only lower the ceiling - so the two settings compose rather than compete.
 
 ## Projection via ResilienceOptions
 

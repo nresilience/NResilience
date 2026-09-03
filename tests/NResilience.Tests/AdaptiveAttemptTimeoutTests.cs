@@ -4,7 +4,7 @@ using NResilience.Testing;
 namespace NResilience.Tests;
 
 /// <summary>
-///     The adaptive per-attempt ceiling: <c>Resilience.Timeouts</c>, which expresses the attempt timeout
+///     The adaptive per-attempt ceiling: <c>Resilience.AttemptCeiling</c>, which expresses the attempt timeout
 ///     as a multiple of measured latency instead of a constant an operator has to guess.
 ///     <para>
 ///         One property is what the design turns on, and it is the one the naive version of this feature
@@ -30,7 +30,7 @@ public sealed class AdaptiveAttemptTimeoutTests
     /// <summary>
     ///     A cold process does not guess a ceiling. Below <c>MinimumSamples</c> there is no measured
     ///     term and the attempt gets <see cref="Resilience.AttemptTimeout" />, exactly as it would
-    ///     without <c>Timeouts</c> configured.
+    ///     without <c>AttemptCeiling</c> configured.
     /// </summary>
     [Fact]
     public async Task No_ceiling_is_measured_before_the_estimate_has_enough_samples()
@@ -40,7 +40,7 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         await WarmAsync(policy, time, Fast, times: 19);
 
-        Assert.Null(policy.MeasuredAttemptTimeout);
+        Assert.Null(policy.MeasuredAttemptCeiling);
         Assert.False(events.Contains(CallEventKind.AttemptTimeoutAdapted));
     }
 
@@ -53,7 +53,7 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         await WarmAsync(policy, time, Fast, times: 20);
 
-        var measured = policy.MeasuredAttemptTimeout;
+        var measured = policy.MeasuredAttemptCeiling;
 
         Assert.NotNull(measured);
 
@@ -102,18 +102,18 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         // The floor is out of the way on purpose: this test is about the multiple porting, and the
         // default 50 ms floor would be what the quick dependency's ceiling came from instead.
-        var noFloor = AttemptTimeouts.Above(3) with { Window = Window, Floor = TimeSpan.FromTicks(1) };
+        var noFloor = AttemptCeiling.Above(3) with { Window = Window, Floor = TimeSpan.FromTicks(1) };
 
-        var quick = Adaptive(time, out _) with { Timeouts = noFloor };
-        var slow = Adaptive(time, out _) with { Timeouts = noFloor };
+        var quick = Adaptive(time, out _) with { AttemptCeiling = noFloor };
+        var slow = Adaptive(time, out _) with { AttemptCeiling = noFloor };
 
         await WarmAsync(quick, time, TimeSpan.FromMilliseconds(2), times: 40);
         await WarmAsync(slow, time, TimeSpan.FromSeconds(2), times: 40);
 
-        // Same AttemptTimeouts.Above(3) on both, and the two ceilings are three orders of magnitude
+        // Same AttemptCeiling.Above(3) on both, and the two ceilings are three orders of magnitude
         // apart because the dependencies are.
-        Assert.InRange(quick.MeasuredAttemptTimeout!.Value, TimeSpan.FromMilliseconds(6), TimeSpan.FromMilliseconds(7));
-        Assert.InRange(slow.MeasuredAttemptTimeout!.Value, TimeSpan.FromSeconds(6), TimeSpan.FromSeconds(6.8));
+        Assert.InRange(quick.MeasuredAttemptCeiling!.Value, TimeSpan.FromMilliseconds(6), TimeSpan.FromMilliseconds(7));
+        Assert.InRange(slow.MeasuredAttemptCeiling!.Value, TimeSpan.FromSeconds(6), TimeSpan.FromSeconds(6.8));
     }
 
     // ---- The clamp, which is the safety argument ----
@@ -132,7 +132,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         // A p95 of 20 s. Three times that is a minute, and the configured ceiling is 30 seconds.
         await WarmAsync(policy, time, TimeSpan.FromSeconds(20), times: 40);
 
-        Assert.True(policy.MeasuredAttemptTimeout > Configured);
+        Assert.True(policy.MeasuredAttemptCeiling > Configured);
 
         var result = await HangAsync(policy, time, advance: TimeSpan.FromSeconds(31));
 
@@ -176,14 +176,14 @@ public sealed class AdaptiveAttemptTimeoutTests
         var policy = Adaptive(time, out _);
 
         await WarmAsync(policy, time, Fast, times: 20);
-        var before = policy.MeasuredAttemptTimeout;
+        var before = policy.MeasuredAttemptCeiling;
 
         // Ten calls that time out at the measured ceiling. Were failures sampled, the ceiling would
         // now be climbing on the evidence of the timeouts it produced.
         for (var i = 0; i < 10; i++)
             await HangAsync(policy, time, advance: TimeSpan.FromMilliseconds(400));
 
-        Assert.Equal(before, policy.MeasuredAttemptTimeout);
+        Assert.Equal(before, policy.MeasuredAttemptCeiling);
     }
 
     /// <summary>
@@ -200,8 +200,8 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         await WarmAsync(one, time, Fast, times: 40);
 
-        Assert.NotNull(one.MeasuredAttemptTimeout);
-        Assert.Null(other.MeasuredAttemptTimeout);
+        Assert.NotNull(one.MeasuredAttemptCeiling);
+        Assert.Null(other.MeasuredAttemptCeiling);
     }
 
     // ---- The floor ----
@@ -218,14 +218,14 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         var policy = Adaptive(time, out _) with
         {
-            Timeouts = AttemptTimeouts.Above(3) with { Window = Window, Floor = TimeSpan.FromMilliseconds(50) },
+            AttemptCeiling = AttemptCeiling.Above(3) with { Window = Window, Floor = TimeSpan.FromMilliseconds(50) },
         };
 
         await WarmAsync(policy, time, TimeSpan.FromMicroseconds(300), times: 40);
 
         // Three times a p95 of 300 microseconds is about a millisecond. The floor is what the attempt
         // actually gets, and it is exactly the floor rather than anything derived from it.
-        Assert.Equal(TimeSpan.FromMilliseconds(50), policy.MeasuredAttemptTimeout);
+        Assert.Equal(TimeSpan.FromMilliseconds(50), policy.MeasuredAttemptCeiling);
 
         // Twenty milliseconds is far past three times the p95 and still under the floor, so an attempt
         // that takes that long is untouched.
@@ -275,7 +275,7 @@ public sealed class AdaptiveAttemptTimeoutTests
     ///     second was due to start, and the caller would have bought a feature that never fires.
     /// </summary>
     /// <remarks>
-    ///     Only reachable when <c>Timeouts.Quantile</c> is below <c>Hedge.Quantile</c> - and only then
+    ///     Only reachable when <c>AttemptCeiling.Quantile</c> is below <c>Hedge.Quantile</c> - and only then
     ///     against a distribution with a tail, because both estimates are read from the same traffic and
     ///     a dependency with no spread has one latency at every quantile. Hence the bimodal warm-up:
     ///     without it, <c>Multiple x p95</c> already clears the hedge threshold and this test asserts
@@ -293,7 +293,7 @@ public sealed class AdaptiveAttemptTimeoutTests
 
             // Read from the median, which is the whole point: the p50 of this dependency is 10 ms and
             // its p95 is 500 ms, so twice the median is 20 ms and a hedge at the p95 could never arm.
-            Timeouts = AttemptTimeouts.Above(2) with { Window = Window, Quantile = 0.5, Floor = TimeSpan.FromTicks(1) },
+            AttemptCeiling = AttemptCeiling.Above(2) with { Window = Window, Quantile = 0.5, Floor = TimeSpan.FromTicks(1) },
         };
 
         await BimodalWarmAsync(policy, time);
@@ -301,7 +301,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         // Twice the median would be about 20 ms, and that is what an unfloored ceiling would be. What
         // the attempt actually gets is twice the *hedge's* quantile, which is two orders of magnitude
         // larger - so the first leg lives long enough for the hedge to arm.
-        var measured = policy.MeasuredAttemptTimeout!.Value;
+        var measured = policy.MeasuredAttemptCeiling!.Value;
 
         Assert.InRange(measured, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1.1));
     }
@@ -319,7 +319,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         {
             Attempts = 2,
             Hedge = Hedge.At(0.95) with { Window = Window, MinimumDelay = TimeSpan.Zero },
-            Timeouts = AttemptTimeouts.Above(2) with { Window = Window, Quantile = 0.5, Floor = TimeSpan.FromTicks(1) },
+            AttemptCeiling = AttemptCeiling.Above(2) with { Window = Window, Quantile = 0.5, Floor = TimeSpan.FromTicks(1) },
         };
 
         await BimodalWarmAsync(policy, time);
@@ -367,9 +367,9 @@ public sealed class AdaptiveAttemptTimeoutTests
     [Fact]
     public void A_multiple_of_one_or_less_is_refused()
     {
-        var problems = Problems(TestPolicy.Instant with { Timeouts = AttemptTimeouts.Above(1) });
+        var problems = Problems(TestPolicy.Instant with { AttemptCeiling = AttemptCeiling.Above(1) });
 
-        Assert.Contains(problems, p => p.Contains("Timeouts.Multiple", StringComparison.Ordinal));
+        Assert.Contains(problems, p => p.Contains("AttemptCeiling.Multiple", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -377,9 +377,9 @@ public sealed class AdaptiveAttemptTimeoutTests
     [InlineData(0.999)]
     public void A_quantile_outside_the_tail_is_refused(double quantile)
     {
-        var problems = Problems(TestPolicy.Instant with { Timeouts = AttemptTimeouts.Above(3) with { Quantile = quantile } });
+        var problems = Problems(TestPolicy.Instant with { AttemptCeiling = AttemptCeiling.Above(3) with { Quantile = quantile } });
 
-        Assert.Contains(problems, p => p.Contains("Timeouts.Quantile", StringComparison.Ordinal));
+        Assert.Contains(problems, p => p.Contains("AttemptCeiling.Quantile", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -393,10 +393,10 @@ public sealed class AdaptiveAttemptTimeoutTests
         var policy = TestPolicy.Instant with
         {
             AttemptTimeout = TimeSpan.FromSeconds(1),
-            Timeouts = AttemptTimeouts.Above(3) with { Floor = TimeSpan.FromSeconds(1) },
+            AttemptCeiling = AttemptCeiling.Above(3) with { Floor = TimeSpan.FromSeconds(1) },
         };
 
-        Assert.Contains(Problems(policy), p => p.Contains("Timeouts.Floor", StringComparison.Ordinal));
+        Assert.Contains(Problems(policy), p => p.Contains("AttemptCeiling.Floor", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -410,32 +410,32 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         var policy = Resilience.None.UseClock(time) with
         {
-            Timeouts = AttemptTimeouts.Above(3) with { Window = Window },
+            AttemptCeiling = AttemptCeiling.Above(3) with { Window = Window },
         };
 
         await WarmAsync(policy, time, Fast, times: 40);
 
         // Passthrough hands back the callback's own task and would never have recorded a sample.
-        Assert.NotNull(policy.MeasuredAttemptTimeout);
+        Assert.NotNull(policy.MeasuredAttemptCeiling);
     }
 
     /// <summary>Value equality is over the effective configuration, so a named default equals an omitted one.</summary>
     [Fact]
     public void Naming_a_default_equals_leaving_it_alone()
     {
-        Assert.Equal(AttemptTimeouts.Above(3), AttemptTimeouts.Above(3) with { Quantile = 0.95 });
-        Assert.Equal(AttemptTimeouts.Above(3).GetHashCode(), (AttemptTimeouts.Above(3) with { MinimumSamples = 20 }).GetHashCode());
-        Assert.NotEqual(AttemptTimeouts.Above(3), AttemptTimeouts.Above(4));
+        Assert.Equal(AttemptCeiling.Above(3), AttemptCeiling.Above(3) with { Quantile = 0.95 });
+        Assert.Equal(AttemptCeiling.Above(3).GetHashCode(), (AttemptCeiling.Above(3) with { MinimumSamples = 20 }).GetHashCode());
+        Assert.NotEqual(AttemptCeiling.Above(3), AttemptCeiling.Above(4));
     }
 
     /// <summary>
-    ///     <c>default(AttemptTimeouts)</c> compiles, because <c>policy with { Timeouts = default }</c>
+    ///     <c>default(AttemptCeiling)</c> compiles, because <c>policy with { AttemptCeiling = default }</c>
     ///     does. Every property but the multiple has to read as its default rather than as zero.
     /// </summary>
     [Fact]
     public void The_default_instance_reads_as_the_defaults()
     {
-        var unconstructed = default(AttemptTimeouts);
+        var unconstructed = default(AttemptCeiling);
 
         Assert.Equal(0.95, unconstructed.Quantile);
         Assert.Equal(TimeSpan.FromMinutes(5), unconstructed.Window);
@@ -444,14 +444,14 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         // And the multiple is the one thing it cannot supply, so it is the one thing Validate refuses.
         Assert.Contains(
-            Problems(TestPolicy.Instant with { Timeouts = unconstructed }),
-            p => p.Contains("Timeouts.Multiple", StringComparison.Ordinal));
+            Problems(TestPolicy.Instant with { AttemptCeiling = unconstructed }),
+            p => p.Contains("AttemptCeiling.Multiple", StringComparison.Ordinal));
     }
 
     [Fact]
     public void It_prints_its_effective_configuration()
     {
-        var text = AttemptTimeouts.Above(3).ToString();
+        var text = AttemptCeiling.Above(3).ToString();
 
         Assert.Contains("3x p95", text, StringComparison.Ordinal);
         Assert.Contains("300s", text, StringComparison.Ordinal);
@@ -471,7 +471,7 @@ public sealed class AdaptiveAttemptTimeoutTests
             Name = "api",
             Attempts = 1,
             AttemptTimeout = Configured,
-            Timeouts = AttemptTimeouts.Above(3) with { Window = Window },
+            AttemptCeiling = AttemptCeiling.Above(3) with { Window = Window },
             OnEvent = recorder.Record,
         };
 

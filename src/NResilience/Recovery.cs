@@ -49,32 +49,38 @@ namespace NResilience;
 ///         raises, through the rejection pause the executor already applies.
 ///     </para>
 ///     <para>
-///         Every property but <see cref="Fraction" /> has a working default, so
+///         Every property but <see cref="Length" /> has a working default, so
 ///         <c>Recovery.Over(0.25)</c> is a complete configuration and
-///         <c>Recovery.Over(0.25) with { Maximum = ... }</c> is the way to change one. The defaults are
+///         <c>Recovery.Over(0.25) with { MaximumLength = ... }</c> is the way to change one. The defaults are
 ///         supplied on read rather than by a constructor, for the reason <see cref="Hedge" /> gives: a
 ///         struct's default instance is the one thing a constructor cannot reach.
 ///     </para>
 /// </remarks>
 public readonly record struct Recovery
 {
-    /// <summary>The fraction of calls the ramp starts by admitting, when <see cref="Initial" /> was not set.</summary>
-    private const double DefaultInitial = 0.05;
+    /// <summary>The fraction of calls the ramp starts by admitting, when <see cref="InitialFraction" /> was not set.</summary>
+    private const double DefaultInitialFraction = 0.05;
 
-    private readonly double? _initial;
-    private readonly TimeSpan? _maximum;
-    private readonly TimeSpan? _minimum;
+    private readonly double? _initialFraction;
+    private readonly TimeSpan? _maximumLength;
+    private readonly TimeSpan? _minimumLength;
 
     /// <summary>
-    ///     How much of the break just served the ramp lasts. <c>0.25</c> means a fifteen-second break
-    ///     is handed back over roughly four seconds.
+    ///     How long the ramp lasts, as a fraction of the break just served. <c>0.25</c> means a
+    ///     fifteen-second break is handed back over roughly four seconds, clamped to
+    ///     <see cref="MinimumLength" /> and <see cref="MaximumLength" />.
     ///     <para>
     ///         Must be greater than 0. This is the one number an operator supplies, and it is
     ///         dimensionless on purpose: "a quarter of however long it was down" is a judgment that
     ///         survives being copied to another dependency, and "five seconds" is not.
     ///     </para>
+    ///     <para>
+    ///         Not to be confused with <see cref="InitialFraction" />, which is a fraction of the
+    ///         <i>calls</i> rather than of the break: this one says how long the ramp runs for, that one
+    ///         says how much traffic it starts by admitting.
+    ///     </para>
     /// </summary>
-    public double Fraction { get; init; }
+    public double Length { get; init; }
 
     /// <summary>
     ///     The shortest ramp, however brief the break was. Default 1 second.
@@ -84,10 +90,10 @@ public readonly record struct Recovery
     ///         cliff with extra state.
     ///     </para>
     /// </summary>
-    public TimeSpan Minimum
+    public TimeSpan MinimumLength
     {
-        get => _minimum ?? TimeSpan.FromSeconds(1);
-        init => _minimum = value;
+        get => _minimumLength ?? TimeSpan.FromSeconds(1);
+        init => _minimumLength = value;
     }
 
     /// <summary>
@@ -98,10 +104,10 @@ public readonly record struct Recovery
     ///         of partial refusal is already more warm-up than any dependency the library can see needs.
     ///     </para>
     /// </summary>
-    public TimeSpan Maximum
+    public TimeSpan MaximumLength
     {
-        get => _maximum ?? TimeSpan.FromSeconds(30);
-        init => _maximum = value;
+        get => _maximumLength ?? TimeSpan.FromSeconds(30);
+        init => _maximumLength = value;
     }
 
     /// <summary>
@@ -112,16 +118,16 @@ public readonly record struct Recovery
     ///         raise this from below rather than lowering it from above.
     ///     </para>
     /// </summary>
-    public double Initial
+    public double InitialFraction
     {
-        get => _initial ?? DefaultInitial;
-        init => _initial = value;
+        get => _initialFraction ?? DefaultInitialFraction;
+        init => _initialFraction = value;
     }
 
     /// <summary>The way to configure a ramped recovery.</summary>
-    /// <param name="fraction">How much of the break just served the ramp lasts. Must be greater than 0.</param>
+    /// <param name="length">How long the ramp lasts, as a fraction of the break just served. Must be greater than 0.</param>
     /// <returns>The configuration.</returns>
-    public static Recovery Over(double fraction = 0.25) => new() { Fraction = fraction };
+    public static Recovery Over(double length = 0.25) => new() { Length = length };
 
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
@@ -130,18 +136,18 @@ public readonly record struct Recovery
     /// <param name="other">The other configuration.</param>
     /// <returns>True when both would behave identically.</returns>
     public bool Equals(Recovery other) =>
-        Fraction.Equals(other.Fraction)
-        && Minimum == other.Minimum
-        && Maximum == other.Maximum
-        && Initial.Equals(other.Initial);
+        Length.Equals(other.Length)
+        && MinimumLength == other.MinimumLength
+        && MaximumLength == other.MaximumLength
+        && InitialFraction.Equals(other.InitialFraction);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(Fraction, Minimum, Maximum, Initial);
+    public override int GetHashCode() => HashCode.Combine(Length, MinimumLength, MaximumLength, InitialFraction);
 
     /// <inheritdoc />
     public override string ToString() =>
-        $"{Fraction:0.##}x the break, from {Initial:0.##%} " +
-        $"(min {Minimum.TotalSeconds:0.#}s, max {Maximum.TotalSeconds:0.#}s)";
+        $"{Length:0.##}x the break, from {InitialFraction:0.##%} " +
+        $"(min {MinimumLength.TotalSeconds:0.#}s, max {MaximumLength.TotalSeconds:0.#}s)";
 
     /// <summary>
     ///     Collects everything wrong with this configuration on its own, in the shape
@@ -150,23 +156,23 @@ public readonly record struct Recovery
     /// <param name="problems">The list to add to.</param>
     internal void Validate(List<string> problems)
     {
-        if (double.IsNaN(Fraction) || double.IsInfinity(Fraction) || Fraction <= 0)
+        if (double.IsNaN(Length) || double.IsInfinity(Length) || Length <= 0)
         {
             problems.Add(
-                $"Recovery.Fraction must be greater than 0; it is {Fraction}. " +
+                $"Recovery.Length must be greater than 0; it is {Length}. " +
                 "Use Recovery.Over(0.25) to hand the traffic back over a quarter of the break just served.");
         }
 
-        if (Minimum <= TimeSpan.Zero)
-            problems.Add($"Recovery.Minimum must be positive; it is {Minimum}.");
+        if (MinimumLength <= TimeSpan.Zero)
+            problems.Add($"Recovery.MinimumLength must be positive; it is {MinimumLength}.");
 
-        if (Maximum < Minimum)
-            problems.Add($"Recovery.Maximum must be at least Recovery.Minimum; they are {Maximum} and {Minimum}.");
+        if (MaximumLength < MinimumLength)
+            problems.Add($"Recovery.MaximumLength must be at least Recovery.MinimumLength; they are {MaximumLength} and {MinimumLength}.");
 
-        if (double.IsNaN(Initial) || Initial <= 0 || Initial >= 1)
+        if (double.IsNaN(InitialFraction) || InitialFraction <= 0 || InitialFraction >= 1)
         {
             problems.Add(
-                $"Recovery.Initial must be in (0, 1); it is {Initial}. " +
+                $"Recovery.InitialFraction must be in (0, 1); it is {InitialFraction}. " +
                 "At 1 the ramp is the cliff it exists to replace, and at 0 it never admits a first call.");
         }
     }
@@ -180,11 +186,11 @@ public readonly record struct Recovery
     /// <returns>The ramp length.</returns>
     internal TimeSpan RampFor(TimeSpan served)
     {
-        var ticks = served.Ticks * Fraction;
+        var ticks = served.Ticks * Length;
 
-        if (double.IsNaN(ticks) || ticks >= Maximum.Ticks)
-            return Maximum;
+        if (double.IsNaN(ticks) || ticks >= MaximumLength.Ticks)
+            return MaximumLength;
 
-        return ticks <= Minimum.Ticks ? Minimum : TimeSpan.FromTicks((long)ticks);
+        return ticks <= MinimumLength.Ticks ? MinimumLength : TimeSpan.FromTicks((long)ticks);
     }
 }

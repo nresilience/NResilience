@@ -381,7 +381,7 @@ public sealed partial record Resilience
                 var effective = Effective(ceiling, remaining);
 
                 // Whether the deadline supplied this attempt's ceiling. Computed here, where both terms
-                // are still in hand, rather than in the catch below: with Timeouts configured,
+                // are still in hand, rather than in the catch below: with AttemptCeiling configured,
                 // `effective != AttemptTimeout` no longer means "the deadline won", and hoisting the
                 // ceiling itself across the attempt await would cost every caller 8 bytes of
                 // state-machine box where a fourth bool costs none - it lands in the padding
@@ -942,8 +942,8 @@ public sealed partial record Resilience
         // MinimumSamples, and the policy reverts to the configured AttemptTimeout until successes
         // accumulate again. Sampling the failures instead would let a wave of timeouts raise the ceiling
         // that produced them.
-        if (verdict.Kind == VerdictKind.Ok && Timeouts is not null)
-            ExecutionState.TimeoutsFor(this)?.Record(duration);
+        if (verdict.Kind == VerdictKind.Ok && AttemptCeiling is not null)
+            ExecutionState.AttemptCeilingFor(this)?.Record(duration);
 
         if (OnEvent is not null)
         {
@@ -1132,7 +1132,7 @@ public sealed partial record Resilience
     ///         finish", and answering it from the tail would refuse attempts that had a good chance. So
     ///         the source is <see cref="NResilience.Breaker.NormalLatency" /> - the body of the
     ///         distribution, capped at the p50 by <see cref="SlowCalls.Quantile" /> - and never the
-    ///         high-quantile windows <see cref="Hedge" /> and <see cref="Timeouts" /> own.
+    ///         high-quantile windows <see cref="Hedge" /> and <see cref="AttemptCeiling" /> own.
     ///     </para>
     ///     <para>
     ///         <b>It can only ever refuse a retry.</b> The first attempt of every call runs whatever the
@@ -1143,7 +1143,7 @@ public sealed partial record Resilience
     ///     </para>
     ///     <para>
     ///         Read on the retry decision rather than hoisted into a local, for the reason
-    ///         <see cref="Internal.ExecutionState.TimeoutsFor" /> gives: a field held across the attempt
+    ///         <see cref="Internal.ExecutionState.AttemptCeilingFor" /> gives: a field held across the attempt
     ///         <c>await</c> would cost every caller's state-machine box whether or not anything was
     ///         measuring. The read itself is a memoized answer per window slice.
     ///     </para>
@@ -1253,11 +1253,11 @@ public sealed partial record Resilience
 
     /// <summary>
     ///     This attempt's ceiling before the deadline is applied: <see cref="AttemptTimeout" />, lowered
-    ///     by a multiple of recent latency when <see cref="Timeouts" /> is configured and has an
+    ///     by a multiple of recent latency when <see cref="AttemptCeiling" /> is configured and has an
     ///     estimate to offer.
     ///     <para>
     ///         Lowered, never raised. The clamp here is the whole safety argument for the feature - see
-    ///         <see cref="AttemptTimeouts" /> - and it is also what keeps this method total: every path
+    ///         <see cref="AttemptCeiling" /> - and it is also what keeps this method total: every path
     ///         with no measured answer hands back the configured constant, which is exactly today's
     ///         behaviour.
     ///     </para>
@@ -1266,9 +1266,9 @@ public sealed partial record Resilience
     /// <returns>The ceiling, or <see cref="Timeout.InfiniteTimeSpan" /> when there is none.</returns>
     /// <remarks>
     ///     Called once per attempt, and the cost to a policy that does not configure
-    ///     <see cref="Timeouts" /> is one branch inside <see cref="Measured" />: a field read off
+    ///     <see cref="AttemptCeiling" /> is one branch inside <see cref="Measured" />: a field read off
     ///     <c>this</c>, which is already a field of the caller's state-machine box. Nothing here is held
-    ///     across an <c>await</c>, which is the point - see <c>ExecutionState.TimeoutsFor</c>.
+    ///     across an <c>await</c>, which is the point - see <c>ExecutionState.AttemptCeilingFor</c>.
     /// </remarks>
     private TimeSpan Ceiling(int attemptNumber)
     {
@@ -1289,22 +1289,22 @@ public sealed partial record Resilience
 
     /// <summary>
     ///     The measured ceiling with its floors applied, before <see cref="AttemptTimeout" /> and the
-    ///     deadline clamp it. Null when <see cref="Timeouts" /> is not configured or the estimate is
+    ///     deadline clamp it. Null when <see cref="AttemptCeiling" /> is not configured or the estimate is
     ///     still cold, which is the case that leaves the policy behaving exactly as it does today.
     /// </summary>
     /// <returns>The ceiling the measurement asks for, or null.</returns>
     private TimeSpan? Measured()
     {
-        if (Timeouts is not { } timeouts)
+        if (AttemptCeiling is not { } ceiling)
             return null;
 
-        if (ExecutionState.TimeoutsFor(this)?.Threshold(timeouts.MinimumSamples) is not { } tail)
+        if (ExecutionState.AttemptCeilingFor(this)?.Threshold(ceiling.MinimumSamples) is not { } tail)
             return null;
 
-        var measured = timeouts.CeilingFor(tail);
+        var measured = ceiling.CeilingFor(tail);
 
-        if (measured < timeouts.Floor)
-            measured = timeouts.Floor;
+        if (measured < ceiling.Floor)
+            measured = ceiling.Floor;
 
         // A hedge arms its second leg at the hedge threshold, so a ceiling at or below that would cancel
         // the first leg at the moment the second was due to start, and the caller would have bought a
@@ -1316,10 +1316,10 @@ public sealed partial record Resilience
         // A floor here rather than a refusal in Validate(), because whether the two collide depends on
         // the shape of the distribution and not on the configuration. Both quantiles are read from the
         // same traffic; only the traffic knows how far apart they are. It is unreachable whenever
-        // Timeouts.Quantile is at or above Hedge.Quantile, which is the common case.
+        // AttemptCeiling.Quantile is at or above Hedge.Quantile, which is the common case.
         if (Hedge is { } hedge && ExecutionState.LatencyFor(this)?.Threshold(hedge.MinimumSamples) is { } armed)
         {
-            var hedgeFloor = timeouts.CeilingFor(armed > hedge.MinimumDelay ? armed : hedge.MinimumDelay);
+            var hedgeFloor = ceiling.CeilingFor(armed > hedge.MinimumDelay ? armed : hedge.MinimumDelay);
 
             if (measured < hedgeFloor)
                 measured = hedgeFloor;

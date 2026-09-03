@@ -79,7 +79,7 @@ That last bound is an instance of one rule, and it holds everywhere in the libra
 
 | Constant | Measured | Effect together |
 | --- | --- | --- |
-| `AttemptTimeout` | `Timeouts` | The attempt is cut at whichever is shorter. |
+| `AttemptTimeout` | `AttemptCeiling` | The attempt is cut at whichever is shorter. |
 | `Breaker.SlowCallThreshold` | `Breaker.SlowCalls` | A call is slow when it is above either. |
 | `Breaker.FailureRatio` | `Breaker.Failures` | The breaker trips at whichever ratio is lower. |
 

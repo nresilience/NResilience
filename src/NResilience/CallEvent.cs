@@ -116,7 +116,7 @@ public enum CallEventKind
 
     /// <summary>
     ///     The measured per-attempt ceiling moved. <see cref="CallEvent.Delay" /> is the new ceiling, and
-    ///     it is the whole output of <see cref="Resilience.Timeouts" /> - nothing else in the process can
+    ///     it is the whole output of <see cref="Resilience.AttemptCeiling" /> - nothing else in the process can
     ///     report it.
     ///     <para>
     ///         Raised only when the measured term is what bounds the attempt, and only when the number

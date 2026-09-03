@@ -31,8 +31,8 @@ public sealed partial record Resilience
     /// </summary>
     private const double DefaultTimeoutMultiple = 3.0;
 
-    private readonly AttemptTimeouts? _timeouts;
-    private readonly bool _timeoutsSet;
+    private readonly AttemptCeiling? _ceiling;
+    private readonly bool _ceilingSet;
 
     /// <summary>
     ///     Passthrough. Every bound is off, so the executor returns the callback's own task and the
@@ -47,7 +47,7 @@ public sealed partial record Resilience
 
         // Passthrough means every bound is off, and a measured ceiling is a bound - the one bound
         // that is on by default everywhere else.
-        Timeouts = null,
+        AttemptCeiling = null,
 
         // Redundant against Attempts = 1, and stated anyway: passthrough means *every* bound is
         // off, and a reader should not have to derive "so no budget either" from the attempt count.
@@ -94,7 +94,7 @@ public sealed partial record Resilience
 
     /// <summary>
     ///     The per-attempt ceiling measured from the dependency's own recent latency, on by default at
-    ///     <c>AttemptTimeouts.Above(3)</c>: the effective ceiling is the minimum of
+    ///     <c>AttemptCeiling.Above(3)</c>: the effective ceiling is the minimum of
     ///     <see cref="AttemptTimeout" />, the time remaining on the deadline, and a multiple of recent
     ///     latency. Set it to <c>null</c> to leave <see cref="AttemptTimeout" /> as the only per-attempt
     ///     ceiling. A policy whose <see cref="AttemptTimeout" /> is <see cref="Timeout.InfiniteTimeSpan" />
@@ -102,36 +102,36 @@ public sealed partial record Resilience
     ///     <para>
     ///         The measured term only lowers the ceiling, making the feature safe to leave on: <see cref="AttemptTimeout" />
     ///         remains the absolute ceiling, and a dependency slow enough that the measurement exceeds it
-    ///         gets the default behavior. See <see cref="NResilience.AttemptTimeouts" /> for details.
+    ///         gets the default behavior. See <see cref="NResilience.AttemptCeiling" /> for details.
     ///     </para>
     ///     <para>
     ///         The estimate is fed by successful attempts only and requires
-    ///         <see cref="NResilience.AttemptTimeouts.MinimumSamples" /> before it bounds any attempt; until then,
+    ///         <see cref="NResilience.AttemptCeiling.MinimumSamples" /> before it bounds any attempt; until then,
     ///         the attempt uses <see cref="AttemptTimeout" /> unchanged. When <see cref="Hedge" /> is also configured,
     ///         the hedge threshold acts as a floor for the ceiling to prevent the first leg from being cancelled
     ///         before the second leg starts.
     ///     </para>
     ///     <para>
     ///         Configuring this does not increase the allocation of the caller's state-machine box.
-    ///         See <c>ExecutionState.TimeoutsFor</c> for details.
+    ///         See <c>ExecutionState.AttemptCeilingFor</c> for details.
     ///     </para>
     /// </summary>
     /// <remarks>
     ///     Defaulted on because the measured term can only tighten: <see cref="AttemptTimeout" /> stays
     ///     the ceiling, the estimate is cold until it has
-    ///     <see cref="NResilience.AttemptTimeouts.MinimumSamples" /> successful attempts, and the worst
+    ///     <see cref="NResilience.AttemptCeiling.MinimumSamples" /> successful attempts, and the worst
     ///     the feature can do is stop shortening. A policy whose <see cref="AttemptTimeout" /> is at or
-    ///     below <see cref="NResilience.AttemptTimeouts.Floor" /> gets no default at all, because the
+    ///     below <see cref="NResilience.AttemptCeiling.Floor" /> gets no default at all, because the
     ///     measured term could never lower anything there - rather than the configuration error the same
     ///     pair would be if the caller had written it.
     /// </remarks>
-    public AttemptTimeouts? Timeouts
+    public AttemptCeiling? AttemptCeiling
     {
-        get => _timeoutsSet ? _timeouts : DefaultTimeouts();
+        get => _ceilingSet ? _ceiling : DefaultAttemptCeiling();
         init
         {
-            _timeouts = value;
-            _timeoutsSet = true;
+            _ceiling = value;
+            _ceilingSet = true;
         }
     }
 
@@ -282,7 +282,7 @@ public sealed partial record Resilience
 
     /// <summary>
     ///     The current measured ceiling, including the floor and hedge floor, before <see cref="AttemptTimeout" />
-    ///     and the deadline clamp it. Returns <c>null</c> when <see cref="Timeouts" /> is not configured,
+    ///     and the deadline clamp it. Returns <c>null</c> when <see cref="AttemptCeiling" /> is not configured,
     ///     or when the estimate is still cold.
     ///     <para>
     ///         This value is what the attempt gets whenever it is below <see cref="AttemptTimeout" />.
@@ -302,7 +302,7 @@ public sealed partial record Resilience
     ///     </para>
     /// </remarks>
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
-    public TimeSpan? MeasuredAttemptTimeout => Measured();
+    public TimeSpan? MeasuredAttemptCeiling => Measured();
 
     /// <summary>
     ///     True when the policy imposes nothing at all, so a call can hand back the callback's own
@@ -322,10 +322,10 @@ public sealed partial record Resilience
         && Hedge is null
 
         // A measured ceiling is a bound, and one this policy has asked for even though the two
-        // constants above say "no bound". A policy that set AttemptTimeout to infinite and Timeouts
+        // constants above say "no bound". A policy that set AttemptTimeout to infinite and AttemptCeiling
         // to something has asked to be bounded by the dependency's own latency, which passthrough
         // cannot deliver.
-        && Timeouts is null
+        && AttemptCeiling is null
 
         // An inbound deadline is a bound like any other, and a policy asking to be clamped by one has
         // asked for a bound it cannot see from here - so passthrough is off the table whether or not
@@ -376,18 +376,18 @@ public sealed partial record Resilience
 
         Backoff.Validate(problems);
 
-        if (Timeouts is { } timeouts)
+        if (AttemptCeiling is { } ceiling)
         {
-            timeouts.Validate(problems);
+            ceiling.Validate(problems);
 
             // A floor at or above the configured ceiling makes the measured term unreachable: the
             // clamp would hand back AttemptTimeout on every attempt, whatever the dependency did.
             // Rejected rather than ignored, for the reason the Hedge check below is: silently doing
             // nothing is how a caller ends up believing a ceiling is being measured when it is not.
-            if (AttemptTimeout != Timeout.InfiniteTimeSpan && timeouts.Floor >= AttemptTimeout)
+            if (AttemptTimeout != Timeout.InfiniteTimeSpan && ceiling.Floor >= AttemptTimeout)
             {
                 problems.Add(
-                    $"Timeouts.Floor must be below AttemptTimeout; they are {timeouts.Floor} and {AttemptTimeout}. " +
+                    $"AttemptCeiling.Floor must be below AttemptTimeout; they are {ceiling.Floor} and {AttemptTimeout}. " +
                     "The measured ceiling is clamped by AttemptTimeout, so a floor at or above it can never lower anything.");
             }
         }
@@ -449,7 +449,7 @@ public sealed partial record Resilience
     ///     <para>
     ///         An <see cref="Timeout.InfiniteTimeSpan" /> <see cref="AttemptTimeout" /> is the caller
     ///         saying the deadline is the only per-attempt bound, and a measured ceiling under it would
-    ///         be a bound nothing they wrote clamps. Writing <see cref="Timeouts" /> alongside an
+    ///         be a bound nothing they wrote clamps. Writing <see cref="AttemptCeiling" /> alongside an
     ///         infinite <see cref="AttemptTimeout" /> is a different statement - "bound me by the
     ///         dependency's own latency and nothing else" - and that one is honoured.
     ///     </para>
@@ -461,14 +461,15 @@ public sealed partial record Resilience
     ///         instead.
     ///     </para>
     /// </remarks>
-    private AttemptTimeouts? DefaultTimeouts()
+    private AttemptCeiling? DefaultAttemptCeiling()
     {
         if (AttemptTimeout == Timeout.InfiniteTimeSpan)
             return null;
 
-        var timeouts = AttemptTimeouts.Above(DefaultTimeoutMultiple);
+        // Qualified because the property of the same name shadows the type inside this class.
+        var ceiling = NResilience.AttemptCeiling.Above(DefaultTimeoutMultiple);
 
-        return timeouts.Floor >= AttemptTimeout ? null : timeouts;
+        return ceiling.Floor >= AttemptTimeout ? null : ceiling;
     }
 
     private static class HttpHolder

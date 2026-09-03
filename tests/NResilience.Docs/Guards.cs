@@ -36,7 +36,7 @@ public sealed class Guards
             SlowCallThreshold = TimeSpan.FromSeconds(value: 2), // anything slower counts against
             SlowCallRatio = 0.5, // half the window being slow trips it
             MinimumCalls = 20, // below this, a ratio means nothing
-            Window = TimeSpan.FromSeconds(value: 30),
+            TripWindow = TimeSpan.FromSeconds(value: 30), // the history the ratios are measured over
             BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
             MaxBreakDuration = TimeSpan.FromMinutes(value: 2),
             ProbeSuccesses = 2, // two good probes to close, not one
@@ -137,7 +137,7 @@ public sealed class Guards
         // more of each period cold. The ramp gives it a trickle it can actually serve.
         var breaker = new Breaker(settings: new BreakerSettings
         {
-            Recovery = Recovery.Over(fraction: 0.25), // ramp back over a quarter of the break served
+            Recovery = Recovery.Over(length: 0.25), // ramp back over a quarter of the break served
             BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
         })
         {
@@ -146,7 +146,7 @@ public sealed class Guards
 
         // </snippet:breaker-recovery>
 
-        Assert.Equal(expected: 0.25, actual: breaker.Settings.Recovery!.Value.Fraction);
+        Assert.Equal(expected: 0.25, actual: breaker.Settings.Recovery!.Value.Length);
     }
 
     [Fact]
