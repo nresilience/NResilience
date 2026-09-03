@@ -52,7 +52,7 @@ The breaker needed no change, but one thing about it is worth recording, because
 
 A verdict is live across the attempt `await`, so every byte of it is paid for in the state-machine box of every suspending call in the library - including calls in applications that never rate limit anything. A feature most users will not enable must not be charged to the users who do not enable it.
 
-The flag was expected to pack into the padding that a single-byte `VerdictKind` leaves in front of a nullable `TimeSpan`. It does not: measured, the obvious `bool` field took the struct from 24 bytes to 32, because the runtime's automatic layout does not fill that padding.
+The flag was expected to pack into the padding that a single-byte `VerdictKind` leaves in front of the `RetryAfter` field. It does not: measured, the obvious `bool` field took the struct from 16 bytes to 24, because the runtime's automatic layout does not fill that padding.
 
 So the flag shares the kind's byte instead. Four of its 256 values are enum members, and the top bit carries the origin:
 
@@ -63,7 +63,7 @@ public VerdictKind Kind => (VerdictKind)(byte)(_packed & ~SelfImposedFlag);
 public bool SelfImposed => (_packed & SelfImposedFlag) != 0;
 ```
 
-Back to 24 bytes, gated by `The_verdict_carries_its_origin_for_free`. `AttemptRecord` already used the same trick to carry the verdict kind in the top eight bits of a 64-bit field, and it has the same spare capacity - so the flag survives into the attempt log for nothing as well, and a reader of `CallResult<T>.Attempts` can tell a limiter this process runs from a 429 the dependency sent.
+Back to 16 bytes, gated by `The_verdict_carries_its_origin_and_its_pushback_for_free`. That gate asserts the same premise about `RetryAfter`, stored as a `long` of ticks biased by one so that `0` means "the server said nothing". A `TimeSpan?` field there cost another eight bytes for a value that is null on all but throttled verdicts, and the public property still hands back a `TimeSpan?`. `AttemptRecord` already used the same trick to carry the verdict kind in the top eight bits of a 64-bit field, and it has the same spare capacity - so the flag survives into the attempt log for nothing as well, and a reader of `CallResult<T>.Attempts` can tell a limiter this process runs from a 429 the dependency sent.
 
 The same accounting is why [the `Admit` hook](#the-admit-hook) does not live in the shared loop. A
 hook returning a new awaitable type would add a hoisted awaiter field to the state-machine box of

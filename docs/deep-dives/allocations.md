@@ -60,9 +60,9 @@ The 48-72 bytes observed with a listener attached come from boxing two attempt r
 
 ## The one path that spends
 
-Hedging is the exception to every figure above, and a deliberate one. A hedged call holds a list of legs, runs each in its own `async` local function, races them with `Task.WhenAny` over an array built per wait, and arms a `Task.Delay` for the threshold. There is no version of hedging that does not allocate; a design that pretended otherwise would be a worse design, not a cheaper one.
+Hedging is the exception to every figure above, and a deliberate one. A hedged call holds a list of legs, runs each in its own `async` local function, races them with `Task.WhenAny`, and arms a cancellable `Task.Delay` for the threshold. There is no version of hedging that does not allocate; a design that pretended otherwise would be a worse design, not a cheaper one.
 
-The measured figure - about 1300 B above the raw callback, on a call where no hedge actually fires - is roughly what a Polly retry-and-timeout pipeline costs *per call*. The difference is who pays it. `Hedge` selects a third execution loop, so a policy without `Hedge` pays nothing for that loop, and that is a gate rather than an intention:
+The measured figure - about 1370 B above the raw callback, on a call where no hedge actually fires - is roughly what a Polly retry-and-timeout pipeline costs *per call*. Two of the decisions behind those bytes point in opposite directions. When `MaxConcurrent` is at its default of 2, the race is between exactly two tasks, so it takes `Task.WhenAny`'s pair overload and allocates no array at all. The arming delay, by contrast, is given a cancellation source of the loop's own: that costs about 170 B per call, and it releases the `TimerQueueTimer` that would otherwise stay armed until its threshold elapsed - long after the call it armed for had finished. The difference is who pays it. `Hedge` selects a third execution loop, so a policy without `Hedge` pays nothing for that loop, and that is a gate rather than an intention:
 
 - `A_policy_with_no_Hedge_pays_nothing_for_the_third_execution_path` compares the two arms in one sweep.
 - `The_hedged_path_stays_within_its_own_budget` holds the hedged figure to a ceiling of its own.

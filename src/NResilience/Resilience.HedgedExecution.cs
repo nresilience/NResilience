@@ -61,7 +61,12 @@ public sealed partial record Resilience
         where TInvoker : struct, IInvoker<TState, T>
         where TShaper : struct, IOutcomeShaper<T, TOut>
     {
-        var hedge = Hedge!.Value;
+        // Deliberately not hoisted into a local, for the reason ExecuteAsync's preamble gives about
+        // Backoff: Hedge measures 128 bytes, the local functions below capture whatever this method puts
+        // in a local, and a captured Hedge lands in their shared display class once per hedged call to
+        // save five field loads the JIT keeps in a register anyway. `this` is already captured, so each
+        // site below pays a null check instead. Non-null by construction - this method is only reached
+        // for a policy whose Hedge is set - which is what the `!` asserts at each of them.
 
         // Non-null by construction: ExecutionState builds one for every policy whose Hedge is set, and
         // this method is only reached for those.
@@ -85,7 +90,7 @@ public sealed partial record Resilience
         StopReason reason;
 
         // The legs currently in flight. Capacity is the concurrency ceiling, so the list never grows.
-        var legs = new List<HedgeLeg<T>>(hedge.MaxConcurrent);
+        var legs = new List<HedgeLeg<T>>(Hedge!.Value.MaxConcurrent);
 
         // Wire calls started. Distinct from log.Count, which also counts discarded legs, and it is this
         // one that Attempts bounds - Attempts is the number of calls the dependency sees.
@@ -95,6 +100,13 @@ public sealed partial record Resilience
         // turn into a hedge decision every threshold for the rest of the round. Cleared when a new round
         // begins.
         var hedgeRefused = false;
+
+        // Cancels the arming delay of the iteration that is over. Without it every iteration leaves a
+        // TimerQueueTimer behind until its threshold elapses, so a hedged call that retries twice leaves
+        // four or five of them, and steady-state load leaves a standing population of dead timers
+        // proportional to throughput times threshold. One source per hedged call, re-created on each
+        // re-arm because a cancelled source cannot arm anything again.
+        CancellationTokenSource? arming = null;
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -148,19 +160,32 @@ public sealed partial record Resilience
                 }
 
                 var armed = ArmHedge();
+                var racing = legs.Count + (armed is null ? 0 : 1);
+                Task done;
 
-                // One array per wait. A hedged call is already allocating a task per leg, and building
-                // the array here rather than keeping a parallel one is what keeps the list of legs the
-                // single source of truth about what is in flight.
-                var pending = new Task[legs.Count + (armed is null ? 0 : 1)];
+                if (racing == 2)
+                {
+                    // MaxConcurrent defaults to 2, so a race is almost always between exactly two tasks -
+                    // one leg and its arming delay, or two legs - and WhenAny has an overload for that
+                    // pair which allocates no array at all.
+                    var second = legs.Count == 2 ? legs[1].Work! : armed!.Value.Delay;
+                    done = await Task.WhenAny(legs[0].Work!, second).ConfigureAwait(false);
+                }
+                else
+                {
+                    // One array per wait. A hedged call is already allocating a task per leg, and building
+                    // the array here rather than keeping a parallel one is what keeps the list of legs the
+                    // single source of truth about what is in flight.
+                    var pending = new Task[racing];
 
-                for (var i = 0; i < legs.Count; i++)
-                    pending[i] = legs[i].Work!;
+                    for (var i = 0; i < legs.Count; i++)
+                        pending[i] = legs[i].Work!;
 
-                if (armed is { } arming)
-                    pending[legs.Count] = arming.Delay;
+                    if (armed is { } fresh)
+                        pending[legs.Count] = fresh.Delay;
 
-                var done = await Task.WhenAny(pending).ConfigureAwait(false);
+                    done = await Task.WhenAny(pending).ConfigureAwait(false);
+                }
 
                 if (armed is { } fired && ReferenceEquals(done, fired.Delay))
                 {
@@ -333,6 +358,12 @@ public sealed partial record Resilience
                 Abandon(legs[i], Breaker, Time);
 
             legs.Clear();
+
+            // Reached on every exit, not only the throwing ones: the last iteration's arming delay is
+            // still pending whenever the call ended before its threshold fired. ArmHedge clears this on
+            // the way past, so there is at most one to release here.
+            arming?.Cancel();
+            arming?.Dispose();
         }
 
         var attempts = log.Materialize(Time.GetElapsedTime(start), deadline);
@@ -360,7 +391,7 @@ public sealed partial record Resilience
             // so a dependency erroring on 40% of calls sits closed while this process hedges every slow
             // one. Once the error rate has climbed to SuppressAt of the rate that would open the breaker,
             // hedging stops rather than adding load to a dependency already in trouble.
-            var elevated = Breaker is { } gate && gate.IsErrorRateElevated(hedge.SuppressAt);
+            var elevated = Breaker is { } gate && gate.IsErrorRateElevated(Hedge!.Value.SuppressAt);
 
             // And a dependency that is not failing can still be one hedging cannot help. Asked second
             // because it is the question with the weaker evidence behind it, and because Admits() takes
@@ -380,7 +411,17 @@ public sealed partial record Resilience
         // dependency are at the firing point instead - see Suppressed().
         (Task Delay, TimeSpan Threshold)? ArmHedge()
         {
-            if (hedgeRefused || legs.Count >= hedge.MaxConcurrent || started >= Attempts)
+            // The previous iteration's delay, if there was one, is nobody's business now: an armed delay
+            // is only ever raced within the iteration that armed it. Cancelling releases its timer at
+            // once rather than at its threshold; it completes Canceled, whose Exception is null, so it
+            // cannot become an unobserved-task exception - and the loop only ever compares the delay task
+            // by reference, never awaits it. Done before the guards below, so a round that stops arming
+            // releases the last timer too.
+            arming?.Cancel();
+            arming?.Dispose();
+            arming = null;
+
+            if (hedgeRefused || legs.Count >= Hedge!.Value.MaxConcurrent || started >= Attempts)
                 return null;
 
             // Half-open counts as not closed: those attempts are probes, and a probe that is raced is not
@@ -390,23 +431,28 @@ public sealed partial record Resilience
             if (Breaker is { State: not BreakerState.Closed })
                 return null;
 
-            if (latency.Threshold(hedge.MinimumSamples) is not { } threshold)
+            if (latency.Threshold(Hedge!.Value.MinimumSamples) is not { } threshold)
                 return null;
 
             // A dependency whose p95 is a few hundred microseconds would otherwise have every call
             // hedged, which spends the extra traffic on calls nobody would describe as slow.
-            if (threshold < hedge.MinimumDelay)
-                threshold = hedge.MinimumDelay;
+            var floor = Hedge!.Value.MinimumDelay;
+
+            if (threshold < floor)
+                threshold = floor;
 
             var left = Remaining(Time, start, deadline);
 
             if (left != Timeout.InfiniteTimeSpan && threshold >= left)
                 return null;
 
-            // Deliberately not given the caller's token. A cancelled caller is observed through the
+            arming = new CancellationTokenSource();
+
+            // Deliberately not given the *caller's* token. A cancelled caller is observed through the
             // legs, which are cancelled with it, and a delay that can fault is a second way for this
-            // loop to unwind for no gain.
-            return (Task.Delay(threshold, Time), threshold);
+            // loop to unwind for no gain. The source above is the loop's own and is only ever cancelled
+            // once nothing is waiting on the delay, so it cannot unwind anything.
+            return (Task.Delay(threshold, Time, arming.Token), threshold);
         }
 
         // Creates a leg and starts it. The sources exist before the body runs, because the body is what

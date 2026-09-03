@@ -37,12 +37,12 @@ public readonly struct Verdict : IEquatable<Verdict>
     ///     The top bit of <see cref="_packed" />, carrying <see cref="SelfImposed" />.
     ///     <para>
     ///         The flag shares the kind's byte rather than sitting beside it in a <c>bool</c> field. The
-    ///         obvious version measured 32 bytes against this one's 24: the runtime's automatic layout does
-    ///         not pack a <c>bool</c> into the padding a single-byte enum leaves in front of a nullable
-    ///         <see cref="TimeSpan" />. A verdict is live across the attempt <c>await</c>, so those eight
+    ///         obvious version measured eight bytes more than this one: the runtime's automatic layout does
+    ///         not pack a <c>bool</c> into the padding a single-byte enum leaves in front of the pushback
+    ///         field. A verdict is live across the attempt <c>await</c>, so those eight
     ///         bytes would be paid for in the state-machine box of every suspending call in the library,
     ///         whether or not anything is ever rate limited. Gated by
-    ///         <c>The_verdict_carries_its_origin_for_free</c>.
+    ///         <c>The_verdict_carries_its_origin_and_its_pushback_for_free</c>.
     ///     </para>
     ///     <para>
     ///         Four of the byte's 256 values are <see cref="VerdictKind" /> members, which is the same spare
@@ -59,12 +59,35 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// </summary>
     internal const byte SelfImposedFlag = 0x80;
 
+    /// <summary>
+    ///     The pushback in ticks, biased by one so that <c>0</c> means "the server said nothing".
+    ///     <para>
+    ///         The bias is load-bearing. <c>default(Verdict)</c> has to report
+    ///         <see cref="RetryAfter" /> as null, and a bare ticks field would report
+    ///         <see cref="TimeSpan.Zero" /> instead - which is a real instruction ("come back
+    ///         immediately"), not the absence of one.
+    ///     </para>
+    ///     <para>
+    ///         A <c>long</c> rather than the obvious <c>TimeSpan?</c>: the nullable measures 16 bytes
+    ///         next to the kind's byte where this measures 8, and a verdict is live across the attempt
+    ///         <c>await</c>, so the difference is paid in the state-machine box of every suspending call
+    ///         in the library whether or not anything is ever throttled. Same ledger the
+    ///         <see cref="SelfImposedFlag" /> packing argument below was made on, and gated by
+    ///         <c>Budgets.VerdictSize</c>.
+    ///     </para>
+    /// </summary>
+    private readonly long _retryAfterPlusOne;
+
     private readonly byte _packed;
 
     private Verdict(VerdictKind kind, TimeSpan? retryAfter, bool selfImposed = false)
     {
         _packed = (byte)((byte)kind | (selfImposed ? SelfImposedFlag : 0));
-        RetryAfter = retryAfter;
+
+        // Clamped at construction rather than left for Backoff.Compute to clamp on the way out: the
+        // encoding has no room for a negative, and a pushback of "-5 seconds ago" has no reading under
+        // which it means anything other than zero.
+        _retryAfterPlusOne = retryAfter is { } after ? Math.Max(after.Ticks, 0) + 1 : 0;
     }
 
     /// <summary>What kind of outcome this is.</summary>
@@ -73,8 +96,14 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// <summary>
     ///     Server pushback, honored verbatim in preference to any backoff curve, and capped only by
     ///     the backoff maximum and the time left on the deadline. Null when the server said nothing.
+    ///     <para>
+    ///         Never negative. A pushback below zero is clamped to <see cref="TimeSpan.Zero" /> when the
+    ///         verdict is constructed, so it reads back as "come back immediately" rather than as a time
+    ///         in the past.
+    ///     </para>
     /// </summary>
-    public TimeSpan? RetryAfter { get; }
+    public TimeSpan? RetryAfter =>
+        _retryAfterPlusOne == 0 ? null : TimeSpan.FromTicks(_retryAfterPlusOne - 1);
 
     /// <summary>
     ///     True when this verdict came from inside this process rather than from the dependency: local
@@ -132,13 +161,13 @@ public readonly struct Verdict : IEquatable<Verdict>
     public static Verdict Refused(TimeSpan? retryAfter = null) => Limited(retryAfter);
 
     /// <inheritdoc />
-    public bool Equals(Verdict other) => _packed == other._packed && RetryAfter == other.RetryAfter;
+    public bool Equals(Verdict other) => _packed == other._packed && _retryAfterPlusOne == other._retryAfterPlusOne;
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is Verdict other && Equals(other);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(_packed, RetryAfter);
+    public override int GetHashCode() => HashCode.Combine(_packed, _retryAfterPlusOne);
 
     /// <summary>Value equality.</summary>
     /// <param name="left">The left operand.</param>

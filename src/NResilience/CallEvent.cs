@@ -182,9 +182,37 @@ public enum CallEventKind
 ///     which is what makes leaving a listener attached in production affordable. The one exception is
 ///     <see cref="Result" />, which boxes a value-type result and is populated only when a listener is
 ///     actually attached.
+///     <para>
+///         Its size is what a raised event costs to copy, so the three fields that would naturally be
+///         nullable value types - <see cref="Delay" />, <see cref="Reason" /> and
+///         <see cref="NResilience.Verdict.RetryAfter" /> inside <see cref="Verdict" /> - are stored
+///         biased-by-one instead, and <see cref="Kind" /> is stored as a byte. Every public property
+///         keeps the type a listener expects; the struct measures 64 bytes rather than 88.
+///     </para>
 /// </remarks>
 public readonly struct CallEvent
 {
+    /// <summary>
+    ///     <see cref="Delay" /> in ticks, biased by one so that <c>0</c> means "no pause". The same
+    ///     encoding <see cref="NResilience.Verdict" /> uses for its pushback, and for the same reason: a
+    ///     <c>TimeSpan?</c> field measures 16 bytes where this measures 8, and this struct is copied by
+    ///     value into every listener on every event.
+    /// </summary>
+    private readonly long _delayPlusOne;
+
+    /// <summary>
+    ///     <see cref="Kind" /> narrowed to the byte it fits in. The enum stays <c>int</c>-backed, which is
+    ///     what a <c>switch</c> over it in a listener sees; only the storage is a byte, so it packs
+    ///     alongside <see cref="_reasonPlusOne" /> in what would otherwise be padding.
+    /// </summary>
+    private readonly byte _kind;
+
+    /// <summary>
+    ///     <see cref="Reason" /> biased by one, so that <c>0</c> is "nothing has stopped yet" and the
+    ///     field needs no separate has-value byte.
+    /// </summary>
+    private readonly byte _reasonPlusOne;
+
     internal CallEvent(
         CallEventKind kind,
         string? policyName,
@@ -196,19 +224,19 @@ public readonly struct CallEvent
         object? result,
         StopReason? reason)
     {
-        Kind = kind;
+        _kind = (byte)kind;
         PolicyName = policyName;
         AttemptNumber = attemptNumber;
         Verdict = verdict;
         Duration = duration;
-        Delay = delay;
+        _delayPlusOne = delay is { } pause ? Math.Max(pause.Ticks, 0) + 1 : 0;
         Exception = exception;
         Result = result;
-        Reason = reason;
+        _reasonPlusOne = reason is { } stopped ? (byte)((byte)stopped + 1) : (byte)0;
     }
 
     /// <summary>What happened.</summary>
-    public CallEventKind Kind { get; }
+    public CallEventKind Kind => (CallEventKind)_kind;
 
     /// <summary><see cref="Resilience.Name" />, so one listener can serve many policies.</summary>
     public string? PolicyName { get; }
@@ -242,7 +270,7 @@ public readonly struct CallEvent
     ///     The pause about to be served: the backoff on <see cref="CallEventKind.Retrying" />, the
     ///     guarded-rejection pause on the two rejection kinds. Null on every other kind.
     /// </summary>
-    public TimeSpan? Delay { get; }
+    public TimeSpan? Delay => _delayPlusOne == 0 ? null : TimeSpan.FromTicks(_delayPlusOne - 1);
 
     /// <summary>What the most recent attempt threw, or null when it returned.</summary>
     public Exception? Exception { get; }
@@ -274,7 +302,7 @@ public readonly struct CallEvent
     ///         "we are retrying too hard".
     ///     </para>
     /// </summary>
-    public StopReason? Reason { get; }
+    public StopReason? Reason => _reasonPlusOne == 0 ? null : (StopReason)(_reasonPlusOne - 1);
 
     /// <summary>
     ///     True for the two refusals - <see cref="CallEventKind.RejectedByBreaker" /> and

@@ -35,11 +35,23 @@ public enum StopReason
 /// </summary>
 public readonly struct Attempt
 {
+    /// <summary>
+    ///     The verdict kind and its origin flag, in the one byte the inline log already packs them into.
+    ///     <para>
+    ///         Stored rather than an embedded <see cref="NResilience.Verdict" />, and rebuilt in
+    ///         <see cref="Verdict" />: the pushback is documented as not round-tripped, so an embedded
+    ///         verdict would be carrying a field structurally guaranteed to be null. The byte measures 24
+    ///         bytes less per attempt, on every materialized log.
+    ///     </para>
+    /// </summary>
+    private readonly byte _packed;
+
     internal Attempt(
         int number,
         TimeSpan duration,
         TimeSpan delayBefore,
-        Verdict verdict,
+        VerdictKind kind,
+        bool selfImposed,
         Exception? exception,
         TimeSpan remaining,
         TimeSpan startOffset,
@@ -49,7 +61,7 @@ public readonly struct Attempt
         Number = number;
         Duration = duration;
         DelayBefore = delayBefore;
-        Verdict = verdict;
+        _packed = (byte)((byte)kind | (selfImposed ? NResilience.Verdict.SelfImposedFlag : 0));
         Exception = exception;
         Remaining = remaining;
         StartOffset = startOffset;
@@ -105,7 +117,18 @@ public readonly struct Attempt
     ///         <see cref="DelayBefore" /> of the attempt that followed it.
     ///     </para>
     /// </summary>
-    public Verdict Verdict { get; }
+    public Verdict Verdict => (VerdictKind)(byte)(_packed & ~NResilience.Verdict.SelfImposedFlag) switch
+    {
+        VerdictKind.Ok => NResilience.Verdict.Ok,
+        VerdictKind.Transient => NResilience.Verdict.Transient,
+
+        // The one place the origin flag matters on the way out: a reader of the log can tell a limiter
+        // this process runs from a 429 the dependency sent.
+        VerdictKind.Throttled => (_packed & NResilience.Verdict.SelfImposedFlag) != 0
+            ? NResilience.Verdict.Limited()
+            : NResilience.Verdict.Throttled(),
+        _ => NResilience.Verdict.Permanent,
+    };
 
     /// <summary>The exception this attempt threw, or null when it returned.</summary>
     public Exception? Exception { get; }

@@ -419,14 +419,15 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     /// <summary>
     ///     A verdict is live across the attempt <c>await</c>, so every byte of it is paid for in the
     ///     state-machine box of every suspending call.
-    ///     <c>SelfImposed</c> - the bit that keeps the retry budget from being charged for
-    ///     a refusal local admission control imposed on this process - was added on the premise that a <c>bool</c>
-    ///     packs into the padding the single-byte <c>Kind</c> already leaves beside a nullable
-    ///     <see cref="TimeSpan" />. That premise is the whole reason the flag is not a fifth
-    ///     <c>VerdictKind</c>, and it is asserted here rather than assumed.
+    ///     Two packings keep it at 16 bytes and both were adopted on a premise this asserts rather than
+    ///     assumes: <c>SelfImposed</c> - the bit that keeps the retry budget from being charged for a
+    ///     refusal local admission control imposed on this process - rides in the padding the single-byte
+    ///     <c>Kind</c> already leaves, which is the whole reason it is not a fifth <c>VerdictKind</c>;
+    ///     and <c>RetryAfter</c> is a biased <c>long</c> of ticks behind a <c>TimeSpan?</c> property,
+    ///     where the field measured eight bytes more.
     /// </summary>
     [Fact]
-    public void The_verdict_carries_its_origin_for_free()
+    public void The_verdict_carries_its_origin_and_its_pushback_for_free()
     {
         var size = Unsafe.SizeOf<Verdict>();
 
@@ -435,6 +436,41 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
             $"Verdict: {size} B; budget {Budgets.VerdictSize} B"));
 
         Assert.Equal(Budgets.VerdictSize, size);
+    }
+
+    /// <summary>
+    ///     An <see cref="Attempt" /> is what a materialized log is an array of, so its size is what a
+    ///     failure costs to report. It stores the verdict as the packed byte the inline log already
+    ///     stores rather than embedding a <see cref="Verdict" />, because the pushback is documented as
+    ///     not round-tripped - and that is the difference this asserts.
+    /// </summary>
+    [Fact]
+    public void An_attempt_does_not_carry_a_pushback_it_never_reports()
+    {
+        var size = Unsafe.SizeOf<Attempt>();
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"Attempt: {size} B; budget {Budgets.AttemptSize} B"));
+
+        Assert.Equal(Budgets.AttemptSize, size);
+    }
+
+    /// <summary>
+    ///     A <see cref="CallEvent" /> is passed by value to every listener, so its size is what raising
+    ///     an event costs. The three nullable value types it would naturally hold accounted for 40 of the
+    ///     88 bytes it used to measure; each is now biased-by-one behind a property of the original type.
+    /// </summary>
+    [Fact]
+    public void Raising_an_event_copies_no_nullable_padding()
+    {
+        var size = Unsafe.SizeOf<CallEvent>();
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"CallEvent: {size} B; budget {Budgets.CallEventSize} B"));
+
+        Assert.Equal(Budgets.CallEventSize, size);
     }
 
     /// <summary>

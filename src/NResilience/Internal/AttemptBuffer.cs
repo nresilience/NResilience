@@ -202,7 +202,8 @@ internal struct AttemptSink
                 i + 1,
                 TimeSpan.FromTicks(record.ElapsedTicks),
                 TimeSpan.FromTicks(delay < 0 ? 0 : delay),
-                new VerdictOf(record.Kind, record.SelfImposed).Value,
+                record.Kind,
+                record.SelfImposed,
                 error,
                 remaining,
                 TimeSpan.FromTicks(start),
@@ -213,21 +214,4 @@ internal struct AttemptSink
         return new AttemptLog(attempts, elapsed);
     }
 
-    /// <summary>
-    ///     Rebuilds a <see cref="Verdict" /> from the kind and the origin flag the buffer stored.
-    ///     Pushback is deliberately not round-tripped; see <see cref="Attempt.Verdict" />.
-    /// </summary>
-    private readonly struct VerdictOf(VerdictKind kind, bool selfImposed)
-    {
-        public Verdict Value => kind switch
-        {
-            VerdictKind.Ok => Verdict.Ok,
-            VerdictKind.Transient => Verdict.Transient,
-
-            // The one place the origin flag matters on the way out: a reader of the log can tell a
-            // limiter this process runs from a 429 the dependency sent.
-            VerdictKind.Throttled => selfImposed ? Verdict.Limited() : Verdict.Throttled(),
-            _ => Verdict.Permanent,
-        };
-    }
 }

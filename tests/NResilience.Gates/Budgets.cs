@@ -95,22 +95,26 @@ public static class Budgets
 
     /// <summary>
     ///     The trivial shipping shape: retry and classification, no deadline and no attempt timeout.
-    ///     Measured: 344 B on .NET 10, 334 B on .NET 8, against the stand-in's 336 B.
-    ///     (328 B and 313 B before deadline propagation; 320 B and 308 B before the breaker and budget.)
+    ///     Measured: 336 B on .NET 10, 326 B on .NET 8, against the stand-in's 336 B.
+    ///     (344 B and 334 B before <c>Verdict</c> packed its pushback; 328 B and 313 B before deadline
+    ///     propagation; 320 B and 308 B before the breaker and budget.)
     /// </summary>
     public const double TrivialOverhead = 368;
 
     /// <summary>
     ///     The realistic policy - <c>Resilience.Default</c>: three attempts, a deadline, an attempt
     ///     timeout, exponential backoff, classification and the inline attempt log.
-    ///     Measured: 408 B on .NET 10, 407 B on .NET 8, against the stand-in's 399 B.
-    ///     (393 B and 390 B before deadline propagation; 384 B and 381 B before the breaker and budget.)
+    ///     Measured: 400 B on .NET 10, 399 B on .NET 8, against the stand-in's 399 B.
+    ///     (408 B and 407 B before <c>Verdict</c> packed its pushback - a verdict is live across the
+    ///     attempt <c>await</c>, so its eight bytes were box; 393 B and 390 B before deadline
+    ///     propagation; 384 B and 381 B before the breaker and budget.)
     /// </summary>
     public const double DefaultOverhead = 448;
 
     /// <summary>
     ///     The same call with a caller token that can be cancelled and never is - the production case.
-    ///     Measured: 424 B on .NET 10, 423 B on .NET 8, against the stand-in's 416 B (408 B and 407 B
+    ///     Measured: 416 B on .NET 10, 415 B on .NET 8, against the stand-in's 416 B (424 B and 423 B
+    ///     before <c>Verdict</c> packed its pushback; 408 B and 407 B
     ///     before deadline propagation; 400 B and 397 B before the breaker and budget). The extra 16 B
     ///     over <see cref="DefaultOverhead" /> is the marginal cost of
     ///     linking against a long-lived source whose registration storage already exists; see
@@ -121,8 +125,10 @@ public static class Budgets
 
     /// <summary>
     ///     <c>TryRunAsync</c>, which always materializes the attempt log because its caller has
-    ///     explicitly asked for a result object. Measured: 584 B on .NET 10 (568 B before deadline
-    ///     propagation, 561 B before hedging, 553 B before the breaker and budget) - so asking for the history costs about 170 B over the throwing
+    ///     explicitly asked for a result object. Measured: 552 B on .NET 10 (584 B before
+    ///     <see cref="AttemptSize" /> dropped to 48 - 8 B of box for the verdict and 24 B for the one
+    ///     <c>Attempt</c> this call materializes; 568 B before deadline
+    ///     propagation, 561 B before hedging, 553 B before the breaker and budget) - so asking for the history costs about 150 B over the throwing
     ///     form. Budgeted rather than left to be discovered by a caller who assumed the two were the same
     ///     price.
     ///     The 8 B hedging added is <c>Attempt.StartOffset</c>, one <see cref="TimeSpan" /> per
@@ -161,22 +167,36 @@ public static class Budgets
     /// <summary>
     ///     <c>Resilience.Default</c> with <see cref="Resilience.Hedge" /> configured, on a call where no
     ///     hedge actually fires - the steady state, and therefore what turning hedging on costs on the
-    ///     roughly <c>Quantile</c> of calls that never needed it. Measured: 1285 B on .NET 10, which
-    ///     moves by more than the 16 B deadline propagation cost the sequential loops: the hedged loop's
-    ///     local functions capture the effective deadline in the closure they already share, on top of
-    ///     the box field.
+    ///     roughly <c>Quantile</c> of calls that never needed it. Measured: 1315 B on .NET 10 and 1435 B
+    ///     on .NET 8 - the widest gap between the two runtimes on this ledger, and it is the cancellable
+    ///     delay below that opens it. It moves by more than the 16 B deadline propagation cost the
+    ///     sequential loops, because the hedged loop's local functions capture the effective deadline in
+    ///     the closure they already share, on top of the box field.
     ///     This is the one number in this file that is large on purpose. The hedged loop holds a list of
     ///     legs, runs each in its own <c>async</c> local function, races them with
-    ///     <see cref="Task.WhenAny(Task[])" /> over an array built per wait, and arms a
-    ///     <see cref="Task.Delay(TimeSpan)" /> for the threshold. There is no version of hedging that
+    ///     <see cref="Task.WhenAny(Task,Task)" /> - or, above a concurrency ceiling of two, over an
+    ///     array built per wait - and arms a cancellable <see cref="Task.Delay(TimeSpan)" /> for the
+    ///     threshold. There is no version of hedging that
     ///     does not allocate, and pretending otherwise would produce a worse design rather than a
-    ///     cheaper one. It lands at roughly what a Polly retry-plus-timeout pipeline costs per call -
+    ///     cheaper one.
+    ///     Three things moved it recently and they do not all point the same way: the array is gone from
+    ///     the two-task race that <c>MaxConcurrent</c>'s default makes the common one (-40 B), the 128-B
+    ///     <see cref="Resilience.Hedge" /> is no longer hoisted into a local the loop's closures capture
+    ///     (-128 B), and the arming delay is now given a cancellation source of the loop's own so its
+    ///     timer is released when the race ends rather than when its threshold elapses (+172 B: the
+    ///     source, and the more expensive promise a cancellable delay returns). The last is a
+    ///     deliberate trade of allocation this path already accepts for a standing population of dead
+    ///     <c>TimerQueueTimer</c>s proportional to throughput times threshold, which nothing on this
+    ///     ledger would have shown. It lands at roughly what a Polly retry-plus-timeout pipeline costs per call -
     ///     except that only callers who asked for hedging pay it.
     ///     The number that matters more than this one is <see cref="DefaultOverhead" /> holding still,
     ///     which <c>A_policy_with_no_Hedge_pays_nothing_for_the_third_execution_path</c> asserts
     ///     directly, in the same sweep.
+    ///     The ceiling was raised from 1500 B when that trade was taken. At 1500 it left the .NET 8
+    ///     measurement 4% of headroom where every other budget in this file carries 10-16% - a ceiling
+    ///     that fails on hardware drift rather than on a regression.
     /// </summary>
-    public const double HedgeConfiguredOverhead = 1500;
+    public const double HedgeConfiguredOverhead = 1650;
 
     /// <summary>
     ///     The streaming path under <c>Resilience.Default</c>, measured over a full enumeration of a
@@ -255,17 +275,36 @@ public static class Budgets
     public const double InlineAttemptLogCost = 64;
 
     /// <summary>
-    ///     <c>sizeof(Verdict)</c>: a byte of <c>VerdictKind</c>, a <c>bool</c> of
-    ///     <c>SelfImposed</c> and a nullable <see cref="TimeSpan" />, which the runtime lays out in 24
+    ///     <c>sizeof(Verdict)</c>: a <c>long</c> of biased <c>RetryAfter</c> ticks and one packed byte
+    ///     carrying both <c>VerdictKind</c> and <c>SelfImposed</c>, which the runtime lays out in 16
     ///     bytes.
-    ///     The <c>SelfImposed</c> flag was added on the premise that it packs into the padding the
-    ///     single-byte <c>Kind</c> already leaves, and is therefore free. A verdict is live across the
-    ///     attempt <c>await</c> and so is paid for in the state-machine box of every suspending call,
-    ///     which makes that premise worth asserting rather than assuming: if the struct ever grows, the
-    ///     flag has to move into the spare bits of <c>Kind</c> instead - the trick
-    ///     <c>AttemptRecord</c> already uses to carry it in the inline log for nothing.
+    ///     Both packings were added on the premise that they are free: the flag rides in the padding the
+    ///     single-byte <c>Kind</c> already leaves, and the pushback rides in a <c>long</c> with zero as
+    ///     its sentinel rather than in the <c>TimeSpan?</c> the public property still exposes. A verdict
+    ///     is live across the attempt <c>await</c> and so is paid for in the state-machine box of every
+    ///     suspending call, which makes that premise worth asserting rather than assuming. The obvious
+    ///     shape - a <c>bool</c> field beside a <c>TimeSpan?</c> - measured 32 bytes.
     /// </summary>
-    public const int VerdictSize = 24;
+    public const int VerdictSize = 16;
+
+    /// <summary>
+    ///     <c>sizeof(Attempt)</c>. Every materialized attempt log is an array of these - which is every
+    ///     <c>TryRunAsync</c> call and every failing <c>RunAsync</c> call - so a byte here is a byte per
+    ///     attempt per failure.
+    ///     <c>Attempt.Verdict</c> is documented as not round-tripping the pushback, so the struct stores
+    ///     the same packed byte the inline log stores and rebuilds the verdict in the property rather
+    ///     than embedding one. Embedding it measured 72 bytes.
+    /// </summary>
+    public const int AttemptSize = 48;
+
+    /// <summary>
+    ///     <c>sizeof(CallEvent)</c>: what raising one event costs to copy into a listener, on a struct
+    ///     whose whole point is that a listener left attached in production allocates nothing.
+    ///     Three fields that would naturally be nullable value types - <c>Delay</c>, <c>Reason</c> and
+    ///     the verdict's own <c>RetryAfter</c> - are stored biased-by-one instead, and <c>Kind</c> is
+    ///     stored as a byte. The natural shape measured 88 bytes.
+    /// </summary>
+    public const int CallEventSize = 64;
 
     // ---- The falsification test. ----
 
