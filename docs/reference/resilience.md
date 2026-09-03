@@ -14,7 +14,7 @@ The presets cover common scenarios:
 
 | Preset | Behavior |
 | :--- | :--- |
-| `Resilience.None` | Passthrough. Executes one attempt with no bounds or budget. The [executor](index.md) returns the callback's own task. |
+| `Resilience.None` | Passthrough. Executes one attempt with no bounds or budget, and `Adaptive` is `false`, which disables measurement. The [executor](index.md) returns the callback's own task. To derive a bound from this preset, enable that bound by name and set `Adaptive` to `true`. |
 | `Resilience.Default` | Three attempts, 30-second deadline, 10-second attempt timeout, `Backoff.Default`, and `Classifier.Default`. |
 | `Resilience.Http` | A `Default` policy configured with `Classifier.Http` and `Name = "http"`. |
 
@@ -34,6 +34,7 @@ The presets cover common scenarios:
 | `Budget` | `RetryBudget?` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` creates a budget private to the policy instance. `null` and `RetryBudget.None` disable the budget. |
 | `BeforeAttempt` | `Func<NextAttempt, Task>?` | `null` | A function that runs before every attempt, including the first. |
 | `OnEvent` | `Action<CallEvent>?` | `null` | The telemetry listener. If `null`, no events are raised and no performance cost is incurred. |
+| `Adaptive` | `bool` | `true` | Whether the policy measures the dependency and bounds itself by what it measures. `false` suppresses every measured term the library would supply - such as `AttemptCeiling` - and leaves only the constants written here. It does not reach `Breaker`, which has its own switch. Setting it `false` alongside a configured `AttemptCeiling` or `Hedge` results in an error. |
 | `Name` | `string?` | `null` | A name used in diagnostics and telemetry tags. |
 | `Time` | `TimeProvider` | `TimeProvider.System` | The clock used for timing. Use the system provider in production. |
 

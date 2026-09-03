@@ -85,6 +85,8 @@ That last bound is an instance of one rule, and it holds everywhere in the libra
 
 The measured half of each pair is on by default and stays invisible until it has a baseline, so a cold process behaves exactly as one with only the constants would.
 
+To opt out of all adaptive measurement, set `Adaptive = false` on the policy and on the breaker's settings if it has one. The policy's switch deliberately stops at the breaker, because a breaker is a live object two policies may share. In configuration, a single `"Adaptive": false` setting covers both.
+
 ## Verdicts
 
 Calls return a value or throw. The library then decides whether to retry, give up, or treat the failure as permanent. A **classifier** maps each outcome to a **verdict**.

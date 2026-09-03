@@ -23,6 +23,13 @@ namespace NResilience.Extensions;
 ///         All properties are nullable. A null value indicates that the property should not be overridden,
 ///         preserving the value of the base policy.
 ///     </para>
+///     <para>
+///         A section is bound with <c>ErrorOnUnknownConfiguration</c>, so a key this type does not have
+///         is an error rather than a no-op. That is the same argument one level out: a misspelled or
+///         renamed key binds nothing, and a policy that quietly kept its defaults reads exactly like a
+///         policy nobody configured. Gated by <c>A_key_the_dto_does_not_have_fails_at_resolution</c>,
+///         and under Native AOT by the probe.
+///     </para>
 /// </summary>
 /// <example>
 ///     <code language="json">
@@ -81,6 +88,18 @@ public sealed class ResilienceOptions
     ///     current request inherited from its caller. Off by default.
     /// </summary>
     public bool? UseAmbientDeadline { get; set; }
+
+    /// <summary>
+    ///     <see cref="Resilience.Adaptive" /> - whether this policy measures the dependency and bounds
+    ///     itself by what it measures. On by default; <c>"Adaptive": false</c> is the one key that turns
+    ///     every measured term off and leaves only the constants this section wrote.
+    ///     <para>
+    ///         Unlike the property it sets, this one <i>does</i> reach the <see cref="Breaker" />, which
+    ///         a section builds for this policy alone rather than sharing. <c>"Breaker": { "Adaptive":
+    ///         true }</c> overrides it for the breaker only.
+    ///     </para>
+    /// </summary>
+    public bool? Adaptive { get; set; }
 
     /// <summary>
     ///     The backoff curve. A section rather than flat properties, so its keys are the property names
@@ -168,6 +187,9 @@ public sealed class ResilienceOptions
         if (UseAmbientDeadline is { } ambient)
             policy = policy with { UseAmbientDeadline = ambient };
 
+        if (Adaptive is { } adaptive)
+            policy = policy with { Adaptive = adaptive };
+
         if (Name is { } name)
             policy = policy with { Name = name };
 
@@ -178,7 +200,7 @@ public sealed class ResilienceOptions
             policy = policy with { Budget = resolved };
 
         if (Breaker is { } breaker)
-            policy = policy with { Breaker = breaker.Enabled is false ? null : breaker.ToBreaker(Name ?? policy.Name, policy.Time) };
+            policy = policy with { Breaker = breaker.Enabled is false ? null : breaker.ToBreaker(Name ?? policy.Name, policy.Time, Adaptive) };
 
         if (Hedge is { } hedge)
             policy = policy with { Hedge = hedge.Enabled is false ? null : hedge.ToHedge() };
@@ -512,6 +534,14 @@ public sealed class BreakerOptions
     /// </summary>
     public bool? Enabled { get; set; }
 
+    /// <summary>
+    ///     <see cref="BreakerSettings.Adaptive" /> - whether this breaker measures the dependency and
+    ///     trips on what it measures. On by default. Inherited from
+    ///     <see cref="ResilienceOptions.Adaptive" /> when this section says nothing, so one
+    ///     <c>"Adaptive": false</c> at the top of a policy covers the breaker too.
+    /// </summary>
+    public bool? Adaptive { get; set; }
+
     /// <summary><see cref="BreakerSettings.ConsecutiveFailures" />.</summary>
     public int? ConsecutiveFailures { get; set; }
 
@@ -590,15 +620,24 @@ public sealed class BreakerOptions
     ///     cannot name a clock, so the breaker a section describes runs on whatever clock the policy
     ///     it is attached to runs on, and one <see cref="Resilience.Time" /> drives both.
     /// </param>
+    /// <param name="adaptive">
+    ///     The policy's <see cref="ResilienceOptions.Adaptive" />, used when this section names none of
+    ///     its own. Null leaves <see cref="BreakerSettings.Adaptive" /> at its default.
+    /// </param>
     /// <returns>A new breaker, closed.</returns>
     /// <remarks>
     ///     <see cref="Enabled" /> is not consulted here - a method that builds a breaker cannot return
     ///     "no breaker". <see cref="ResilienceOptions.ToPolicy(Resilience?)" /> checks it before calling
     ///     this.
     /// </remarks>
-    public Breaker ToBreaker(string? name = null, TimeProvider? time = null)
+    public Breaker ToBreaker(string? name = null, TimeProvider? time = null, bool? adaptive = null)
     {
         var settings = time is null ? new BreakerSettings() : new BreakerSettings { Time = time };
+
+        // This section's own answer wins; the policy's is the fallback, because a section that says
+        // nothing about measurement should follow the policy it belongs to.
+        if ((Adaptive ?? adaptive) is { } measures)
+            settings = settings with { Adaptive = measures };
 
         if (ConsecutiveFailures is { } consecutive)
             settings = settings with { ConsecutiveFailures = consecutive };
@@ -636,8 +675,8 @@ public sealed class BreakerOptions
         if (SlowCallThreshold is { } slow)
             settings = settings with { SlowCallThreshold = slow };
 
-        if (SlowCalls is { } adaptive)
-            settings = settings with { SlowCalls = adaptive.Enabled is false ? null : adaptive.ToSlowCalls() };
+        if (SlowCalls is { } slowCalls)
+            settings = settings with { SlowCalls = slowCalls.Enabled is false ? null : slowCalls.ToSlowCalls() };
 
         if (SlowCallRatio is { } slowRatio)
             settings = settings with { SlowCallRatio = slowRatio };

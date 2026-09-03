@@ -257,4 +257,129 @@ public sealed class AdaptiveDefaultsTests
         Sample(breaker, VerdictKind.Transient, 1, TimeSpan.FromSeconds(30));
         Assert.Equal(BreakerState.Open, breaker.State);
     }
+
+    // ---- Turning the whole lot off ----
+
+    /// <summary>
+    ///     The one-word answer to "make this deterministic". Before it, the same statement was four
+    ///     assignments across two objects, and a reader had to know which four.
+    /// </summary>
+    [Fact]
+    public void Adaptive_false_turns_off_every_measured_term_the_library_supplies()
+    {
+        var policy = Resilience.Http with { Adaptive = false };
+
+        Assert.Null(policy.AttemptCeiling);
+        Assert.Null(policy.MeasuredAttemptCeiling);
+
+        var settings = new BreakerSettings { Adaptive = false };
+
+        Assert.Null(settings.SlowCalls);
+        Assert.Null(settings.Failures);
+
+        policy.Validate();
+        settings.Validate();
+    }
+
+    /// <summary>
+    ///     And what is left is the breaker people expect from the name: consecutive failures, and any
+    ///     absolute rate that was written down.
+    /// </summary>
+    [Fact]
+    public void A_non_adaptive_breaker_still_trips_on_the_conditions_that_were_written_down()
+    {
+        var time = new FakeTimeProvider();
+        var breaker = new Breaker(new BreakerSettings { Adaptive = false, Time = time });
+
+        Assert.Null(breaker.NormalLatency);
+        Assert.Null(breaker.NormalFailureRate);
+
+        // Thirty calls at thirty times any plausible baseline. An adaptive breaker would have opened
+        // on the brownout; this one has nothing measuring it.
+        Sample(breaker, VerdictKind.Ok, 30, TimeSpan.FromSeconds(30));
+        Assert.Equal(BreakerState.Closed, breaker.State);
+
+        Sample(breaker, VerdictKind.Transient, 5, TimeSpan.FromMilliseconds(1));
+        Assert.Equal(BreakerState.Open, breaker.State);
+    }
+
+    /// <summary>
+    ///     It suppresses the defaults; it does not overrule what you wrote. Saying both is a
+    ///     contradiction, and the library reports both halves rather than ranking them.
+    /// </summary>
+    [Fact]
+    public void Adaptive_false_beside_a_measured_term_is_refused_on_the_policy()
+    {
+        var problem = Assert.Throws<ResilienceConfigurationException>(() =>
+            (Resilience.Http with
+            {
+                Adaptive = false,
+                AttemptCeiling = AttemptCeiling.Above(3),
+                Hedge = Hedge.At(0.95),
+            }).Validate());
+
+        Assert.Contains(problem.Problems, p => p.Contains("AttemptCeiling is set", StringComparison.Ordinal));
+        Assert.Contains(problem.Problems, p => p.Contains("Hedge is set", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Adaptive_false_beside_a_measured_trip_is_refused_on_the_breaker()
+    {
+        var problem = Assert.Throws<ResilienceConfigurationException>(() =>
+            new Breaker(new BreakerSettings
+            {
+                Adaptive = false,
+                SlowCalls = SlowCalls.Above(3),
+                Failures = Failures.Above(5),
+            }));
+
+        Assert.Contains(problem.Problems, p => p.Contains("SlowCalls is set", StringComparison.Ordinal));
+        Assert.Contains(problem.Problems, p => p.Contains("Failures is set", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Explicitly turning a measured term off agrees with <c>Adaptive = false</c> rather than
+    ///     contradicting it, so saying the same thing twice is not an error.
+    /// </summary>
+    [Fact]
+    public void Adaptive_false_beside_an_explicit_null_is_not_a_contradiction()
+    {
+        (Resilience.Http with { Adaptive = false, AttemptCeiling = null }).Validate();
+        new BreakerSettings { Adaptive = false, SlowCalls = null, Failures = null }.Validate();
+    }
+
+    /// <summary>
+    ///     The constants still work. <c>Adaptive</c> is about what the library measures for you, not
+    ///     about what you are allowed to configure.
+    /// </summary>
+    [Fact]
+    public void A_non_adaptive_breaker_still_accepts_the_absolute_forms()
+    {
+        var settings = new BreakerSettings
+        {
+            Adaptive = false,
+            SlowCallThreshold = TimeSpan.FromSeconds(2),
+            FailureRatio = 0.5,
+        };
+
+        settings.Validate();
+
+        Assert.Null(settings.SlowCalls);
+        Assert.Equal(TimeSpan.FromSeconds(2), settings.SlowCallThreshold);
+        Assert.Equal(0.5, settings.FailureRatio);
+    }
+
+    /// <summary>
+    ///     A policy's <c>Adaptive</c> deliberately does not reach its breaker: a breaker is a live
+    ///     object two policies may share, and one policy's switch must not re-configure a guard the
+    ///     other is also holding. In code you say it twice, and this is the test that says so out loud.
+    /// </summary>
+    [Fact]
+    public void A_policys_adaptive_does_not_reach_the_breaker_it_holds()
+    {
+        var policy = Resilience.Http with { Adaptive = false, Breaker = new Breaker() };
+
+        Assert.Null(policy.AttemptCeiling);
+        Assert.NotNull(policy.Breaker!.Settings.SlowCalls);
+    }
 }

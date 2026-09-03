@@ -46,8 +46,10 @@ public sealed partial record Resilience
         Backoff = Backoff.None,
 
         // Passthrough means every bound is off, and a measured ceiling is a bound - the one bound
-        // that is on by default everywhere else.
-        AttemptCeiling = null,
+        // that is on by default everywhere else. Said as Adaptive rather than as
+        // `AttemptCeiling = null`, because that is the one word for "measure nothing", and a preset
+        // for "no bounds at all" should be spelled the same way a caller would spell it.
+        Adaptive = false,
 
         // Redundant against Attempts = 1, and stated anyway: passthrough means *every* bound is
         // off, and a reader should not have to derive "so no budget either" from the attempt count.
@@ -270,6 +272,31 @@ public sealed partial record Resilience
     /// </summary>
     public Action<CallEvent>? OnEvent { get; init; }
 
+    /// <summary>
+    ///     Whether this policy is allowed to measure the dependency and bound itself by what it
+    ///     measures. True by default.
+    ///     <para>
+    ///         Setting it to <c>false</c> is the one-line answer to "make this deterministic": it turns
+    ///         off every measured term the library would otherwise supply, leaving only the constants
+    ///         written here. Today that is <see cref="AttemptCeiling" />; anything added later that
+    ///         measures rather than asks joins it.
+    ///     </para>
+    ///     <para>
+    ///         It suppresses defaults rather than overriding what you wrote. A policy that says
+    ///         <c>false</c> and then configures <see cref="AttemptCeiling" /> or <see cref="Hedge" />
+    ///         has contradicted itself, and <see cref="Validate" /> says so rather than picking a
+    ///         winner.
+    ///     </para>
+    ///     <para>
+    ///         It does not reach the <see cref="Breaker" />, which has its own
+    ///         <see cref="BreakerSettings.Adaptive" />. A breaker is a live object that two policies may
+    ///         share, so a switch on one policy cannot silently re-configure a guard the other is also
+    ///         holding. In configuration there is no such sharing and one <c>"Adaptive": false</c>
+    ///         covers both.
+    ///     </para>
+    /// </summary>
+    public bool Adaptive { get; init; } = true;
+
     /// <summary>A name for this policy, used in diagnostics.</summary>
     public string? Name { get; init; }
 
@@ -392,6 +419,26 @@ public sealed partial record Resilience
             }
         }
 
+        if (!Adaptive)
+        {
+            // Suppressing the defaults is what Adaptive does; refusing what the caller wrote is not.
+            // A policy that turns measurement off and then configures a measured term has said two
+            // incompatible things, and the library reports both rather than ranking them.
+            if (AttemptCeiling is not null)
+            {
+                problems.Add(
+                    "Adaptive is false, so this policy measures nothing, but AttemptCeiling is set. " +
+                    "Remove one: drop AttemptCeiling to keep the policy deterministic, or drop Adaptive = false to keep the measured ceiling.");
+            }
+
+            if (Hedge is not null)
+            {
+                problems.Add(
+                    "Adaptive is false, so this policy measures nothing, but Hedge is set. " +
+                    "Hedging has no constant form - its threshold is always a measured quantile - so remove one of the two.");
+            }
+        }
+
         if (Hedge is { } hedge)
         {
             hedge.Validate(problems);
@@ -463,7 +510,7 @@ public sealed partial record Resilience
     /// </remarks>
     private AttemptCeiling? DefaultAttemptCeiling()
     {
-        if (AttemptTimeout == Timeout.InfiniteTimeSpan)
+        if (!Adaptive || AttemptTimeout == Timeout.InfiniteTimeSpan)
             return null;
 
         // Qualified because the property of the same name shadows the type inside this class.

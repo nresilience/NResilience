@@ -403,6 +403,13 @@ public sealed class AdaptiveAttemptTimeoutTests
     ///     A measured ceiling is a bound, so a policy that has one is not passthrough even when every
     ///     constant says otherwise.
     /// </summary>
+    /// <remarks>
+    ///     <c>Adaptive</c> has to be turned back on alongside it, because <see cref="Resilience.None" />
+    ///     says "measure nothing" and this policy is asking for a measurement. That is the same ceremony
+    ///     the preset already demands of every other bound - deriving one from passthrough means turning
+    ///     it back on by name - and the alternative was a preset that said "no bounds" while quietly
+    ///     accepting one.
+    /// </remarks>
     [Fact]
     public async Task A_policy_with_a_measured_ceiling_is_not_passthrough()
     {
@@ -410,6 +417,7 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         var policy = Resilience.None.UseClock(time) with
         {
+            Adaptive = true,
             AttemptCeiling = AttemptCeiling.Above(3) with { Window = Window },
         };
 

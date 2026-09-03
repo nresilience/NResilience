@@ -66,6 +66,7 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `AttemptCeiling` | An `AttemptCeilingOptions` section. On by default; `"AttemptCeiling": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |
 | `Breaker` | A `BreakerOptions` section. Omit it, or write `"Enabled": false`, for no circuit breaker. |
 | `Hedge` | A `HedgeOptions` section. Omit it, or write `"Enabled": false`, for no hedging. |
+| `Adaptive` | Set to `false` to turn off every measured term in the policy **and its breaker**. See [Turning measurement off](#turning-measurement-off). |
 | `Telemetry` | Set to `false` to opt this policy out of the telemetry meter. |
 
 ## Every feature is a section, and every section has `Enabled`
@@ -91,6 +92,36 @@ merge sections and never delete a key. It replaces per-feature magic numbers; va
 fail at registration with a message naming `"Enabled": false`.
 
 `Backoff` has no `Enabled`, because a policy always has a backoff curve.
+
+## Turning measurement off
+
+Several bounds are measured from the dependency rather than guessed: the attempt ceiling, and the
+breaker's two relative trips. `"Adaptive": false` turns all of them off at once:
+
+<!-- snippet: appsettings.resilience.deterministic.json -->
+```json
+{
+  "Resilience": {
+    "api": {
+      "Adaptive": false,
+      "AttemptTimeout": "00:00:03",
+      "Breaker": { "ConsecutiveFailures": 5 }
+    }
+  }
+}
+```
+<!-- endsnippet -->
+
+What is left is the constants you wrote: `AttemptTimeout` bounds each attempt, and the breaker opens
+on `ConsecutiveFailures` and on `FailureRatio` or `SlowCallThreshold` if you named them.
+
+Unlike the `Resilience.Adaptive` property it sets, the key reaches the breaker too. A section builds
+a breaker for this policy alone rather than sharing one, so there is no second holder for the switch
+to surprise. `"Breaker": { "Adaptive": true }` overrides it for the breaker only.
+
+`Adaptive` suppresses defaults; it does not overrule what you wrote. A section that says `false` and
+then configures `AttemptCeiling`, `Hedge`, `Breaker:SlowCalls` or `Breaker:Failures` has said two
+incompatible things, and registration fails naming both.
  
 The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `TripWindow`, `BreakDuration`, `MaxBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `Recovery` is a subsection of its own - `"Recovery": {}` turns the [recovery ramp](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) on at its defaults, `"Recovery": { "Length": 0.5 }` changes it, and `"Enabled": false` turns it back off. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
 
@@ -108,6 +139,26 @@ NResilience binds configuration onto `ResilienceOptions`, a flat, mutable Data T
 > Avoid binding a configuration section directly onto a `Resilience` instance. Direct binding is silently partial: properties like `Attempts` bind correctly, but computed properties (such as backoff caps) or complex objects (such as classifiers and circuit breakers) are ignored or incorrectly initialized. For example, `Backoff:Max` is dropped because the cap is a computed property; `Classify: "Http"` is ignored, leaving a policy that does not retry a 503; and `Breaker:ConsecutiveFailures` constructs a live circuit breaker with default settings, ignoring the value you set.
 
 The middle case is the dangerous one, because the half that worked is the evidence people use to conclude the other half did too. The DTO ensures the final policy matches the section exactly. All three failures are gated by a test.
+
+### An unrecognized key is an error
+
+A section is bound with `ErrorOnUnknownConfiguration`, so a key that `ResilienceOptions` does not have
+fails during policy resolution, naming the key:
+
+```
+The configuration section for policy "api" could not be bound. 'ErrorOnUnknownConfiguration' was set
+on the provided BinderOptions instance, but the following properties were not found on the instance
+of ResilienceOptions: 'Timeouts'. Check the spelling, and check whether the key was renamed - see
+"Migrating an existing file" in the configuration documentation.
+```
+
+This follows the same principle as the preceding note. A misspelled or renamed key binds
+nothing, and a policy that quietly kept its defaults reads exactly like a policy nobody configured -
+so the one thing a configuration file must never do is look applied when it is not. The check runs at
+every nesting depth, and under Native AOT.
+
+`RateLimitOptions` is bound the same way, at registration rather than on resolution, because a
+limiter is built eagerly.
 
 ### Backoff settings patch the base policy's curve
 

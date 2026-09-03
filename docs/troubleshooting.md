@@ -98,7 +98,16 @@ When the work eventually returns, an `OrphanedWork` event fires and names the po
 
 **Why this happens**: Binding directly to the `Resilience` record is silently partial. `Backoff:Max` is dropped, `Classify` is ignored, and `Breaker:ConsecutiveFailures` creates a breaker with default settings while ignoring your value.
 
-For more information, see [Why the binding target is a DTO](./di/configuration.md#why-the-binding-target-is-a-dto). Also check that the property is bindable: classifiers, `BeforeAttempt`, and `OnEvent` are lambdas and must be set in the `configure` callback.
+For more information, see [Projection via ResilienceOptions](./di/configuration.md#projection-via-resilienceoptions). Also check that the property is bindable: classifiers, `BeforeAttempt`, and `OnEvent` are lambdas and must be set in the `configure` callback.
+
+### Symptom: Registration fails saying a property "was not found on the instance of ResilienceOptions".
+
+> [!CAUTION] Quick fix
+> The key named in the message does not exist. Check the spelling, then check whether it was renamed.
+
+**Why this happens**: policy sections are bound with `ErrorOnUnknownConfiguration`, so a key the DTO does not have fails rather than binding nothing. Several keys have different names: `AttemptCeiling` (for `Timeouts`), `Breaker:TripWindow` (for `Breaker:Window`), and the `Backoff` and `Budget` sections (for flat keys).
+
+The check is deliberate: a key that binds nothing leaves the policy quietly on its defaults, which is indistinguishable from a policy nobody configured. See [An unrecognized key is an error](./di/configuration.md#an-unrecognized-key-is-an-error).
 
 ### Symptom: A configuration reload does not reach the client.
 

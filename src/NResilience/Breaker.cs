@@ -113,6 +113,28 @@ public sealed record BreakerSettings
     /// </summary>
     private static readonly TimeSpan MaxDerivedBaseline = TimeSpan.FromHours(1);
 
+    /// <summary>
+    ///     Whether this breaker is allowed to measure the dependency and trip on what it measures. True
+    ///     by default.
+    ///     <para>
+    ///         Setting it to <c>false</c> turns off both relative trips - <see cref="SlowCalls" /> and
+    ///         <see cref="Failures" /> - in one word, leaving a breaker that opens only on
+    ///         <see cref="ConsecutiveFailures" /> and on whatever absolute rates were written here. It is
+    ///         the breaker's half of <see cref="Resilience.Adaptive" />, and it is separate because a
+    ///         breaker is a live object two policies may share.
+    ///     </para>
+    ///     <para>
+    ///         It suppresses defaults rather than overriding what you wrote. Settings that say
+    ///         <c>false</c> and then configure <see cref="SlowCalls" /> or <see cref="Failures" /> have
+    ///         contradicted themselves, and <see cref="Validate" /> says so rather than picking a winner.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="Recovery" /> is unaffected. Its ramp needs no baseline - without one it is
+    ///         driven by the clock alone, which is a weaker ramp rather than a broken one.
+    ///     </para>
+    /// </summary>
+    public bool Adaptive { get; init; } = true;
+
     /// <summary>Consecutive failures before opening. The reading most people have of "circuit breaker".</summary>
     public int ConsecutiveFailures { get; init; } = 5;
 
@@ -344,6 +366,25 @@ public sealed record BreakerSettings
         if (SlowCallThreshold is { } slow && slow <= TimeSpan.Zero)
             problems.Add($"{nameof(SlowCallThreshold)} must be positive, or null for no slow-call trip; it is {slow}.");
 
+        if (!Adaptive)
+        {
+            // The same rule Resilience.Adaptive follows: suppress the defaults, refuse the
+            // contradiction, and report both halves rather than ranking them.
+            if (SlowCalls is not null)
+            {
+                problems.Add(
+                    $"{nameof(Adaptive)} is false, so this breaker measures nothing, but {nameof(SlowCalls)} is set. " +
+                    $"Remove one, or state the brownout trip as a constant with {nameof(SlowCallThreshold)}.");
+            }
+
+            if (Failures is not null)
+            {
+                problems.Add(
+                    $"{nameof(Adaptive)} is false, so this breaker measures nothing, but {nameof(Failures)} is set. " +
+                    $"Remove one, or state the rate trip as a constant with {nameof(FailureRatio)}.");
+            }
+        }
+
         if (SlowCalls is { } adaptive)
         {
             adaptive.Validate(problems);
@@ -469,6 +510,9 @@ public sealed record BreakerSettings
     /// </remarks>
     private Failures? DefaultFailures()
     {
+        if (!Adaptive)
+            return null;
+
         var failures = NResilience.Failures.Above(DefaultFailureMultiple);
 
         // TripWindow has its own message in Validate, and the race check skips itself for the same
@@ -487,6 +531,9 @@ public sealed record BreakerSettings
     /// <remarks>The baseline widens for the reason <see cref="DefaultFailures" /> gives.</remarks>
     private SlowCalls? DefaultSlowCalls()
     {
+        if (!Adaptive)
+            return null;
+
         var slow = NResilience.SlowCalls.Above(DefaultSlowCallMultiple);
 
         // Each of these has its own message in Validate; see DefaultFailures.

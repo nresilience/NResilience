@@ -49,6 +49,8 @@ NResilience.Extensions.BackoffOptions.ToBackoff(NResilience.Backoff baseline) ->
 NResilience.Extensions.BackoffOptions.TransientBase.get -> System.TimeSpan?
 NResilience.Extensions.BackoffOptions.TransientBase.set -> void
 NResilience.Extensions.BreakerOptions
+NResilience.Extensions.BreakerOptions.Adaptive.get -> bool?
+NResilience.Extensions.BreakerOptions.Adaptive.set -> void
 NResilience.Extensions.BreakerOptions.BreakDuration.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.BreakDuration.set -> void
 NResilience.Extensions.BreakerOptions.BreakJitter.get -> NResilience.Jitter?
@@ -78,7 +80,7 @@ NResilience.Extensions.BreakerOptions.SlowCallThreshold.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.SlowCallThreshold.set -> void
 NResilience.Extensions.BreakerOptions.SlowCalls.get -> NResilience.Extensions.SlowCallsOptions?
 NResilience.Extensions.BreakerOptions.SlowCalls.set -> void
-NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null, System.TimeProvider? time = null) -> NResilience.Breaker!
+NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null, System.TimeProvider? time = null, bool? adaptive = null) -> NResilience.Breaker!
 NResilience.Extensions.BreakerOptions.TripWindow.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.TripWindow.set -> void
 NResilience.Extensions.BudgetOptions
@@ -190,6 +192,10 @@ NResilience.Extensions.ResilienceLoggingOptions.RepeatWindow.get -> System.TimeS
 NResilience.Extensions.ResilienceLoggingOptions.RepeatWindow.set -> void
 NResilience.Extensions.ResilienceLoggingOptions.ResilienceLoggingOptions() -> void
 NResilience.Extensions.ResilienceOptions
+NResilience.Extensions.ResilienceOptions.Adaptive.get -> bool?
+NResilience.Extensions.ResilienceOptions.Adaptive.set -> void
+NResilience.Extensions.ResilienceOptions.AttemptCeiling.get -> NResilience.Extensions.AttemptCeilingOptions?
+NResilience.Extensions.ResilienceOptions.AttemptCeiling.set -> void
 NResilience.Extensions.ResilienceOptions.AttemptTimeout.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.AttemptTimeout.set -> void
 NResilience.Extensions.ResilienceOptions.Attempts.get -> int?
@@ -213,8 +219,6 @@ NResilience.Extensions.ResilienceOptions.Preset.set -> void
 NResilience.Extensions.ResilienceOptions.ResilienceOptions() -> void
 NResilience.Extensions.ResilienceOptions.Telemetry.get -> bool?
 NResilience.Extensions.ResilienceOptions.Telemetry.set -> void
-NResilience.Extensions.ResilienceOptions.AttemptCeiling.get -> NResilience.Extensions.AttemptCeilingOptions?
-NResilience.Extensions.ResilienceOptions.AttemptCeiling.set -> void
 NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseline = null) -> NResilience.Resilience!
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.get -> bool?
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.set -> void

@@ -49,6 +49,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 
 | Setting | Default | Description |
 | :--- | :--- | :--- |
+| `Adaptive` | `true` | Whether the breaker measures the dependency. `false` turns off both relative trips with a single setting. |
 | `ConsecutiveFailures` | 5 | The number of consecutive failures before the breaker opens. |
 | `FailureRatio` | null | An optional rate-based trip condition, evaluated alongside the consecutive failure counter. |
 | `Failures` | `Failures.Above(5)` | The same trip, expressed as a multiple of the dependency's own measured error rate. On by default. Composes with `FailureRatio`, which stays the ceiling. |

@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Extensions;
 
@@ -354,6 +355,119 @@ public sealed class ResilienceOptionsTests
 
         Assert.Contains(section, error.Message, StringComparison.Ordinal);
         Assert.Contains("\"Enabled\": false", error.Message, StringComparison.Ordinal);
+    }
+
+    // ---- Turning measurement off from a section ----
+
+    /// <summary>
+    ///     In configuration <c>Adaptive</c> reaches the breaker, which in code it cannot. A section
+    ///     builds a breaker for this policy alone rather than sharing one, so there is no other holder
+    ///     for the switch to surprise - and that makes <c>"Adaptive": false</c> the single key that
+    ///     turns off every measured term in the policy.
+    /// </summary>
+    [Fact]
+    public void One_adaptive_key_turns_measurement_off_for_the_policy_and_its_breaker()
+    {
+        var options = new ResilienceOptions();
+
+        Config(("Adaptive", "false"), ("Breaker:ConsecutiveFailures", "5")).Bind(options);
+
+        var policy = options.ToPolicy();
+
+        Assert.Null(policy.AttemptCeiling);
+        Assert.Null(policy.Breaker!.Settings.SlowCalls);
+        Assert.Null(policy.Breaker.Settings.Failures);
+
+        policy.Validate();
+    }
+
+    /// <summary>The breaker section's own answer wins over the policy's, in both directions.</summary>
+    [Theory]
+    [InlineData("false", "true", true)]
+    [InlineData("true", "false", false)]
+    public void A_breaker_section_overrides_the_policys_adaptive(string policyValue, string breakerValue, bool measures)
+    {
+        var options = new ResilienceOptions();
+
+        Config(("Adaptive", policyValue), ("Breaker:Adaptive", breakerValue)).Bind(options);
+
+        var settings = options.ToPolicy().Breaker!.Settings;
+
+        Assert.Equal(measures, settings.SlowCalls is not null);
+        Assert.Equal(measures, settings.Failures is not null);
+    }
+
+    /// <summary>A section that says nothing leaves every measured term on, as it always did.</summary>
+    [Fact]
+    public void An_unmentioned_adaptive_leaves_measurement_on()
+    {
+        var policy = new ResilienceOptions { Breaker = new BreakerOptions() }.ToPolicy();
+
+        Assert.True(policy.Adaptive);
+        Assert.NotNull(policy.AttemptCeiling);
+        Assert.NotNull(policy.Breaker!.Settings.SlowCalls);
+    }
+
+    // ---- An unrecognized key is a mistake, not a comment ----
+
+    /// <summary>
+    ///     The other half of what the DTO is for. Binding a section onto the record is silently partial;
+    ///     binding a section with a key the DTO does not have used to be silently partial too - the key
+    ///     bound nothing, and the policy quietly kept its defaults, which reads exactly like a policy
+    ///     nobody configured. Renaming keys made that gap worth closing.
+    /// </summary>
+    /// <param name="key">A key that no longer exists, at each nesting depth the binder has to reach.</param>
+    /// <param name="named">
+    ///     The segment the binder complains about: the first one it cannot resolve, which for a renamed
+    ///     <i>section</i> is the section rather than the property inside it.
+    /// </param>
+    [Theory]
+    [InlineData("Timeouts:Multiple", "Timeouts")]
+    [InlineData("MaxDelay", "MaxDelay")]
+    [InlineData("BudgetFraction", "BudgetFraction")]
+    [InlineData("Breaker:Window", "Window")]
+    [InlineData("Breaker:Recovery:Fraction", "Fraction")]
+    [InlineData("Adaptivee", "Adaptivee")]
+    public void A_key_the_dto_does_not_have_fails_at_resolution(string key, string named)
+    {
+        var services = new ServiceCollection();
+        services.AddResilience("api", Config((key, "1")));
+
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
+
+        var error = Assert.Throws<ResilienceConfigurationException>(() => _ = policies["api"]);
+
+        Assert.Contains(named, error.Message, StringComparison.Ordinal);
+        Assert.Contains("renamed", error.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>And a section made entirely of keys that do exist still binds, at every depth.</summary>
+    [Fact]
+    public void A_section_of_recognized_keys_still_binds()
+    {
+        var services = new ServiceCollection();
+
+        services.AddResilience(
+            "api",
+            Config(
+                ("Preset", "Http"),
+                ("Adaptive", "true"),
+                ("Backoff:Max", "00:00:04"),
+                ("Budget:Fraction", "0.25"),
+                ("AttemptCeiling:Multiple", "5"),
+                ("Breaker:TripWindow", "00:00:30"),
+                ("Breaker:Recovery:Length", "0.5"),
+                ("Breaker:SlowCalls:Enabled", "false")));
+
+        using var provider = services.BuildServiceProvider();
+        var policy = provider.GetRequiredService<IResiliencePolicies>()["api"];
+
+        Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.Max);
+        Assert.Equal(5, policy.AttemptCeiling!.Value.Multiple);
+        Assert.Equal(TimeSpan.FromSeconds(30), policy.Breaker!.Settings.TripWindow);
+        Assert.Equal(0.5, policy.Breaker.Settings.Recovery!.Value.Length);
+        Assert.Null(policy.Breaker.Settings.SlowCalls);
     }
 
     /// <summary>A named budget is the shared one, which is the opt-in the design insists is an opt-in.</summary>

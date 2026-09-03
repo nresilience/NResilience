@@ -474,6 +474,31 @@ internal static class Program
         var result = await api.RunAsync(Gate.SuspendAsync).ConfigureAwait(false);
         failures += Check("a resolved policy executes under AOT", result == Gate.Value);
 
+        // Unknown-key detection is the one binder feature that reads property *names* rather than
+        // setting them, so it is the one a trimmed or source-generated binder is most likely to drop.
+        // Dropping it silently would leave an AOT app with exactly the failure the flag exists to
+        // prevent: a renamed key binding nothing, and a policy quietly on its defaults.
+        var typo = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Resilience:api:Attemptss"] = "4" })
+            .Build();
+
+        var strict = new ServiceCollection();
+        strict.AddResilience(typo.GetSection("Resilience"));
+
+        using var strictProvider = strict.BuildServiceProvider();
+        var caught = false;
+
+        try
+        {
+            _ = strictProvider.GetRequiredService<IResiliencePolicies>()["api"];
+        }
+        catch (ResilienceConfigurationException)
+        {
+            caught = true;
+        }
+
+        failures += Check("an unrecognized configuration key is refused under AOT", caught);
+
         var health = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync().ConfigureAwait(false);
         var resilience = health.Entries["resilience"];
 

@@ -104,6 +104,34 @@ public sealed class DependencyInjectionDocs
         Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: policies[name: "api"].Deadline);
     }
 
+    /// <summary>
+    ///     One key turns off every measured term in the policy and in the breaker the section builds.
+    ///     In code the policy's switch stops at the breaker, because a breaker may be shared; a section
+    ///     builds one for this policy alone, so there is no second holder to surprise.
+    /// </summary>
+    [Fact]
+    public void One_adaptive_key_makes_a_configured_policy_deterministic()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(path: "appsettings.resilience.deterministic.json")
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddResilience(section: configuration.GetSection(key: "Resilience"));
+
+        using var provider = services.BuildServiceProvider();
+        var api = provider.GetRequiredService<IResiliencePolicies>()[name: "api"];
+
+        Assert.False(api.Adaptive);
+        Assert.Null(api.AttemptCeiling);
+        Assert.Null(api.Breaker!.Settings.SlowCalls);
+        Assert.Null(api.Breaker.Settings.Failures);
+
+        // What is left is what the section wrote.
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 3), actual: api.AttemptTimeout);
+        Assert.Equal(expected: 5, actual: api.Breaker.Settings.ConsecutiveFailures);
+    }
+
     [Fact]
     public void The_configure_callback_holds_what_json_cannot()
     {

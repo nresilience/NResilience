@@ -64,6 +64,8 @@ NResilience.Breaker.Settings.get -> NResilience.BreakerSettings!
 NResilience.Breaker.State.get -> NResilience.BreakerState
 NResilience.BreakerSettings
 NResilience.BreakerSettings.<Clone>$() -> NResilience.BreakerSettings!
+NResilience.BreakerSettings.Adaptive.get -> bool
+NResilience.BreakerSettings.Adaptive.init -> void
 NResilience.BreakerSettings.BreakDuration.get -> System.TimeSpan
 NResilience.BreakerSettings.BreakDuration.init -> void
 NResilience.BreakerSettings.BreakJitter.get -> NResilience.Jitter
@@ -267,6 +269,8 @@ NResilience.Recovery.MinimumLength.init -> void
 NResilience.Recovery.Recovery() -> void
 NResilience.Resilience
 NResilience.Resilience.<Clone>$() -> NResilience.Resilience!
+NResilience.Resilience.Adaptive.get -> bool
+NResilience.Resilience.Adaptive.init -> void
 NResilience.Resilience.Admit.get -> System.Func<NResilience.NextAttempt, System.Threading.Tasks.Task<NResilience.Verdict>!>?
 NResilience.Resilience.Admit.init -> void
 NResilience.Resilience.AttemptCeiling.get -> NResilience.AttemptCeiling?

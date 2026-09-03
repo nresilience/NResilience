@@ -103,7 +103,13 @@ public static class ResilienceServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(section);
 
         Register(services, name);
-        services.Configure<ResilienceOptions>(name, section);
+
+        // A key this DTO does not recognize is a mistake, not a comment. Binding it silently is the
+        // exact "silently partial" failure ResilienceOptions exists to prevent - a misspelled or
+        // renamed key would bind nothing and leave the policy quietly on its defaults, which reads
+        // identical to a policy that was never configured. See ResiliencePolicies.Build for where the
+        // binder's complaint is turned into one of ours.
+        services.Configure<ResilienceOptions>(name, section, binder => binder.ErrorOnUnknownConfiguration = true);
 
         if (configure is not null)
             services.Configure<ResiliencePolicyRegistration>(name, r => r.Configure = configure);

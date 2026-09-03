@@ -86,7 +86,17 @@ public static class RateLimitHttpClientBuilderExtensions
         ArgumentNullException.ThrowIfNull(section);
 
         var options = new RateLimitOptions();
-        section.Bind(options);
+
+        try
+        {
+            // Unknown keys fail here for the reason they do on a policy section: a misspelled limit is
+            // a limiter that silently does something else.
+            section.Bind(options, binder => binder.ErrorOnUnknownConfiguration = true);
+        }
+        catch (InvalidOperationException error)
+        {
+            throw new ResilienceConfigurationException($"The rate limit section could not be bound. {error.Message}", error);
+        }
 
         return Add(builder, options);
     }

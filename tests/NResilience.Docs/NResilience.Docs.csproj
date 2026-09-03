@@ -49,6 +49,7 @@
     <!-- A configuration sample that is bound and asserted on, not just printed. -->
     <None Include="appsettings.resilience.json" CopyToOutputDirectory="PreserveNewest"/>
     <None Include="appsettings.resilience.production.json" CopyToOutputDirectory="PreserveNewest"/>
+    <None Include="appsettings.resilience.deterministic.json" CopyToOutputDirectory="PreserveNewest"/>
     <None Include="appsettings.logging.json" CopyToOutputDirectory="PreserveNewest"/>
     <None Include="appsettings.logging-verbose.json" CopyToOutputDirectory="PreserveNewest"/>
   </ItemGroup>

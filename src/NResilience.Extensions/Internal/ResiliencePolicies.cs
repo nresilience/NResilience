@@ -154,10 +154,40 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
     /// </summary>
     private Resilience Project(string name) => _projected.GetOrAdd(name, Build, this);
 
+    /// <summary>
+    ///     Binds one policy's section, turning the binder's complaint about an unrecognized key into
+    ///     one of ours.
+    /// </summary>
+    /// <remarks>
+    ///     The section is bound with <c>ErrorOnUnknownConfiguration</c>, so a key this DTO does not
+    ///     have is an error rather than a no-op. The binder's own message names the offending keys but
+    ///     not what to do about them, and by far the most likely cause is a key that used to exist -
+    ///     so this adds the sentence that points at the migration table.
+    /// </remarks>
+    /// <param name="self">The policies.</param>
+    /// <param name="name">The registration name.</param>
+    /// <returns>The bound options.</returns>
+    /// <exception cref="ResilienceConfigurationException">The section holds a key <see cref="ResilienceOptions" /> does not have.</exception>
+    private static ResilienceOptions OptionsFor(ResiliencePolicies self, string name)
+    {
+        try
+        {
+            return self._options.Get(name);
+        }
+        catch (InvalidOperationException error)
+        {
+            throw new ResilienceConfigurationException(
+                $"The configuration section for policy \"{name}\" could not be bound. {error.Message} " +
+                "Check the spelling, and check whether the key was renamed - see \"Migrating an existing file\" " +
+                "in the configuration documentation.",
+                error);
+        }
+    }
+
     private static Resilience Build(string name, ResiliencePolicies self)
     {
         var registration = self._registrations.Get(name);
-        var options = self._options.Get(name);
+        var options = OptionsFor(self, name);
 
         var policy = options.ToPolicy(registration.Baseline);
 

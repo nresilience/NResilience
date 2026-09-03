@@ -103,9 +103,9 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 ## `ResilienceOptions`
 
-`ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone".
+`ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone". An unrecognized key is an error, not a no-op - see [An unrecognized key is an error](../di/configuration.md#an-unrecognized-key-is-an-error).
 
-**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`.
+**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.

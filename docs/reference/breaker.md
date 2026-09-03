@@ -40,6 +40,7 @@ The `BreakerState` enum defines the breaker's states:
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
+| `Adaptive` | `true` | Whether the breaker measures the dependency and trips on what it measures. `false` turns off both relative trips - `SlowCalls` and `Failures` - with a single setting, leaving `ConsecutiveFailures` and any configured absolute rates. Setting it `false` alongside a configured `SlowCalls` or `Failures` results in an error. `Recovery` is unaffected. |
 | `ConsecutiveFailures` | 5 | The number of consecutive failures required to trip the breaker. |
 | `FailureRatio` | `null` | An optional rate-based trip threshold in the range (0, 1]. This is evaluated alongside the consecutive failure counter. |
 | `Failures` | `Failures.Above(5)` | The same trip, expressed as a multiple of the dependency's own measured error rate. On by default; set it to `null` to turn it off. Composes with `FailureRatio`, which stays the ceiling when both are set. See [`Failures`](#failures). |
