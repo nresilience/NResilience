@@ -14,10 +14,11 @@ The breaker transitions through the following states:
 
 - **Closed**: The breaker samples every attempt. If trip conditions are met, the breaker moves to the `Open` state and sets a break deadline.
 - **Open**: Calls are refused immediately. When a call arrives after the break deadline has elapsed, the breaker transitions to `HalfOpen` and treats that call as a probe.
-- **HalfOpen**: A limited number of concurrent trial calls (`HalfOpenProbes`) are allowed. If the required number of `ProbeSuccesses` is reached, the breaker returns to the `Closed` state. A single failure during this phase re-opens the breaker and increases the break duration.
+- **HalfOpen**: A limited number of concurrent trial calls (`HalfOpenProbes`) are allowed. If the required number of `ProbeSuccesses` is reached, the breaker returns to the `Closed` state - or to `Recovering`, if a ramp is configured. A single failure during this phase re-opens the breaker and increases the break duration.
+- **Recovering**: A growing fraction of calls is admitted and the rest are refused. Reachable only when `Recovery` is set - see [the recovery cliff](#the-recovery-cliff).
 - **Isolated**: This is a manually triggered state that behaves like `Open` but never self-heals.
 
-Health endpoints can monitor the breaker without interfering: reading `State` reports `HalfOpen` for an open breaker whose break has elapsed. The actual transition happens only during call admission, so health checks never consume probe slots.
+Health endpoints can monitor the breaker without interfering: reading `State` reports `HalfOpen` for an open breaker whose break has elapsed, and `Closed` for a recovering one whose ramp has run out. The actual transition happens only during call admission, so health checks never consume probe slots.
 
 ## Design of the defaults
 
@@ -135,6 +136,44 @@ Three details make it honest:
 - The jitter is applied once, when the breaker opens, to the already-grown and already-capped duration. Growth is therefore computed from the nominal break, so a short first break does not shorten every break after it, and `MaxBreakDuration` still bounds the result.
 - `RetryAfterHint` returns `_breakUntil` minus the elapsed time, so it reports the break actually being served rather than the nominal one, and `CallRejectedException.RetryAfter` is honest by construction.
 - `Jitter.None` is the escape hatch. A test that asserts "after exactly `BreakDuration`, the state is half-open" needs it, and that is the whole migration.
+
+## The recovery cliff
+
+The synchronized probe is a fleet-level problem. There is a pod-level one immediately after it, and `BreakJitter` does nothing about it: recovery is a cliff.
+
+Half-open admits `HalfOpenProbes` calls, `ProbeSuccesses` of them succeed, the breaker closes, and the *entire* offered load reaches the dependency in the next millisecond. There is nothing between "one call at a time" and "everything". For a dependency whose failure was capacity-related - which is most of them, since a dependency that failed for a reason unrelated to load usually fails the probe too - that is the worst possible recovery. It has been receiving one request every fifteen seconds. It has a cold cache, an empty connection pool, and possibly a backlog of its own upstream work. Two successful probes prove it can serve two requests, and a cliffed close reads that as proof it can serve two thousand. It cannot, it fails, the breaker re-opens with a doubled break, and the cycle repeats with the dependency spending more of each period cold.
+
+`Recovery` adds a fourth thing the breaker can be doing. On recovery it enters `Recovering` and admits a fraction `p` of calls, refusing the rest through the branch an open breaker's refusal already takes - `TryEnter` returns false, the caller gets a `CallRejectedException` with `StopReason.DependencyUnavailable`, and the [guarded rejection](guarded-rejection.md) pause keeps a refused caller from spinning. There is no executor contact at all.
+
+### Both halves of `p`, and why neither is enough
+
+`p` is the lower of a clock term and an evidence term.
+
+The **clock** climbs linearly from `Recovery.Initial` to 1 across a ramp whose length is `Fraction` times the break just served, clamped to `Minimum` and `Maximum`. Deriving the length from the break is what keeps this from being another number to guess: the breaker already knows how long it was open, and that is the only honest estimate of how much recovering there is to do. A fifteen-second break ramps over about four seconds; a two-minute break ramps over thirty.
+
+The **evidence** is AIMD over whether the admitted calls are fast, where "fast" is the same `IsSlow` reading the slow-call trip uses - so it reads the measured baseline and needs no threshold of its own. A slow call halves the admitted fraction, floored at `Initial`. `ProbeSuccesses` fast calls in a row add one `Initial` back, capped at 1, where the clock takes the decision back over.
+
+Neither term alone works, and the two failure modes are symmetric. A purely evidence-driven ramp completes in milliseconds against a busy dependency - ten successful calls at a thousand a second is not a ramp, it is the cliff with extra state. A purely clock-driven one hands the traffic back on schedule to a dependency that is answering three times slower than normal, which is the thing the breaker can actually see and would be ignoring. The clock paces a healthy recovery; the evidence stalls an unhealthy one.
+
+The increase is additive rather than doubling for a reason worth stating: a ramp that overshoots saturates the dependency, and a saturated dependency stops warming. Overshoot does not cost one bad round, it costs the recovery.
+
+### Three rules that fall out of it
+
+- **A failure re-opens the ramp immediately**, without waiting for the trip conditions a closed breaker is held to. The ramp is a hypothesis about a dependency that was broken a moment ago, and one transient failure withdraws it. The break it re-opens with is the grown one, because nothing has closed the breaker cleanly yet.
+- **A slow call stalls the ramp rather than tripping the breaker.** While a dependency warms, slow is the *expected* reading; letting it reach the slow-call trip would re-open the breaker every time and make the stall - the one thing that can express "up, and not ready" - unreachable. The trip window is not fed slow calls during a ramp for exactly this reason.
+- **A slow probe starts the ramp** instead of re-opening, when a ramp is configured. Without one, "a slow probe is not a recovery" leaves only two answers, and re-opening is the safer of them. With one there is a third and better answer, and it is also the one that gives the dependency the trickle of traffic it needs in order to warm at all.
+
+### Deficit accounting, not a coin flip
+
+Admission uses a running credit - `p` added per offered call, one call admitted per whole credit - rather than `Rng.NextDouble() < p`. A ramp therefore admits an even share of what it is offered instead of a random one, which makes the whole thing deterministic on a fake clock and testable in a simulation. Nothing is lost: the fleet is already de-correlated by `BreakJitter`, which decides *when* each pod's ramp starts, and a second source of randomness would only buy variance.
+
+### The cost, and why it is opt-in
+
+Callers refused during a ramp would have been served by a cliffed breaker. That is a real availability cost, and it is why `Recovery` defaults to `null`. The argument for turning it on is that the alternative is not "all of them served" - it is "all of them served once, then all of them refused again for twice as long".
+
+`RampedRecoveryTests` makes that argument rather than asserting it, in the shape the adaptive limiter's capacity simulation established: a fake dependency whose success rate and latency are functions of the load offered to it, which warms over ten seconds of being used and is knocked back when it is overloaded, driven on a fake clock with no randomness anywhere. Over the forty-five seconds after a five-second outage, a ramped breaker serves 8,250 of the offered calls and a cliffed one serves 3,002.
+
+The failure mode is documented on [the feature page](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) and is worth repeating: a ramp against a dependency that answers but stays slow never finishes, and `State` reports `Recovering` for as long as that lasts. A breaker that has been recovering for longer than its break duration is worth an alert.
 
 ## Concurrency and implementation
 

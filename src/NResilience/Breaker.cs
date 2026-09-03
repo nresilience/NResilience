@@ -17,6 +17,14 @@ public enum BreakerState
     /// </summary>
     HalfOpen,
 
+    /// <summary>
+    ///     The probes succeeded and the breaker is handing the traffic back a growing fraction at a
+    ///     time rather than all at once. Calls that fall outside that fraction are refused exactly as
+    ///     an open breaker refuses them; a failure re-opens it. Only reachable when
+    ///     <see cref="BreakerSettings.Recovery" /> is configured.
+    /// </summary>
+    Recovering,
+
     /// <summary>Forced open by <see cref="Breaker.Isolate" />. Never self-heals.</summary>
     Isolated,
 }
@@ -239,6 +247,21 @@ public sealed record BreakerSettings
     /// </summary>
     public Jitter BreakJitter { get; init; } = Jitter.Equal;
 
+    /// <summary>
+    ///     How the traffic is handed back once the probes succeed. Null - the default - is a cliff:
+    ///     <see cref="ProbeSuccesses" /> probes land and the entire offered load hits the dependency in
+    ///     the next millisecond.
+    ///     <para>
+    ///         <c>Recovery.Over(0.25)</c> puts a fourth state between half-open and closed, in which a
+    ///         growing fraction of calls is admitted and the rest are refused the way an open breaker
+    ///         refuses them. The ramp's length comes from the break just served and its growth comes
+    ///         from whether the admitted calls are fast, so there is no number to pick beyond the
+    ///         fraction itself. See <see cref="NResilience.Recovery" /> for what it costs and why it is
+    ///         opt-in.
+    ///     </para>
+    /// </summary>
+    public Recovery? Recovery { get; init; }
+
     /// <summary>Concurrent trial calls allowed while half-open.</summary>
     public int HalfOpenProbes { get; init; } = 1;
 
@@ -338,6 +361,9 @@ public sealed record BreakerSettings
 
         if (MaxBreakDuration < BreakDuration)
             problems.Add($"{nameof(MaxBreakDuration)} must be at least {nameof(BreakDuration)}; they are {MaxBreakDuration} and {BreakDuration}.");
+
+        if (Recovery is { } ramp)
+            ramp.Validate(problems);
 
         if (HalfOpenProbes < 1)
             problems.Add($"{nameof(HalfOpenProbes)} must be at least 1; it is {HalfOpenProbes}.");
@@ -579,13 +605,45 @@ public sealed class Breaker
     /// </summary>
     private readonly RateWindow? _rate;
 
+    /// <summary>
+    ///     How the traffic is handed back, read once for the reason <see cref="_adaptive" /> is. Null -
+    ///     the default - means the breaker closes on a cliff and <see cref="BreakerState.Recovering" />
+    ///     is unreachable.
+    /// </summary>
+    private readonly Recovery? _recovery;
+
     private readonly int[]? _slow;
     private readonly long _startedAt;
     private readonly long _ticksPerBucket;
     private readonly TimeProvider _time;
+
+    /// <summary>The break the current open is actually serving, jitter included - the ramp's input.</summary>
+    private long _breakServed;
+
     private long _breakUntil;
     private int _consecutiveFailures;
     private int _consecutiveOpens;
+
+    /// <summary>
+    ///     The ceiling the evidence puts on the admitted fraction. It starts at 1 - no cap - halves
+    ///     whenever an admitted call comes back slow, and climbs by one
+    ///     <see cref="NResilience.Recovery.Initial" /> behind every
+    ///     <see cref="BreakerSettings.ProbeSuccesses" /> that come back fast. The clock is the other
+    ///     half, and the effective fraction is the lower of the two.
+    /// </summary>
+    private double _rampAdmit;
+
+    /// <summary>
+    ///     Deficit accounting for the admitted fraction, so a ramp admits an even <c>p</c> of the calls
+    ///     offered to it rather than a random <c>p</c>. Deterministic on purpose: the fleet is already
+    ///     de-correlated by <see cref="BreakerSettings.BreakJitter" />, which decides when each pod's
+    ///     ramp starts, so a second source of randomness would buy nothing and cost the simulation.
+    /// </summary>
+    private double _rampCredit;
+
+    private long _rampStartedAt;
+    private int _rampSuccesses;
+    private long _rampTicks;
 
     private long _epoch = -1;
     private DateTimeOffset _openedAt;
@@ -640,6 +698,8 @@ public sealed class Breaker
             _relative = relative;
             _rate = new RateWindow(relative.Window);
         }
+
+        _recovery = Settings.Recovery;
     }
 
     /// <summary>A name for this breaker, used in diagnostics and health endpoints.</summary>
@@ -656,6 +716,12 @@ public sealed class Breaker
     ///         this never changes it: the transition happens on admission, so a health endpoint cannot
     ///         consume the probe slot a real call needs.
     ///     </para>
+    ///     <para>
+    ///         A <see cref="BreakerState.Recovering" /> breaker whose ramp has run out reports
+    ///         <see cref="BreakerState.Closed" /> for the same reason, and a ramp still stalled on slow
+    ///         traffic keeps reporting <see cref="BreakerState.Recovering" /> however long ago it
+    ///         started - which is the reading worth alerting on.
+    ///     </para>
     /// </summary>
     public BreakerState State
     {
@@ -663,9 +729,12 @@ public sealed class Breaker
         {
             lock (_gate)
             {
-                return _state == BreakerState.Open && Elapsed() >= _breakUntil
-                    ? BreakerState.HalfOpen
-                    : _state;
+                return _state switch
+                {
+                    BreakerState.Open when Elapsed() >= _breakUntil => BreakerState.HalfOpen,
+                    BreakerState.Recovering when Admission(Elapsed()) >= 1 => BreakerState.Closed,
+                    _ => _state,
+                };
             }
         }
     }
@@ -709,7 +778,14 @@ public sealed class Breaker
         }
     }
 
-    /// <summary>When the breaker last opened, or null while it is closed.</summary>
+    /// <summary>
+    ///     When the breaker last opened, or null while it is closed.
+    ///     <para>
+    ///         A <see cref="BreakerState.Recovering" /> breaker still reports it. The ramp is the tail
+    ///         of the open it is recovering from, and "recovering, open since 12:04:11" is the reading
+    ///         an operator wants; the timestamp is cleared when the ramp completes.
+    ///     </para>
+    /// </summary>
     public DateTimeOffset? OpenedAt
     {
         get
@@ -734,6 +810,7 @@ public sealed class Breaker
             _probesInFlight = 0;
             _probeSuccesses = 0;
             _consecutiveFailures = 0;
+            ClearRamp();
             ClearWindow();
         }
     }
@@ -799,6 +876,29 @@ public sealed class Breaker
                     _probesInFlight++;
                     return true;
 
+                case BreakerState.Recovering:
+                    var admit = Admission(Elapsed());
+
+                    // The ramp finished. Closing here rather than on the next recorded outcome means a
+                    // breaker whose ramp ran out during a quiet minute is closed by the call that ends
+                    // the quiet, not left reporting Recovering behind it.
+                    if (admit >= 1)
+                    {
+                        CloseCore();
+                        return true;
+                    }
+
+                    // Deficit accounting rather than a coin flip: p of the calls offered, evenly
+                    // spaced. Two hundred pods do not have to be de-correlated here, because the
+                    // jittered break already decided that they would not start their ramps together.
+                    _rampCredit += admit;
+
+                    if (_rampCredit < 1)
+                        return false;
+
+                    _rampCredit -= 1;
+                    return true;
+
                 default:
                     throw new InvalidOperationException($"Unknown breaker state '{_state}'.");
             }
@@ -856,6 +956,7 @@ public sealed class Breaker
             return;
 
         var probe = _state == BreakerState.HalfOpen;
+        var recovering = _state == BreakerState.Recovering;
 
         if (probe && _probesInFlight > 0)
             _probesInFlight--;
@@ -866,17 +967,35 @@ public sealed class Breaker
         {
             var slow = IsSlow(duration);
             _consecutiveFailures = 0;
-            Bucket(now, false, slow);
+
+            // A slow call during a ramp is recorded as an outcome but not as a slow one. Slow is the
+            // expected reading while a dependency warms, and letting it reach the slow-call trip
+            // would re-open the breaker every time - which makes the stall below, the one thing that
+            // can say "up, and not ready", unreachable.
+            Bucket(now, false, slow && _state != BreakerState.Recovering);
 
             if (probe)
             {
-                // A slow probe is not a recovery. Closing on a 200 that took 30 s hands the
-                // waiting client fleet straight back to a dependency that is still in trouble.
-                if (slow)
+                // A slow probe is not a recovery. Closing on a 200 that took 30 s hands the waiting
+                // client fleet straight back to a dependency that is still in trouble - so without a
+                // ramp the only other answer available is to re-open.
+                //
+                // With a ramp there is a third answer, and it is the right one: "up, and not ready"
+                // is the state the ramp exists to express. The probe counts, the ramp starts, and it
+                // stalls at Recovery.Initial until the traffic it admits comes back fast. That
+                // trickle is also the traffic the dependency needs in order to warm, which re-opening
+                // would deny it - and it is bounded, unlike the close a slow probe must never cause.
+                if (slow && _recovery is null)
                     OpenCore(now);
                 else if (++_probeSuccesses >= Settings.ProbeSuccesses)
-                    CloseCore();
+                    RecoverCore(now);
 
+                return;
+            }
+
+            if (recovering)
+            {
+                Pace(now, slow);
                 return;
             }
 
@@ -896,7 +1015,11 @@ public sealed class Breaker
         Bucket(now, true, false);
         _consecutiveFailures++;
 
-        if (probe)
+        // A failure during the ramp re-opens on the spot, without waiting for the trip conditions a
+        // closed breaker is held to. The ramp is a hypothesis about a dependency that was broken
+        // ninety seconds ago, and one transient failure is enough to withdraw it - the break the
+        // re-open serves is the doubled one, because nothing has closed the breaker cleanly yet.
+        if (probe || recovering)
         {
             OpenCore(now);
             return;
@@ -908,7 +1031,9 @@ public sealed class Breaker
     /// <summary>
     ///     How long until admission might succeed, for the <see cref="CallRejectedException" /> a
     ///     refusal carries. Null when there is nothing useful to say - an isolated breaker will not
-    ///     self-heal, and a half-open one is waiting on a probe rather than on a clock.
+    ///     self-heal, a half-open one is waiting on a probe rather than on a clock, and a recovering
+    ///     one will very likely admit the caller's next call, so any span it named would be an
+    ///     overstatement the caller would honour.
     /// </summary>
     internal TimeSpan? RetryAfterHint()
     {
@@ -1085,12 +1210,132 @@ public sealed class Breaker
         // Jittered once, here, so RetryAfterHint reports the break this breaker is actually serving
         // rather than the nominal one. The growth above is computed from the nominal duration, so
         // jitter de-correlates the fleet without slowing the backoff down.
-        _breakUntil = now + Jittered(capped);
+        _breakServed = Jittered(capped);
+        _breakUntil = now + _breakServed;
         _consecutiveOpens = Math.Min(_consecutiveOpens + 1, MaxGrowthShift);
         _probesInFlight = 0;
         _probeSuccesses = 0;
         _consecutiveFailures = 0;
+        ClearRamp();
         ClearWindow();
+    }
+
+    /// <summary>
+    ///     What the probes succeeding means: a ramp when one is configured, and the cliff a breaker
+    ///     without one has always had. Always called with the lock held.
+    /// </summary>
+    /// <param name="now">The current elapsed reading.</param>
+    /// <remarks>
+    ///     <para>
+    ///         The transition reported is <see cref="BreakerTransition.Closed" /> either way, and it is
+    ///         reported here rather than when the ramp completes, because this is the moment the
+    ///         breaker stops refusing everything. A listener that sees <c>BreakerClosed</c> and then a
+    ///         <see cref="CallEventKind.RejectedByBreaker" /> is seeing the ramp, and
+    ///         <see cref="State" /> says <see cref="BreakerState.Recovering" /> for exactly as long as
+    ///         that lasts. The completion is deliberately silent: a second <c>BreakerClosed</c> for one
+    ///         recovery would make the event sequence lie about how many times the breaker closed.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="Reset" /> does not come through here. It is administrative - somebody decided
+    ///         the dependency is fine - and warming a dependency the operator has already vouched for
+    ///         is not something an operator means by "reset".
+    ///     </para>
+    /// </remarks>
+    private void RecoverCore(long now)
+    {
+        // A ramp derived from a break of zero would be the Minimum floor rather than anything the
+        // breaker measured, and _breakServed is only zero when this breaker never opened.
+        if (_recovery is not { } recovery || _breakServed <= 0)
+        {
+            CloseCore();
+            return;
+        }
+
+        _transition = BreakerTransition.Closed;
+        _state = BreakerState.Recovering;
+        _breakUntil = 0;
+        _consecutiveFailures = 0;
+        _probesInFlight = 0;
+        _probeSuccesses = 0;
+
+        // No evidence-based cap yet, so the clock alone paces a recovery nothing has complained
+        // about - including one with no traffic at all, which would otherwise report Recovering
+        // forever because it never collected the successes a floor-to-ceiling climb would need.
+        _rampAdmit = 1;
+        _rampCredit = 0;
+        _rampSuccesses = 0;
+        _rampStartedAt = now;
+        _rampTicks = recovery.RampFor(TimeSpan.FromTicks(_breakServed)).Ticks;
+
+        // The accumulated growth is not forgotten yet. A ramp that fails is not a clean close, and
+        // the break it re-opens with has to be the doubled one or a dependency that fails every ramp
+        // gets probed on a fixed cadence forever - the exact flapping MaxBreakDuration exists to stop.
+        ClearWindow();
+    }
+
+    /// <summary>
+    ///     The evidence half of the ramp, applied to one admitted outcome. Always called with the lock
+    ///     held, and only while <see cref="_state" /> is <see cref="BreakerState.Recovering" />.
+    /// </summary>
+    /// <param name="now">The current elapsed reading.</param>
+    /// <param name="slow">Whether the call was slow, as <see cref="IsSlow" /> judged it.</param>
+    /// <remarks>
+    ///     <para>
+    ///         AIMD, with the same asymmetry the adaptive limiter uses and for the same reason: evidence
+    ///         that a dependency is coping is weak and evidence that it is not is strong. A slow call
+    ///         halves the admitted fraction on the spot, floored at <see cref="NResilience.Recovery.Initial" />;
+    ///         <see cref="BreakerSettings.ProbeSuccesses" /> fast ones in a row add one
+    ///         <see cref="NResilience.Recovery.Initial" /> back, capped at 1, where the clock takes the
+    ///         decision back. Additive rather than doubling on the way up because a ramp that overshoots
+    ///         saturates the dependency, and a saturated dependency stops warming - which is the failure
+    ///         the whole feature exists to avoid.
+    ///     </para>
+    ///     <para>
+    ///         A ramp sitting at 12% because the traffic it admitted is three times slower than normal
+    ///         is the feature working, and it is the only way a breaker has of saying that the
+    ///         dependency is up and is not ready. Halving rather than merely holding is what lets the
+    ///         ramp find a level the dependency can actually serve - a ramp pinned above that level
+    ///         keeps it saturated, and a saturated dependency never warms.
+    ///     </para>
+    /// </remarks>
+    private void Pace(long now, bool slow)
+    {
+        if (slow)
+        {
+            _rampAdmit = Math.Max(_recovery!.Value.Initial, Admission(now) / 2);
+            _rampSuccesses = 0;
+            return;
+        }
+
+        if (++_rampSuccesses < Settings.ProbeSuccesses)
+            return;
+
+        _rampAdmit = Math.Min(1, _rampAdmit + _recovery!.Value.Initial);
+        _rampSuccesses = 0;
+    }
+
+    /// <summary>
+    ///     The fraction of offered calls a ramp admits right now: the lower of what the clock has
+    ///     reached and what the evidence has earned. Always called with the lock held, and only while
+    ///     <see cref="_state" /> is <see cref="BreakerState.Recovering" />, which is reachable only when
+    ///     <see cref="_recovery" /> is set.
+    /// </summary>
+    /// <param name="now">The current elapsed reading.</param>
+    /// <returns>The admitted fraction. 1 or more means the ramp is over.</returns>
+    /// <remarks>
+    ///     Both halves are needed and neither is sufficient. A purely evidence-driven ramp completes in
+    ///     milliseconds against a busy dependency - ten successful calls at a thousand a second - which
+    ///     is the cliff again; a purely clock-driven one hands the traffic back on schedule to a
+    ///     dependency that is answering three times slower than normal. The clock paces a healthy
+    ///     recovery and the evidence stalls an unhealthy one.
+    /// </remarks>
+    private double Admission(long now)
+    {
+        var initial = _recovery!.Value.Initial;
+        var elapsed = now - _rampStartedAt;
+        var clock = _rampTicks <= 0 ? 1 : initial + (1 - initial) * ((double)elapsed / _rampTicks);
+
+        return Math.Min(_rampAdmit, clock);
     }
 
     private void CloseCore()
@@ -1103,7 +1348,17 @@ public sealed class Breaker
         _consecutiveFailures = 0;
         _probesInFlight = 0;
         _probeSuccesses = 0;
+        ClearRamp();
         ClearWindow();
+    }
+
+    private void ClearRamp()
+    {
+        _rampAdmit = 0;
+        _rampCredit = 0;
+        _rampSuccesses = 0;
+        _rampStartedAt = 0;
+        _rampTicks = 0;
     }
 
     /// <summary>

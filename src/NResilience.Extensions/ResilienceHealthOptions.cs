@@ -21,8 +21,9 @@ public sealed class ResilienceHealthOptions
     private readonly List<(string Name, Breaker? Breaker, RetryBudget? Budget)> _watched = [];
 
     /// <summary>
-    ///     What an open or isolated breaker reports. <see cref="HealthStatus.Degraded" /> by default; see
-    ///     the remarks on this class for why.
+    ///     What an open, recovering or isolated breaker reports. <see cref="HealthStatus.Degraded" /> by
+    ///     default; see the remarks on this class for why. A recovering breaker counts because it is
+    ///     still refusing some of the calls it is offered.
     /// </summary>
     public HealthStatus BreakerOpenStatus { get; set; } = HealthStatus.Degraded;
 

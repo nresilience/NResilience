@@ -13,8 +13,8 @@ The `Breaker` is a `sealed class` implementing the circuit breaker pattern. It i
 | `Breaker(BreakerSettings? settings = null)` | Creates a new breaker. This constructor validates the settings and throws a `ResilienceConfigurationException` if they are invalid. |
 | `Name` | An `init`-only property used for diagnostics and health endpoints. |
 | `Settings` | The `BreakerSettings` used to configure the breaker. |
-| `State` | The current state of the breaker. If a breaker is open but the break duration has elapsed, it reports `HalfOpen` because the next call will be treated as a probe. Reading this property does not consume a probe slot. |
-| `OpenedAt` | The timestamp of when the breaker last opened, or `null` if it is currently closed. |
+| `State` | The current state of the breaker. If a breaker is open but the break duration has elapsed, it reports `HalfOpen` because the next call will be treated as a probe; if it is recovering and its ramp has run out, it reports `Closed` for the same reason. Reading this property does not consume a probe slot. |
+| `OpenedAt` | The timestamp of when the breaker last opened, or `null` if it is currently closed. A recovering breaker still reports this timestamp, as the ramp is a continuation of the previous open state. |
 | `NormalLatency` | How long a healthy call to this dependency currently takes, as the breaker measures it. `null` unless `SlowCalls` is in effect - it is by default - and the baseline has enough samples. An adaptive breaker trips at `NormalLatency` times `SlowCalls.Multiple`. |
 | `NormalFailureRate` | How often a call to this dependency fails, as the breaker measures it. `null` unless `Failures` is in effect - it is by default - and the baseline has enough samples. The relative trip point is `max(Failures.AbsoluteFloor, NormalFailureRate * Failures.Multiple)`. |
 | `Isolate()` | Forces the breaker into the `Isolated` state. An isolated breaker does not self-heal. |
@@ -31,6 +31,7 @@ The `BreakerState` enum defines the breaker's states:
 | `Closed` | The breaker is operating normally. Calls pass through, and outcomes are sampled. |
 | `Open` | The breaker has tripped. Calls are refused until the break duration expires. |
 | `HalfOpen` | The break duration has expired. A limited number of trial calls (probes) are allowed through. |
+| `Recovering` | The probes succeeded and the breaker is admitting a growing fraction of calls, refusing the rest. Only reachable when `Recovery` is set. |
 | `Isolated` | The breaker has been forced open via the `Isolate` method. |
 
 ## `BreakerSettings`
@@ -51,7 +52,8 @@ The `BreakerState` enum defines the breaker's states:
 | `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set it equal to `BreakDuration` to disable growth. |
 | `BreakJitter` | `Jitter.Equal` | How much randomness is applied to the break duration, so a fleet whose breakers opened together does not probe together. `Jitter.Equal` serves half the computed duration plus a random share of the other half; `Jitter.None` serves it exactly. Jitter never lengthens a break, so `MaxBreakDuration` still bounds it. |
 | `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while `HalfOpen`. |
-| `ProbeSuccesses` | 2 | The number of successful probes needed to return the breaker to `Closed`. |
+| `ProbeSuccesses` | 2 | The number of successful probes needed to return the breaker to `Closed`. Also the number of consecutive fast calls a `Recovery` ramp needs before it raises the admitted fraction. |
+| `Recovery` | `null` | Hand the traffic back over a ramp rather than a cliff, through a `Recovering` state. Off by default, because a caller refused during the ramp would have been served by a cliffed breaker. See [`Recovery`](#recovery). |
 | `Time` | `TimeProvider.System` | The clock used for timing. The breaker maintains its own clock so its state can be read by health endpoints without a policy. When the library builds the breaker (per-host or from configuration), it uses the policy's `Time` if no other clock is specified. See [the breaker's clock](../features/circuit-breaker.md#the-breakers-clock). |
 | `Validate()` | N/A | Validates the settings and throws a `ResilienceConfigurationException` listing all found problems. |
 
@@ -83,6 +85,30 @@ The `BreakerState` enum defines the breaker's states:
 - **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Failures.Window` divided by `Multiple` is less than twice `Window`. Such a breaker cannot open on the error rate at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-relative-failure-ratio).
 - **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.Window` needs it to, and no relative trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `Failures` you wrote is used as written, or rejected.
 - **Cost**: two `int[10]` rings per breaker, allocated whenever `Failures` is set - which, at the defaults, is always.
+
+## `Recovery`
+
+`Recovery` is a `readonly record struct` that says how a breaker hands the traffic back once the probes succeed. `Recovery.Over(0.25)` means "ramp back over a quarter of the break just served", and is a complete configuration; derive variants with `with`.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Fraction` | N/A | How much of the break just served the ramp lasts. Must be greater than 0. |
+| `Minimum` | 1 s | The shortest ramp, however brief the break was. |
+| `Maximum` | 30 s | The longest ramp, however long the break was. The bound on what the feature can cost. |
+| `Initial` | 0.05 | The fraction of calls the ramp admits when it starts, and the floor it never drops below. Must be in (0, 1). |
+| `Over(double fraction = 0.25)` | N/A | The static factory. |
+
+### Implementation details
+
+- **Admission**: the admitted fraction is the lower of a clock term, which climbs from `Initial` to 1 across the ramp, and an evidence term. Calls outside it are refused exactly as an open breaker refuses them, through the same guarded rejection pause, with `StopReason.DependencyUnavailable`.
+- **Evenly spaced, not random**: admission uses deficit accounting rather than a coin flip, so a ramp admits an even share of what it is offered. The fleet is already de-correlated by `BreakJitter`, which decides when each pod's ramp starts.
+- **Evidence is AIMD**: the admitted fraction is adjusted using an additive-increase/multiplicative-decrease (AIMD) approach: a slow call halves the fraction (floored at `Initial`), and `ProbeSuccesses` consecutive fast calls increase it by `Initial` (capped at 1). This prevents the ramp from overshooting and saturating the dependency.
+- **Failure**: one `Transient` outcome during the ramp re-opens the breaker, without waiting for the trip conditions a closed breaker is held to. The break it re-opens with is the grown one, because nothing has closed the breaker cleanly yet.
+- **Slow calls during a ramp** stall it rather than counting towards the slow-call trip. Slow is the expected reading while a dependency warms, and tripping on it would make the stall unreachable.
+- **A slow probe** starts the ramp rather than re-opening the breaker when `Recovery` is set, and the ramp then stalls at `Initial`. Without a ramp there is no third answer available and a slow probe re-opens, as it always has.
+- **Telemetry**: `BreakerClosed` is raised when the ramp starts, not when it completes - that is where the breaker stops refusing everything. `RetryAfter` is `null` for a refusal during a ramp, because the caller's next call is likely to be admitted.
+- **`Reset`** closes without a ramp. It is administrative, and warming a dependency an operator has vouched for is not part of what "reset" means.
+- **Cost**: five fields on the breaker, no allocation, and no executor contact - a ramp refusal takes the branch an open breaker's refusal already takes.
 
 ## `SlowCalls`
 

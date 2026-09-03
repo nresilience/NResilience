@@ -2,6 +2,7 @@ using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 using NResilience.Extensions;
 using NResilience.Testing;
 
@@ -266,6 +267,45 @@ public sealed class HealthCheckTests
     }
 
     /// <summary>A breaker in the open state, by feeding it the failures its settings ask for.</summary>
+    /// <summary>
+    ///     A recovering breaker is still refusing some of what it is offered, so the answer to "is this
+    ///     process serving every call?" is the same as it is for an open one.
+    /// </summary>
+    [Fact]
+    public async Task A_recovering_breaker_is_degraded_too()
+    {
+        var time = new FakeTimeProvider();
+
+        var breaker = new Breaker(new BreakerSettings
+        {
+            Time = time,
+            ConsecutiveFailures = 1,
+            ProbeSuccesses = 1,
+            BreakDuration = TimeSpan.FromSeconds(10),
+            BreakJitter = Jitter.None,
+            Recovery = Recovery.Over(0.25),
+        });
+
+        breaker.TryEnter(out _);
+        breaker.Record(VerdictKind.Transient, TimeSpan.Zero);
+
+        time.Advance(TimeSpan.FromSeconds(10));
+        breaker.TryEnter(out _);
+        breaker.Record(VerdictKind.Ok, TimeSpan.Zero);
+
+        Assert.Equal(BreakerState.Recovering, breaker.State);
+
+        using var provider = Provider(services => services
+            .AddResilience("api", Resilience.Default with { Breaker = breaker })
+            .AddHealthChecks().AddResilience());
+
+        var report = await Check(provider);
+
+        Assert.Equal(HealthStatus.Degraded, report.Status);
+        Assert.Contains("Recovering since", (string)report.Data["breaker:api"], StringComparison.Ordinal);
+        Assert.Contains("1 of 1 breaker(s) open, recovering or isolated", report.Description, StringComparison.Ordinal);
+    }
+
     private static Breaker Tripped()
     {
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1 });

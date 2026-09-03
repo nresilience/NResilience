@@ -410,6 +410,14 @@ public sealed class BreakerOptions
     /// </summary>
     public Jitter? BreakJitter { get; set; }
 
+    /// <summary>
+    ///     <see cref="BreakerSettings.Recovery" /> - hand the traffic back over a ramp rather than a
+    ///     cliff. A section of its own, so <c>"Recovery": {}</c> turns it on at its defaults and
+    ///     <c>"Recovery": { "Fraction": 0.5 }</c> changes the one number. Off unless the section is
+    ///     present, and <c>"Fraction": 0</c> is how a section that is present turns it back off.
+    /// </summary>
+    public RecoveryOptions? Recovery { get; set; }
+
     /// <summary><see cref="BreakerSettings.HalfOpenProbes" />.</summary>
     public int? HalfOpenProbes { get; set; }
 
@@ -471,6 +479,9 @@ public sealed class BreakerOptions
         if (BreakJitter is { } jitter)
             settings = settings with { BreakJitter = jitter };
 
+        if (Recovery is { } ramp)
+            settings = settings with { Recovery = ramp.Fraction is 0 ? null : ramp.ToRecovery() };
+
         if (HalfOpenProbes is { } probes)
             settings = settings with { HalfOpenProbes = probes };
 
@@ -531,6 +542,48 @@ public sealed class FailureOptions
             failures = failures with { AbsoluteFloor = floor };
 
         return failures;
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.Recovery" />.
+///     <para>
+///         A section rather than flat properties, so <c>"Recovery": {}</c> is a complete configuration
+///         and <c>"Fraction": 0</c> is how a section that is present turns the ramp off again -
+///         a section cannot say <c>null</c>, and "a ramp lasting none of the break" is not something
+///         anyone could mean.
+///     </para>
+/// </summary>
+public sealed class RecoveryOptions
+{
+    /// <summary><see cref="NResilience.Recovery.Fraction" />. Defaults to 0.25.</summary>
+    public double? Fraction { get; set; }
+
+    /// <summary><see cref="NResilience.Recovery.Minimum" />.</summary>
+    public TimeSpan? Minimum { get; set; }
+
+    /// <summary><see cref="NResilience.Recovery.Maximum" />.</summary>
+    public TimeSpan? Maximum { get; set; }
+
+    /// <summary><see cref="NResilience.Recovery.Initial" />.</summary>
+    public double? Initial { get; set; }
+
+    /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
+    /// <returns>The configuration.</returns>
+    public Recovery ToRecovery()
+    {
+        var recovery = NResilience.Recovery.Over(Fraction ?? 0.25);
+
+        if (Minimum is { } minimum)
+            recovery = recovery with { Minimum = minimum };
+
+        if (Maximum is { } maximum)
+            recovery = recovery with { Maximum = maximum };
+
+        if (Initial is { } initial)
+            recovery = recovery with { Initial = initial };
+
+        return recovery;
     }
 }
 

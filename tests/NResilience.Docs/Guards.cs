@@ -128,12 +128,34 @@ public sealed class Guards
     }
 
     [Fact]
+    public void A_recovery_ramp_hands_the_traffic_back_gradually()
+    {
+        // <snippet:breaker-recovery>
+        // Two successful probes prove the dependency can serve two calls. A cliffed close reads
+        // that as proof it can serve two thousand, and a dependency that failed because it ran out
+        // of capacity cannot: it fails, the breaker re-opens with a doubled break, and it spends
+        // more of each period cold. The ramp gives it a trickle it can actually serve.
+        var breaker = new Breaker(settings: new BreakerSettings
+        {
+            Recovery = Recovery.Over(fraction: 0.25), // ramp back over a quarter of the break served
+            BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
+        })
+        {
+            Name = "search",
+        };
+
+        // </snippet:breaker-recovery>
+
+        Assert.Equal(expected: 0.25, actual: breaker.Settings.Recovery!.Value.Fraction);
+    }
+
+    [Fact]
     public void A_breaker_can_be_read_and_driven_by_an_operator()
     {
         var breaker = new Breaker { Name = "payments" };
 
         // <snippet:breaker-admin>
-        var state = breaker.State; // Closed, Open, HalfOpen or Isolated
+        var state = breaker.State; // Closed, Open, HalfOpen, Recovering or Isolated
         var since = breaker.OpenedAt; // null while it is closed
 
         breaker.Isolate(); // force it open and keep it there

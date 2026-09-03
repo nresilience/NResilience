@@ -472,6 +472,41 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(0.1, failures.AbsoluteFloor);
     }
 
+    [Fact]
+    public void Every_recovery_setting_projects()
+    {
+        var options = new ResilienceOptions();
+
+        Config(
+            ("Breaker:Recovery:Fraction", "0.5"),
+            ("Breaker:Recovery:Minimum", "00:00:02"),
+            ("Breaker:Recovery:Maximum", "00:01:00"),
+            ("Breaker:Recovery:Initial", "0.1")).Bind(options);
+
+        var recovery = options.ToPolicy().Breaker!.Settings.Recovery!.Value;
+
+        Assert.Equal(0.5, recovery.Fraction);
+        Assert.Equal(TimeSpan.FromSeconds(2), recovery.Minimum);
+        Assert.Equal(TimeSpan.FromMinutes(1), recovery.Maximum);
+        Assert.Equal(0.1, recovery.Initial);
+    }
+
+    /// <summary>
+    ///     Off unless the section says otherwise, and a section that is present turns it back off with
+    ///     the zero that a section can say in place of the null it cannot.
+    /// </summary>
+    [Fact]
+    public void The_ramp_is_off_until_a_section_asks_for_it()
+    {
+        Assert.Null(new ResilienceOptions { Breaker = new BreakerOptions() }.ToPolicy().Breaker!.Settings.Recovery);
+
+        var on = new ResilienceOptions { Breaker = new BreakerOptions { Recovery = new RecoveryOptions() } };
+        Assert.Equal(Recovery.Over(0.25), on.ToPolicy().Breaker!.Settings.Recovery);
+
+        var off = new ResilienceOptions { Breaker = new BreakerOptions { Recovery = new RecoveryOptions { Fraction = 0 } } };
+        Assert.Null(off.ToPolicy().Breaker!.Settings.Recovery);
+    }
+
     /// <summary>
     ///     The break's jitter binds by name, so a test that needs a deterministic break can say so from
     ///     a configuration section rather than only from code.

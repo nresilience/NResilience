@@ -62,7 +62,11 @@ internal sealed class ResilienceHealthCheck(
             var state = breaker.State;
             tally.Breakers++;
 
-            if (state is BreakerState.Open or BreakerState.Isolated)
+            // A recovering breaker is still refusing callers, so it counts. It is folded in with the
+            // open ones rather than given a status of its own because the answer to "is this process
+            // serving every call it is offered?" is the same either way, and BreakerOpenStatus is the
+            // knob an operator has already set to say what they want done about that.
+            if (state is BreakerState.Open or BreakerState.Isolated or BreakerState.Recovering)
                 tally.OpenBreakers++;
 
             data[$"breaker:{name}"] = breaker.OpenedAt is { } since
@@ -107,7 +111,7 @@ internal sealed class ResilienceHealthCheck(
         var problems = new List<string>(2);
 
         if (tally.OpenBreakers > 0)
-            problems.Add($"{tally.OpenBreakers} of {tally.Breakers} breaker(s) open or isolated");
+            problems.Add($"{tally.OpenBreakers} of {tally.Breakers} breaker(s) open, recovering or isolated");
 
         if (tally.ExhaustedBudgets > 0)
             problems.Add($"{tally.ExhaustedBudgets} of {tally.Budgets} retry budget(s) exhausted");

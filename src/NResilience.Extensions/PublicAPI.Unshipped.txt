@@ -53,6 +53,8 @@ NResilience.Extensions.BreakerOptions.MinimumCalls.get -> int?
 NResilience.Extensions.BreakerOptions.MinimumCalls.set -> void
 NResilience.Extensions.BreakerOptions.ProbeSuccesses.get -> int?
 NResilience.Extensions.BreakerOptions.ProbeSuccesses.set -> void
+NResilience.Extensions.BreakerOptions.Recovery.get -> NResilience.Extensions.RecoveryOptions?
+NResilience.Extensions.BreakerOptions.Recovery.set -> void
 NResilience.Extensions.BreakerOptions.SlowCallRatio.get -> double?
 NResilience.Extensions.BreakerOptions.SlowCallRatio.set -> void
 NResilience.Extensions.BreakerOptions.SlowCallThreshold.get -> System.TimeSpan?
@@ -114,6 +116,17 @@ NResilience.Extensions.RateLimitOptions.Validate() -> void
 NResilience.Extensions.RateLimitOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.RateLimitOptions.Window.set -> void
 NResilience.Extensions.RateLimiterExtensions
+NResilience.Extensions.RecoveryOptions
+NResilience.Extensions.RecoveryOptions.Fraction.get -> double?
+NResilience.Extensions.RecoveryOptions.Fraction.set -> void
+NResilience.Extensions.RecoveryOptions.Initial.get -> double?
+NResilience.Extensions.RecoveryOptions.Initial.set -> void
+NResilience.Extensions.RecoveryOptions.Maximum.get -> System.TimeSpan?
+NResilience.Extensions.RecoveryOptions.Maximum.set -> void
+NResilience.Extensions.RecoveryOptions.Minimum.get -> System.TimeSpan?
+NResilience.Extensions.RecoveryOptions.Minimum.set -> void
+NResilience.Extensions.RecoveryOptions.RecoveryOptions() -> void
+NResilience.Extensions.RecoveryOptions.ToRecovery() -> NResilience.Recovery
 NResilience.Extensions.ResilienceHealthOptions
 NResilience.Extensions.ResilienceHealthOptions.BreakerOpenStatus.get -> Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus
 NResilience.Extensions.ResilienceHealthOptions.BreakerOpenStatus.set -> void

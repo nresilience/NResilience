@@ -31,13 +31,14 @@ For HTTP calls, the handler can scope a breaker per host automatically - see [pe
 
 ## Breaker states
 
-A circuit breaker is always in one of these four states:
+A circuit breaker is always in one of these states:
 
 | State | Description |
 | :--- | :--- |
 | `Closed` | Normal operation. Calls are allowed, and failures are tracked. |
 | `Open` | The dependency is failing. Calls are refused for the duration of the break. |
 | `HalfOpen` | The break duration has elapsed. A small number of trial calls (probes) are allowed to test for recovery. |
+| `Recovering` | The probes succeeded and a growing fraction of calls is being admitted. Only reachable when `Recovery` is set. |
 | `Isolated` | Forced open by an operator via `Isolate()`. The breaker stays open until `Reset()` is called. |
 
 ## Trip conditions
@@ -61,6 +62,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 | `BreakJitter` | `Jitter.Equal` | How much randomness the break duration carries, so a fleet that opened together does not probe together. |
 | `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while in the `HalfOpen` state. |
 | `ProbeSuccesses` | 2 | The number of successful probes required to close the breaker. |
+| `Recovery` | null | Hand the traffic back over a ramp instead of a cliff. Off by default. |
 
 <!-- snippet: breaker-slow-calls -->
 ```csharp
@@ -185,6 +187,33 @@ var breaker = new Breaker(settings: new BreakerSettings
 
 `Jitter.Equal` rather than `Jitter.Full` keeps a floor under the break, because the duration has a purpose beyond de-correlation - it is how long the dependency gets left alone. `RetryAfterHint` and `CallRejectedException.RetryAfter` report the break actually being served, so a caller scheduling its own retry is never told the nominal figure. Use `Jitter.None` when a test needs the break to expire at exactly `BreakDuration`.
 
+## Hand the traffic back over a ramp
+
+Two successful probes indicate the dependency can serve some traffic. Closing the breaker immediately restores full load, which may overwhelm a dependency that failed due to capacity limits. This can cause the breaker to trip again with a longer break duration.
+
+`Recovery` introduces a `Recovering` state between `HalfOpen` and `Closed`. In this state, a growing fraction of calls is admitted while the rest are refused. This feature is off by default, as any call refused during the ramp would have been served by a breaker that closed immediately.
+
+<!-- snippet: breaker-recovery -->
+```csharp
+// Two successful probes prove the dependency can serve two calls. A cliffed close reads
+// that as proof it can serve two thousand, and a dependency that failed because it ran out
+// of capacity cannot: it fails, the breaker re-opens with a doubled break, and it spends
+// more of each period cold. The ramp gives it a trickle it can actually serve.
+var breaker = new Breaker(settings: new BreakerSettings
+{
+    Recovery = Recovery.Over(fraction: 0.25), // ramp back over a quarter of the break served
+    BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
+})
+{
+    Name = "search",
+};
+```
+<!-- endsnippet -->
+
+The ramp's length is derived from the break duration just served, clamped between `Minimum` and `Maximum`. Its pace depends on the performance of admitted calls: a slow call halves the admitted fraction, and `ProbeSuccesses` consecutive fast calls increase it, with the clock providing an upper bound. A single failure during the ramp re-opens the breaker with an increased break duration.
+
+**The failure mode.** A ramp against a dependency that answers but remains slow will not complete: it stays at `Initial`, and `State` reports `Recovering` indefinitely. This is reported as degraded to the [health check](../di/health-checks.md). This is deliberate; it indicates the dependency is up but not ready, and re-opening would deny the trickle of traffic it needs to warm. Alert on a breaker recovering for longer than its break. See [Breaker internals](../deep-dives/breaker-internals.md#the-recovery-cliff).
+
 ## Handle refused calls
 
 When a breaker refuses a call, it pauses briefly before returning. That stops callers in tight polling loops from busy-spinning on CPU.
@@ -220,7 +249,7 @@ You can read the breaker's state or control it by hand.
 
 <!-- snippet: breaker-admin -->
 ```csharp
-var state = breaker.State; // Closed, Open, HalfOpen or Isolated
+var state = breaker.State; // Closed, Open, HalfOpen, Recovering or Isolated
 var since = breaker.OpenedAt; // null while it is closed
 
 breaker.Isolate(); // force it open and keep it there
@@ -228,8 +257,8 @@ breaker.Reset(); // close it and forget the history
 ```
 <!-- endsnippet -->
 
-`State` reports `HalfOpen` for an open breaker whose break duration has elapsed. Reading the state does not consume a probe slot. `Isolate` and `Reset` raise no events because no call triggered them.
+`State` reports `HalfOpen` for an open breaker whose break duration has elapsed, and `Closed` for a recovering one whose ramp has run out. Reading the state does not consume a probe slot. `Isolate` and `Reset` raise no events because no call triggered them.
 
-Transitions raise `BreakerOpened`, `BreakerClosed`, and `BreakerHalfOpened` [events](telemetry.md) on the call that caused the transition.
+Transitions raise `BreakerOpened`, `BreakerClosed`, and `BreakerHalfOpened` [events](telemetry.md) on the call that caused the transition. A ramp raises `BreakerClosed` when it starts, because that is where the breaker stops refusing everything; its completion is silent.
 
 For more, see [Breaker internals](../deep-dives/breaker-internals.md).

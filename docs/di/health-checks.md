@@ -35,13 +35,13 @@ Each guard is one entry in the check's `Data` dictionary:
 
 | Key | Value |
 | :--- | :--- |
-| `breaker:<name>` | `Closed`, `HalfOpen`, or `Open since <timestamp>` / `Isolated since <timestamp>`. |
+| `breaker:<name>` | `Closed`, `HalfOpen`, or `Open since <timestamp>` / `Recovering since <timestamp>` / `Isolated since <timestamp>`. |
 | `breaker:<name>:normal` | The measured normal latency in milliseconds, for a breaker whose `SlowCalls` trip is in effect - which is the default. Absent until the baseline has enough samples. |
 | `budget:<name>` | Utilization, from 0 to 1. |
 
 For a registered policy, `<name>` is the registration name. For an HTTP client it is `<client>:<host:port>`, so a client talking to three hosts reports three breakers, and you can tell which one is in trouble.
 
-The `Description` summarizes: either `"4 breaker(s) closed, 2 retry budget(s) funding retries."` or, when something is wrong, `"1 of 4 breaker(s) open or isolated."`
+The `Description` summarizes: either `"4 breaker(s) closed, 2 retry budget(s) funding retries."` or, when something is wrong, `"1 of 4 breaker(s) open, recovering or isolated."`
 
 A process with nothing to report says so rather than claiming health: if you see `"No breakers or retry budgets are registered"`, either nothing is configured with one, or the policies that have them are not registered in this container.
 
@@ -72,7 +72,7 @@ services.AddHealthChecks().AddResilience(configure: o =>
 
 | Option | Default | What it does |
 | :--- | :--- | :--- |
-| `BreakerOpenStatus` | `Degraded` | What an open or isolated breaker reports. |
+| `BreakerOpenStatus` | `Degraded` | What an open, recovering or isolated breaker reports. A recovering breaker counts because it is still refusing some of what it is offered. |
 | `BudgetExhaustedStatus` | `Degraded` | What a retry budget at or above the threshold reports. |
 | `BudgetThreshold` | `0.9` | The utilization at which a budget counts as exhausted. |
 | `IncludeHttpClients` | `true` | Whether per-host guards from HTTP clients are included. |

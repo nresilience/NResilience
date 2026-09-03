@@ -84,6 +84,8 @@ NResilience.BreakerSettings.MinimumCalls.get -> int
 NResilience.BreakerSettings.MinimumCalls.init -> void
 NResilience.BreakerSettings.ProbeSuccesses.get -> int
 NResilience.BreakerSettings.ProbeSuccesses.init -> void
+NResilience.BreakerSettings.Recovery.get -> NResilience.Recovery?
+NResilience.BreakerSettings.Recovery.init -> void
 NResilience.BreakerSettings.SlowCallRatio.get -> double
 NResilience.BreakerSettings.SlowCallRatio.init -> void
 NResilience.BreakerSettings.SlowCallThreshold.get -> System.TimeSpan?
@@ -98,8 +100,9 @@ NResilience.BreakerSettings.Window.init -> void
 NResilience.BreakerState
 NResilience.BreakerState.Closed = 0 -> NResilience.BreakerState
 NResilience.BreakerState.HalfOpen = 2 -> NResilience.BreakerState
-NResilience.BreakerState.Isolated = 3 -> NResilience.BreakerState
+NResilience.BreakerState.Isolated = 4 -> NResilience.BreakerState
 NResilience.BreakerState.Open = 1 -> NResilience.BreakerState
+NResilience.BreakerState.Recovering = 3 -> NResilience.BreakerState
 NResilience.CallEvent
 NResilience.CallEvent.AttemptNumber.get -> int
 NResilience.CallEvent.CallEvent() -> void
@@ -251,6 +254,17 @@ NResilience.RateLimitedException.RateLimitedException(string! message) -> void
 NResilience.RateLimitedException.RateLimitedException(string! message, System.Exception! innerException) -> void
 NResilience.RateLimitedException.RateLimitedException(string? limiter = null, System.TimeSpan? retryAfter = null, System.Exception? innerException = null) -> void
 NResilience.RateLimitedException.RetryAfter.get -> System.TimeSpan?
+NResilience.Recovery
+NResilience.Recovery.Equals(NResilience.Recovery other) -> bool
+NResilience.Recovery.Fraction.get -> double
+NResilience.Recovery.Fraction.init -> void
+NResilience.Recovery.Initial.get -> double
+NResilience.Recovery.Initial.init -> void
+NResilience.Recovery.Maximum.get -> System.TimeSpan
+NResilience.Recovery.Maximum.init -> void
+NResilience.Recovery.Minimum.get -> System.TimeSpan
+NResilience.Recovery.Minimum.init -> void
+NResilience.Recovery.Recovery() -> void
 NResilience.Resilience
 NResilience.Resilience.<Clone>$() -> NResilience.Resilience!
 NResilience.Resilience.Admit.get -> System.Func<NResilience.NextAttempt, System.Threading.Tasks.Task<NResilience.Verdict>!>?
@@ -365,6 +379,8 @@ override NResilience.Failures.GetHashCode() -> int
 override NResilience.Failures.ToString() -> string!
 override NResilience.Hedge.GetHashCode() -> int
 override NResilience.Hedge.ToString() -> string!
+override NResilience.Recovery.GetHashCode() -> int
+override NResilience.Recovery.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
 override NResilience.Resilience.GetHashCode() -> int
 override NResilience.Resilience.ToString() -> string!
@@ -402,6 +418,9 @@ static NResilience.Http.ResilienceHttp.CreateClient(NResilience.Resilience? poli
 static NResilience.Http.ResilienceHttp.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
 static NResilience.Http.ResilienceHttpRequestExtensions.MarkRepeatable(this System.Net.Http.HttpRequestMessage! request, string? idempotencyKey = null, string! headerName = "Idempotency-Key") -> System.Net.Http.HttpRequestMessage!
 static NResilience.Http.ResilienceHttpRequestExtensions.MarkSingleShot(this System.Net.Http.HttpRequestMessage! request) -> System.Net.Http.HttpRequestMessage!
+static NResilience.Recovery.Over(double fraction = 0.25) -> NResilience.Recovery
+static NResilience.Recovery.operator !=(NResilience.Recovery left, NResilience.Recovery right) -> bool
+static NResilience.Recovery.operator ==(NResilience.Recovery left, NResilience.Recovery right) -> bool
 static NResilience.Resilience.Default.get -> NResilience.Resilience!
 static NResilience.Resilience.Http.get -> NResilience.Resilience!
 static NResilience.Resilience.None.get -> NResilience.Resilience!
@@ -442,4 +461,5 @@ static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Ver
 ~override NResilience.Backoff.ToString() -> string
 ~override NResilience.Failures.Equals(object obj) -> bool
 ~override NResilience.Hedge.Equals(object obj) -> bool
+~override NResilience.Recovery.Equals(object obj) -> bool
 ~override NResilience.SlowCalls.Equals(object obj) -> bool
