@@ -131,14 +131,14 @@ public static class ResilienceTelemetry
     ///     <para>
     ///         The companion to <c>nresilience.attempt.timeout</c>, and read the same way: the gap
     ///         between this and the configured transient base is how wrong the constant was. A base
-    ///         pinned to <see cref="BackoffBase.Spread" />'s clamp stops moving, and that silence is
+    ///         pinned to <see cref="MeasuredBase.Spread" />'s clamp stops moving, and that silence is
     ///         itself the signal that the band wants widening.
     ///     </para>
     /// </summary>
-    private static readonly Histogram<double> BackoffBase = Meter.CreateHistogram<double>(
+    private static readonly Histogram<double> MeasuredBase = Meter.CreateHistogram<double>(
         "nresilience.backoff.base",
         "s",
-        "The measured backoff base, recorded when it changes. Reported only by a policy that configures Backoff.Measured.");
+        "The measured backoff base, recorded when it changes. Reported only by a policy that configures Backoff.MeasuredBase.");
 
     private static readonly Histogram<double> LeaseWait = Meter.CreateHistogram<double>(
         "nresilience.limiter.wait.duration",
@@ -261,7 +261,7 @@ public static class ResilienceTelemetry
 
             case CallEventKind.BackoffBaseAdapted:
                 if (e.Delay is { } measured)
-                    BackoffBase.Record(measured.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
+                    MeasuredBase.Record(measured.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
 
                 Annotate(e, "nresilience.backoff_base_adapted");
                 break;

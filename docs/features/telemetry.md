@@ -103,7 +103,7 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.hedges` | `{hedge}` | [Hedged](hedging.md) attempts, tagged `started`, `won`, `discarded` or `suppressed` |
 | `nresilience.hedge.threshold` | s | The latency quantile a hedge fired at, recorded when it fired |
 | `nresilience.attempt.timeout` | s | The measured per-attempt [ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), recorded when it changes - which, since the ceiling is measured by default, is on every policy with an `AttemptTimeout` |
-| `nresilience.backoff.base` | s | The measured [backoff base](retry.md#measure-the-backoff-base-instead-of-guessing-it), recorded when it changes. Reported only by a policy that configures `Backoff.Measured` |
+| `nresilience.backoff.base` | s | The measured [backoff base](retry.md#measure-the-backoff-base-instead-of-guessing-it), recorded when it changes. Reported only by a policy that configures `Backoff.MeasuredBase` |
 | `nresilience.limiter.leases` | `{lease}` | Permits a [limiter](rate-limiting.md) was asked for, tagged `acquired` or `denied` |
 | `nresilience.limiter.wait.duration` | s | How long a caller waited on a limiter. Zero unless queueing is enabled |
 

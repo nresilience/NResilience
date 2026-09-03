@@ -4,7 +4,7 @@ namespace NResilience;
 ///     The first retry delay, expressed relative to how long a call to this dependency normally takes
 ///     rather than as a constant somebody has to guess.
 ///     <para>
-///         <c>BackoffBase.Of(1)</c> means "wait about as long as a normal call takes before trying
+///         <c>MeasuredBase.Of(1)</c> means "wait about as long as a normal call takes before trying
 ///         again". That number ports across dependencies, across environments and across a dependency's
 ///         own capacity changes; <c>100 ms</c> does not. Against a dependency whose median is three
 ///         seconds a 100 ms base is not backoff at all - the retry lands while the first attempt's work
@@ -28,7 +28,7 @@ namespace NResilience;
 ///     <code>
 /// var api = Resilience.Http with
 /// {
-///     Backoff = Backoff.Adaptive(1.0),   // first retry waits about one normal call
+///     Backoff = Backoff.Measured(1.0),   // first retry waits about one normal call
 /// };
 /// </code>
 /// </example>
@@ -54,14 +54,14 @@ namespace NResilience;
 ///         base to nothing and turn backoff into a retry storm.
 ///     </para>
 ///     <para>
-///         Every property but <see cref="Multiple" /> has a working default, so <c>BackoffBase.Of(1)</c>
-///         is a complete configuration and <c>BackoffBase.Of(1) with { Window = ... }</c> is the way to
+///         Every property but <see cref="Multiple" /> has a working default, so <c>MeasuredBase.Of(1)</c>
+///         is a complete configuration and <c>MeasuredBase.Of(1) with { Window = ... }</c> is the way to
 ///         change one. The defaults are supplied on read rather than by a constructor, for the reason
 ///         <see cref="Hedge" /> gives: a struct's default instance is the one thing a constructor cannot
 ///         reach.
 ///     </para>
 /// </remarks>
-public readonly record struct BackoffBase
+public readonly record struct MeasuredBase
 {
     /// <summary>
     ///     The multiple used when <see cref="Of" /> is called without one: one normal call. Long enough
@@ -168,7 +168,7 @@ public readonly record struct BackoffBase
     /// <summary>The way to configure an adaptive backoff base.</summary>
     /// <param name="multiple">How many normal calls the first retry waits. Must be greater than zero.</param>
     /// <returns>The configuration.</returns>
-    public static BackoffBase Of(double multiple = DefaultMultiple) => new() { Multiple = multiple };
+    public static MeasuredBase Of(double multiple = DefaultMultiple) => new() { Multiple = multiple };
 
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
@@ -176,7 +176,7 @@ public readonly record struct BackoffBase
     /// </summary>
     /// <param name="other">The other configuration.</param>
     /// <returns>True when both would behave identically.</returns>
-    public bool Equals(BackoffBase other) =>
+    public bool Equals(MeasuredBase other) =>
         Multiple.Equals(other.Multiple)
         && Quantile.Equals(other.Quantile)
         && Window == other.Window
@@ -202,28 +202,28 @@ public readonly record struct BackoffBase
         if (double.IsNaN(Multiple) || double.IsInfinity(Multiple) || Multiple <= 0)
         {
             problems.Add(
-                $"BackoffBase.Multiple must be greater than zero; it is {Multiple}. " +
-                "Use BackoffBase.Of(1) for a first retry that waits about one normal call.");
+                $"MeasuredBase.Multiple must be greater than zero; it is {Multiple}. " +
+                "Use MeasuredBase.Of(1) for a first retry that waits about one normal call.");
         }
 
         if (double.IsNaN(Quantile) || Quantile <= 0 || Quantile > MaxQuantile)
         {
             problems.Add(
-                $"BackoffBase.Quantile must be in (0, {MaxQuantile}]; it is {Quantile}. " +
+                $"MeasuredBase.Quantile must be in (0, {MaxQuantile}]; it is {Quantile}. " +
                 "The baseline has to be a low quantile: a high one moves with the brownout it is " +
                 "supposed to be measured against, and the backoff then grows with the incident.");
         }
 
         if (Window <= TimeSpan.Zero)
-            problems.Add($"BackoffBase.Window must be positive; it is {Window}.");
+            problems.Add($"MeasuredBase.Window must be positive; it is {Window}.");
 
         if (MinimumSamples < 1)
-            problems.Add($"BackoffBase.MinimumSamples must be at least 1; it is {MinimumSamples}.");
+            problems.Add($"MeasuredBase.MinimumSamples must be at least 1; it is {MinimumSamples}.");
 
         if (double.IsNaN(Spread) || double.IsInfinity(Spread) || Spread <= 1)
         {
             problems.Add(
-                $"BackoffBase.Spread must be greater than 1; it is {Spread}. " +
+                $"MeasuredBase.Spread must be greater than 1; it is {Spread}. " +
                 "It is the factor the measured base may move from the configured one in either " +
                 "direction, and a spread of 1 pins it to the constant it was supposed to replace.");
         }

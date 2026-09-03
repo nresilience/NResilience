@@ -98,7 +98,7 @@ Two dependencies, one configuration, opposite outcomes. A payments API whose ste
 
 ### The two guards
 
-**The floor is not optional.** A baseline of 0.02% times a multiple of 5 is 0.1%, and on a 30-second window at 20 minimum calls that is one failure. Without `AbsoluteFloor`, this feature is a breaker that opens on a single error against any healthy dependency. The floor is the line that says "below 5% absolute, nothing is wrong no matter how quiet the baseline was".
+**The floor is not optional.** A baseline of 0.02% times a multiple of 5 is 0.1%, and on a 30-second window at 20 minimum calls that is one failure. Without `Floor`, this feature is a breaker that opens on a single error against any healthy dependency. The floor is the line that says "below 5% absolute, nothing is wrong no matter how quiet the baseline was".
 
 The trip window has the same problem from the other end. At a 5% floor and `MinimumCalls`' default of 20, one transient error *is* the threshold - so a relative trip also requires at least two failures in the window, because a rate estimated from a single event is not a claim about a rate. An absolute `FailureRatio` is deliberately not held to that: a caller who wrote `0.05` over 20 calls asked for exactly that reading, and this feature does not get to second-guess it.
 
@@ -115,7 +115,7 @@ An outage contaminates the baseline as it fills it, exactly as a brownout contam
 
 ### Composition, and why this one is not exclusive
 
-Both pairs follow one rule: a measurement may tighten a constant and never loosen one. `SlowCalls` and `SlowCallThreshold` are the same trip defined two ways, and the effective threshold is `min(SlowCallThreshold, Multiple * baseline)` - a call is slow when it is above either. `Failures` and `FailureRatio` are the same trip in ratio form, and the effective trip point is `min(FailureRatio, max(AbsoluteFloor, baseline * Multiple))`. In both, the constant is a ceiling the estimator can only lower, which is the house rule for every adaptive feature in the library.
+Both pairs follow one rule: a measurement may tighten a constant and never loosen one. `SlowCalls` and `SlowCallThreshold` are the same trip defined two ways, and the effective threshold is `min(SlowCallThreshold, Multiple * baseline)` - a call is slow when it is above either. `Failures` and `FailureRatio` are the same trip in ratio form, and the effective trip point is `min(FailureRatio, max(Floor, baseline * Multiple))`. In both, the constant is a ceiling the estimator can only lower, which is the house rule for every adaptive feature in the library.
 
 The baseline is recorded whether or not a constant is also set. It is a measurement of the dependency rather than a decision about it, so `Breaker.NormalLatency` reads the same either way, and a breaker whose constant was chosen badly can still be seen to be wrong.
 

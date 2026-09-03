@@ -218,7 +218,7 @@ public sealed class HedgeFeedbackTests
     [Fact]
     public void A_zero_floor_lets_the_retreat_run_past_the_default_one()
     {
-        var window = New(out var time, WinRate.Above(0.2) with { MinimumAllowance = 0, Window = Window });
+        var window = New(out var time, WinRate.AtLeast(0.2) with { MinimumAllowance = 0, Window = Window });
 
         var (_, allowances) = Simulate(window, time, slices: 8, hedgesPerSlice: 100, winsPerSlice: 0);
 
@@ -342,11 +342,11 @@ public sealed class HedgeFeedbackTests
     [InlineData(-0.5)]
     [InlineData(1.5)]
     [InlineData(double.NaN)]
-    public void A_floor_outside_the_unit_interval_is_refused(double floor)
+    public void A_minimum_outside_the_unit_interval_is_refused(double minimum)
     {
-        var problem = Refuse(WinRate.Above(floor));
+        var problem = Refuse(WinRate.AtLeast(minimum));
 
-        Assert.Contains(problem, p => p.Contains("WinRate.Floor", StringComparison.Ordinal));
+        Assert.Contains(problem, p => p.Contains("WinRate.Minimum", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -360,7 +360,7 @@ public sealed class HedgeFeedbackTests
     [InlineData(double.NaN)]
     public void An_allowance_that_cannot_retreat_is_refused(double allowance)
     {
-        var problem = Refuse(WinRate.Above(0.2) with { MinimumAllowance = allowance });
+        var problem = Refuse(WinRate.AtLeast(0.2) with { MinimumAllowance = allowance });
 
         Assert.Contains(problem, p => p.Contains("WinRate.MinimumAllowance", StringComparison.Ordinal));
     }
@@ -369,11 +369,11 @@ public sealed class HedgeFeedbackTests
     public void A_window_and_a_sample_count_have_to_be_positive()
     {
         Assert.Contains(
-            Refuse(WinRate.Above(0.2) with { Window = TimeSpan.Zero }),
+            Refuse(WinRate.AtLeast(0.2) with { Window = TimeSpan.Zero }),
             p => p.Contains("WinRate.Window", StringComparison.Ordinal));
 
         Assert.Contains(
-            Refuse(WinRate.Above(0.2) with { MinimumSamples = 0 }),
+            Refuse(WinRate.AtLeast(0.2) with { MinimumSamples = 0 }),
             p => p.Contains("WinRate.MinimumSamples", StringComparison.Ordinal));
     }
 
@@ -384,14 +384,14 @@ public sealed class HedgeFeedbackTests
     [Fact]
     public void Naming_a_default_changes_nothing()
     {
-        Assert.Equal(0.2, WinRate.Above().Floor);
-        Assert.Equal(WinRate.Above(0.2), WinRate.Above(0.2) with { MinimumSamples = 10 });
-        Assert.NotEqual(WinRate.Above(0.2), WinRate.Above(0.2) with { MinimumSamples = 11 });
+        Assert.Equal(0.2, WinRate.AtLeast().Minimum);
+        Assert.Equal(WinRate.AtLeast(0.2), WinRate.AtLeast(0.2) with { MinimumSamples = 10 });
+        Assert.NotEqual(WinRate.AtLeast(0.2), WinRate.AtLeast(0.2) with { MinimumSamples = 11 });
 
-        Assert.NotEqual(Hedge.At(0.95), Hedge.At(0.95) with { WinRate = WinRate.Above(0.2) });
+        Assert.NotEqual(Hedge.At(0.95), Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) });
         Assert.Equal(
-            Hedge.At(0.95) with { WinRate = WinRate.Above(0.2) },
-            Hedge.At(0.95) with { WinRate = WinRate.Above(0.2) with { Window = TimeSpan.FromMinutes(1) } });
+            Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) },
+            Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) with { Window = TimeSpan.FromMinutes(1) } });
     }
 
     // ---- Helpers ----
@@ -400,7 +400,7 @@ public sealed class HedgeFeedbackTests
     ///     A loop that acts on a single hedge, so the end-to-end tests do not have to drive twenty races
     ///     through a fake clock to reach a decision.
     /// </summary>
-    private static WinRate Feedback => WinRate.Above(0.9) with
+    private static WinRate Feedback => WinRate.AtLeast(0.9) with
     {
         Window = Window,
         MinimumSamples = 1,
@@ -410,7 +410,7 @@ public sealed class HedgeFeedbackTests
     {
         time = new FakeTimeProvider();
 
-        return new WinWindow(feedback ?? WinRate.Above(0.2) with { Window = Window }, time);
+        return new WinWindow(feedback ?? WinRate.AtLeast(0.2) with { Window = Window }, time);
     }
 
     /// <summary>

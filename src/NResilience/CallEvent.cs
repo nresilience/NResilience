@@ -131,8 +131,8 @@ public enum CallEventKind
 
     /// <summary>
     ///     The measured backoff base moved. <see cref="CallEvent.Delay" /> is the new base - the
-    ///     measurement after <see cref="BackoffBase.Spread" /> has clamped it, which is what the curve
-    ///     actually uses - and it is the whole output of <see cref="Backoff.Measured" />.
+    ///     measurement after <see cref="MeasuredBase.Spread" /> has clamped it, which is what the curve
+    ///     actually uses - and it is the whole output of <see cref="Backoff.MeasuredBase" />.
     ///     <para>
     ///         Raised on the retry decision, and only when the number differs from the last one raised
     ///         for this policy instance, so the rate follows how much the estimate moves rather than how

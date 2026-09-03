@@ -3,7 +3,7 @@ namespace NResilience;
 /// <summary>
 ///     How often a hedge has to actually win before this process keeps paying for hedging.
 ///     <para>
-///         <c>WinRate.Above(0.2)</c> means "keep hedging while at least one hedge in five produces the
+///         <c>WinRate.AtLeast(0.2)</c> means "keep hedging while at least one hedge in five produces the
 ///         answer". Whether that ever happens is the one thing no configuration can state: it depends on
 ///         whether latency is independent enough between two attempts that the second one wins. Against
 ///         a dependency with one slow shard it wins often, and hedging is the best feature in the
@@ -13,7 +13,7 @@ namespace NResilience;
 ///     </para>
 ///     <para>
 ///         The loop is AIMD, on the load multiplier rather than on the threshold. A window in which the
-///         win rate falls below <see cref="Floor" /> <b>halves</b> the fraction of would-be hedges that
+///         win rate falls below <see cref="Minimum" /> <b>halves</b> the fraction of would-be hedges that
 ///         start; a window that clears it <b>adds</b> a quarter back. Multiplicative retreat and additive
 ///         return, the asymmetry <see cref="Recovery" /> and the adaptive limiter both use and for the
 ///         same reason: the cost of hedging too much is borne by the dependency, and the cost of hedging
@@ -24,7 +24,7 @@ namespace NResilience;
 ///     <code>
 /// var api = Resilience.Http with
 /// {
-///     Hedge = Hedge.At(0.95) with { WinRate = WinRate.Above(0.2) },
+///     Hedge = Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) },
 /// };
 /// </code>
 /// </example>
@@ -58,9 +58,9 @@ namespace NResilience;
 ///         dependency hedging cannot help, and it is bounded by the return step.
 ///     </para>
 ///     <para>
-///         Every property but <see cref="Floor" /> has a working default, so
-///         <c>WinRate.Above(0.2)</c> is a complete configuration and
-///         <c>WinRate.Above(0.2) with { Window = ... }</c> is the way to change one. The defaults are
+///         Every property but <see cref="Minimum" /> has a working default, so
+///         <c>WinRate.AtLeast(0.2)</c> is a complete configuration and
+///         <c>WinRate.AtLeast(0.2) with { Window = ... }</c> is the way to change one. The defaults are
 ///         supplied on read rather than by a constructor, for the reason <see cref="Hedge" /> gives: a
 ///         struct's default instance is the one thing a constructor cannot reach.
 ///     </para>
@@ -68,11 +68,11 @@ namespace NResilience;
 public readonly record struct WinRate
 {
     /// <summary>
-    ///     The win rate required when <see cref="Above" /> is called without one. One hedge in five:
+    ///     The win rate required when <see cref="AtLeast" /> is called without one. One hedge in five:
     ///     below that, hedging at <c>0.95</c> is spending 5% extra load to shorten under 1% of calls,
     ///     which is not the trade the feature was turned on for.
     /// </summary>
-    public const double DefaultFloor = 0.2;
+    public const double DefaultMinimum = 0.2;
 
     /// <summary>How many hedges the estimate needs, when <see cref="MinimumSamples" /> was not set.</summary>
     private const int DefaultMinimumSamples = 10;
@@ -101,7 +101,12 @@ public readonly record struct WinRate
     ///         reports.
     ///     </para>
     /// </summary>
-    public double Floor { get; init; }
+    public double Minimum { get; init; }
+
+    // Two other properties here begin with "Minimum", and each is the minimum of a different thing:
+    // this one is the minimum win *rate*, MinimumSamples is the minimum number of hedges the estimate
+    // needs, and MinimumAllowance is the floor under the fraction of hedges still admitted. The bare
+    // name belongs to the win rate because that is what the type is named after.
 
     /// <summary>
     ///     How much history the win rate covers, and - a quarter of it at a time - how often the loop
@@ -149,9 +154,9 @@ public readonly record struct WinRate
     }
 
     /// <summary>The way to configure win-rate feedback.</summary>
-    /// <param name="floor">The fraction of hedges that has to win. Must be in <c>(0, 1)</c>.</param>
+    /// <param name="minimum">The fraction of hedges that has to win. Must be in <c>(0, 1)</c>.</param>
     /// <returns>The configuration.</returns>
-    public static WinRate Above(double floor = DefaultFloor) => new() { Floor = floor };
+    public static WinRate AtLeast(double minimum = DefaultMinimum) => new() { Minimum = minimum };
 
     /// <summary>
     ///     Value equality over the <i>effective</i> configuration, so a value that names a default
@@ -160,17 +165,17 @@ public readonly record struct WinRate
     /// <param name="other">The other configuration.</param>
     /// <returns>True when both would behave identically.</returns>
     public bool Equals(WinRate other) =>
-        Floor.Equals(other.Floor)
+        Minimum.Equals(other.Minimum)
         && Window == other.Window
         && MinimumSamples == other.MinimumSamples
         && MinimumAllowance.Equals(other.MinimumAllowance);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(Floor, Window, MinimumSamples, MinimumAllowance);
+    public override int GetHashCode() => HashCode.Combine(Minimum, Window, MinimumSamples, MinimumAllowance);
 
     /// <inheritdoc />
     public override string ToString() =>
-        $"{Floor:0.##%} of hedges win over {Window.TotalSeconds:0.#}s " +
+        $"{Minimum:0.##%} of hedges win over {Window.TotalSeconds:0.#}s " +
         $"(min {MinimumSamples} hedges, down to {MinimumAllowance:0.##%} of the hedge rate)";
 
     /// <summary>
@@ -180,13 +185,13 @@ public readonly record struct WinRate
     /// <param name="problems">The list to add to.</param>
     internal void Validate(List<string> problems)
     {
-        if (double.IsNaN(Floor) || Floor <= 0 || Floor >= 1)
+        if (double.IsNaN(Minimum) || Minimum <= 0 || Minimum >= 1)
         {
             problems.Add(
-                $"WinRate.Floor must be in (0, 1); it is {Floor}. " +
+                $"WinRate.Minimum must be in (0, 1); it is {Minimum}. " +
                 "At 0 nothing can ever fall below it and the feedback never acts; at 1 every window is " +
                 "losing, because a hedge that loses its race is the ordinary case. " +
-                "Use WinRate.Above(0.2) for one hedge in five.");
+                "Use WinRate.AtLeast(0.2) for one hedge in five.");
         }
 
         if (Window <= TimeSpan.Zero)
@@ -204,14 +209,14 @@ public readonly record struct WinRate
         }
     }
 
-    /// <summary>The allowance after a window whose win rate fell below <see cref="Floor" />.</summary>
+    /// <summary>The allowance after a window whose win rate fell below <see cref="Minimum" />.</summary>
     /// <param name="allowance">The current allowance.</param>
     /// <returns>Half of it, floored at <see cref="MinimumAllowance" />.</returns>
     internal double Retreated(double allowance) => Math.Max(MinimumAllowance, allowance * RetreatFactor);
 
     /// <summary>
     ///     The allowance after <paramref name="slices" /> decision points that were not losing - either
-    ///     because the win rate cleared <see cref="Floor" />, or because there was not enough evidence
+    ///     because the win rate cleared <see cref="Minimum" />, or because there was not enough evidence
     ///     to say it had not.
     /// </summary>
     /// <param name="allowance">The current allowance.</param>

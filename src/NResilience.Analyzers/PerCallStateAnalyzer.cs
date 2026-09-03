@@ -138,8 +138,8 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     }
 
     /// <summary>
-    ///     How this curve was given a measured base - <c>Backoff.Adaptive(...)</c> or an explicit
-    ///     <c>Measured</c> - or null when it was given none.
+    ///     How this curve was given a measured base - <c>Backoff.Measured(...)</c> or an explicit
+    ///     <c>MeasuredBase</c> - or null when it was given none.
     /// </summary>
     /// <remarks>
     ///     Only the two shapes written at the assignment are recognized, for the reason the estimator
@@ -155,15 +155,15 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
             current = conversion.Operand;
         }
 
-        if (current is IInvocationOperation { TargetMethod.Name: "Adaptive" })
-            return "Backoff.Adaptive";
+        if (current is IInvocationOperation { TargetMethod.Name: "Measured" })
+            return "Backoff.MeasuredBase";
 
         if (current is IWithOperation with && with.Initializer is { } initializer)
         {
             foreach (var assignment in initializer.Initializers.OfType<ISimpleAssignmentOperation>())
             {
-                if (assignment.Target is IPropertyReferenceOperation { Property.Name: "Measured" } && !IsNull(assignment.Value))
-                    return "Backoff.Measured";
+                if (assignment.Target is IPropertyReferenceOperation { Property.Name: "MeasuredBase" } && !IsNull(assignment.Value))
+                    return "Backoff.MeasuredBase";
             }
         }
 

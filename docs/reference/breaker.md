@@ -16,7 +16,7 @@ The `Breaker` is a `sealed class` implementing the circuit breaker pattern. It i
 | `State` | The current state of the breaker. If a breaker is open but the break duration has elapsed, it reports `HalfOpen` because the next call will be treated as a probe; if it is recovering and its ramp has run out, it reports `Closed` for the same reason. Reading this property does not consume a probe slot. |
 | `OpenedAt` | The timestamp of when the breaker last opened, or `null` if it is currently closed. A recovering breaker still reports this timestamp, as the ramp is a continuation of the previous open state. |
 | `NormalLatency` | How long a healthy call to this dependency currently takes, as the breaker measures it. `null` unless `SlowCalls` is in effect - it is by default - and the baseline has enough samples. An adaptive breaker trips at `NormalLatency` times `SlowCalls.Multiple`. |
-| `NormalFailureRate` | How often a call to this dependency fails, as the breaker measures it. `null` unless `Failures` is in effect - it is by default - and the baseline has enough samples. The relative trip point is `max(Failures.AbsoluteFloor, NormalFailureRate * Failures.Multiple)`. |
+| `NormalFailureRate` | How often a call to this dependency fails, as the breaker measures it. `null` unless `Failures` is in effect - it is by default - and the baseline has enough samples. The relative trip point is `max(Failures.Floor, NormalFailureRate * Failures.Multiple)`. |
 | `Isolate()` | Forces the breaker into the `Isolated` state. An isolated breaker does not self-heal. |
 | `Reset()` | Closes the breaker and clears its failure history. `NormalLatency` and `NormalFailureRate` survive, because they are measurements of the dependency rather than decisions about it. |
 
@@ -74,14 +74,14 @@ The `BreakerState` enum defines the breaker's states:
 | `Multiple` | N/A | How many times the baseline error rate counts as too many. Must be greater than 1. |
 | `Window` | 5 min | The window the baseline is measured over. |
 | `MinimumSamples` | 100 | Sampled outcomes required before the relative trip is armed. |
-| `AbsoluteFloor` | 0.05 | The error rate the relative trip never fires below, whatever the baseline was. Must be in (0, 1]. |
+| `Floor` | 0.05 | The error rate the relative trip never fires below, whatever the baseline was. Must be in (0, 1]. |
 | `Above(double multiple = 5.0)` | N/A | The static factory. |
 
 ### Implementation details
 
 - **Sampling**: `Ok` and `Transient` outcomes feed the baseline, the same stream the trip window sees. `Throttled` and `Permanent` outcomes are not evidence about the dependency's health.
 - **The baseline is separate from the trip window**: it is not cleared when the breaker opens, closes, or is `Reset`.
-- **Trip point**: `min(FailureRatio, max(AbsoluteFloor, NormalFailureRate * Multiple))`, clamped to 1. The relative trip can only fire sooner than `FailureRatio`, never later.
+- **Trip point**: `min(FailureRatio, max(Floor, NormalFailureRate * Multiple))`, clamped to 1. The relative trip can only fire sooner than `FailureRatio`, never later.
 - **Two failures minimum**: a relative trip needs at least two failures in the window whatever the ratio says, because at the default floor a single failure in a 20-call window is already 5%. An absolute `FailureRatio` is not held to that.
 - **Combined validation**: `BreakerSettings.Validate` rejects a configuration where `Failures.Window` divided by `Multiple` is less than twice `TripWindow`. Such a breaker cannot open on the error rate at all - see [Breaker internals](../deep-dives/breaker-internals.md#the-relative-failure-ratio).
 - **Default baseline**: `Window` widens beyond its 5-minute default when `BreakerSettings.TripWindow` needs it to, and no relative trip is defaulted on at all once that requirement passes an hour. Both apply to the default only - a `Failures` you wrote is used as written, or rejected.

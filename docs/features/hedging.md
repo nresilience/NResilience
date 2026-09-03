@@ -99,7 +99,7 @@ var api = Resilience.Http with
     Hedge = Hedge.At(quantile: 0.95) with
     {
         // Keep hedging while at least one hedge in five produces the answer.
-        WinRate = WinRate.Above(floor: 0.2),
+        WinRate = WinRate.AtLeast(minimum: 0.2),
     },
 };
 ```

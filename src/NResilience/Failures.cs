@@ -14,7 +14,7 @@ namespace NResilience;
 ///     <para>
 ///         <b>This can only trip sooner.</b> When <see cref="BreakerSettings.FailureRatio" /> is also
 ///         set it stays the ceiling: the effective trip point is
-///         <c>min(FailureRatio, max(<see cref="AbsoluteFloor" />, <see cref="Multiple" /> x baseline))</c>.
+///         <c>min(FailureRatio, max(<see cref="Floor" />, <see cref="Multiple" /> x baseline))</c>.
 ///     </para>
 /// </summary>
 /// <example>
@@ -30,7 +30,7 @@ namespace NResilience;
 ///     <para>
 ///         <b>Why the floor is not optional.</b> A baseline of 0.02% times a multiple of 5 is 0.1%, and
 ///         on a 30-second window at 20 calls that is a single failure. Without
-///         <see cref="AbsoluteFloor" /> this feature is a breaker that opens on one error against a
+///         <see cref="Floor" /> this feature is a breaker that opens on one error against a
 ///         perfectly healthy dependency. The floor is what says "below 5% absolute, nothing is wrong no
 ///         matter how quiet the baseline was".
 ///     </para>
@@ -68,9 +68,9 @@ public readonly record struct Failures
 {
     /// <summary>
     ///     The error rate below which nothing is wrong, whatever the baseline was, when
-    ///     <see cref="AbsoluteFloor" /> was not set.
+    ///     <see cref="Floor" /> was not set.
     /// </summary>
-    private const double DefaultAbsoluteFloor = 0.05;
+    private const double DefaultFloor = 0.05;
 
     /// <summary>
     ///     How many samples the baseline needs, when <see cref="MinimumSamples" /> was not set. Five
@@ -135,9 +135,9 @@ public readonly record struct Failures
     ///         near-zero is one unlucky call. The floor is the "nothing is wrong here" line.
     ///     </para>
     /// </summary>
-    public double AbsoluteFloor
+    public double Floor
     {
-        get => _absoluteFloor ?? DefaultAbsoluteFloor;
+        get => _absoluteFloor ?? DefaultFloor;
         init => _absoluteFloor = value;
     }
 
@@ -156,15 +156,15 @@ public readonly record struct Failures
         Multiple.Equals(other.Multiple)
         && Window == other.Window
         && MinimumSamples == other.MinimumSamples
-        && AbsoluteFloor.Equals(other.AbsoluteFloor);
+        && Floor.Equals(other.Floor);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(Multiple, Window, MinimumSamples, AbsoluteFloor);
+    public override int GetHashCode() => HashCode.Combine(Multiple, Window, MinimumSamples, Floor);
 
     /// <inheritdoc />
     public override string ToString() =>
         $"{Multiple:0.##}x the rate over {Window.TotalSeconds:0.#}s " +
-        $"(min {MinimumSamples} samples, floor {AbsoluteFloor:0.##%})";
+        $"(min {MinimumSamples} samples, floor {Floor:0.##%})";
 
     /// <summary>
     ///     Collects everything wrong with this configuration on its own, in the shape
@@ -187,21 +187,21 @@ public readonly record struct Failures
         if (MinimumSamples < 1)
             problems.Add($"Failures.MinimumSamples must be at least 1; it is {MinimumSamples}.");
 
-        if (double.IsNaN(AbsoluteFloor) || AbsoluteFloor <= 0 || AbsoluteFloor > 1)
+        if (double.IsNaN(Floor) || Floor <= 0 || Floor > 1)
         {
             problems.Add(
-                $"Failures.AbsoluteFloor must be in (0, 1]; it is {AbsoluteFloor}. " +
+                $"Failures.Floor must be in (0, 1]; it is {Floor}. " +
                 "Without a floor, a multiple of a near-zero baseline is a single failure.");
         }
     }
 
     /// <summary>
     ///     The trip ratio this configuration implies for a measured baseline: never below
-    ///     <see cref="AbsoluteFloor" />, and never above 1, where the whole trip window failing is what
+    ///     <see cref="Floor" />, and never above 1, where the whole trip window failing is what
     ///     it takes.
     /// </summary>
     /// <param name="baseline">The measured baseline error rate.</param>
     /// <returns>The proportion of the trip window that has to fail.</returns>
     internal double ThresholdFor(double baseline) =>
-        Math.Min(1, Math.Max(AbsoluteFloor, baseline * Multiple));
+        Math.Min(1, Math.Max(Floor, baseline * Multiple));
 }

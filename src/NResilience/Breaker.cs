@@ -168,7 +168,7 @@ public sealed record BreakerSettings
     ///     off; set it to a value to change it. The default is invisible until the breaker has a
     ///     baseline - <see cref="NResilience.Failures.MinimumSamples" /> outcomes over
     ///     <see cref="NResilience.Failures.Window" /> - and cannot fire below
-    ///     <see cref="NResilience.Failures.AbsoluteFloor" /> however quiet that baseline was.
+    ///     <see cref="NResilience.Failures.Floor" /> however quiet that baseline was.
     /// </remarks>
     public Failures? Failures
     {
@@ -813,7 +813,7 @@ public sealed class Breaker
     ///     <para>
     ///         Worth graphing beside <see cref="NormalLatency" />. It is the library's answer to "how
     ///         reliable is this dependency, normally?", and the trip point is
-    ///         <c>max(Failures.AbsoluteFloor, NormalFailureRate x Failures.Multiple)</c>.
+    ///         <c>max(Failures.Floor, NormalFailureRate x Failures.Multiple)</c>.
     ///     </para>
     /// </summary>
     public double? NormalFailureRate

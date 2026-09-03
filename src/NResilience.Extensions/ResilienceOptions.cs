@@ -276,9 +276,9 @@ public sealed class BackoffOptions
     /// <summary>
     ///     Measures <see cref="TransientBase" /> from the dependency's own recent latency instead of
     ///     taking it as the constant above. Off unless the section says so, which is
-    ///     <c>"Backoff": { "Measured": { "Multiple": 1 } }</c>.
+    ///     <c>"Backoff": { "MeasuredBase": { "Multiple": 1 } }</c>.
     /// </summary>
-    public BackoffBaseOptions? Measured { get; set; }
+    public MeasuredBaseOptions? MeasuredBase { get; set; }
 
     /// <summary>Whether this section names anything that changes the shape of the curve rather than only its randomness.</summary>
     private bool HasCurve =>
@@ -289,7 +289,7 @@ public sealed class BackoffOptions
 
         // A measured base is only carried by an exponential curve, so naming one is a reason to
         // rebuild a Constant or Custom baseline into an exponential exactly as naming a knob is.
-        || Measured is not null;
+        || MeasuredBase is not null;
 
     /// <summary>Patches a curve with whatever this section named.</summary>
     /// <param name="baseline">The curve the base policy carried.</param>
@@ -314,22 +314,22 @@ public sealed class BackoffOptions
             Max ?? existing.Max) with
         {
             Jitter = Jitter ?? baseline.Jitter,
-            Measured = Measured is { } measured
-                ? measured.Enabled is false ? null : measured.ToBackoffBase()
-                : existing.Measured,
+            MeasuredBase = MeasuredBase is { } measured
+                ? measured.Enabled is false ? null : measured.ToMeasuredBase()
+                : existing.MeasuredBase,
         };
     }
 }
 
 /// <summary>
-///     The bindable shape of a <see cref="NResilience.BackoffBase" />.
+///     The bindable shape of a <see cref="NResilience.MeasuredBase" />.
 /// </summary>
 /// <remarks>
 ///     Opt-in, unlike <see cref="AttemptCeilingOptions" />: a measured base can lengthen a delay as well
 ///     as shorten one, so it is not something the library turns on for a policy that did not ask. See
-///     <see cref="NResilience.BackoffBase" /> for the argument.
+///     <see cref="NResilience.MeasuredBase" /> for the argument.
 /// </remarks>
-public sealed class BackoffBaseOptions
+public sealed class MeasuredBaseOptions
 {
     /// <summary>
     ///     Whether the backoff base is measured at all. <c>false</c> drops a measured base the base
@@ -343,32 +343,32 @@ public sealed class BackoffBaseOptions
     /// </summary>
     public double? Multiple { get; set; }
 
-    /// <summary><see cref="NResilience.BackoffBase.Quantile" />.</summary>
+    /// <summary><see cref="NResilience.MeasuredBase.Quantile" />.</summary>
     public double? Quantile { get; set; }
 
-    /// <summary><see cref="NResilience.BackoffBase.Window" />.</summary>
+    /// <summary><see cref="NResilience.MeasuredBase.Window" />.</summary>
     public TimeSpan? Window { get; set; }
 
-    /// <summary><see cref="NResilience.BackoffBase.MinimumSamples" />.</summary>
+    /// <summary><see cref="NResilience.MeasuredBase.MinimumSamples" />.</summary>
     public int? MinimumSamples { get; set; }
 
-    /// <summary><see cref="NResilience.BackoffBase.Spread" />.</summary>
+    /// <summary><see cref="NResilience.MeasuredBase.Spread" />.</summary>
     public double? Spread { get; set; }
 
-    /// <summary>Converts the options to a <see cref="NResilience.BackoffBase" /> value, using defaults for any unset properties.</summary>
+    /// <summary>Converts the options to a <see cref="NResilience.MeasuredBase" /> value, using defaults for any unset properties.</summary>
     /// <returns>The configuration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which is the shape an off switch would take.</exception>
-    public BackoffBase ToBackoffBase()
+    public MeasuredBase ToMeasuredBase()
     {
         if (Multiple is 0)
         {
             throw RetiredOffSwitch.For(
-                "Backoff.Measured",
+                "Backoff.MeasuredBase",
                 nameof(Multiple),
                 "Zero normal calls is not a delay anyone could mean.");
         }
 
-        var measured = BackoffBase.Of(Multiple ?? BackoffBase.DefaultMultiple);
+        var measured = MeasuredBase.Of(Multiple ?? MeasuredBase.DefaultMultiple);
 
         if (Quantile is { } quantile)
             measured = measured with { Quantile = quantile };
@@ -539,7 +539,7 @@ public sealed class HedgeOptions
 ///     The bindable shape of a <see cref="NResilience.WinRate" />.
 /// </summary>
 /// <remarks>
-///     Opt-in, like <see cref="BackoffBaseOptions" /> and unlike the rest of
+///     Opt-in, like <see cref="MeasuredBaseOptions" /> and unlike the rest of
 ///     <see cref="HedgeOptions" />: it is a control loop over a control loop, and its failure mode - the
 ///     dependency whose tail no second attempt can route around is exactly the one it retreats from - is
 ///     not something the library decides on a caller's behalf. See <see cref="NResilience.WinRate" />.
@@ -556,7 +556,7 @@ public sealed class WinRateOptions
     ///     The fraction of hedges that has to win. Defaults to 0.2, and must be in <c>(0, 1)</c> -
     ///     <c>"Enabled": false</c> is how a section turns the feedback off.
     /// </summary>
-    public double? Floor { get; set; }
+    public double? Minimum { get; set; }
 
     /// <summary><see cref="NResilience.WinRate.Window" />.</summary>
     public TimeSpan? Window { get; set; }
@@ -569,21 +569,21 @@ public sealed class WinRateOptions
 
     /// <summary>Projects onto the value the policy carries, or null when the section turned it off.</summary>
     /// <returns>The configuration, or null.</returns>
-    /// <exception cref="ResilienceConfigurationException"><see cref="Floor" /> is zero, which is the shape an off switch would take.</exception>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Minimum" /> is zero, which is the shape an off switch would take.</exception>
     public WinRate? ToWinRate()
     {
         if (Enabled is false)
             return null;
 
-        if (Floor is 0)
+        if (Minimum is 0)
         {
             throw RetiredOffSwitch.For(
                 "Hedge.WinRate",
-                nameof(Floor),
+                nameof(Minimum),
                 "A win rate no hedge can fall below is feedback that never acts.");
         }
 
-        var feedback = WinRate.Above(Floor ?? WinRate.DefaultFloor);
+        var feedback = WinRate.AtLeast(Minimum ?? WinRate.DefaultMinimum);
 
         if (Window is { } window)
             feedback = feedback with { Window = window };
@@ -864,8 +864,8 @@ public sealed class FailuresOptions
     /// <summary><see cref="NResilience.Failures.MinimumSamples" />.</summary>
     public int? MinimumSamples { get; set; }
 
-    /// <summary><see cref="NResilience.Failures.AbsoluteFloor" />.</summary>
-    public double? AbsoluteFloor { get; set; }
+    /// <summary><see cref="NResilience.Failures.Floor" />.</summary>
+    public double? Floor { get; set; }
 
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
@@ -888,8 +888,8 @@ public sealed class FailuresOptions
         if (MinimumSamples is { } samples)
             failures = failures with { MinimumSamples = samples };
 
-        if (AbsoluteFloor is { } floor)
-            failures = failures with { AbsoluteFloor = floor };
+        if (Floor is { } floor)
+            failures = failures with { Floor = floor };
 
         return failures;
     }

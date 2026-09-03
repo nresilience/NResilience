@@ -160,7 +160,7 @@ The breaker keeps a baseline error rate - by default over the last five minutes 
 
 Three guards make it safe, all defaulted:
 
-- `AbsoluteFloor` (default 0.05) is the rate below which nothing is wrong, whatever the baseline was. Five times a baseline of nearly zero is nearly zero, so without a floor the first error of the day would open the circuit. A relative trip also needs at least two failures in the window, because one failure is not a rate.
+- `Floor` (default 0.05) is the rate below which nothing is wrong, whatever the baseline was. Five times a baseline of nearly zero is nearly zero, so without a floor the first error of the day would open the circuit. A relative trip also needs at least two failures in the window, because one failure is not a rate.
 - `MinimumSamples` (default 100) is how many outcomes the baseline needs before the relative trip is armed. Until then the breaker behaves exactly as it does without the setting.
 - `Window` (default 5 minutes) is how far back the baseline reaches. `BreakerSettings.Validate` rejects a baseline short enough that an outage raises it before the trip window fills - such a breaker never opens on the error rate at all. The default baseline widens instead, the way the slow-call baseline does.
 

@@ -8,6 +8,49 @@ order: 10
 
 Registration methods live in the `NResilience.Extensions` package as extension methods for `IServiceCollection` and `IHttpClientBuilder`.
 
+## On this page
+
+**Registering a policy**
+
+| | |
+| :--- | :--- |
+| [`AddResilience` on `IServiceCollection`](#addresilience-on-iservicecollection) | Register a named policy from a value, a callback, or a section. |
+| [`AddResilience` on `IHttpClientBuilder`](#addresilience-on-ihttpclientbuilder) | Put the handler on an `HttpClient`. |
+| [`IResiliencePolicies`](#iresiliencepolicies) | Resolve a registered policy by name. |
+
+**The bindable shape of a policy.** One section per feature, each with an `Enabled` switch:
+
+| Section | Configures | JSON key |
+| :--- | :--- | :--- |
+| [`ResilienceOptions`](#resilienceoptions) | The policy itself | *(the policy's own section)* |
+| [`BackoffOptions`](#backoffoptions) | The retry delay curve | `Backoff` |
+| [`MeasuredBaseOptions`](#measuredbaseoptions) | Measuring that curve's base from latency | `Backoff:MeasuredBase` |
+| [`BudgetOptions`](#budgetoptions) | The retry budget | `Budget` |
+| [`AttemptCeilingOptions`](#attemptceilingoptions) | Measuring the per-attempt ceiling | `AttemptCeiling` |
+| [`BreakerOptions`](#breakeroptions) | The circuit breaker | `Breaker` |
+| `FailuresOptions` | Its relative failure trip - keys mirror [`Failures`](breaker.md#failures) | `Breaker:Failures` |
+| `SlowCallsOptions` | Its relative brownout trip - keys mirror [`SlowCalls`](breaker.md#slowcalls) | `Breaker:SlowCalls` |
+| `RecoveryOptions` | Its recovery ramp - keys mirror [`Recovery`](breaker.md#recovery) | `Breaker:Recovery` |
+| [`HedgeOptions`](#hedgeoptions) | Hedging | `Hedge` |
+| [`WinRateOptions`](#winrateoptions) | Holding hedges back when they stop winning | `Hedge:WinRate` |
+
+**Limiting, health and observability**
+
+| | |
+| :--- | :--- |
+| [`AddRateLimit`](#addratelimit-on-ihttpclientbuilder) and [`RateLimitOptions`](#ratelimitoptions) | Rate and concurrency limits. |
+| [`Limit`](#limit-and-acquireorthrowasync), [`AdaptiveLimitOptions`](#adaptivelimitoptions), [`AdaptiveLimiter`](#adaptivelimiter) | Building a limiter, including the adaptive one. |
+| [`AddResilience` on `IHealthChecksBuilder`](#addresilience-on-ihealthchecksbuilder) and [`ResilienceHealthOptions`](#resiliencehealthoptions) | Health reporting. |
+| [`ResilienceTelemetry`](#resiliencetelemetry), [`ResilienceLogging`](#resiliencelogging), [`ResilienceLoggingOptions`](#resilienceloggingoptions) | Metrics and logs. |
+
+**ASP.NET Core middleware**
+
+| | |
+| :--- | :--- |
+| [`UseResilienceDeadline`](#useresiliencedeadline-on-iapplicationbuilder) | Read an inbound deadline and publish it. |
+| [`UseResilienceNestedRetry`](#useresiliencenestedretry-on-iapplicationbuilder) | Read the nested-retry marker. |
+| [`AddResilienceExceptionHandler`](#addresilienceexceptionhandler-on-iservicecollection) | Map the library's exceptions to responses. |
+
 ## `AddResilience` on `IServiceCollection`
 
 Register resilience policies in the DI container with these methods.
@@ -105,7 +148,7 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 `ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone". An unrecognized key is an error, not a no-op - see [An unrecognized key is an error](../di/configuration.md#an-unrecognized-key-is-an-error).
 
-**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`. `Backoff` carries a `Measured` subsection of its own.
+**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`. `Backoff` carries a `MeasuredBase` subsection of its own.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
@@ -203,9 +246,9 @@ Opt-in, unlike the rest of `HedgeOptions`: it is a control loop over a control l
 
 There is deliberately no way to make the measured ceiling longer than `AttemptTimeout`. The clamp is what makes the feature safe to leave on, and a key that lifted it would be the one key nobody should have.
 
-## `BackoffBaseOptions`
+## `MeasuredBaseOptions`
 
-`BackoffBaseOptions` provides the bindable shape of [`BackoffBase`](backoff.md#backoffbase), the measured [backoff base](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it). It is a subsection of `Backoff`, and it is off unless the section asks for it.
+`MeasuredBaseOptions` provides the bindable shape of [`MeasuredBase`](backoff.md#backoffbase), the measured [backoff base](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it). It is a subsection of `Backoff`, and it is off unless the section asks for it.
 
 | Property | Default | Description |
 | :--- | :--- | :--- |

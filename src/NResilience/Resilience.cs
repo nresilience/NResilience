@@ -279,13 +279,13 @@ public sealed partial record Resilience
     ///         Setting it to <c>false</c> is the one-line answer to "make this deterministic": it turns
     ///         off every measured term the library would otherwise supply, leaving only the constants
     ///         written here. Today that is <see cref="AttemptCeiling" />; anything added later that
-    ///         measures rather than asks joins it, and <see cref="NResilience.Backoff.Measured" />
+    ///         measures rather than asks joins it, and <see cref="NResilience.Backoff.MeasuredBase" />
     ///         already has.
     ///     </para>
     ///     <para>
     ///         It suppresses defaults rather than overriding what you wrote. A policy that says
     ///         <c>false</c> and then configures <see cref="AttemptCeiling" />, <see cref="Hedge" /> or
-    ///         <see cref="NResilience.Backoff.Measured" /> has contradicted itself, and <see cref="Validate" /> says so rather than picking a
+    ///         <see cref="NResilience.Backoff.MeasuredBase" /> has contradicted itself, and <see cref="Validate" /> says so rather than picking a
     ///         winner.
     ///     </para>
     ///     <para>
@@ -333,8 +333,8 @@ public sealed partial record Resilience
     public TimeSpan? MeasuredAttemptCeiling => Measured();
 
     /// <summary>
-    ///     The base delay the next transient retry would wait, when <see cref="NResilience.Backoff.Measured" />
-    ///     is configured: the measured baseline, after <see cref="BackoffBase.Spread" /> has clamped it
+    ///     The base delay the next transient retry would wait, when <see cref="NResilience.Backoff.MeasuredBase" />
+    ///     is configured: the measured baseline, after <see cref="MeasuredBase.Spread" /> has clamped it
     ///     around <see cref="NResilience.Backoff.TransientBase" />. Returns <c>null</c> when no base is
     ///     being measured, or when the estimate is still cold and the configured constant is what a
     ///     retry would use.
@@ -356,7 +356,7 @@ public sealed partial record Resilience
     {
         get
         {
-            if (Backoff.Measured is not { } measured)
+            if (Backoff.MeasuredBase is not { } measured)
                 return null;
 
             return Internal.ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is { } normal
@@ -465,10 +465,10 @@ public sealed partial record Resilience
                     "Remove one: drop AttemptCeiling to keep the policy deterministic, or drop Adaptive = false to keep the measured ceiling.");
             }
 
-            if (Backoff.Measured is not null)
+            if (Backoff.MeasuredBase is not null)
             {
                 problems.Add(
-                    "Adaptive is false, so this policy measures nothing, but Backoff.Measured is set. " +
+                    "Adaptive is false, so this policy measures nothing, but Backoff.MeasuredBase is set. " +
                     "Remove one: use Backoff.Exponential(...) to keep the policy deterministic, or drop " +
                     "Adaptive = false to keep the measured backoff base.");
             }

@@ -64,7 +64,7 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `Backoff` | A `BackoffOptions` section: `TransientBase`, `ThrottledBase`, `Max`, `Factor`, `Jitter`. |
 | `Budget` | A `BudgetOptions` section: `Enabled`, `Fraction`, `MinimumPerSecond`, `Shared`. |
 | `AttemptCeiling` | An `AttemptCeilingOptions` section. On by default; `"AttemptCeiling": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |
-| `Backoff:Measured` | A `BackoffBaseOptions` subsection. Off by default; `"Backoff": { "Measured": { "Multiple": 1 } }` measures the transient base from recent latency. |
+| `Backoff:MeasuredBase` | A `MeasuredBaseOptions` subsection. Off by default; `"Backoff": { "MeasuredBase": { "Multiple": 1 } }` measures the transient base from recent latency. |
 | `Breaker` | A `BreakerOptions` section. Omit it, or write `"Enabled": false`, for no circuit breaker. |
 | `Hedge` | A `HedgeOptions` section. Omit it, or write `"Enabled": false`, for no hedging. |
 | `Adaptive` | Set to `false` to turn off every measured term in the policy **and its breaker**. See [Turning measurement off](#turning-measurement-off). |
@@ -122,17 +122,17 @@ to surprise. `"Breaker": { "Adaptive": true }` overrides it for the breaker only
 
 `Adaptive` suppresses defaults; it does not overrule what you wrote. A section that says `false` and
 then configures `AttemptCeiling`, `Hedge`, `Breaker:SlowCalls`, `Breaker:Failures` or
-`Backoff:Measured` has said two incompatible things, and registration fails naming both.
+`Backoff:MeasuredBase` has said two incompatible things, and registration fails naming both.
  
 The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `TripWindow`, `BreakDuration`, `MaxBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `Recovery` is a subsection of its own - `"Recovery": {}` turns the [recovery ramp](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) on at its defaults, `"Recovery": { "Length": 0.5 }` changes it, and `"Enabled": false` turns it back off. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
 
 `Breaker:SlowCalls` is a nested section rather than a flat property, and the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number) it configures is on by default. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. `"SlowCalls": { "Enabled": false }` turns the trip off. Naming `SlowCallThreshold` as well composes rather than colliding - a call is slow when it is above either threshold.
 
-`Breaker:Failures` is a nested section on the same pattern, and the [relative failure trip](../features/circuit-breaker.md#trip-on-errors-without-guessing-a-rate) it configures is on by default too. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Window`, `MinimumSamples`, and `AbsoluteFloor`, with `"Failures": { "Enabled": false }` turning the trip off. Set `FailureRatio` as well when you have a rate you never want exceeded - it becomes the ceiling, and the relative trip can only fire sooner.
+`Breaker:Failures` is a nested section on the same pattern, and the [relative failure trip](../features/circuit-breaker.md#trip-on-errors-without-guessing-a-rate) it configures is on by default too. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Window`, `MinimumSamples`, and `Floor`, with `"Failures": { "Enabled": false }` turning the trip off. Set `FailureRatio` as well when you have a rate you never want exceeded - it becomes the ceiling, and the relative trip can only fire sooner.
 
 `AttemptCeiling` is likewise a nested section, configuring the [measured attempt ceiling](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) the default policy already carries. It accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Floor`, with `"AttemptCeiling": { "Enabled": false }` turning the measured term off. It never lengthens `AttemptTimeout` - the measured term can only lower the ceiling - so the two settings compose rather than compete.
 
-`Backoff:Measured` is a subsection of the backoff section, configuring the [measured backoff base](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it). Unlike every other measured term it is off unless you ask for it, because it is the one that can lengthen a delay rather than only shorten one. It accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Spread`, with `"Measured": { "Enabled": false }` dropping one a lower configuration layer added.
+`Backoff:MeasuredBase` is a subsection of the backoff section, configuring the [measured backoff base](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it). Unlike every other measured term it is off unless you ask for it, because it is the one that can lengthen a delay rather than only shorten one. It accepts `Multiple`, `Quantile`, `Window`, `MinimumSamples`, and `Spread`, with `"MeasuredBase": { "Enabled": false }` dropping one a lower configuration layer added.
 
 ## Projection via ResilienceOptions
 

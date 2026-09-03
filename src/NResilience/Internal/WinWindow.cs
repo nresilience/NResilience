@@ -196,7 +196,7 @@ internal sealed class WinWindow
             return;
         }
 
-        _allowance = won < _feedback.Floor * started
+        _allowance = won < _feedback.Minimum * started
             ? _feedback.Retreated(_allowance)
             : _feedback.Relaxed(_allowance, 1);
     }

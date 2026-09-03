@@ -42,7 +42,7 @@ One property is computed rather than configured:
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| `MeasuredBackoffBase` | `TimeSpan?` | The base delay the next transient retry would wait when `Backoff.Measured` is configured, after the `Spread` clamp. `null` when no base is being measured or the estimate is still cold. Reading it validates the policy, exactly as executing it does. |
+| `MeasuredBackoffBase` | `TimeSpan?` | The base delay the next transient retry would wait when `Backoff.MeasuredBase` is configured, after the `Spread` clamp. `null` when no base is being measured or the estimate is still cold. Reading it validates the policy, exactly as executing it does. |
 | `MeasuredAttemptCeiling` | `TimeSpan?` | What `AttemptCeiling` currently measures the ceiling to be, before `AttemptTimeout` and the deadline clamp it. `null` when `AttemptCeiling` is not configured or the estimate is still cold. Reading it validates the policy, exactly as executing it does. |
 
 ## Methods

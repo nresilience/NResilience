@@ -35,21 +35,6 @@ NResilience.Extensions.AttemptCeilingOptions.Quantile.set -> void
 NResilience.Extensions.AttemptCeilingOptions.ToAttemptCeiling() -> NResilience.AttemptCeiling
 NResilience.Extensions.AttemptCeilingOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.AttemptCeilingOptions.Window.set -> void
-NResilience.Extensions.BackoffBaseOptions
-NResilience.Extensions.BackoffBaseOptions.BackoffBaseOptions() -> void
-NResilience.Extensions.BackoffBaseOptions.Enabled.get -> bool?
-NResilience.Extensions.BackoffBaseOptions.Enabled.set -> void
-NResilience.Extensions.BackoffBaseOptions.MinimumSamples.get -> int?
-NResilience.Extensions.BackoffBaseOptions.MinimumSamples.set -> void
-NResilience.Extensions.BackoffBaseOptions.Multiple.get -> double?
-NResilience.Extensions.BackoffBaseOptions.Multiple.set -> void
-NResilience.Extensions.BackoffBaseOptions.Quantile.get -> double?
-NResilience.Extensions.BackoffBaseOptions.Quantile.set -> void
-NResilience.Extensions.BackoffBaseOptions.Spread.get -> double?
-NResilience.Extensions.BackoffBaseOptions.Spread.set -> void
-NResilience.Extensions.BackoffBaseOptions.ToBackoffBase() -> NResilience.BackoffBase
-NResilience.Extensions.BackoffBaseOptions.Window.get -> System.TimeSpan?
-NResilience.Extensions.BackoffBaseOptions.Window.set -> void
 NResilience.Extensions.BackoffOptions
 NResilience.Extensions.BackoffOptions.BackoffOptions() -> void
 NResilience.Extensions.BackoffOptions.Factor.get -> double?
@@ -58,8 +43,8 @@ NResilience.Extensions.BackoffOptions.Jitter.get -> NResilience.Jitter?
 NResilience.Extensions.BackoffOptions.Jitter.set -> void
 NResilience.Extensions.BackoffOptions.Max.get -> System.TimeSpan?
 NResilience.Extensions.BackoffOptions.Max.set -> void
-NResilience.Extensions.BackoffOptions.Measured.get -> NResilience.Extensions.BackoffBaseOptions?
-NResilience.Extensions.BackoffOptions.Measured.set -> void
+NResilience.Extensions.BackoffOptions.MeasuredBase.get -> NResilience.Extensions.MeasuredBaseOptions?
+NResilience.Extensions.BackoffOptions.MeasuredBase.set -> void
 NResilience.Extensions.BackoffOptions.ThrottledBase.get -> System.TimeSpan?
 NResilience.Extensions.BackoffOptions.ThrottledBase.set -> void
 NResilience.Extensions.BackoffOptions.ToBackoff(NResilience.Backoff baseline) -> NResilience.Backoff
@@ -112,11 +97,11 @@ NResilience.Extensions.BudgetOptions.Shared.get -> string?
 NResilience.Extensions.BudgetOptions.Shared.set -> void
 NResilience.Extensions.BudgetOptions.ToBudget(System.TimeProvider? time = null) -> NResilience.RetryBudget?
 NResilience.Extensions.FailuresOptions
-NResilience.Extensions.FailuresOptions.AbsoluteFloor.get -> double?
-NResilience.Extensions.FailuresOptions.AbsoluteFloor.set -> void
 NResilience.Extensions.FailuresOptions.Enabled.get -> bool?
 NResilience.Extensions.FailuresOptions.Enabled.set -> void
 NResilience.Extensions.FailuresOptions.FailuresOptions() -> void
+NResilience.Extensions.FailuresOptions.Floor.get -> double?
+NResilience.Extensions.FailuresOptions.Floor.set -> void
 NResilience.Extensions.FailuresOptions.MinimumSamples.get -> int?
 NResilience.Extensions.FailuresOptions.MinimumSamples.set -> void
 NResilience.Extensions.FailuresOptions.Multiple.get -> double?
@@ -157,6 +142,21 @@ NResilience.Extensions.LogSampling.KeepOneIn.init -> void
 NResilience.Extensions.LogSampling.LogSampling() -> void
 NResilience.Extensions.LogSampling.MinimumSamples.get -> int
 NResilience.Extensions.LogSampling.MinimumSamples.init -> void
+NResilience.Extensions.MeasuredBaseOptions
+NResilience.Extensions.MeasuredBaseOptions.Enabled.get -> bool?
+NResilience.Extensions.MeasuredBaseOptions.Enabled.set -> void
+NResilience.Extensions.MeasuredBaseOptions.MeasuredBaseOptions() -> void
+NResilience.Extensions.MeasuredBaseOptions.MinimumSamples.get -> int?
+NResilience.Extensions.MeasuredBaseOptions.MinimumSamples.set -> void
+NResilience.Extensions.MeasuredBaseOptions.Multiple.get -> double?
+NResilience.Extensions.MeasuredBaseOptions.Multiple.set -> void
+NResilience.Extensions.MeasuredBaseOptions.Quantile.get -> double?
+NResilience.Extensions.MeasuredBaseOptions.Quantile.set -> void
+NResilience.Extensions.MeasuredBaseOptions.Spread.get -> double?
+NResilience.Extensions.MeasuredBaseOptions.Spread.set -> void
+NResilience.Extensions.MeasuredBaseOptions.ToMeasuredBase() -> NResilience.MeasuredBase
+NResilience.Extensions.MeasuredBaseOptions.Window.get -> System.TimeSpan?
+NResilience.Extensions.MeasuredBaseOptions.Window.set -> void
 NResilience.Extensions.RateLimitOptions
 NResilience.Extensions.RateLimitOptions.Adaptive.get -> NResilience.Extensions.AdaptiveLimitOptions?
 NResilience.Extensions.RateLimitOptions.Adaptive.set -> void
@@ -269,8 +269,8 @@ NResilience.Extensions.SlowCallsOptions.Window.set -> void
 NResilience.Extensions.WinRateOptions
 NResilience.Extensions.WinRateOptions.Enabled.get -> bool?
 NResilience.Extensions.WinRateOptions.Enabled.set -> void
-NResilience.Extensions.WinRateOptions.Floor.get -> double?
-NResilience.Extensions.WinRateOptions.Floor.set -> void
+NResilience.Extensions.WinRateOptions.Minimum.get -> double?
+NResilience.Extensions.WinRateOptions.Minimum.set -> void
 NResilience.Extensions.WinRateOptions.MinimumAllowance.get -> double?
 NResilience.Extensions.WinRateOptions.MinimumAllowance.set -> void
 NResilience.Extensions.WinRateOptions.MinimumSamples.get -> int?

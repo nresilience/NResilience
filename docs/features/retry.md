@@ -53,7 +53,7 @@ Server pushback overrides the backoff curve. If a verdict carries a `RetryAfter`
 
 `transientBase` is a guess about a dependency the library is already measuring. Against a dependency whose normal call takes three seconds, 100 ms is not backoff - the retry lands while the first attempt's work is very likely still queued. Against one that answers in two milliseconds, it spends 100 ms of the deadline doing nothing.
 
-`Backoff.Adaptive` sets the transient base to a multiple of what a call to this dependency recently took, and changes nothing else - the throttled base, the factor, the jitter, the cap, and server pushback all behave exactly as they do on `Backoff.Exponential`.
+`Backoff.Measured(...)` sets the transient base to a multiple of what a call to this dependency recently took, and changes nothing else - the throttled base, the factor, the jitter, the cap, and server pushback all behave exactly as they do on `Backoff.Exponential`.
 
 <!-- snippet: retry-backoff-adaptive -->
 ```csharp
@@ -62,14 +62,14 @@ var api = Resilience.Http with
     // "Wait about one normal call before retrying", instead of a millisecond count that is
     // only right for one dependency. The measured base is clamped to a factor of 10 either
     // side of the 100 ms written here, so the constant stays the anchor.
-    Backoff = Backoff.Adaptive(multiple: 1, transientBase: TimeSpan.FromMilliseconds(value: 100)),
+    Backoff = Backoff.Measured(multiple: 1, transientBase: TimeSpan.FromMilliseconds(value: 100)),
 };
 ```
 <!-- endsnippet -->
 
 Unlike the [measured attempt ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), this estimate is not tighten-only: a longer backoff during a brownout is arguably correct, and it also lengthens every call's wall-clock time during the incident. So the measured base is clamped to `Spread` either side of the base you configured, and the constant you wrote stays the anchor.
 
-`Backoff.Adaptive(1)` is a complete configuration. The properties you can change, through `Backoff.Measured`:
+`Backoff.Measured(1)` is a complete configuration. The properties you can change, through `Backoff.MeasuredBase`:
 
 | Property | Default | Description |
 | :--- | :--- | :--- |

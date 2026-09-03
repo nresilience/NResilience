@@ -87,7 +87,7 @@ public sealed class Hedging
             Hedge = Hedge.At(quantile: 0.95) with
             {
                 // Keep hedging while at least one hedge in five produces the answer.
-                WinRate = WinRate.Above(floor: 0.2),
+                WinRate = WinRate.AtLeast(minimum: 0.2),
             },
         };
 
@@ -95,7 +95,7 @@ public sealed class Hedging
 
         api.Validate();
 
-        Assert.Equal(expected: 0.2, actual: api.Hedge!.Value.WinRate!.Value.Floor);
+        Assert.Equal(expected: 0.2, actual: api.Hedge!.Value.WinRate!.Value.Minimum);
     }
 
     /// <summary>

@@ -88,7 +88,7 @@ public sealed class RelativeFailureRatioTests
     }
 
     /// <summary>
-    ///     The other dependency, and the reason <c>AbsoluteFloor</c> is not optional. A baseline near
+    ///     The other dependency, and the reason <c>Floor</c> is not optional. A baseline near
     ///     zero times any multiple is still near zero, so without a floor this feature is a breaker that
     ///     opens on one error against a dependency that has never misbehaved.
     /// </summary>
@@ -256,7 +256,7 @@ public sealed class RelativeFailureRatioTests
 
         Assert.Equal(TimeSpan.FromMinutes(5), relative.Window);
         Assert.Equal(100, relative.MinimumSamples);
-        Assert.Equal(0.05, relative.AbsoluteFloor);
+        Assert.Equal(0.05, relative.Floor);
     }
 
     [Theory]
@@ -278,9 +278,9 @@ public sealed class RelativeFailureRatioTests
     public void A_floor_that_is_not_a_ratio_is_refused(double floor)
     {
         var problem = Assert.Throws<ResilienceConfigurationException>(() =>
-            new Breaker(new BreakerSettings { Failures = Failures.Above(5) with { AbsoluteFloor = floor } }));
+            new Breaker(new BreakerSettings { Failures = Failures.Above(5) with { Floor = floor } }));
 
-        Assert.Contains(problem.Problems, p => p.Contains("Failures.AbsoluteFloor", StringComparison.Ordinal));
+        Assert.Contains(problem.Problems, p => p.Contains("Failures.Floor", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -303,7 +303,7 @@ public sealed class RelativeFailureRatioTests
         {
             Window = TimeSpan.FromMinutes(5),
             MinimumSamples = 100,
-            AbsoluteFloor = 0.05,
+            Floor = 0.05,
         };
 
         Assert.Equal(left, right);

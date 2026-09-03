@@ -948,7 +948,7 @@ public sealed partial record Resilience
         // Successes only again, and here it is what keeps backoff from collapsing: a dependency failing
         // fast has a very short latency distribution, and a base measured from it would turn the retry
         // curve into a tight loop at the moment the dependency could least afford one.
-        if (verdict.Kind == VerdictKind.Ok && Backoff.Measured is not null)
+        if (verdict.Kind == VerdictKind.Ok && Backoff.MeasuredBase is not null)
             ExecutionState.BackoffBaseFor(this)?.Record(duration);
 
         if (OnEvent is not null)
@@ -1158,12 +1158,12 @@ public sealed partial record Resilience
 
     /// <summary>
     ///     What a normal call to this dependency recently took, for
-    ///     <see cref="NResilience.Backoff.Measured" /> to derive its base from. Null when nothing is
+    ///     <see cref="NResilience.Backoff.MeasuredBase" /> to derive its base from. Null when nothing is
     ///     measuring or the estimate is still cold, which is the case that leaves the curve exactly as
     ///     it is configured.
     /// </summary>
     /// <param name="attemptNumber">Which attempt is about to be delayed, for the event a changed base raises.</param>
-    /// <param name="kind">What ended the previous attempt. A throttled one is never measured - see <see cref="BackoffBase" />.</param>
+    /// <param name="kind">What ended the previous attempt. A throttled one is never measured - see <see cref="MeasuredBase" />.</param>
     /// <returns>The baseline, or null.</returns>
     /// <remarks>
     ///     Read on the retry decision rather than hoisted into a local, for the reason
@@ -1173,7 +1173,7 @@ public sealed partial record Resilience
     /// </remarks>
     private TimeSpan? MeasuredBase(int attemptNumber, VerdictKind kind)
     {
-        if (kind == VerdictKind.Throttled || Backoff.Measured is not { } measured)
+        if (kind == VerdictKind.Throttled || Backoff.MeasuredBase is not { } measured)
             return null;
 
         if (ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is not { } normal)

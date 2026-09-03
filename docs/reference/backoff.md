@@ -13,7 +13,7 @@ order: 4
 | `Backoff.Default` | Uses `Exponential()` with a 100 ms transient base, 1 s throttled base, factor of 2, 30 s cap, and full jitter. |
 | `Backoff.None` | Retries immediately. Use this only when the dependency is not shared. |
 | `Backoff.Exponential(transientBase, throttledBase, factor, max)` | Uses exponential backoff with separate bases for different retryable verdicts. All parameters are optional. |
-| `Backoff.Adaptive(multiple, transientBase, throttledBase, factor, max)` | Uses exponential backoff whose transient base is measured from recent latency. All parameters are optional. |
+| `Backoff.Measured(multiple, transientBase, throttledBase, factor, max)` | Uses exponential backoff whose transient base is measured from recent latency. All parameters are optional. |
 | `Backoff.Constant(delay)` | Uses the same delay before every retry. |
 | `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Computes the delay yourself. This mode ignores the `Max` property and jitter. |
 | `Jitter` | Determines the amount of randomness applied to the delay. |
@@ -22,7 +22,7 @@ order: 4
 | `ThrottledBase` | The base delay for a `Throttled` verdict. Zero for a `Custom` curve. |
 | `Factor` | The growth per attempt. |
 | `Kind` | Which curve this is: `Exponential`, `Constant`, or `Custom`. |
-| `Measured` | A `BackoffBase?` that measures `TransientBase` from recent latency, or `null` to keep the configured constant. Only an `Exponential` curve may carry one. |
+| `MeasuredBase` | A `MeasuredBase?` that measures `TransientBase` from recent latency, or `null` to keep the configured constant. Only an `Exponential` curve may carry one. |
 | `Compute(in NextAttempt)` | Calculates the delay before the specified attempt. This value is never negative. |
 
 ### Reading a backoff back
@@ -73,15 +73,15 @@ The [executor](index.md) also keeps a delay from consuming the deadline's remain
 
 **Note**: `default(Backoff)` is equivalent to `Backoff.Default`.
 
-## `BackoffBase`
+## `MeasuredBase`
 
-`BackoffBase` is a `readonly record struct` that measures `TransientBase` from what a call to this
+`MeasuredBase` is a `readonly record struct` that measures `TransientBase` from what a call to this
 dependency recently took, instead of taking it as a constant. It is opt-in, and
 [Retry](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it) has the argument for it.
 
 | Member | Default | Description |
 | :--- | :--- | :--- |
-| `BackoffBase.Of(multiple)` | `1` | Builds a configuration. `multiple` is how many normal calls the first retry waits. |
+| `MeasuredBase.Of(multiple)` | `1` | Builds a configuration. `multiple` is how many normal calls the first retry waits. |
 | `Multiple` | none - you supply it | How many normal calls the first retry waits. Must be greater than zero. |
 | `Quantile` | `0.5` | The quantile of recent successful latency that counts as normal. Must be in `(0, 0.5]`. |
 | `Window` | `5 min` | How much history the baseline covers. |

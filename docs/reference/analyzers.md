@@ -17,7 +17,7 @@ Installing `NResilience` gives you seven diagnostics automatically. They ship in
 | [NRES005](#nres005) | A breaker, retry budget, policy scope, or gRPC interceptor is created per call. | Reliability | Warning |
 | [NRES006](#nres006) | A resilient `HttpClient` is created per call. | Reliability | Info |
 | [NRES007](#nres007) | The callback does not need to be `async`. | Performance | Info |
-| [NRES008](#nres008) | A policy configuring `Hedge`, `AttemptCeiling` or `Backoff.Adaptive` is created per call. | Reliability | Info |
+| [NRES008](#nres008) | A policy configuring `Hedge`, `AttemptCeiling` or `Backoff.MeasuredBase` is created per call. | Reliability | Info |
 
 Rules `NRES001` and `NRES002` include automated code fixes.
 
@@ -137,7 +137,7 @@ For the allocation details, see [where the allocations are](../deep-dives/alloca
 
 ## NRES008: Policy with a latency estimate created per call
 
-[`Hedge`](../features/hedging.md), [`AttemptCeiling`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) and [`Backoff.Adaptive`](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it) all measure a quantile of recent latency, and that estimate is held per policy **instance** - which is the scope the feature wants, because one host's p95 is not another's. A policy rebuilt on every call therefore starts cold every time, never reaches `MinimumSamples`, and the feature silently does nothing.
+[`Hedge`](../features/hedging.md), [`AttemptCeiling`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) and [`Backoff.MeasuredBase`](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it) all measure a quantile of recent latency, and that estimate is held per policy **instance** - which is the scope the feature wants, because one host's p95 is not another's. A policy rebuilt on every call therefore starts cold every time, never reaches `MinimumSamples`, and the feature silently does nothing.
 
 ```csharp
 // Reported: a new policy, and so a new latency estimate, on every call.

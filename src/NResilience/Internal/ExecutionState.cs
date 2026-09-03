@@ -83,7 +83,7 @@ internal sealed class ExecutionState
         // window, because a backoff base is a measure of what healthy looked like rather than of the
         // tail. It is the reading SlowCalls takes, and the breaker's copy of it is not reachable here -
         // a Breaker is a live object two policies may share, and it may not be configured at all.
-        _backoffBase = policy.Backoff.Measured is { } measured
+        _backoffBase = policy.Backoff.MeasuredBase is { } measured
             ? new LatencyWindow(measured.Quantile, measured.Window, policy.Time)
             : null;
 

@@ -255,15 +255,15 @@ public sealed class ResilienceOptionsTests
 
         Config(
             ("Backoff:TransientBase", "00:00:00.200"),
-            ("Backoff:Measured:Multiple", "2"),
-            ("Backoff:Measured:Spread", "4"),
-            ("Backoff:Measured:MinimumSamples", "50")).Bind(options);
+            ("Backoff:MeasuredBase:Multiple", "2"),
+            ("Backoff:MeasuredBase:Spread", "4"),
+            ("Backoff:MeasuredBase:MinimumSamples", "50")).Bind(options);
 
         var policy = options.ToPolicy();
 
         Assert.Equal(TimeSpan.FromMilliseconds(200), policy.Backoff.TransientBase);
 
-        var measured = Assert.NotNull(policy.Backoff.Measured);
+        var measured = Assert.NotNull(policy.Backoff.MeasuredBase);
 
         Assert.Equal(2.0, measured.Multiple);
         Assert.Equal(4.0, measured.Spread);
@@ -276,21 +276,21 @@ public sealed class ResilienceOptionsTests
     [Fact]
     public void No_backoff_base_is_measured_unless_the_section_asks_for_one()
     {
-        Assert.Null(new ResilienceOptions().ToPolicy().Backoff.Measured);
+        Assert.Null(new ResilienceOptions().ToPolicy().Backoff.MeasuredBase);
     }
 
     /// <summary><c>"Enabled": false</c> drops a measured base the base policy carried.</summary>
     [Fact]
     public void A_disabled_measured_section_drops_the_base_policys_measurement()
     {
-        var baseline = Resilience.Default with { Backoff = Backoff.Adaptive(1) };
+        var baseline = Resilience.Default with { Backoff = Backoff.Measured(1) };
 
         var policy = new ResilienceOptions
         {
-            Backoff = new BackoffOptions { Measured = new BackoffBaseOptions { Enabled = false } },
+            Backoff = new BackoffOptions { MeasuredBase = new MeasuredBaseOptions { Enabled = false } },
         }.ToPolicy(baseline);
 
-        Assert.Null(policy.Backoff.Measured);
+        Assert.Null(policy.Backoff.MeasuredBase);
     }
 
     /// <summary>Jitter on its own is a modifier, not a reason to rebuild the curve.</summary>
@@ -390,12 +390,12 @@ public sealed class ResilienceOptionsTests
     /// </summary>
     [Theory]
     [InlineData("AttemptCeiling:Multiple", "AttemptCeiling")]
-    [InlineData("Backoff:Measured:Multiple", "Backoff.Measured")]
+    [InlineData("Backoff:MeasuredBase:Multiple", "Backoff.MeasuredBase")]
     [InlineData("Budget:Fraction", "Budget")]
     [InlineData("Breaker:SlowCalls:Multiple", "SlowCalls")]
     [InlineData("Breaker:Failures:Multiple", "Failures")]
     [InlineData("Breaker:Recovery:Length", "Recovery")]
-    [InlineData("Hedge:WinRate:Floor", "Hedge.WinRate")]
+    [InlineData("Hedge:WinRate:Minimum", "Hedge.WinRate")]
     public void A_retired_off_switch_names_the_one_that_replaced_it(string key, string section)
     {
         var options = new ResilienceOptions();
@@ -706,7 +706,7 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(4, failures.Multiple);
         Assert.Equal(TimeSpan.FromMinutes(5), failures.Window);
         Assert.Equal(100, failures.MinimumSamples);
-        Assert.Equal(0.05, failures.AbsoluteFloor);
+        Assert.Equal(0.05, failures.Floor);
     }
 
     [Fact]
@@ -721,7 +721,7 @@ public sealed class ResilienceOptionsTests
                     Multiple = 3,
                     Window = TimeSpan.FromMinutes(10),
                     MinimumSamples = 200,
-                    AbsoluteFloor = 0.1,
+                    Floor = 0.1,
                 },
             },
         }.ToPolicy();
@@ -731,7 +731,7 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(3, failures.Multiple);
         Assert.Equal(TimeSpan.FromMinutes(10), failures.Window);
         Assert.Equal(200, failures.MinimumSamples);
-        Assert.Equal(0.1, failures.AbsoluteFloor);
+        Assert.Equal(0.1, failures.Floor);
     }
 
     [Fact]
@@ -801,7 +801,7 @@ public sealed class ResilienceOptionsTests
                 SuppressAt = 0.25,
                 WinRate = new WinRateOptions
                 {
-                    Floor = 0.3,
+                    Minimum = 0.3,
                     Window = TimeSpan.FromMinutes(2),
                     MinimumSamples = 25,
                     MinimumAllowance = 0.1,
@@ -820,7 +820,7 @@ public sealed class ResilienceOptionsTests
 
         var feedback = Assert.NotNull(hedge.WinRate);
 
-        Assert.Equal(0.3, feedback.Floor);
+        Assert.Equal(0.3, feedback.Minimum);
         Assert.Equal(TimeSpan.FromMinutes(2), feedback.Window);
         Assert.Equal(25, feedback.MinimumSamples);
         Assert.Equal(0.1, feedback.MinimumAllowance);
@@ -838,9 +838,9 @@ public sealed class ResilienceOptionsTests
 
         Assert.Null(options.ToPolicy().Hedge!.Value.WinRate);
 
-        Config(("Hedge:WinRate:Floor", "0.2")).Bind(options);
+        Config(("Hedge:WinRate:Minimum", "0.2")).Bind(options);
 
-        Assert.Equal(WinRate.Above(0.2), options.ToPolicy().Hedge!.Value.WinRate);
+        Assert.Equal(WinRate.AtLeast(0.2), options.ToPolicy().Hedge!.Value.WinRate);
     }
 
     /// <summary><c>"Enabled": false</c> drops a loop the base policy carried.</summary>
@@ -849,7 +849,7 @@ public sealed class ResilienceOptionsTests
     {
         var baseline = Resilience.Default with
         {
-            Hedge = Hedge.At(0.95) with { WinRate = WinRate.Above(0.2) },
+            Hedge = Hedge.At(0.95) with { WinRate = WinRate.AtLeast(0.2) },
         };
 
         var policy = new ResilienceOptions

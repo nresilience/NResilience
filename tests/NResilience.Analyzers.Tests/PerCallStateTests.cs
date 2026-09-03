@@ -351,12 +351,12 @@ public sealed class PerCallStateTests
         var reported = Assert.Single(Harness.Run(Harness.InFile("""
                                                                 internal static class Dependencies
                                                                 {
-                                                                    internal static Resilience Api() => Resilience.Http with { Backoff = Backoff.Adaptive(1) };
+                                                                    internal static Resilience Api() => Resilience.Http with { Backoff = Backoff.Measured(1) };
                                                                 }
                                                                 """)));
 
         Assert.Equal("NRES008", reported.Id);
-        Assert.Contains("'Backoff.Adaptive'", reported.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("'Backoff.MeasuredBase'", reported.GetMessage(), StringComparison.Ordinal);
     }
 
     /// <summary>The long-hand form measures the same thing and is reported the same way.</summary>
@@ -368,13 +368,13 @@ public sealed class PerCallStateTests
                                                                 {
                                                                     internal static Resilience Api() => Resilience.Http with
                                                                     {
-                                                                        Backoff = Backoff.Exponential() with { Measured = BackoffBase.Of(1) },
+                                                                        Backoff = Backoff.Exponential() with { MeasuredBase = MeasuredBase.Of(1) },
                                                                     };
                                                                 }
                                                                 """)));
 
         Assert.Equal("NRES008", reported.Id);
-        Assert.Contains("'Backoff.Measured'", reported.GetMessage(), StringComparison.Ordinal);
+        Assert.Contains("'Backoff.MeasuredBase'", reported.GetMessage(), StringComparison.Ordinal);
     }
 
     /// <summary>

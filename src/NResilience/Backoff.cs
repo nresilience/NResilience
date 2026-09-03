@@ -77,11 +77,11 @@ public readonly record struct Backoff
     ///         Only <see cref="BackoffKind.Exponential" /> curves can carry one, and it moves only the
     ///         transient base: <see cref="ThrottledBase" />, <see cref="Factor" />, <see cref="Jitter" />,
     ///         <see cref="Max" /> and the <see cref="Verdict.RetryAfter" /> pushback precedence are all
-    ///         unchanged. See <see cref="BackoffBase" /> for why, and <see cref="Adaptive" /> for the
-    ///         short way to write it.
+    ///         unchanged. See <see cref="NResilience.MeasuredBase" /> for why, and
+    ///         <see cref="Measured" /> for the short way to write it.
     ///     </para>
     /// </summary>
-    public BackoffBase? Measured { get; init; }
+    public MeasuredBase? MeasuredBase { get; init; }
 
     /// <summary>
     ///     Base delay for a <see cref="VerdictKind.Transient" /> failure. Returns zero for
@@ -140,13 +140,14 @@ public readonly record struct Backoff
     /// <param name="factor">Growth per attempt. Defaults to 2.0.</param>
     /// <param name="max">Hard cap on any single delay. Defaults to 30 s.</param>
     /// <returns>The configured backoff.</returns>
-    public static Backoff Adaptive(
-        double multiple = BackoffBase.DefaultMultiple,
+    public static Backoff Measured(
+        double multiple = NResilience.MeasuredBase.DefaultMultiple,
         TimeSpan? transientBase = null,
         TimeSpan? throttledBase = null,
         double factor = DefaultFactor,
         TimeSpan? max = null)
-        => Exponential(transientBase, throttledBase, factor, max) with { Measured = BackoffBase.Of(multiple) };
+        => Exponential(transientBase, throttledBase, factor, max)
+            with { MeasuredBase = NResilience.MeasuredBase.Of(multiple) };
 
     /// <summary>The same delay every time.</summary>
     /// <param name="delay">The delay.</param>
@@ -177,7 +178,7 @@ public readonly record struct Backoff
     /// <param name="next">The attempt that is about to happen.</param>
     /// <returns>The delay, never negative.</returns>
     /// <remarks>
-    ///     A curve carrying a <see cref="Measured" /> base computes its <i>unmeasured</i> delay here.
+    ///     A curve carrying a <see cref="MeasuredBase" /> computes its <i>unmeasured</i> delay here.
     ///     The estimate is private to the policy instance that owns it, so only the executor can supply
     ///     it, and a caller asking a bare <see cref="Backoff" /> value what it would do gets the
     ///     configured curve - the same answer the executor gives while the estimate is still cold.
@@ -190,7 +191,7 @@ public readonly record struct Backoff
     /// </summary>
     /// <param name="next">The attempt that is about to happen.</param>
     /// <param name="normal">
-    ///     The measured baseline, already gated on <see cref="BackoffBase.MinimumSamples" />, or null
+    ///     The measured baseline, already gated on <see cref="MeasuredBase.MinimumSamples" />, or null
     ///     when nothing is measuring or the estimate is still cold.
     /// </param>
     /// <returns>The delay, never negative.</returns>
@@ -215,7 +216,7 @@ public readonly record struct Backoff
 
         // Throttling is deliberately excluded: a rate limiter's refill interval is not visible in how
         // fast it said no, and the one case where the server does know is the pushback above.
-        if (!throttled && normal is { } measured && effective.Measured is { } adaptive)
+        if (!throttled && normal is { } measured && effective.MeasuredBase is { } adaptive)
             @base = adaptive.BaseFor(effective._transientBase, measured);
 
         if (@base <= TimeSpan.Zero)
@@ -262,7 +263,7 @@ public readonly record struct Backoff
         if (effective._max < TimeSpan.Zero && effective._max != Timeout.InfiniteTimeSpan)
             problems.Add($"Backoff maximum delay must not be negative; it is {effective._max}.");
 
-        if (Measured is { } measured)
+        if (MeasuredBase is { } measured)
         {
             measured.Validate(problems);
 
@@ -274,8 +275,8 @@ public readonly record struct Backoff
             if (effective._kind != BackoffKind.Exponential)
             {
                 problems.Add(
-                    $"Backoff.Measured is only supported on an exponential curve; this one is {effective._kind}. " +
-                    "Use Backoff.Adaptive(...) to build one, or drop Measured to keep the curve as written.");
+                    $"Backoff.MeasuredBase is only supported on an exponential curve; this one is {effective._kind}. " +
+                    "Use Backoff.Measured(...) to build one, or drop MeasuredBase to keep the curve as written.");
             }
         }
     }
@@ -290,7 +291,7 @@ public readonly record struct Backoff
             ? new Backoff(BackoffKind.Exponential, DefaultTransientBase, DefaultThrottledBase, DefaultFactor, DefaultMax, null)
             {
                 Jitter = Jitter,
-                Measured = Measured,
+                MeasuredBase = MeasuredBase,
             }
             : this;
 }
