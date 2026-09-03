@@ -80,6 +80,30 @@ public sealed class DependencyInjectionDocs
         Assert.Equal(expected: 5, actual: policies[name: "reports"].Attempts);
     }
 
+    /// <summary>
+    ///     The reason every section has an <c>Enabled</c>: configuration providers merge and never
+    ///     remove a key, so an environment file that wants no breaker has to be able to say so.
+    /// </summary>
+    [Fact]
+    public void A_later_layer_turns_the_breaker_off()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(path: "appsettings.resilience.json")
+            .AddJsonFile(path: "appsettings.resilience.production.json")
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddResilience(section: configuration.GetSection(key: "Resilience"));
+
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
+
+        Assert.Null(policies[name: "api"].Breaker);
+
+        // Everything else the base file said still stands.
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: policies[name: "api"].Deadline);
+    }
+
     [Fact]
     public void The_configure_callback_holds_what_json_cannot()
     {

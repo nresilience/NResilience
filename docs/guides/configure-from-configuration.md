@@ -36,9 +36,11 @@ The `AddResilience` method expects a configuration section structured as follows
       "Attempts": 3,
       "Deadline": "00:00:10",
       "AttemptTimeout": "00:00:03",
-      "TransientBaseDelay": "00:00:00.200",
-      "ThrottledBaseDelay": "00:00:02",
-      "MaxDelay": "00:00:10",
+      "Backoff": {
+        "TransientBase": "00:00:00.200",
+        "ThrottledBase": "00:00:02",
+        "Max": "00:00:10"
+      },
       "Breaker": {
         "ConsecutiveFailures": 5,
         "BreakDuration": "00:00:15",
@@ -49,7 +51,7 @@ The `AddResilience` method expects a configuration section structured as follows
       "Preset": "Http",
       "Attempts": 5,
       "Deadline": "00:05:00",
-      "BudgetFraction": 0.2
+      "Budget": { "Fraction": 0.2 }
     }
   }
 }

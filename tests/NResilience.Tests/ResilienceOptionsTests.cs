@@ -98,8 +98,8 @@ public sealed class ResilienceOptionsTests
 
         Config(
             ("Preset", "Http"),
-            ("MaxDelay", "00:00:05"),
-            ("Jitter", "None"),
+            ("Backoff:Max", "00:00:05"),
+            ("Backoff:Jitter", "None"),
             ("Breaker:ConsecutiveFailures", "2")).Bind(options);
 
         var policy = options.ToPolicy();
@@ -177,10 +177,13 @@ public sealed class ResilienceOptionsTests
     {
         var policy = new ResilienceOptions
         {
-            MaxDelay = TimeSpan.FromSeconds(5),
-            Jitter = Jitter.None,
-            TransientBaseDelay = TimeSpan.FromMilliseconds(50),
-            BackoffFactor = 3,
+            Backoff = new BackoffOptions
+            {
+                Max = TimeSpan.FromSeconds(5),
+                Jitter = Jitter.None,
+                TransientBase = TimeSpan.FromMilliseconds(50),
+                Factor = 3,
+            },
         }.ToPolicy();
 
         Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
@@ -207,7 +210,10 @@ public sealed class ResilienceOptionsTests
                 TimeSpan.FromSeconds(60)) with { Jitter = Jitter.None },
         };
 
-        var policy = new ResilienceOptions { MaxDelay = TimeSpan.FromSeconds(5) }.ToPolicy(baseline);
+        var policy = new ResilienceOptions
+        {
+            Backoff = new BackoffOptions { Max = TimeSpan.FromSeconds(5) },
+        }.ToPolicy(baseline);
 
         Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
         Assert.Equal(TimeSpan.FromMilliseconds(500), policy.Backoff.TransientBase);
@@ -225,7 +231,10 @@ public sealed class ResilienceOptionsTests
     {
         var baseline = Resilience.Default with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(2)) };
 
-        var policy = new ResilienceOptions { MaxDelay = TimeSpan.FromSeconds(5), Jitter = Jitter.None }.ToPolicy(baseline);
+        var policy = new ResilienceOptions
+        {
+            Backoff = new BackoffOptions { Max = TimeSpan.FromSeconds(5), Jitter = Jitter.None },
+        }.ToPolicy(baseline);
 
         Assert.Equal(BackoffKind.Exponential, policy.Backoff.Kind);
         Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
@@ -240,32 +249,120 @@ public sealed class ResilienceOptionsTests
     {
         var baseline = Resilience.Default with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(2)) };
 
-        var policy = new ResilienceOptions { Jitter = Jitter.None }.ToPolicy(baseline);
+        var policy = new ResilienceOptions { Backoff = new BackoffOptions { Jitter = Jitter.None } }.ToPolicy(baseline);
 
         Assert.Equal(Jitter.None, policy.Backoff.Jitter);
         Assert.Equal(TimeSpan.FromSeconds(2), Delay(policy, 2));
     }
 
     /// <summary>
-    ///     Zero is the off switch rather than a fraction to reject: it is the only obvious way to say
-    ///     "no budget" in JSON, and making the obvious thing an error is how configuration files end up
-    ///     with a superstition in them.
+    ///     One spelling of "off", and it is the word. A section cannot say <c>null</c>, and the fraction
+    ///     that used to stand in for it was a superstition every reader had to be taught.
     /// </summary>
     [Fact]
-    public void A_zero_budget_fraction_turns_the_budget_off()
+    public void A_disabled_budget_section_turns_the_budget_off()
     {
-        var policy = new ResilienceOptions { BudgetFraction = 0 }.ToPolicy();
+        var policy = new ResilienceOptions { Budget = new BudgetOptions { Enabled = false } }.ToPolicy();
 
         Assert.Same(RetryBudget.None, policy.Budget);
+    }
+
+    /// <summary>An enabled budget section with nothing else in it is a budget at the defaults.</summary>
+    [Fact]
+    public void An_enabled_budget_section_turns_one_on_at_the_defaults()
+    {
+        var policy = new ResilienceOptions { Budget = new BudgetOptions { Enabled = true } }.ToPolicy();
+
+        Assert.NotNull(policy.Budget);
+        Assert.False(policy.Budget!.IsNone);
+        Assert.False(policy.Budget.IsAutomatic);
+    }
+
+    // ---- One spelling of "off", and it works from a configuration layer ----
+
+    /// <summary>
+    ///     The reason <c>Enabled</c> exists rather than a magic number per section. Configuration
+    ///     providers merge and never remove a key, so before this there was no way for an
+    ///     <c>appsettings.Production.json</c> to take back a breaker or a hedge that the base file
+    ///     turned on: the section was still there, and its presence was the switch.
+    /// </summary>
+    [Fact]
+    public void A_later_configuration_layer_can_turn_a_feature_off()
+    {
+        var options = new ResilienceOptions();
+
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(
+            [
+                // The base file.
+                new KeyValuePair<string, string?>("Breaker:ConsecutiveFailures", "5"),
+                new KeyValuePair<string, string?>("Hedge:Quantile", "0.9"),
+            ])
+            .AddInMemoryCollection(
+            [
+                // The environment override, which can only add keys.
+                new KeyValuePair<string, string?>("Breaker:Enabled", "false"),
+                new KeyValuePair<string, string?>("Hedge:Enabled", "false"),
+            ])
+            .Build()
+            .Bind(options);
+
+        var policy = options.ToPolicy();
+
+        Assert.Null(policy.Breaker);
+        Assert.Null(policy.Hedge);
+    }
+
+    /// <summary>
+    ///     And the same section without the override still describes what it always did, so
+    ///     <c>Enabled</c> is an override rather than a thing every section now has to say.
+    /// </summary>
+    [Fact]
+    public void An_unmentioned_enabled_leaves_every_section_meaning_what_it_meant()
+    {
+        var policy = new ResilienceOptions
+        {
+            Breaker = new BreakerOptions { ConsecutiveFailures = 5 },
+            Hedge = new HedgeOptions(),
+        }.ToPolicy();
+
+        Assert.NotNull(policy.Breaker);
+        Assert.NotNull(policy.Hedge);
+        Assert.Equal(AttemptTimeouts.Above(3), policy.Timeouts);
+        Assert.NotNull(policy.Breaker!.Settings.SlowCalls);
+        Assert.NotNull(policy.Breaker.Settings.Failures);
+    }
+
+    /// <summary>
+    ///     Every retired off switch fails at registration naming the one that replaced it. A silent
+    ///     behavior change here would be worse than a startup failure: the value used to mean "off" and
+    ///     now means a threshold nobody could have intended, so the message is the migration note.
+    /// </summary>
+    [Theory]
+    [InlineData("Timeouts:Multiple", "Timeouts")]
+    [InlineData("Budget:Fraction", "Budget")]
+    [InlineData("Breaker:SlowCalls:Multiple", "SlowCalls")]
+    [InlineData("Breaker:Failures:Multiple", "Failures")]
+    [InlineData("Breaker:Recovery:Fraction", "Recovery")]
+    public void A_retired_off_switch_names_the_one_that_replaced_it(string key, string section)
+    {
+        var options = new ResilienceOptions();
+
+        Config((key, "0")).Bind(options);
+
+        var error = Assert.Throws<ResilienceConfigurationException>(() => options.ToPolicy());
+
+        Assert.Contains(section, error.Message, StringComparison.Ordinal);
+        Assert.Contains("\"Enabled\": false", error.Message, StringComparison.Ordinal);
     }
 
     /// <summary>A named budget is the shared one, which is the opt-in the design insists is an opt-in.</summary>
     [Fact]
     public void A_named_budget_is_shared_by_name()
     {
-        var first = new ResilienceOptions { SharedBudget = "tier-1" }.ToPolicy();
-        var second = new ResilienceOptions { SharedBudget = "tier-1" }.ToPolicy();
-        var other = new ResilienceOptions { SharedBudget = "tier-2" }.ToPolicy();
+        var first = new ResilienceOptions { Budget = new BudgetOptions { Shared = "tier-1" } }.ToPolicy();
+        var second = new ResilienceOptions { Budget = new BudgetOptions { Shared = "tier-1" } }.ToPolicy();
+        var other = new ResilienceOptions { Budget = new BudgetOptions { Shared = "tier-2" } }.ToPolicy();
 
         Assert.Same(first.Budget, second.Budget);
         Assert.NotSame(first.Budget, other.Budget);
@@ -372,15 +469,15 @@ public sealed class ResilienceOptionsTests
     }
 
     /// <summary>
-    ///     A configuration section cannot say <c>null</c>, so a zero multiple is the off switch - the
-    ///     same shape <c>BudgetFraction: 0</c> uses.
+    ///     A configuration section cannot say <c>null</c>, so it says <c>Enabled: false</c> - the same
+    ///     shape every other section uses.
     /// </summary>
     [Fact]
-    public void A_zero_multiple_turns_the_measured_ceiling_off()
+    public void A_disabled_timeouts_section_turns_the_measured_ceiling_off()
     {
         var options = new ResilienceOptions();
 
-        Config(("Timeouts:Multiple", "0")).Bind(options);
+        Config(("Timeouts:Enabled", "false")).Bind(options);
 
         Assert.Null(options.ToPolicy().Timeouts);
     }
@@ -493,7 +590,7 @@ public sealed class ResilienceOptionsTests
 
     /// <summary>
     ///     Off unless the section says otherwise, and a section that is present turns it back off with
-    ///     the zero that a section can say in place of the null it cannot.
+    ///     the word a section can say in place of the null it cannot.
     /// </summary>
     [Fact]
     public void The_ramp_is_off_until_a_section_asks_for_it()
@@ -503,7 +600,7 @@ public sealed class ResilienceOptionsTests
         var on = new ResilienceOptions { Breaker = new BreakerOptions { Recovery = new RecoveryOptions() } };
         Assert.Equal(Recovery.Over(0.25), on.ToPolicy().Breaker!.Settings.Recovery);
 
-        var off = new ResilienceOptions { Breaker = new BreakerOptions { Recovery = new RecoveryOptions { Fraction = 0 } } };
+        var off = new ResilienceOptions { Breaker = new BreakerOptions { Recovery = new RecoveryOptions { Enabled = false } } };
         Assert.Null(off.ToPolicy().Breaker!.Settings.Recovery);
     }
 
@@ -578,7 +675,7 @@ public sealed class ResilienceOptionsTests
 
         var policy = new ResilienceOptions
         {
-            BudgetFraction = 0.5,
+            Budget = new BudgetOptions { Fraction = 0.5 },
             Breaker = new BreakerOptions { ConsecutiveFailures = 2 },
         }.ToPolicy(Resilience.Default with { Time = time });
 
@@ -642,10 +739,10 @@ public sealed class ResilienceOptionsTests
                 ("Deadline", "00:00:10"),
                 ("AttemptTimeout", "00:00:03"),
                 ("UseAmbientDeadline", "true"),
-                ("MaxDelay", "00:00:04"),
-                ("Jitter", "Equal"),
-                ("BudgetFraction", "0.25"),
-                ("BudgetMinimumPerSecond", "10"),
+                ("Backoff:Max", "00:00:04"),
+                ("Backoff:Jitter", "Equal"),
+                ("Budget:Fraction", "0.25"),
+                ("Budget:MinimumPerSecond", "10"),
                 ("Breaker:ConsecutiveFailures", "8"),
                 ("Breaker:SlowCallThreshold", "00:00:02"))
             .Bind(options);
@@ -668,17 +765,18 @@ public sealed class ResilienceOptionsTests
     }
 
     /// <summary>
-    ///     Both relative trips are on by default, and a section cannot say <c>null</c> - so a zero
-    ///     multiple is how configuration turns one off, the same way it turns the measured ceiling off.
+    ///     Both relative trips are on by default, and a section cannot say <c>null</c> - so
+    ///     <c>Enabled: false</c> is how configuration turns one off, the same way it turns the measured
+    ///     ceiling off.
     /// </summary>
     [Fact]
-    public void A_zero_multiple_turns_a_relative_trip_off()
+    public void A_disabled_section_turns_a_relative_trip_off()
     {
         var options = new ResilienceOptions();
 
         Config(
-                ("Breaker:SlowCalls:Multiple", "0"),
-                ("Breaker:Failures:Multiple", "0"))
+                ("Breaker:SlowCalls:Enabled", "false"),
+                ("Breaker:Failures:Enabled", "false"))
             .Bind(options);
 
         var settings = options.ToPolicy().Breaker!.Settings;

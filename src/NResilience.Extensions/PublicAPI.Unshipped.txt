@@ -22,6 +22,8 @@ NResilience.Extensions.AdaptiveLimiter.CurrentLimit.get -> int
 NResilience.Extensions.AdaptiveLimiter.InFlight.get -> int
 NResilience.Extensions.AttemptTimeoutsOptions
 NResilience.Extensions.AttemptTimeoutsOptions.AttemptTimeoutsOptions() -> void
+NResilience.Extensions.AttemptTimeoutsOptions.Enabled.get -> bool?
+NResilience.Extensions.AttemptTimeoutsOptions.Enabled.set -> void
 NResilience.Extensions.AttemptTimeoutsOptions.Floor.get -> System.TimeSpan?
 NResilience.Extensions.AttemptTimeoutsOptions.Floor.set -> void
 NResilience.Extensions.AttemptTimeoutsOptions.MinimumSamples.get -> int?
@@ -33,6 +35,19 @@ NResilience.Extensions.AttemptTimeoutsOptions.Quantile.set -> void
 NResilience.Extensions.AttemptTimeoutsOptions.ToTimeouts() -> NResilience.AttemptTimeouts
 NResilience.Extensions.AttemptTimeoutsOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.AttemptTimeoutsOptions.Window.set -> void
+NResilience.Extensions.BackoffOptions
+NResilience.Extensions.BackoffOptions.BackoffOptions() -> void
+NResilience.Extensions.BackoffOptions.Factor.get -> double?
+NResilience.Extensions.BackoffOptions.Factor.set -> void
+NResilience.Extensions.BackoffOptions.Jitter.get -> NResilience.Jitter?
+NResilience.Extensions.BackoffOptions.Jitter.set -> void
+NResilience.Extensions.BackoffOptions.Max.get -> System.TimeSpan?
+NResilience.Extensions.BackoffOptions.Max.set -> void
+NResilience.Extensions.BackoffOptions.ThrottledBase.get -> System.TimeSpan?
+NResilience.Extensions.BackoffOptions.ThrottledBase.set -> void
+NResilience.Extensions.BackoffOptions.ToBackoff(NResilience.Backoff baseline) -> NResilience.Backoff
+NResilience.Extensions.BackoffOptions.TransientBase.get -> System.TimeSpan?
+NResilience.Extensions.BackoffOptions.TransientBase.set -> void
 NResilience.Extensions.BreakerOptions
 NResilience.Extensions.BreakerOptions.BreakDuration.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.BreakDuration.set -> void
@@ -41,6 +56,8 @@ NResilience.Extensions.BreakerOptions.BreakJitter.set -> void
 NResilience.Extensions.BreakerOptions.BreakerOptions() -> void
 NResilience.Extensions.BreakerOptions.ConsecutiveFailures.get -> int?
 NResilience.Extensions.BreakerOptions.ConsecutiveFailures.set -> void
+NResilience.Extensions.BreakerOptions.Enabled.get -> bool?
+NResilience.Extensions.BreakerOptions.Enabled.set -> void
 NResilience.Extensions.BreakerOptions.FailureRatio.get -> double?
 NResilience.Extensions.BreakerOptions.FailureRatio.set -> void
 NResilience.Extensions.BreakerOptions.Failures.get -> NResilience.Extensions.FailureOptions?
@@ -64,9 +81,22 @@ NResilience.Extensions.BreakerOptions.SlowCalls.set -> void
 NResilience.Extensions.BreakerOptions.ToBreaker(string? name = null, System.TimeProvider? time = null) -> NResilience.Breaker!
 NResilience.Extensions.BreakerOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.BreakerOptions.Window.set -> void
+NResilience.Extensions.BudgetOptions
+NResilience.Extensions.BudgetOptions.BudgetOptions() -> void
+NResilience.Extensions.BudgetOptions.Enabled.get -> bool?
+NResilience.Extensions.BudgetOptions.Enabled.set -> void
+NResilience.Extensions.BudgetOptions.Fraction.get -> double?
+NResilience.Extensions.BudgetOptions.Fraction.set -> void
+NResilience.Extensions.BudgetOptions.MinimumPerSecond.get -> int?
+NResilience.Extensions.BudgetOptions.MinimumPerSecond.set -> void
+NResilience.Extensions.BudgetOptions.Shared.get -> string?
+NResilience.Extensions.BudgetOptions.Shared.set -> void
+NResilience.Extensions.BudgetOptions.ToBudget(System.TimeProvider? time = null) -> NResilience.RetryBudget?
 NResilience.Extensions.FailureOptions
 NResilience.Extensions.FailureOptions.AbsoluteFloor.get -> double?
 NResilience.Extensions.FailureOptions.AbsoluteFloor.set -> void
+NResilience.Extensions.FailureOptions.Enabled.get -> bool?
+NResilience.Extensions.FailureOptions.Enabled.set -> void
 NResilience.Extensions.FailureOptions.FailureOptions() -> void
 NResilience.Extensions.FailureOptions.MinimumSamples.get -> int?
 NResilience.Extensions.FailureOptions.MinimumSamples.set -> void
@@ -76,6 +106,8 @@ NResilience.Extensions.FailureOptions.ToFailures() -> NResilience.Failures
 NResilience.Extensions.FailureOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.FailureOptions.Window.set -> void
 NResilience.Extensions.HedgeOptions
+NResilience.Extensions.HedgeOptions.Enabled.get -> bool?
+NResilience.Extensions.HedgeOptions.Enabled.set -> void
 NResilience.Extensions.HedgeOptions.HedgeOptions() -> void
 NResilience.Extensions.HedgeOptions.MaxConcurrent.get -> int?
 NResilience.Extensions.HedgeOptions.MaxConcurrent.set -> void
@@ -117,6 +149,8 @@ NResilience.Extensions.RateLimitOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.RateLimitOptions.Window.set -> void
 NResilience.Extensions.RateLimiterExtensions
 NResilience.Extensions.RecoveryOptions
+NResilience.Extensions.RecoveryOptions.Enabled.get -> bool?
+NResilience.Extensions.RecoveryOptions.Enabled.set -> void
 NResilience.Extensions.RecoveryOptions.Fraction.get -> double?
 NResilience.Extensions.RecoveryOptions.Fraction.set -> void
 NResilience.Extensions.RecoveryOptions.Initial.get -> double?
@@ -160,44 +194,34 @@ NResilience.Extensions.ResilienceOptions.AttemptTimeout.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.AttemptTimeout.set -> void
 NResilience.Extensions.ResilienceOptions.Attempts.get -> int?
 NResilience.Extensions.ResilienceOptions.Attempts.set -> void
-NResilience.Extensions.ResilienceOptions.BackoffFactor.get -> double?
-NResilience.Extensions.ResilienceOptions.BackoffFactor.set -> void
+NResilience.Extensions.ResilienceOptions.Backoff.get -> NResilience.Extensions.BackoffOptions?
+NResilience.Extensions.ResilienceOptions.Backoff.set -> void
 NResilience.Extensions.ResilienceOptions.Breaker.get -> NResilience.Extensions.BreakerOptions?
 NResilience.Extensions.ResilienceOptions.Breaker.set -> void
-NResilience.Extensions.ResilienceOptions.BudgetFraction.get -> double?
-NResilience.Extensions.ResilienceOptions.BudgetFraction.set -> void
-NResilience.Extensions.ResilienceOptions.BudgetMinimumPerSecond.get -> int?
-NResilience.Extensions.ResilienceOptions.BudgetMinimumPerSecond.set -> void
+NResilience.Extensions.ResilienceOptions.Budget.get -> NResilience.Extensions.BudgetOptions?
+NResilience.Extensions.ResilienceOptions.Budget.set -> void
 NResilience.Extensions.ResilienceOptions.Deadline.get -> System.TimeSpan?
 NResilience.Extensions.ResilienceOptions.Deadline.set -> void
 NResilience.Extensions.ResilienceOptions.Hedge.get -> NResilience.Extensions.HedgeOptions?
 NResilience.Extensions.ResilienceOptions.Hedge.set -> void
-NResilience.Extensions.ResilienceOptions.Jitter.get -> NResilience.Jitter?
-NResilience.Extensions.ResilienceOptions.Jitter.set -> void
 NResilience.Extensions.ResilienceOptions.Logging.get -> string?
 NResilience.Extensions.ResilienceOptions.Logging.set -> void
-NResilience.Extensions.ResilienceOptions.MaxDelay.get -> System.TimeSpan?
-NResilience.Extensions.ResilienceOptions.MaxDelay.set -> void
 NResilience.Extensions.ResilienceOptions.Name.get -> string?
 NResilience.Extensions.ResilienceOptions.Name.set -> void
 NResilience.Extensions.ResilienceOptions.Preset.get -> string?
 NResilience.Extensions.ResilienceOptions.Preset.set -> void
 NResilience.Extensions.ResilienceOptions.ResilienceOptions() -> void
-NResilience.Extensions.ResilienceOptions.SharedBudget.get -> string?
-NResilience.Extensions.ResilienceOptions.SharedBudget.set -> void
 NResilience.Extensions.ResilienceOptions.Telemetry.get -> bool?
 NResilience.Extensions.ResilienceOptions.Telemetry.set -> void
-NResilience.Extensions.ResilienceOptions.ThrottledBaseDelay.get -> System.TimeSpan?
-NResilience.Extensions.ResilienceOptions.ThrottledBaseDelay.set -> void
 NResilience.Extensions.ResilienceOptions.Timeouts.get -> NResilience.Extensions.AttemptTimeoutsOptions?
 NResilience.Extensions.ResilienceOptions.Timeouts.set -> void
 NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseline = null) -> NResilience.Resilience!
-NResilience.Extensions.ResilienceOptions.TransientBaseDelay.get -> System.TimeSpan?
-NResilience.Extensions.ResilienceOptions.TransientBaseDelay.set -> void
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.get -> bool?
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.set -> void
 NResilience.Extensions.ResilienceTelemetry
 NResilience.Extensions.SlowCallOptions
+NResilience.Extensions.SlowCallOptions.Enabled.get -> bool?
+NResilience.Extensions.SlowCallOptions.Enabled.set -> void
 NResilience.Extensions.SlowCallOptions.MinimumSamples.get -> int?
 NResilience.Extensions.SlowCallOptions.MinimumSamples.set -> void
 NResilience.Extensions.SlowCallOptions.Multiple.get -> double?

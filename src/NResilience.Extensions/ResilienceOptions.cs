@@ -1,8 +1,8 @@
 namespace NResilience.Extensions;
 
 /// <summary>
-///     The bindable shape of a policy: flat, mutable, and made of primitives, <see cref="TimeSpan" />s
-///     and enums.
+///     The bindable shape of a policy: the policy's own scalars at the top level, and one section per
+///     optional feature.
 ///     <para>
 ///         This type exists because binding a configuration section directly to <see cref="Resilience" />
 ///         is <b>silently partial</b>. Measured against
@@ -35,10 +35,21 @@ namespace NResilience.Extensions;
 /// </code>
 /// </example>
 /// <remarks>
-///     <see cref="Resilience.Classify" />, <see cref="Resilience.BeforeAttempt" /> and
-///     <see cref="Resilience.OnEvent" /> are not bindable and are not represented here: a classifier is
-///     a lambda and JSON cannot hold one. The <c>configure</c> callback on every registration is where
-///     they go, and it runs after this projection so it always wins.
+///     <para>
+///         <b>Every feature is a section, and every section has an <c>Enabled</c>.</b>
+///         <see cref="Backoff" />, <see cref="Budget" />, <see cref="Timeouts" />, <see cref="Breaker" />
+///         and <see cref="Hedge" /> are objects whose keys are the property names of the type each one
+///         configures. Writing <c>"Enabled": false</c> in any of them turns that feature off, whatever
+///         else the section says - which is the only way an <c>appsettings.Production.json</c> can
+///         remove a feature a base file turned on, because configuration providers merge and never
+///         delete a key.
+///     </para>
+///     <para>
+///         <see cref="Resilience.Classify" />, <see cref="Resilience.BeforeAttempt" /> and
+///         <see cref="Resilience.OnEvent" /> are not bindable and are not represented here: a classifier
+///         is a lambda and JSON cannot hold one. The <c>configure</c> callback on every registration is
+///         where they go, and it runs after this projection so it always wins.
+///     </para>
 /// </remarks>
 public sealed class ResilienceOptions
 {
@@ -71,53 +82,40 @@ public sealed class ResilienceOptions
     /// </summary>
     public bool? UseAmbientDeadline { get; set; }
 
-    /// <summary>The first delay after a <see cref="VerdictKind.Transient" /> failure.</summary>
-    public TimeSpan? TransientBaseDelay { get; set; }
-
-    /// <summary>The first delay after a <see cref="VerdictKind.Throttled" /> failure, which starts higher because the dependency has said so.</summary>
-    public TimeSpan? ThrottledBaseDelay { get; set; }
-
-    /// <summary>The ceiling on any single backoff delay.</summary>
-    public TimeSpan? MaxDelay { get; set; }
-
-    /// <summary>The multiplier applied per attempt. 2 doubles; 1 makes the backoff constant.</summary>
-    public double? BackoffFactor { get; set; }
-
-    /// <summary>How much of the computed delay is randomized. <see cref="NResilience.Jitter.Full" /> is the default and the right answer for almost everyone.</summary>
-    public Jitter? Jitter { get; set; }
+    /// <summary>
+    ///     The backoff curve. A section rather than flat properties, so its keys are the property names
+    ///     of <see cref="NResilience.Backoff" /> itself. A policy always has a curve, so there is no
+    ///     <c>Enabled</c> here; the section patches what the base policy carried.
+    /// </summary>
+    public BackoffOptions? Backoff { get; set; }
 
     /// <summary>
-    ///     The retry budget as a fraction of successful traffic: <c>0.1</c> means retries may add at
-    ///     most 10% on top. Zero turns the budget off.
+    ///     The retry budget. <c>"Budget": { "Enabled": false }</c> turns it off; every preset but
+    ///     <see cref="Resilience.None" /> has one on.
     /// </summary>
-    public double? BudgetFraction { get; set; }
-
-    /// <summary>The floor, in retries per second, below which the fraction does not apply - so a quiet service can still retry at all.</summary>
-    public int? BudgetMinimumPerSecond { get; set; }
-
-    /// <summary>
-    ///     Names a <see cref="RetryBudget.Shared(string, double, int)" /> budget, so several policies
-    ///     throttle against one pool. Null - the default - gives this policy its own, which is the
-    ///     blast-radius decision the library argues for.
-    /// </summary>
-    public string? SharedBudget { get; set; }
-
-    /// <summary>The circuit breaker, or null for no breaking. A breaker is a live object; this is the configuration one is built from.</summary>
-    public BreakerOptions? Breaker { get; set; }
-
-    /// <summary>
-    ///     Hedging, or null - the default - for none. Never on by default and never on in a preset, so
-    ///     this section is the only way a registered policy hedges.
-    /// </summary>
-    public HedgeOptions? Hedge { get; set; }
+    public BudgetOptions? Budget { get; set; }
 
     /// <summary>
     ///     The measured per-attempt ceiling, which <see cref="Resilience.Timeouts" /> has on by default.
     ///     Every property has a working default, so this section is only needed to change one -
     ///     <c>"Timeouts": { "Multiple": 5 }</c> - or to turn the feature off, which is
-    ///     <c>"Timeouts": { "Multiple": 0 }</c>.
+    ///     <c>"Timeouts": { "Enabled": false }</c>.
     /// </summary>
     public AttemptTimeoutsOptions? Timeouts { get; set; }
+
+    /// <summary>
+    ///     The circuit breaker. A breaker is a live object; this is the configuration one is built from.
+    ///     Off unless the section is present, and <c>"Breaker": { "Enabled": false }</c> is how a later
+    ///     configuration layer removes one an earlier layer asked for.
+    /// </summary>
+    public BreakerOptions? Breaker { get; set; }
+
+    /// <summary>
+    ///     Hedging, or null - the default - for none. Never on by default and never on in a preset, so
+    ///     this section is the only way a registered policy hedges;
+    ///     <c>"Hedge": { "Enabled": false }</c> takes it back off again.
+    /// </summary>
+    public HedgeOptions? Hedge { get; set; }
 
     /// <summary>
     ///     Whether the registered policy records to <see cref="ResilienceTelemetry" />. On by default,
@@ -141,12 +139,6 @@ public sealed class ResilienceOptions
     /// </summary>
     public string? Logging { get; set; }
 
-    private bool HasBackoff =>
-        TransientBaseDelay is not null
-        || ThrottledBaseDelay is not null
-        || MaxDelay is not null
-        || BackoffFactor is not null;
-
     /// <summary>
     ///     Projects onto a policy. Applies <see cref="Preset" /> first when it is set, then every
     ///     property that is not null.
@@ -156,7 +148,10 @@ public sealed class ResilienceOptions
     ///     <see cref="Resilience.Default" />.
     /// </param>
     /// <returns>The policy. Not validated - the caller validates, so a bad section fails at registration.</returns>
-    /// <exception cref="ResilienceConfigurationException"><see cref="Preset" /> names something that is not a preset.</exception>
+    /// <exception cref="ResilienceConfigurationException">
+    ///     <see cref="Preset" /> names something that is not a preset, or a section uses a value that
+    ///     used to be an off switch and is now spelled <c>"Enabled": false</c>.
+    /// </exception>
     public Resilience ToPolicy(Resilience? baseline = null)
     {
         var policy = ResolvePreset() ?? baseline ?? Resilience.Default;
@@ -176,64 +171,22 @@ public sealed class ResilienceOptions
         if (Name is { } name)
             policy = policy with { Name = name };
 
-        if (HasBackoff)
-        {
-            // Patched rather than rebuilt: anything the section did not mention keeps the value the
-            // base policy carried. Patching only makes sense against an exponential curve, so a
-            // Constant or Custom base policy whose section sets a knob gets a fresh exponential,
-            // and that is the documented behavior.
-            var existing = policy.Backoff.Kind == BackoffKind.Exponential ? policy.Backoff : Backoff.Default;
+        if (Backoff is { } backoff)
+            policy = policy with { Backoff = backoff.ToBackoff(policy.Backoff) };
 
-            policy = policy with
-            {
-                Backoff = Backoff.Exponential(
-                        TransientBaseDelay ?? existing.TransientBase,
-                        ThrottledBaseDelay ?? existing.ThrottledBase,
-                        BackoffFactor ?? existing.Factor,
-                        MaxDelay ?? existing.Max) with
-                    {
-                        Jitter = Jitter ?? policy.Backoff.Jitter,
-                    },
-            };
-        }
-        else if (Jitter is { } jitter)
-            policy = policy with { Backoff = policy.Backoff with { Jitter = jitter } };
-
-        if (BuildBudget(policy.Time) is { } budget)
-            policy = policy with { Budget = budget };
+        if (Budget is { } budget && budget.ToBudget(policy.Time) is { } resolved)
+            policy = policy with { Budget = resolved };
 
         if (Breaker is { } breaker)
-            policy = policy with { Breaker = breaker.ToBreaker(Name ?? policy.Name, policy.Time) };
+            policy = policy with { Breaker = breaker.Enabled is false ? null : breaker.ToBreaker(Name ?? policy.Name, policy.Time) };
 
         if (Hedge is { } hedge)
-            policy = policy with { Hedge = hedge.ToHedge() };
+            policy = policy with { Hedge = hedge.Enabled is false ? null : hedge.ToHedge() };
 
         if (Timeouts is { } timeouts)
-            policy = policy with { Timeouts = timeouts.Multiple is 0 ? null : timeouts.ToTimeouts() };
+            policy = policy with { Timeouts = timeouts.Enabled is false ? null : timeouts.ToTimeouts() };
 
         return policy;
-    }
-
-    /// <param name="time">
-    ///     The policy's clock, which a private budget adopts. A shared budget does not: it is
-    ///     process-wide and the first caller's parameters win, so a clock from one section would
-    ///     silently apply to every policy naming the same string.
-    /// </param>
-    private RetryBudget? BuildBudget(TimeProvider time)
-    {
-        if (SharedBudget is { } shared)
-            return RetryBudget.Shared(shared, BudgetFraction ?? 0.1, BudgetMinimumPerSecond ?? 3);
-
-        if (BudgetFraction is null && BudgetMinimumPerSecond is null)
-            return null;
-
-        // Zero is the off switch rather than a fraction to validate: "retries may add at most 0% on
-        // top of success" is not a budget anyone can spend from, and rejecting it would make the
-        // only obvious way to say "no budget" in JSON an error.
-        if (BudgetFraction is 0)
-            return RetryBudget.None;
-
-        return RetryBudget.Of(BudgetFraction ?? 0.1, BudgetMinimumPerSecond ?? 3, time);
     }
 
     private Resilience? ResolvePreset()
@@ -253,6 +206,158 @@ public sealed class ResilienceOptions
 }
 
 /// <summary>
+///     The one message every retired off switch produces, so a configuration file written against the
+///     old spelling fails at registration naming the new one rather than failing later on a value that
+///     no longer means what it used to.
+/// </summary>
+internal static class RetiredOffSwitch
+{
+    /// <summary>Builds the exception, naming the section, the key that used to mean "off", and what to write instead.</summary>
+    /// <param name="section">The section the key lives in, as it is written in JSON.</param>
+    /// <param name="key">The key that used to be the off switch.</param>
+    /// <param name="reading">What the retired value would have to mean if it were taken literally.</param>
+    /// <returns>The exception, for the caller to throw.</returns>
+    internal static ResilienceConfigurationException For(string section, string key, string reading) =>
+        new(
+        [
+            $"\"{section}\": {{ \"{key}\": 0 }} is no longer how a section turns {section} off; " +
+            $"write \"{section}\": {{ \"Enabled\": false }} instead. {reading}",
+        ]);
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.Backoff" /> curve.
+///     <para>
+///         A section rather than five flat properties, so its keys are the property names of
+///         <see cref="NResilience.Backoff" /> itself and there is no second spelling to learn. A policy
+///         always has a curve, so there is no <c>Enabled</c>: the section patches the one the base
+///         policy carried, and anything it does not mention keeps that policy's value.
+///     </para>
+/// </summary>
+public sealed class BackoffOptions
+{
+    /// <summary>The first delay after a <see cref="VerdictKind.Transient" /> failure.</summary>
+    public TimeSpan? TransientBase { get; set; }
+
+    /// <summary>The first delay after a <see cref="VerdictKind.Throttled" /> failure, which starts higher because the dependency has said so.</summary>
+    public TimeSpan? ThrottledBase { get; set; }
+
+    /// <summary>The ceiling on any single backoff delay.</summary>
+    public TimeSpan? Max { get; set; }
+
+    /// <summary>The multiplier applied per attempt. 2 doubles; 1 makes the backoff constant.</summary>
+    public double? Factor { get; set; }
+
+    /// <summary>How much of the computed delay is randomized. <see cref="NResilience.Jitter.Full" /> is the default and the right answer for almost everyone.</summary>
+    public Jitter? Jitter { get; set; }
+
+    /// <summary>Whether this section names anything that changes the shape of the curve rather than only its randomness.</summary>
+    private bool HasCurve =>
+        TransientBase is not null
+        || ThrottledBase is not null
+        || Max is not null
+        || Factor is not null;
+
+    /// <summary>Patches a curve with whatever this section named.</summary>
+    /// <param name="baseline">The curve the base policy carried.</param>
+    /// <returns>The curve, with every unmentioned knob left as it was.</returns>
+    /// <remarks>
+    ///     Patching only makes sense against an exponential curve, so a Constant or Custom baseline
+    ///     whose section sets a knob gets a fresh exponential built on the shipped defaults, and that is
+    ///     the documented behavior. Jitter on its own is a modifier rather than a reason to rebuild, so
+    ///     a section naming only <see cref="Jitter" /> leaves a Constant curve constant.
+    /// </remarks>
+    public Backoff ToBackoff(Backoff baseline)
+    {
+        if (!HasCurve)
+            return Jitter is { } only ? baseline with { Jitter = only } : baseline;
+
+        var existing = baseline.Kind == BackoffKind.Exponential ? baseline : NResilience.Backoff.Default;
+
+        return NResilience.Backoff.Exponential(
+            TransientBase ?? existing.TransientBase,
+            ThrottledBase ?? existing.ThrottledBase,
+            Factor ?? existing.Factor,
+            Max ?? existing.Max) with
+        {
+            Jitter = Jitter ?? baseline.Jitter,
+        };
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="RetryBudget" />.
+///     <para>
+///         A section rather than three flat properties, so the budget is turned off the way every other
+///         feature is - <c>"Budget": { "Enabled": false }</c> - rather than by a zero fraction that a
+///         reader has to know is special.
+///     </para>
+/// </summary>
+public sealed class BudgetOptions
+{
+    /// <summary>The fraction a budget gets when the section named none.</summary>
+    private const double DefaultFraction = 0.1;
+
+    /// <summary>The floor a budget gets when the section named none.</summary>
+    private const int DefaultMinimumPerSecond = 3;
+
+    /// <summary>
+    ///     Whether this policy has a retry budget at all. <c>false</c> is
+    ///     <see cref="RetryBudget.None" />, whatever else this section says; <c>true</c> turns one on at
+    ///     the defaults; null leaves the base policy's budget alone unless another property here names
+    ///     one.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
+    ///     The budget as a fraction of successful traffic: <c>0.1</c> means retries may add at most 10%
+    ///     on top.
+    /// </summary>
+    public double? Fraction { get; set; }
+
+    /// <summary>The floor, in retries per second, below which the fraction does not apply - so a quiet service can still retry at all.</summary>
+    public int? MinimumPerSecond { get; set; }
+
+    /// <summary>
+    ///     Names a <see cref="RetryBudget.Shared(string, double, int)" /> budget, so several policies
+    ///     throttle against one pool. Null - the default - gives this policy its own, which is the
+    ///     blast-radius decision the library argues for.
+    /// </summary>
+    public string? Shared { get; set; }
+
+    /// <summary>Builds the budget this section describes.</summary>
+    /// <param name="time">
+    ///     The policy's clock, which a private budget adopts. A shared budget does not: it is
+    ///     process-wide and the first caller's parameters win, so a clock from one section would
+    ///     silently apply to every policy naming the same string. Null means
+    ///     <see cref="TimeProvider.System" />.
+    /// </param>
+    /// <returns>The budget, or null when the section named nothing and the base policy's should stand.</returns>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Fraction" /> is zero, which used to be the off switch.</exception>
+    public RetryBudget? ToBudget(TimeProvider? time = null)
+    {
+        if (Enabled is false)
+            return RetryBudget.None;
+
+        if (Fraction is 0)
+        {
+            throw RetiredOffSwitch.For(
+                "Budget",
+                nameof(Fraction),
+                "A budget that lets retries add nothing on top of success is not a budget anyone can spend from.");
+        }
+
+        if (Shared is { } shared)
+            return RetryBudget.Shared(shared, Fraction ?? DefaultFraction, MinimumPerSecond ?? DefaultMinimumPerSecond);
+
+        if (Enabled is null && Fraction is null && MinimumPerSecond is null)
+            return null;
+
+        return RetryBudget.Of(Fraction ?? DefaultFraction, MinimumPerSecond ?? DefaultMinimumPerSecond, time ?? TimeProvider.System);
+    }
+}
+
+/// <summary>
 ///     The bindable shape of a <see cref="NResilience.Hedge" />.
 ///     <para>
 ///         A section of its own rather than five flat properties, so that the presence of the section is
@@ -263,6 +368,13 @@ public sealed class ResilienceOptions
 /// </summary>
 public sealed class HedgeOptions
 {
+    /// <summary>
+    ///     Whether this policy hedges. Hedging is off until a section asks for it, so this is only
+    ///     needed to take it back off - <c>"Hedge": { "Enabled": false }</c> in a configuration layer
+    ///     over one that turned it on.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
     /// <summary>
     ///     <see cref="NResilience.Hedge.Quantile" />. Defaults to 0.95, so <c>"Hedge": {}</c> is a
     ///     complete configuration.
@@ -282,8 +394,9 @@ public sealed class HedgeOptions
     public TimeSpan? Window { get; set; }
 
     /// <summary>
-    ///     <see cref="NResilience.Hedge.SuppressAt" />. Defaults to 0.5; <c>"SuppressAt": 1</c> is how a
-    ///     section turns the error-rate suppression off.
+    ///     <see cref="NResilience.Hedge.SuppressAt" />. Defaults to 0.5. Unlike the off switches this
+    ///     type retired, this is a real point on a real scale: <c>1</c> is "suppress only at the trip
+    ///     point itself", which is the top of the range rather than a magic value.
     /// </summary>
     public double? SuppressAt { get; set; }
 
@@ -322,9 +435,15 @@ public sealed class HedgeOptions
 public sealed class AttemptTimeoutsOptions
 {
     /// <summary>
-    ///     The multiple of the measured quantile. Defaults to 3, and <c>0</c> is the off switch: a
-    ///     section cannot say <c>null</c>, and "zero times the recent p95" is not a ceiling anyone
-    ///     could mean.
+    ///     Whether the measured ceiling bounds attempts. On by default, so this is only needed to turn
+    ///     it off - <c>"Timeouts": { "Enabled": false }</c> leaves
+    ///     <see cref="ResilienceOptions.AttemptTimeout" /> as the only per-attempt bound.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
+    ///     The multiple of the measured quantile. Defaults to 3, and must be greater than 1 -
+    ///     <c>"Enabled": false</c> is how a section turns the ceiling off.
     /// </summary>
     public double? Multiple { get; set; }
 
@@ -342,8 +461,17 @@ public sealed class AttemptTimeoutsOptions
 
     /// <summary>Converts the options to an <see cref="NResilience.AttemptTimeouts" /> value, using defaults for any unset properties.</summary>
     /// <returns>The configuration.</returns>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which used to be the off switch.</exception>
     public AttemptTimeouts ToTimeouts()
     {
+        if (Multiple is 0)
+        {
+            throw RetiredOffSwitch.For(
+                "Timeouts",
+                nameof(Multiple),
+                "Zero times the recent p95 is not a ceiling anyone could mean.");
+        }
+
         var timeouts = AttemptTimeouts.Above(Multiple ?? 3.0);
 
         if (Quantile is { } quantile)
@@ -376,6 +504,14 @@ public sealed class AttemptTimeoutsOptions
 /// </remarks>
 public sealed class BreakerOptions
 {
+    /// <summary>
+    ///     Whether this policy has a breaker. Breaking is off until a section asks for it, so this is
+    ///     only needed to take it back off - <c>"Breaker": { "Enabled": false }</c> in a configuration
+    ///     layer over one that turned it on. It is the only way to do that, because configuration
+    ///     providers merge sections and never remove a key.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
     /// <summary><see cref="BreakerSettings.ConsecutiveFailures" />.</summary>
     public int? ConsecutiveFailures { get; set; }
 
@@ -387,8 +523,8 @@ public sealed class BreakerOptions
     ///     dependency's own measured error rate instead of an absolute ratio, which the breaker has on
     ///     by default. A section of its own, so it is only needed to change a property -
     ///     <c>"Failures": { "Multiple": 10 }</c> - or to turn the trip off, which is
-    ///     <c>"Failures": { "Multiple": 0 }</c>. Composes with <see cref="FailureRatio" />, which stays
-    ///     the ceiling when both are set.
+    ///     <c>"Failures": { "Enabled": false }</c>. Composes with <see cref="FailureRatio" />, which
+    ///     stays the ceiling when both are set.
     /// </summary>
     public FailureOptions? Failures { get; set; }
 
@@ -412,9 +548,9 @@ public sealed class BreakerOptions
 
     /// <summary>
     ///     <see cref="BreakerSettings.Recovery" /> - hand the traffic back over a ramp rather than a
-    ///     cliff. A section of its own, so <c>"Recovery": {}</c> turns it on at its defaults and
-    ///     <c>"Recovery": { "Fraction": 0.5 }</c> changes the one number. Off unless the section is
-    ///     present, and <c>"Fraction": 0</c> is how a section that is present turns it back off.
+    ///     cliff. A section of its own, so <c>"Recovery": {}</c> turns it on at its defaults,
+    ///     <c>"Recovery": { "Fraction": 0.5 }</c> changes the one number, and
+    ///     <c>"Recovery": { "Enabled": false }</c> turns it back off.
     /// </summary>
     public RecoveryOptions? Recovery { get; set; }
 
@@ -434,7 +570,7 @@ public sealed class BreakerOptions
     ///     <see cref="BreakerSettings.SlowCalls" /> - the same brownout trip stated as a multiple of
     ///     measured normal latency instead of a constant, which the breaker has on by default. A section
     ///     of its own, so it is only needed to change a property - <c>"SlowCalls": { "Multiple": 5 }</c>
-    ///     - or to turn the trip off, which is <c>"SlowCalls": { "Multiple": 0 }</c>. Setting
+    ///     - or to turn the trip off, which is <c>"SlowCalls": { "Enabled": false }</c>. Setting
     ///     <see cref="SlowCallThreshold" /> also turns it off, because the two are the same trip defined
     ///     two ways; setting both this and <see cref="SlowCallThreshold" /> is refused.
     /// </summary>
@@ -451,6 +587,11 @@ public sealed class BreakerOptions
     ///     it is attached to runs on, and one <see cref="Resilience.Time" /> drives both.
     /// </param>
     /// <returns>A new breaker, closed.</returns>
+    /// <remarks>
+    ///     <see cref="Enabled" /> is not consulted here - a method that builds a breaker cannot return
+    ///     "no breaker". <see cref="ResilienceOptions.ToPolicy(Resilience?)" /> checks it before calling
+    ///     this.
+    /// </remarks>
     public Breaker ToBreaker(string? name = null, TimeProvider? time = null)
     {
         var settings = time is null ? new BreakerSettings() : new BreakerSettings { Time = time };
@@ -462,7 +603,7 @@ public sealed class BreakerOptions
             settings = settings with { FailureRatio = ratio };
 
         if (Failures is { } relative)
-            settings = settings with { Failures = relative.Multiple is 0 ? null : relative.ToFailures() };
+            settings = settings with { Failures = relative.Enabled is false ? null : relative.ToFailures() };
 
         if (MinimumCalls is { } minimum)
             settings = settings with { MinimumCalls = minimum };
@@ -480,7 +621,7 @@ public sealed class BreakerOptions
             settings = settings with { BreakJitter = jitter };
 
         if (Recovery is { } ramp)
-            settings = settings with { Recovery = ramp.Fraction is 0 ? null : ramp.ToRecovery() };
+            settings = settings with { Recovery = ramp.Enabled is false ? null : ramp.ToRecovery() };
 
         if (HalfOpenProbes is { } probes)
             settings = settings with { HalfOpenProbes = probes };
@@ -492,7 +633,7 @@ public sealed class BreakerOptions
             settings = settings with { SlowCallThreshold = slow };
 
         if (SlowCalls is { } adaptive)
-            settings = settings with { SlowCalls = adaptive.Multiple is 0 ? null : adaptive.ToSlowCalls() };
+            settings = settings with { SlowCalls = adaptive.Enabled is false ? null : adaptive.ToSlowCalls() };
 
         if (SlowCallRatio is { } slowRatio)
             settings = settings with { SlowCallRatio = slowRatio };
@@ -505,15 +646,21 @@ public sealed class BreakerOptions
 ///     The bindable shape of a <see cref="NResilience.Failures" />.
 ///     <para>
 ///         A section rather than four flat properties, so <c>"Failures": { "Multiple": 5 }</c> is a
-///         complete configuration, and <c>"Multiple": 0</c> is how a section turns the trip off.
+///         complete configuration, and <c>"Enabled": false</c> is how a section turns the trip off.
 ///     </para>
 /// </summary>
 public sealed class FailureOptions
 {
     /// <summary>
+    ///     Whether the relative failure trip is armed. On by default, so this is only needed to turn it
+    ///     off.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
     ///     <see cref="NResilience.Failures.Multiple" />. Defaults to 5, so <c>"Failures": {}</c> is a
-    ///     complete configuration, and <c>0</c> is the off switch: a section cannot say <c>null</c>, and
-    ///     "zero times the recent error rate" is not a trip point anyone could mean.
+    ///     complete configuration, and must be greater than 1 - <c>"Enabled": false</c> is how a section
+    ///     turns the trip off.
     /// </summary>
     public double? Multiple { get; set; }
 
@@ -528,8 +675,17 @@ public sealed class FailureOptions
 
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which used to be the off switch.</exception>
     public Failures ToFailures()
     {
+        if (Multiple is 0)
+        {
+            throw RetiredOffSwitch.For(
+                "Failures",
+                nameof(Multiple),
+                "Zero times the recent error rate is not a trip point anyone could mean.");
+        }
+
         var failures = NResilience.Failures.Above(Multiple ?? 5.0);
 
         if (Window is { } window)
@@ -549,14 +705,21 @@ public sealed class FailureOptions
 ///     The bindable shape of a <see cref="NResilience.Recovery" />.
 ///     <para>
 ///         A section rather than flat properties, so <c>"Recovery": {}</c> is a complete configuration
-///         and <c>"Fraction": 0</c> is how a section that is present turns the ramp off again -
-///         a section cannot say <c>null</c>, and "a ramp lasting none of the break" is not something
-///         anyone could mean.
+///         and <c>"Enabled": false</c> is how a section that is present turns the ramp off again.
 ///     </para>
 /// </summary>
 public sealed class RecoveryOptions
 {
-    /// <summary><see cref="NResilience.Recovery.Fraction" />. Defaults to 0.25.</summary>
+    /// <summary>
+    ///     Whether the traffic comes back over a ramp. The ramp is off until a section asks for it, so
+    ///     this is only needed to take it back off.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
+    ///     <see cref="NResilience.Recovery.Fraction" />. Defaults to 0.25, and must be above zero -
+    ///     <c>"Enabled": false</c> is how a section turns the ramp off.
+    /// </summary>
     public double? Fraction { get; set; }
 
     /// <summary><see cref="NResilience.Recovery.Minimum" />.</summary>
@@ -570,8 +733,17 @@ public sealed class RecoveryOptions
 
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Fraction" /> is zero, which used to be the off switch.</exception>
     public Recovery ToRecovery()
     {
+        if (Fraction is 0)
+        {
+            throw RetiredOffSwitch.For(
+                "Recovery",
+                nameof(Fraction),
+                "A ramp lasting none of the break is not a ramp anyone could mean.");
+        }
+
         var recovery = NResilience.Recovery.Over(Fraction ?? 0.25);
 
         if (Minimum is { } minimum)
@@ -591,15 +763,20 @@ public sealed class RecoveryOptions
 ///     The bindable shape of a <see cref="NResilience.SlowCalls" />.
 ///     <para>
 ///         A section rather than four flat properties, so <c>"SlowCalls": { "Multiple": 3 }</c> is a
-///         complete configuration, and <c>"Multiple": 0</c> is how a section turns the trip off.
+///         complete configuration, and <c>"Enabled": false</c> is how a section turns the trip off.
 ///     </para>
 /// </summary>
 public sealed class SlowCallOptions
 {
     /// <summary>
+    ///     Whether the brownout trip is armed. On by default, so this is only needed to turn it off.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
     ///     <see cref="NResilience.SlowCalls.Multiple" />. Defaults to 3, so <c>"SlowCalls": {}</c> is a
-    ///     complete configuration, and <c>0</c> is the off switch: a section cannot say <c>null</c>, and
-    ///     "zero times normal latency" is not a threshold anyone could mean.
+    ///     complete configuration, and must be greater than 1 - <c>"Enabled": false</c> is how a section
+    ///     turns the trip off.
     /// </summary>
     public double? Multiple { get; set; }
 
@@ -614,8 +791,17 @@ public sealed class SlowCallOptions
 
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which used to be the off switch.</exception>
     public SlowCalls ToSlowCalls()
     {
+        if (Multiple is 0)
+        {
+            throw RetiredOffSwitch.For(
+                "SlowCalls",
+                nameof(Multiple),
+                "Zero times normal latency is not a threshold anyone could mean.");
+        }
+
         var slow = NResilience.SlowCalls.Above(Multiple ?? 3.0);
 
         if (Quantile is { } quantile)

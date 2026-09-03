@@ -442,7 +442,7 @@ internal static class Program
                 ["Resilience:api:Preset"] = "Http",
                 ["Resilience:api:Attempts"] = "4",
                 ["Resilience:api:Deadline"] = "00:00:20",
-                ["Resilience:api:MaxDelay"] = "00:00:01",
+                ["Resilience:api:Backoff:Max"] = "00:00:01",
                 ["Resilience:api:Breaker:ConsecutiveFailures"] = "2",
                 ["Resilience:api:Logging"] = "Verbose",
             })

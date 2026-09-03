@@ -105,12 +105,55 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 `ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone".
 
-**Properties**:
-`Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `Timeouts`, `UseAmbientDeadline`, `TransientBaseDelay`, `ThrottledBaseDelay`, `MaxDelay`, `BackoffFactor`, `Jitter`, `BudgetFraction`, `BudgetMinimumPerSecond`, `SharedBudget`, `Breaker`, `Hedge`, `Telemetry`, `Logging`.
+**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `Timeouts`, `Breaker`, `Hedge`.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
-- **Budget disabling**: Setting `BudgetFraction = 0` disables the retry budget.
 - **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
+
+### Every section has an `Enabled`
+
+`Budget`, `Timeouts`, `Breaker`, `Hedge`, and the `Failures`, `SlowCalls` and `Recovery` subsections
+of `Breaker` each take a nullable `bool Enabled`:
+
+| Value | Meaning |
+| :--- | :--- |
+| unset | The section means what its presence has always meant: an opt-in feature turns on, an on-by-default feature is only tuned. |
+| `false` | The feature is off, whatever else the section says. |
+| `true` | Explicitly on. A no-op except on `Budget`, where it turns one on at the defaults. |
+
+`Enabled` is the only way a later configuration layer can remove a feature an earlier one added,
+because providers merge sections and never delete a key. It replaces the per-feature magic numbers
+that used to stand in for the `null` a section cannot say: `"Multiple": 0`, `"Fraction": 0` and
+`"BudgetFraction": 0` now fail at registration with a message naming `"Enabled": false`.
+
+`Backoff` has no `Enabled`, because a policy always has a backoff curve.
+
+## `BackoffOptions`
+
+`BackoffOptions` provides the bindable shape of [`Backoff`](backoff.md), with the same property names. A section that mentions some of the knobs patches the curve the base policy already carried; anything it does not mention keeps that policy's value.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `TransientBase` | `200 ms` | The first delay after a `Transient` failure. |
+| `ThrottledBase` | `2 s` | The first delay after a `Throttled` failure, which starts higher because the dependency has said so. |
+| `Max` | `30 s` | The ceiling on any single backoff delay. |
+| `Factor` | `2` | The multiplier applied per attempt. `1` makes the backoff constant. |
+| `Jitter` | `Full` | How much of the computed delay is randomized. |
+
+- **`ToBackoff(Backoff baseline)`**: Patches `baseline` with whatever the section named. `Jitter` on its own is a modifier rather than a reason to rebuild, so a section naming only `Jitter` leaves a `Constant` curve constant. A non-exponential baseline whose section sets a curve knob gets a fresh exponential built on the shipped defaults.
+
+## `BudgetOptions`
+
+`BudgetOptions` provides the bindable shape of a [`RetryBudget`](retry-budget.md).
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Enabled` | `null` | `false` is `RetryBudget.None`; `true` turns one on at the defaults. |
+| `Fraction` | `0.1` | Retries may add at most this much on top of successful traffic. |
+| `MinimumPerSecond` | `3` | The floor, in retries per second, below which the fraction does not apply - so a quiet service can still retry at all. |
+| `Shared` | `null` | Names a shared budget, so several policies throttle against one pool. Null gives this policy its own. |
+
+- **`ToBudget(TimeProvider? time = null)`**: Builds the budget, or returns `null` when the section named nothing and the base policy's should stand. A private budget adopts `time`; a shared one does not, because it is process-wide and the first caller's parameters win.
 
 For more information on the configuration structure, see [Configuration](../di/configuration.md).
 
@@ -125,17 +168,19 @@ For more information on the configuration structure, see [Configuration](../di/c
 | `MinimumSamples` | `20` | How many recent calls the latency estimate needs before any hedge fires. |
 | `MinimumDelay` | `10 ms` | A floor under the hedge delay. |
 | `Window` | `30 s` | How much history the latency estimate covers. |
-| `SuppressAt` | `0.5` | The fraction of the breaker's trip point at which hedging stops. Set to `1` to disable suppression. |
+| `Enabled` | `null` | `false` turns hedging off, which is how a later configuration layer takes back a hedge an earlier one added. |
+| `SuppressAt` | `0.5` | The fraction of the breaker's trip point at which hedging stops. `1` is the top of the range - suppress only at the trip point itself. |
 
 There is deliberately no fixed-delay setting. A constant threshold is the failure mode the adaptive one exists to avoid, and it would be one JSON key away if it existed at all.
 
 ## `AttemptTimeoutsOptions`
 
-`AttemptTimeoutsOptions` provides the bindable shape of [`AttemptTimeouts`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), which the default policy has on. Every property has a working default, so the section is only needed to change one - or to turn the feature off, which is `"Timeouts": { "Multiple": 0 }`. A section cannot say `null`, and "zero times the recent p95" is not a ceiling anyone could mean.
+`AttemptTimeoutsOptions` provides the bindable shape of [`AttemptTimeouts`](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), which the default policy has on. Every property has a working default, so the section is only needed to change one - or to turn the feature off, which is `"Timeouts": { "Enabled": false }`.
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
-| `Multiple` | `3` | How many times the measured quantile an attempt may take. Must be greater than 1, or `0` to turn the measured ceiling off. |
+| `Enabled` | `null` | `false` leaves `AttemptTimeout` as the only per-attempt bound. |
+| `Multiple` | `3` | How many times the measured quantile an attempt may take. Must be greater than 1. |
 | `Quantile` | `0.95` | The quantile of recent successful latency the ceiling is measured from. Between 0.5 and 0.99. |
 | `Window` | `5 min` | How much history the estimate covers. |
 | `MinimumSamples` | `20` | How many recent successful calls the estimate needs before it bounds anything. |
@@ -149,7 +194,9 @@ There is deliberately no way to make the measured ceiling longer than `AttemptTi
 
 - **`ToBreaker(string? name = null)`**: Builds a live `Breaker` instance. A configured breaker is created once per policy and survives configuration reloads, keeping its state.
 
-The two relative trips are on by default, as they are on `BreakerSettings`, and a section turns one off the same way `Timeouts` does: `"SlowCalls": { "Multiple": 0 }` or `"Failures": { "Multiple": 0 }`. Setting `SlowCallThreshold` also turns `SlowCalls` off, because the two are the same trip defined two ways.
+`Enabled` is `false` for no breaker at all - the only way a later configuration layer can remove one an earlier layer added.
+
+The two relative trips are on by default, as they are on `BreakerSettings`, and a subsection turns one off the same way `Timeouts` does: `"SlowCalls": { "Enabled": false }` or `"Failures": { "Enabled": false }`. Setting `SlowCallThreshold` also turns `SlowCalls` off, because the two are the same trip defined two ways. `"Recovery": { "Enabled": false }` turns the ramp back off.
 
 ## `AddRateLimit` on `IHttpClientBuilder`
 
