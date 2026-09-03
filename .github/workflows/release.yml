@@ -154,6 +154,7 @@ jobs:
             src/NResilience/NResilience.csproj \
             src/NResilience.Extensions/NResilience.Extensions.csproj \
             src/NResilience.AspNetCore/NResilience.AspNetCore.csproj \
+            src/NResilience.Grpc/NResilience.Grpc.csproj \
             src/NResilience.Testing/NResilience.Testing.csproj; do
             echo "Packing: $csproj"
             dotnet pack "$csproj" --no-build -c Release \
