@@ -67,6 +67,9 @@ public sealed partial record Resilience
         // this method is only reached for those.
         var latency = ExecutionState.LatencyFor(this)!;
 
+        // Null unless this policy configured WinRate. Read once, like the budget and the estimate above.
+        var wins = ExecutionState.WinRateFor(this);
+
         // The effective deadline, resolved once per call. See the sequential loop for why the ambient
         // read happens here and not per attempt; the local functions below close over it.
         var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
@@ -88,9 +91,10 @@ public sealed partial record Resilience
         // one that Attempts bounds - Attempts is the number of calls the dependency sees.
         var started = 0;
 
-        // Set when the budget refuses to fund a hedge, so one refusal does not turn into a hedge
-        // decision every threshold for the rest of the round. Cleared when a new round begins.
-        var budgetRefused = false;
+        // Set when something refuses a hedge whose threshold has already fired, so one refusal does not
+        // turn into a hedge decision every threshold for the rest of the round. Cleared when a new round
+        // begins.
+        var hedgeRefused = false;
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -103,7 +107,7 @@ public sealed partial record Resilience
                     // A new round. The first leg of one is an ordinary attempt in every respect: the
                     // deadline is checked, the breaker admits it, and if the breaker refuses, the call
                     // stops exactly as it would without hedging configured.
-                    budgetRefused = false;
+                    hedgeRefused = false;
 
                     var remaining = Remaining(Time, start, deadline);
 
@@ -156,9 +160,16 @@ public sealed partial record Resilience
                 if (armed is { } fired && ReferenceEquals(done, fired.Delay))
                 {
                     // The leg has been running longer than the configured quantile of recent calls to
-                    // this dependency, so a copy of it is worth starting. The budget is charged here
-                    // rather than when the timer was armed, so a call that came back on its own is never
-                    // charged for a hedge it did not need.
+                    // this dependency, so a copy of it is worth starting - and both of the questions
+                    // about whether it is worth its load are asked here rather than when the timer was
+                    // armed, so that they are asked only about a call that really did get slow.
+                    if (Suppressed(fired.Threshold))
+                        continue;
+
+                    // Charged here rather than when the timer was armed, so a call that came back on its
+                    // own is never charged for a hedge it did not need - and after the gates above, so a
+                    // hedge nobody is going to start does not spend a token that funds a retry this call
+                    // may still need.
                     //
                     // Hedges and retries draw on the same bucket on purpose: both are amplification, and
                     // what the budget exists to bound is the total. A policy already retrying at its
@@ -166,12 +177,16 @@ public sealed partial record Resilience
                     // that something failed, and a hedge is a guess that something is slow.
                     if (budget is not null && !budget.TrySpend())
                     {
-                        budgetRefused = true;
+                        hedgeRefused = true;
                         continue;
                     }
 
                     var hedged = StartLeg(++started, hedged: true);
                     legs.Add(hedged);
+
+                    // Counted here rather than in Admits(), so the denominator of the win rate is the
+                    // hedges that actually reached the dependency.
+                    wins?.Started();
 
                     if (OnEvent is not null)
                     {
@@ -228,8 +243,13 @@ public sealed partial record Resilience
                 {
                     var winner = log.Count;
 
-                    if (leg.Hedged && OnEvent is not null)
-                        Notify(CallEventKind.HedgeWon, winner, verdict, Time.GetElapsedTime(start), null, null, null);
+                    if (leg.Hedged)
+                    {
+                        wins?.Won();
+
+                        if (OnEvent is not null)
+                            Notify(CallEventKind.HedgeWon, winner, verdict, Time.GetElapsedTime(start), null, null, null);
+                    }
 
                     DiscardLegs(ref log, legs, start);
 
@@ -310,20 +330,43 @@ public sealed partial record Resilience
         // the closure they share is one object on a path that already allocates several.
         // ---------------------------------------------------------------------------------------
 
-        // Whether a hedge is worth arming, and the threshold that would trigger it. Every gate but the
-        // budget is here, because the budget is charged when the timer fires rather than when it is set.
+        // Whether this hedge is worth what it costs, asked at the moment its threshold fires rather than
+        // when the timer was armed - so the two questions are asked only about calls that really did get
+        // slow, and so a listener can compare what was suppressed against what started.
+        bool Suppressed(TimeSpan threshold)
+        {
+            // Closed is not the same as healthy: a breaker's default trip is five consecutive failures,
+            // so a dependency erroring on 40% of calls sits closed while this process hedges every slow
+            // one. Once the error rate has climbed to SuppressAt of the rate that would open the breaker,
+            // hedging stops rather than adding load to a dependency already in trouble.
+            var elevated = Breaker is { } gate && gate.IsErrorRateElevated(hedge.SuppressAt);
+
+            // And a dependency that is not failing can still be one hedging cannot help. Asked second
+            // because it is the question with the weaker evidence behind it, and because Admits() takes
+            // the loop's decision as a side effect - which should not happen for a hedge already refused.
+            if (!elevated && (wins is null || wins.Admits()))
+                return false;
+
+            hedgeRefused = true;
+
+            if (OnEvent is not null)
+                Notify(CallEventKind.HedgeSuppressed, started + 1, verdict, Time.GetElapsedTime(start), threshold, null, null);
+
+            return true;
+        }
+
+        // Whether a hedge is worth arming, and the threshold that would trigger it. The gates about the
+        // dependency are at the firing point instead - see Suppressed().
         (Task Delay, TimeSpan Threshold)? ArmHedge()
         {
-            if (budgetRefused || legs.Count >= hedge.MaxConcurrent || started >= Attempts)
+            if (hedgeRefused || legs.Count >= hedge.MaxConcurrent || started >= Attempts)
                 return null;
 
-            // A dependency that is failing does not need a second copy of every slow request. Half-open
-            // counts as not closed: those attempts are probes, and a probe that is raced is not a probe.
-            // Closed is not the same as healthy, though - a breaker's default trip is five consecutive
-            // failures, so a dependency erroring on 40% of calls is closed - and the second gate is the
-            // difference: once the error rate has climbed to SuppressAt of the rate that would open the
-            // breaker, hedging stops rather than adding load to a dependency already in trouble.
-            if (Breaker is { } gate && (gate.State != BreakerState.Closed || gate.IsErrorRateElevated(hedge.SuppressAt)))
+            // Half-open counts as not closed: those attempts are probes, and a probe that is raced is not
+            // a probe. The two gates that ask whether a hedge is *worth* starting - the error rate, and
+            // the win rate - are not here but at the firing point, so that the hedge they refuse is one
+            // a call actually got slow enough to want. See Suppressed().
+            if (Breaker is { State: not BreakerState.Closed })
                 return null;
 
             if (latency.Threshold(hedge.MinimumSamples) is not { } threshold)

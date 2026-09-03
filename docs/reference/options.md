@@ -170,8 +170,23 @@ For more information on the configuration structure, see [Configuration](../di/c
 | `Window` | `30 s` | How much history the latency estimate covers. |
 | `Enabled` | `null` | `false` turns hedging off, which is how a later configuration layer takes back a hedge an earlier one added. |
 | `SuppressAt` | `0.5` | The fraction of the breaker's trip point at which hedging stops. `1` is the top of the range - suppress only at the trip point itself. |
+| `WinRate` | `null` | A [`WinRateOptions`](#winrateoptions) subsection, which holds hedges back once they stop winning. Off unless named. |
 
 There is deliberately no fixed-delay setting. A constant threshold is the failure mode the adaptive one exists to avoid, and it would be one JSON key away if it existed at all.
+
+## `WinRateOptions`
+
+`WinRateOptions` provides the bindable shape of [`WinRate`](../features/hedging.md#stop-hedging-when-hedging-stops-helping). It is a subsection of `Hedge`, and it is off unless the section asks for it.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Enabled` | `null` | `false` drops a loop the base policy carried. |
+| `Floor` | `0.2` | The fraction of hedges that has to win. Must be in `(0, 1)`. |
+| `Window` | `1 min` | How much history the win rate covers. A quarter of it is one decision. |
+| `MinimumSamples` | `10` | How many hedges the window needs before the loop has an opinion. |
+| `MinimumAllowance` | `0.05` | The least hedging the loop retreats to. `0` is no floor at all. Must be less than 1. |
+
+Opt-in, unlike the rest of `HedgeOptions`: it is a control loop over a control loop, and its failure mode is that the dependency whose tail no second attempt can route around is exactly the one it retreats from.
 
 ## `AttemptCeilingOptions`
 

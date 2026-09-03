@@ -139,6 +139,8 @@ NResilience.Extensions.HedgeOptions.Quantile.set -> void
 NResilience.Extensions.HedgeOptions.SuppressAt.get -> double?
 NResilience.Extensions.HedgeOptions.SuppressAt.set -> void
 NResilience.Extensions.HedgeOptions.ToHedge() -> NResilience.Hedge
+NResilience.Extensions.HedgeOptions.WinRate.get -> NResilience.Extensions.WinRateOptions?
+NResilience.Extensions.HedgeOptions.WinRate.set -> void
 NResilience.Extensions.HedgeOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.HedgeOptions.Window.set -> void
 NResilience.Extensions.IResiliencePolicies
@@ -253,6 +255,19 @@ NResilience.Extensions.SlowCallsOptions.SlowCallsOptions() -> void
 NResilience.Extensions.SlowCallsOptions.ToSlowCalls() -> NResilience.SlowCalls
 NResilience.Extensions.SlowCallsOptions.Window.get -> System.TimeSpan?
 NResilience.Extensions.SlowCallsOptions.Window.set -> void
+NResilience.Extensions.WinRateOptions
+NResilience.Extensions.WinRateOptions.Enabled.get -> bool?
+NResilience.Extensions.WinRateOptions.Enabled.set -> void
+NResilience.Extensions.WinRateOptions.Floor.get -> double?
+NResilience.Extensions.WinRateOptions.Floor.set -> void
+NResilience.Extensions.WinRateOptions.MinimumAllowance.get -> double?
+NResilience.Extensions.WinRateOptions.MinimumAllowance.set -> void
+NResilience.Extensions.WinRateOptions.MinimumSamples.get -> int?
+NResilience.Extensions.WinRateOptions.MinimumSamples.set -> void
+NResilience.Extensions.WinRateOptions.ToWinRate() -> NResilience.WinRate?
+NResilience.Extensions.WinRateOptions.WinRateOptions() -> void
+NResilience.Extensions.WinRateOptions.Window.get -> System.TimeSpan?
+NResilience.Extensions.WinRateOptions.Window.set -> void
 const Microsoft.Extensions.DependencyInjection.ResilienceHealthChecksBuilderExtensions.DefaultName = "resilience" -> string!
 const NResilience.Extensions.ResilienceLogging.CategoryPrefix = "NResilience" -> string!
 const NResilience.Extensions.ResilienceTelemetry.ActivitySourceName = "NResilience" -> string!

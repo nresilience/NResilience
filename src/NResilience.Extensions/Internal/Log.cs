@@ -131,6 +131,13 @@ internal static partial class Log
         Message = "{Policy} answered from hedge attempt {Attempt} after {ElapsedMs} ms")]
     internal static partial void HedgeWon(ILogger logger, LogLevel level, string policy, int attempt, long elapsedMs);
 
+    [LoggerMessage(
+        EventId = Codes.HedgeSuppressed,
+        EventName = nameof(Ids.HedgeSuppressed),
+        Message =
+            "{Policy} held back hedge attempt {Attempt} after {ThresholdMs} ms: the dependency is failing often enough, or hedging is winning seldom enough, that the extra load is not worth adding")]
+    internal static partial void HedgeSuppressed(ILogger logger, LogLevel level, string policy, int attempt, long thresholdMs);
+
     [LoggerMessage(EventId = Codes.HedgeDiscarded, EventName = nameof(Ids.HedgeDiscarded),
         Message = "{Policy} discarded attempt {Attempt} after {ElapsedMs} ms because a sibling answered first")]
     internal static partial void HedgeDiscarded(ILogger logger, LogLevel level, string policy, int attempt, long elapsedMs);
@@ -181,6 +188,7 @@ internal static partial class Log
         internal const int HedgeDiscarded = 1024;
         internal const int AttemptTimeoutAdapted = 1025;
         internal const int BackoffBaseAdapted = 1026;
+        internal const int HedgeSuppressed = 1027;
     }
 
     /// <summary>
@@ -216,5 +224,6 @@ internal static partial class Log
         internal static readonly EventId HedgeDiscarded = new(Codes.HedgeDiscarded, nameof(HedgeDiscarded));
         internal static readonly EventId AttemptTimeoutAdapted = new(Codes.AttemptTimeoutAdapted, nameof(AttemptTimeoutAdapted));
         internal static readonly EventId BackoffBaseAdapted = new(Codes.BackoffBaseAdapted, nameof(BackoffBaseAdapted));
+        internal static readonly EventId HedgeSuppressed = new(Codes.HedgeSuppressed, nameof(HedgeSuppressed));
     }
 }

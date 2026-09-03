@@ -266,6 +266,11 @@ public static class ResilienceTelemetry
                 Annotate(e, "nresilience.backoff_base_adapted");
                 break;
 
+            case CallEventKind.HedgeSuppressed:
+                HedgeCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Hedge("suppressed"));
+                Annotate(e, "nresilience.hedge_suppressed");
+                break;
+
             case CallEventKind.HedgeWon:
                 HedgeCounter.Add(1, new KeyValuePair<string, object?>("nresilience.policy", policy), Hedge("won"));
                 Annotate(e, "nresilience.hedge_won");

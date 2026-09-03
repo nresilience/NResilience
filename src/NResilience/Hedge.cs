@@ -163,6 +163,25 @@ public readonly record struct Hedge
     }
 
     /// <summary>
+    ///     Stops paying for hedging that is not winning. Off unless set.
+    ///     <para>
+    ///         <see cref="SuppressAt" /> asks whether the dependency is healthy enough to be sent extra
+    ///         load; this asks whether the extra load is buying anything. They are different questions
+    ///         and a dependency can answer them differently - one that is uniformly slow because it is
+    ///         overloaded is failing neither often enough to suppress nor independently enough for a
+    ///         second leg to win.
+    ///     </para>
+    ///     <para>
+    ///         Opt-in, because it is a control loop on top of a control loop and its failure mode is
+    ///         stated on <see cref="WinRate" />: the dependency whose tail no second attempt can route
+    ///         around is exactly the one it retreats from, and the tail is still real. Needs no
+    ///         <see cref="Resilience.Breaker" /> - the evidence is hedges won over hedges started, which
+    ///         this policy measures itself.
+    ///     </para>
+    /// </summary>
+    public WinRate? WinRate { get; init; }
+
+    /// <summary>
     ///     The way to configure hedging. There is deliberately no fixed-delay form - see the type's own
     ///     documentation for why that omission is the feature.
     /// </summary>
@@ -187,17 +206,19 @@ public readonly record struct Hedge
         && MinimumSamples == other.MinimumSamples
         && MinimumDelay == other.MinimumDelay
         && Window == other.Window
-        && SuppressAt.Equals(other.SuppressAt);
+        && SuppressAt.Equals(other.SuppressAt)
+        && Nullable.Equals(WinRate, other.WinRate);
 
     /// <inheritdoc />
     public override int GetHashCode() =>
-        HashCode.Combine(Quantile, MaxConcurrent, MinimumSamples, MinimumDelay, Window, SuppressAt);
+        HashCode.Combine(Quantile, MaxConcurrent, MinimumSamples, MinimumDelay, Window, SuppressAt, WinRate);
 
     /// <inheritdoc />
     public override string ToString() =>
         $"p{Quantile * 100:0.##} (max {MaxConcurrent} in flight, min {MinimumSamples} samples, " +
         $"floor {MinimumDelay.TotalMilliseconds:0.#}ms, window {Window.TotalSeconds:0.#}s, " +
-        $"suppressed at {SuppressAt:0.##} of the trip point)";
+        $"suppressed at {SuppressAt:0.##} of the trip point)" +
+        (WinRate is { } feedback ? $", while at least {feedback}" : "");
 
     /// <summary>
     ///     Collects everything wrong with this configuration, in the shape
@@ -231,5 +252,7 @@ public readonly record struct Hedge
                 $"Hedge.SuppressAt must be in (0, 1]; it is {SuppressAt}. " +
                 "It is a fraction of the breaker's trip point, and 1 is how you turn the suppression off.");
         }
+
+        WinRate?.Validate(problems);
     }
 }

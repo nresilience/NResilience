@@ -141,6 +141,27 @@ public enum CallEventKind
     ///     </para>
     /// </summary>
     BackoffBaseAdapted,
+
+    /// <summary>
+    ///     A call got slow enough to hedge and the hedge was held back.
+    ///     <see cref="CallEvent.AttemptNumber" /> is the copy that would have started, and
+    ///     <see cref="CallEvent.Delay" /> is the latency threshold that fired - the same two numbers
+    ///     <see cref="HedgeStarted" /> carries, so the pair count against each other directly.
+    ///     <para>
+    ///         Two things raise it, and the arithmetic tells them apart:
+    ///         <see cref="Hedge.SuppressAt" /> once the dependency's error rate has climbed towards its
+    ///         breaker's trip point, and <see cref="Hedge.WinRate" /> once hedges have stopped winning
+    ///         often enough to be worth their load. Neither is a failure - a suppressed hedge is load
+    ///         this process decided not to add - but a policy that suppresses most of what it arms is
+    ///         one whose <see cref="Hedge" /> is no longer buying anything, and that is worth seeing.
+    ///     </para>
+    ///     <para>
+    ///         Not raised when the retry budget refuses to fund the hedge, and not raised for a hedge
+    ///         that was never armed - an open breaker, a concurrency ceiling, or a deadline too close to
+    ///         fit another attempt. Those are bounds on the call rather than judgments about hedging.
+    ///     </para>
+    /// </summary>
+    HedgeSuppressed,
 }
 
 /// <summary>

@@ -501,6 +501,12 @@ public sealed class HedgeOptions
     /// </summary>
     public double? SuppressAt { get; set; }
 
+    /// <summary>
+    ///     <see cref="NResilience.Hedge.WinRate" />. Off unless the section says so, which is
+    ///     <c>"Hedge": { "WinRate": { "Floor": 0.2 } }</c>.
+    /// </summary>
+    public WinRateOptions? WinRate { get; set; }
+
     /// <summary>Projects onto the value the policy carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
     public Hedge ToHedge()
@@ -522,7 +528,73 @@ public sealed class HedgeOptions
         if (SuppressAt is { } suppressAt)
             hedge = hedge with { SuppressAt = suppressAt };
 
+        if (WinRate is { } feedback)
+            hedge = hedge with { WinRate = feedback.ToWinRate() };
+
         return hedge;
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.WinRate" />.
+/// </summary>
+/// <remarks>
+///     Opt-in, like <see cref="BackoffBaseOptions" /> and unlike the rest of
+///     <see cref="HedgeOptions" />: it is a control loop over a control loop, and its failure mode - the
+///     dependency whose tail no second attempt can route around is exactly the one it retreats from - is
+///     not something the library decides on a caller's behalf. See <see cref="NResilience.WinRate" />.
+/// </remarks>
+public sealed class WinRateOptions
+{
+    /// <summary>
+    ///     Whether hedges are held back when they stop winning. <c>false</c> drops a loop the base policy
+    ///     carried, whatever else this section says.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
+    ///     The fraction of hedges that has to win. Defaults to 0.2, and must be in <c>(0, 1)</c> -
+    ///     <c>"Enabled": false</c> is how a section turns the feedback off.
+    /// </summary>
+    public double? Floor { get; set; }
+
+    /// <summary><see cref="NResilience.WinRate.Window" />.</summary>
+    public TimeSpan? Window { get; set; }
+
+    /// <summary><see cref="NResilience.WinRate.MinimumSamples" />.</summary>
+    public int? MinimumSamples { get; set; }
+
+    /// <summary><see cref="NResilience.WinRate.MinimumAllowance" />.</summary>
+    public double? MinimumAllowance { get; set; }
+
+    /// <summary>Projects onto the value the policy carries, or null when the section turned it off.</summary>
+    /// <returns>The configuration, or null.</returns>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Floor" /> is zero, which is the shape an off switch would take.</exception>
+    public WinRate? ToWinRate()
+    {
+        if (Enabled is false)
+            return null;
+
+        if (Floor is 0)
+        {
+            throw RetiredOffSwitch.For(
+                "Hedge.WinRate",
+                nameof(Floor),
+                "A win rate no hedge can fall below is feedback that never acts.");
+        }
+
+        var feedback = WinRate.Above(Floor ?? WinRate.DefaultFloor);
+
+        if (Window is { } window)
+            feedback = feedback with { Window = window };
+
+        if (MinimumSamples is { } samples)
+            feedback = feedback with { MinimumSamples = samples };
+
+        if (MinimumAllowance is { } allowance)
+            feedback = feedback with { MinimumAllowance = allowance };
+
+        return feedback;
     }
 }
 

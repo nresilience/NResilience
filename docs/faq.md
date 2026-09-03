@@ -37,7 +37,7 @@ It is here, and it is opt-in: set `Hedge = Hedge.At(0.95)`. See [Hedging](featur
 
 Issuing a second request before the first fails multiplies load on a dependency exactly when it is slow. That objection is correct - against a **fixed** delay, which is why there is no `Hedge.After(TimeSpan)`. Hedging against a live quantile of recent latency removes the failure mode by construction: a brownout carries the quantile up with it, so the fraction of calls that hedge stays at about `1 - Quantile`.
 
-The three gates a hedge passes are a budget, an adaptive latency threshold, and a per-request idempotency strategy. See [Hedging internals](deep-dives/hedging-internals.md) for the argument.
+The three gates a hedge passes are a budget, an adaptive latency threshold, and a per-request idempotency strategy. Two more stop hedging a dependency that cannot use it: `SuppressAt` once its error rate climbs towards its breaker's trip point, and `WinRate` once hedges have stopped winning often enough to be worth their load. See [Hedging internals](deep-dives/hedging-internals.md) for the argument.
 
 ### Where is a rate limiter?
 `NResilience.Extensions` provides one, and it does not reimplement `System.Threading.RateLimiting` - it gives the platform's limiters a correct place to stand. See [Rate limiting](features/rate-limiting.md).

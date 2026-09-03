@@ -274,6 +274,7 @@ public sealed class TelemetryTests
     [InlineData(CallEventKind.HedgeDiscarded, false)]
     [InlineData(CallEventKind.AttemptTimeoutAdapted, false)]
     [InlineData(CallEventKind.BackoffBaseAdapted, false)]
+    [InlineData(CallEventKind.HedgeSuppressed, false)]
     public void IsRejection_covers_the_two_refusals(CallEventKind kind, bool expected) =>
         Assert.Equal(expected, CallEvent.Create(kind).IsRejection);
 
@@ -300,6 +301,7 @@ public sealed class TelemetryTests
     [InlineData(CallEventKind.HedgeDiscarded, false)]
     [InlineData(CallEventKind.AttemptTimeoutAdapted, false)]
     [InlineData(CallEventKind.BackoffBaseAdapted, false)]
+    [InlineData(CallEventKind.HedgeSuppressed, false)]
     public void IsTerminal_covers_the_kinds_that_end_a_call(CallEventKind kind, bool expected) =>
         Assert.Equal(expected, CallEvent.Create(kind).IsTerminal);
 
@@ -309,7 +311,7 @@ public sealed class TelemetryTests
     /// </summary>
     [Fact]
     public void The_kind_predicates_are_asserted_over_every_kind() =>
-        Assert.Equal(18, Enum.GetValues<CallEventKind>().Length);
+        Assert.Equal(19, Enum.GetValues<CallEventKind>().Length);
 
     /// <summary>
     ///     <see cref="CallEvent.Create" /> exists so a listener can be tested without the executor, and

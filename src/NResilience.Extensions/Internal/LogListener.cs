@@ -118,6 +118,12 @@ internal sealed class LogListener
 
                 break;
 
+            case CallEventKind.HedgeSuppressed:
+                if (Level(Log.Ids.HedgeSuppressed, e) is { } suppressed)
+                    Log.HedgeSuppressed(_logger, suppressed, policy, e.AttemptNumber, Ms(e.Delay));
+
+                break;
+
             case CallEventKind.HedgeWon:
                 if (Level(Log.Ids.HedgeWon, e) is { } won)
                     Log.HedgeWon(_logger, won, policy, e.AttemptNumber, Ms(e.Duration));
@@ -291,6 +297,11 @@ internal sealed class LogListener
         Log.Codes.HedgeStarted => LogLevel.Trace,
         Log.Codes.HedgeWon => LogLevel.Trace,
         Log.Codes.HedgeDiscarded => LogLevel.Trace,
+
+        // Debug rather than Trace, unlike the three records beside it. A hedge that started is
+        // ordinary traffic; a hedge held back is this process deciding that a feature the operator
+        // turned on has stopped being worth its load, and the operator reading Default should see it.
+        Log.Codes.HedgeSuppressed => LogLevel.Debug,
         Log.Codes.PolicyClassifier => LogLevel.Trace,
         Log.Codes.NotRetriedFirstSighting => LogLevel.Warning,
         Log.Codes.RejectedDependencyUnavailable => LogLevel.Warning,

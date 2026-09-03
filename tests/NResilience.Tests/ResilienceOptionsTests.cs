@@ -395,6 +395,7 @@ public sealed class ResilienceOptionsTests
     [InlineData("Breaker:SlowCalls:Multiple", "SlowCalls")]
     [InlineData("Breaker:Failures:Multiple", "Failures")]
     [InlineData("Breaker:Recovery:Length", "Recovery")]
+    [InlineData("Hedge:WinRate:Floor", "Hedge.WinRate")]
     public void A_retired_off_switch_names_the_one_that_replaced_it(string key, string section)
     {
         var options = new ResilienceOptions();
@@ -798,6 +799,13 @@ public sealed class ResilienceOptionsTests
                 MinimumDelay = TimeSpan.FromMilliseconds(25),
                 Window = TimeSpan.FromSeconds(10),
                 SuppressAt = 0.25,
+                WinRate = new WinRateOptions
+                {
+                    Floor = 0.3,
+                    Window = TimeSpan.FromMinutes(2),
+                    MinimumSamples = 25,
+                    MinimumAllowance = 0.1,
+                },
             },
         }.ToPolicy();
 
@@ -809,6 +817,47 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(TimeSpan.FromMilliseconds(25), hedge.MinimumDelay);
         Assert.Equal(TimeSpan.FromSeconds(10), hedge.Window);
         Assert.Equal(0.25, hedge.SuppressAt);
+
+        var feedback = Assert.NotNull(hedge.WinRate);
+
+        Assert.Equal(0.3, feedback.Floor);
+        Assert.Equal(TimeSpan.FromMinutes(2), feedback.Window);
+        Assert.Equal(25, feedback.MinimumSamples);
+        Assert.Equal(0.1, feedback.MinimumAllowance);
+    }
+
+    /// <summary>
+    ///     The win-rate loop is opt-in, unlike the error-rate suppression beside it: it is a control
+    ///     loop over a control loop, so a section that says nothing about it gets none.
+    /// </summary>
+    [Fact]
+    public void No_win_rate_feedback_unless_the_section_asks_for_one()
+    {
+        var options = new ResilienceOptions();
+        Config(("Hedge:Quantile", "0.99")).Bind(options);
+
+        Assert.Null(options.ToPolicy().Hedge!.Value.WinRate);
+
+        Config(("Hedge:WinRate:Floor", "0.2")).Bind(options);
+
+        Assert.Equal(WinRate.Above(0.2), options.ToPolicy().Hedge!.Value.WinRate);
+    }
+
+    /// <summary><c>"Enabled": false</c> drops a loop the base policy carried.</summary>
+    [Fact]
+    public void A_disabled_win_rate_section_drops_the_base_policys_loop()
+    {
+        var baseline = Resilience.Default with
+        {
+            Hedge = Hedge.At(0.95) with { WinRate = WinRate.Above(0.2) },
+        };
+
+        var policy = new ResilienceOptions
+        {
+            Hedge = new HedgeOptions { WinRate = new WinRateOptions { Enabled = false } },
+        }.ToPolicy(baseline);
+
+        Assert.Null(policy.Hedge!.Value.WinRate);
     }
 
     /// <summary>

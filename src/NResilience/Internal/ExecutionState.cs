@@ -45,6 +45,8 @@ internal sealed class ExecutionState
 
     private readonly LatencyWindow? _backoffBase;
 
+    private readonly WinWindow? _winRate;
+
     /// <summary>
     ///     The last measured ceiling reported for this policy instance, in ticks. Zero until one is,
     ///     which no real ceiling can be.
@@ -84,6 +86,12 @@ internal sealed class ExecutionState
         _backoffBase = policy.Backoff.Measured is { } measured
             ? new LatencyWindow(measured.Quantile, measured.Window, policy.Time)
             : null;
+
+        // Not a latency window at all: this one counts hedges won against hedges started, and holds the
+        // allowance that count moves. Same scope argument as the hedge's own estimate - the HTTP handler
+        // derives a policy per host, and whether hedging wins against one host says nothing about
+        // another.
+        _winRate = policy.Hedge is { WinRate: { } feedback } ? new WinWindow(feedback, policy.Time) : null;
     }
 
     /// <summary>Validates the policy on its first execution, and caches the result per thread.</summary>
@@ -151,6 +159,18 @@ internal sealed class ExecutionState
     ///     <see cref="AttemptCeilingFor" /> gives.
     /// </remarks>
     public static LatencyWindow? BackoffBaseFor(Resilience policy) => StateFor(policy)._backoffBase;
+
+    /// <summary>
+    ///     The win-rate feedback loop for this policy, or null when it does not have one.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <returns>The loop, or null.</returns>
+    /// <remarks>
+    ///     Read once per hedged execution into a local, unlike <see cref="AttemptCeilingFor" />: the only
+    ///     loop that reaches this is the hedged one, which already holds several such locals and is the
+    ///     one path the allocation gates do not measure.
+    /// </remarks>
+    public static WinWindow? WinRateFor(Resilience policy) => StateFor(policy)._winRate;
 
     /// <summary>
     ///     Whether this measured ceiling differs from the last one reported for this policy instance,

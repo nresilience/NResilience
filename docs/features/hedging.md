@@ -55,6 +55,7 @@ var api = Resilience.Http with
 | `MinimumDelay` | `10 ms` | A floor under the delay, so a dependency with a sub-millisecond p95 does not hedge everything. |
 | `Window` | `30 s` | How much history the estimate covers. |
 | `SuppressAt` | `0.5` | How far towards the breaker's trip point the error rate may climb before hedging stops. |
+| `WinRate` | none | Holds hedges back once they stop winning often enough to be worth their load. Opt-in. |
 
 Pick `Quantile` by the load you are willing to add. Everything else has a working default, so `Hedge.At(0.95)` is a complete configuration.
 
@@ -81,6 +82,44 @@ The gate requires a `Breaker` to measure the error rate. It remains disarmed unt
 
 > [!NOTE]
 > A dependency with one bad shard often fails but is also the case hedging routes around best; this gate turns hedging off for such dependencies. If a second attempt often resolves your errors, increase `SuppressAt` or set it to `1` to suppress hedging only when the breaker opens.
+
+## Stop hedging when hedging stops helping
+
+`SuppressAt` asks whether the dependency is healthy enough to take extra load. `WinRate` asks the other question: whether the extra load is buying anything.
+
+Hedging only shortens the tail if the second attempt is independent enough of the first to win sometimes. Against one slow shard it wins often. Against a dependency that is uniformly slow because it is overloaded, the second leg is exactly as slow as the first, so hedging wins nothing and adds load to a service that is already struggling. No configuration can tell those apart in advance, but the policy can measure it - it already counts hedges started and hedges won.
+
+<!-- snippet: hedging-win-rate -->
+```csharp
+// Hedging only shortens the tail if the second attempt is independent enough of the first to
+// win sometimes. Against a dependency that is uniformly slow because it is overloaded, it
+// never is - so track how often hedges actually win, and hedge less when they stop.
+var api = Resilience.Http with
+{
+    Hedge = Hedge.At(quantile: 0.95) with
+    {
+        // Keep hedging while at least one hedge in five produces the answer.
+        WinRate = WinRate.Above(floor: 0.2),
+    },
+};
+```
+<!-- endsnippet -->
+
+Set `WinRate` and the policy tracks how often hedges win. A window in which fewer than `Floor` of them do **halves** the fraction of would-be hedges that start; a window that clears it **adds a quarter back**. Multiplicative retreat, additive return - the same asymmetry [ramped recovery](circuit-breaker.md#hand-the-traffic-back-over-a-ramp) uses, because hedging too much costs the dependency and hedging too little costs this process.
+
+| Property | Default | What it means |
+| :--- | :--- | :--- |
+| `Floor` | - | The fraction of hedges that has to win. `0.2` is one in five. |
+| `Window` | `1 min` | How much history the win rate covers. A quarter of it is one decision. |
+| `MinimumSamples` | `10` | How many hedges the window needs before the loop has an opinion. |
+| `MinimumAllowance` | `0.05` | The least hedging it retreats to. `0` is no floor at all. |
+
+The loop is off until you set it, and needs no `Breaker`: the evidence is hedges won over hedges started, which the policy measures itself. A held-back hedge raises `HedgeSuppressed` and counts as `nresilience.hedges{outcome=suppressed}`.
+
+> [!CAUTION]
+> A dependency whose tail no second attempt can route around is exactly what this loop retreats from - and the tail is still real. Read a climbing `suppressed` count as "hedging has stopped helping", not as "the dependency is healthy again".
+
+See [Hedging internals](../deep-dives/hedging-internals.md#when-the-extra-load-buys-nothing) for why the loop moves the load rather than the threshold, and why its return runs on the clock.
 
 ## Hold the policy
 
@@ -149,6 +188,7 @@ Three [events](telemetry.md) describe a race, and the attempt log records both l
 | `HedgeStarted` | A copy was started. `Delay` carries the threshold that triggered it, which is the live quantile itself. |
 | `HedgeWon` | The copy produced the answer, so this call saw the shorter of two draws. |
 | `HedgeDiscarded` | An attempt was cancelled because a sibling answered first. `Duration` is how long it had been running. |
+| `HedgeSuppressed` | A call got slow enough to hedge and the hedge was held back, by `SuppressAt` or by `WinRate`. `Delay` carries the same threshold `HedgeStarted` does, so the two count against each other. |
 
 <!-- snippet: hedging-events -->
 ```csharp
@@ -167,7 +207,7 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
-In `NResilience.Extensions`, the same facts arrive as `nresilience.hedges` tagged `started`, `won` and `discarded`, plus `nresilience.hedge.threshold` - the adaptive threshold, recorded each time a hedge fires. Watching that number during an incident tells a brownout from a tail.
+In `NResilience.Extensions`, the same facts arrive as `nresilience.hedges` tagged `started`, `won`, `discarded` and `suppressed`, plus `nresilience.hedge.threshold` - the adaptive threshold, recorded each time a hedge fires. Watching that number during an incident tells a brownout from a tail.
 
 The [attempt log](../reference/call-result.md) shows both legs, and a discarded one reads as what it is:
 

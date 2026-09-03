@@ -144,6 +144,7 @@ NResilience.CallEventKind.DeadlineExceeded = 6 -> NResilience.CallEventKind
 NResilience.CallEventKind.Exhausted = 12 -> NResilience.CallEventKind
 NResilience.CallEventKind.HedgeDiscarded = 15 -> NResilience.CallEventKind
 NResilience.CallEventKind.HedgeStarted = 13 -> NResilience.CallEventKind
+NResilience.CallEventKind.HedgeSuppressed = 18 -> NResilience.CallEventKind
 NResilience.CallEventKind.HedgeWon = 14 -> NResilience.CallEventKind
 NResilience.CallEventKind.NestedRetry = 11 -> NResilience.CallEventKind
 NResilience.CallEventKind.NotRetried = 3 -> NResilience.CallEventKind
@@ -214,6 +215,8 @@ NResilience.Hedge.Quantile.get -> double
 NResilience.Hedge.Quantile.init -> void
 NResilience.Hedge.SuppressAt.get -> double
 NResilience.Hedge.SuppressAt.init -> void
+NResilience.Hedge.WinRate.get -> NResilience.WinRate?
+NResilience.Hedge.WinRate.init -> void
 NResilience.Hedge.Window.get -> System.TimeSpan
 NResilience.Hedge.Window.init -> void
 NResilience.Http.HttpResilienceOptions
@@ -382,11 +385,23 @@ NResilience.VerdictKind.Ok = 0 -> NResilience.VerdictKind
 NResilience.VerdictKind.Permanent = 3 -> NResilience.VerdictKind
 NResilience.VerdictKind.Throttled = 2 -> NResilience.VerdictKind
 NResilience.VerdictKind.Transient = 1 -> NResilience.VerdictKind
+NResilience.WinRate
+NResilience.WinRate.Equals(NResilience.WinRate other) -> bool
+NResilience.WinRate.Floor.get -> double
+NResilience.WinRate.Floor.init -> void
+NResilience.WinRate.MinimumAllowance.get -> double
+NResilience.WinRate.MinimumAllowance.init -> void
+NResilience.WinRate.MinimumSamples.get -> int
+NResilience.WinRate.MinimumSamples.init -> void
+NResilience.WinRate.WinRate() -> void
+NResilience.WinRate.Window.get -> System.TimeSpan
+NResilience.WinRate.Window.init -> void
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
 const NResilience.BackoffBase.DefaultMultiple = 1 -> double
 const NResilience.Http.ResilienceHttp.NestedRetryHeader = "X-NResilience-Retrying" -> string!
 const NResilience.ResilienceDeadline.Header = "X-Deadline-Ms" -> string!
 const NResilience.ResilienceNestedRetry.Marker = "1" -> string!
+const NResilience.WinRate.DefaultFloor = 0.2 -> double
 override NResilience.Attempt.ToString() -> string!
 override NResilience.AttemptCeiling.GetHashCode() -> int
 override NResilience.AttemptCeiling.ToString() -> string!
@@ -413,6 +428,8 @@ override NResilience.SlowCalls.ToString() -> string!
 override NResilience.Verdict.Equals(object? obj) -> bool
 override NResilience.Verdict.GetHashCode() -> int
 override NResilience.Verdict.ToString() -> string!
+override NResilience.WinRate.GetHashCode() -> int
+override NResilience.WinRate.ToString() -> string!
 static NResilience.AttemptCeiling.Above(double multiple = 3) -> NResilience.AttemptCeiling
 static NResilience.AttemptCeiling.operator !=(NResilience.AttemptCeiling left, NResilience.AttemptCeiling right) -> bool
 static NResilience.AttemptCeiling.operator ==(NResilience.AttemptCeiling left, NResilience.AttemptCeiling right) -> bool
@@ -484,6 +501,9 @@ static NResilience.Verdict.Throttled(System.TimeSpan? retryAfter = null) -> NRes
 static NResilience.Verdict.Transient.get -> NResilience.Verdict
 static NResilience.Verdict.operator !=(NResilience.Verdict left, NResilience.Verdict right) -> bool
 static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Verdict right) -> bool
+static NResilience.WinRate.Above(double floor = 0.2) -> NResilience.WinRate
+static NResilience.WinRate.operator !=(NResilience.WinRate left, NResilience.WinRate right) -> bool
+static NResilience.WinRate.operator ==(NResilience.WinRate left, NResilience.WinRate right) -> bool
 ~override NResilience.AttemptCeiling.Equals(object obj) -> bool
 ~override NResilience.Backoff.Equals(object obj) -> bool
 ~override NResilience.Backoff.ToString() -> string
@@ -492,3 +512,4 @@ static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Ver
 ~override NResilience.Hedge.Equals(object obj) -> bool
 ~override NResilience.Recovery.Equals(object obj) -> bool
 ~override NResilience.SlowCalls.Equals(object obj) -> bool
+~override NResilience.WinRate.Equals(object obj) -> bool

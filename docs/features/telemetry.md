@@ -53,6 +53,7 @@ A lambda is still the right answer for anything that is not an `ILogger`. If it 
 | `HedgeStarted` | A copy of a slow attempt was started. `Delay` carries the live [latency quantile](hedging.md) that triggered it | No |
 | `HedgeWon` | The copy answered, so this call saw the shorter of two draws | No |
 | `HedgeDiscarded` | An attempt was cancelled because a sibling answered first | No |
+| `HedgeSuppressed` | A call got slow enough to hedge and the hedge was held back | No |
  
 **Every call ends with exactly one terminal event.** That invariant is what makes counts of logical operations accurate. Use the `IsTerminal` property to identify these events. `IsRejection` is true for the two refusal kinds; use it when a listener treats both rejections alike.
 
@@ -99,7 +100,7 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.rejections` | `{rejection}` | Calls refused by a guard, tagged `dependency_unavailable` or `budget_exhausted` |
 | `nresilience.call.duration` | s | End-to-end duration of a logical operation |
 | `nresilience.attempt.duration` | s | Duration of a single attempt |
-| `nresilience.hedges` | `{hedge}` | [Hedged](hedging.md) attempts, tagged `started`, `won` or `discarded` |
+| `nresilience.hedges` | `{hedge}` | [Hedged](hedging.md) attempts, tagged `started`, `won`, `discarded` or `suppressed` |
 | `nresilience.hedge.threshold` | s | The latency quantile a hedge fired at, recorded when it fired |
 | `nresilience.attempt.timeout` | s | The measured per-attempt [ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), recorded when it changes - which, since the ceiling is measured by default, is on every policy with an `AttemptTimeout` |
 | `nresilience.backoff.base` | s | The measured [backoff base](retry.md#measure-the-backoff-base-instead-of-guessing-it), recorded when it changes. Reported only by a policy that configures `Backoff.Measured` |

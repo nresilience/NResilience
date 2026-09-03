@@ -72,6 +72,33 @@ public sealed class Hedging
     }
 
     /// <summary>
+    ///     The other question, and the one no configuration can answer in advance: whether a second
+    ///     attempt is independent enough of the first to ever win.
+    /// </summary>
+    [Fact]
+    public void Hedging_stops_once_it_stops_winning()
+    {
+        // <snippet:hedging-win-rate>
+        // Hedging only shortens the tail if the second attempt is independent enough of the first to
+        // win sometimes. Against a dependency that is uniformly slow because it is overloaded, it
+        // never is - so track how often hedges actually win, and hedge less when they stop.
+        var api = Resilience.Http with
+        {
+            Hedge = Hedge.At(quantile: 0.95) with
+            {
+                // Keep hedging while at least one hedge in five produces the answer.
+                WinRate = WinRate.Above(floor: 0.2),
+            },
+        };
+
+        // </snippet:hedging-win-rate>
+
+        api.Validate();
+
+        Assert.Equal(expected: 0.2, actual: api.Hedge!.Value.WinRate!.Value.Floor);
+    }
+
+    /// <summary>
     ///     The estimate belongs to the policy instance, so the policy has to outlive the call. Exactly
     ///     the rule the automatic retry budget already follows, and the failure mode is the same: a
     ///     policy rebuilt per call never learns anything and therefore never hedges.
