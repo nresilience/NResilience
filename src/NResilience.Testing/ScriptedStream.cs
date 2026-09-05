@@ -41,7 +41,7 @@ public static class ScriptedStream
 ///         possibly delayed before the first - or an exception thrown from the source's first pull.
 ///         Elements after the first are served without delay, because the streaming path's machinery
 ///         stops at the first element; a script that wants to exercise a mid-stream fault pairs
-///         elements with a <see cref="FaultsAfter" /> fault on the same step.
+///         elements with a <see cref="ThrowsAfter" /> fault on the same step.
 ///     </para>
 ///     <para>
 ///         Like <see cref="Sequence{T}" />, building is not thread-safe and is not meant to; serving
@@ -96,8 +96,13 @@ public sealed class ScriptedStream<T>
 
     /// <summary>
     ///     Appends a step that yields <paramref name="elements" />, waiting <paramref name="delay" />
-    ///     before the first one.
+    ///     before the first one. Shorthand for <c>.Delays(delay).Yields(elements)</c>.
     /// </summary>
+    /// <remarks>
+    ///     The <c>After</c> here is a delay, where <see cref="ThrowsAfter" />'s is the elements the
+    ///     step served first. The two are told apart by what they take, and by the pairing:
+    ///     <c>Yields*</c> is what comes out, <c>Throws*</c> is what goes wrong.
+    /// </remarks>
     public ScriptedStream<T> YieldsAfter(TimeSpan delay, params ReadOnlySpan<T> elements)
     {
         Delays(delay);
@@ -135,11 +140,18 @@ public sealed class ScriptedStream<T>
     ///     <paramref name="exception" /> mid-stream, from the pull after the last element.
     /// </summary>
     /// <remarks>
-    ///     The streaming path stops classifying at the first element, so a fault after one is the
-    ///     consumer's - it propagates out of <c>MoveNextAsync</c> verbatim, unclassified and raising
-    ///     nothing. This step is how a test proves that without hand-rolling its own source.
+    ///     <para>
+    ///         The streaming path stops classifying at the first element, so a fault after one is the
+    ///         consumer's - it propagates out of <c>MoveNextAsync</c> verbatim, unclassified and raising
+    ///         nothing. This step is how a test proves that without hand-rolling its own source.
+    ///     </para>
+    ///     <para>
+    ///         Same event as <see cref="Throws" />, at a later point in the stream, which is why it is
+    ///         named for the same verb: <c>Yields*</c> is what comes out and <c>Throws*</c> is what goes
+    ///         wrong.
+    ///     </para>
     /// </remarks>
-    public ScriptedStream<T> FaultsAfter(Exception exception, params ReadOnlySpan<T> elements)
+    public ScriptedStream<T> ThrowsAfter(Exception exception, params ReadOnlySpan<T> elements)
     {
         ArgumentNullException.ThrowIfNull(exception);
 
@@ -198,7 +210,7 @@ public sealed class ScriptedStream<T>
             throw new InvalidOperationException(
                 $"The scripted stream has {_steps.Count} step(s) and attempt {index + 1} asked for one more." +
                 (_hasPendingDelay && _pendingDelay > TimeSpan.Zero
-                    ? " A trailing Delays() was scripted with no Yields(), YieldsNothing(), Throws() or FaultsAfter() after it, so it is not a step."
+                    ? " A trailing Delays() was scripted with no Yields(), YieldsNothing(), Throws() or ThrowsAfter() after it, so it is not a step."
                     : " Script the attempts the policy will actually make - retries included."));
         }
 

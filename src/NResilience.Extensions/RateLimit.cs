@@ -120,10 +120,20 @@ public static class Limit
     ///         normally is, the limit shrinks, and when it is not, the limit probes upward by one.
     ///     </para>
     /// </summary>
+    /// <param name="initial">
+    ///     Where the limit starts, before enough calls have been seen to measure anything. Defaults to
+    ///     <see cref="AdaptiveLimitOptions.Initial" />, and overrides it when both are given.
+    /// </param>
+    /// <param name="maximum">
+    ///     The ceiling the limit may never go above. Defaults to
+    ///     <see cref="AdaptiveLimitOptions.Maximum" />, and overrides it when both are given. This is the
+    ///     one number worth setting per dependency: it is what the loop cannot exceed when the baseline
+    ///     is wrong.
+    /// </param>
     /// <param name="options">
-    ///     The bounds and the gains. <see cref="AdaptiveLimitOptions.Minimum" /> and
-    ///     <see cref="AdaptiveLimitOptions.Maximum" /> are the two worth setting per dependency; they are
-    ///     what the loop cannot leave when the signal is wrong.
+    ///     The rest of the bounds and the gains - the floor, the multiple that counts as congestion, and
+    ///     how hard a congested round backs off. Every property has a working default, so this is
+    ///     optional and <c>Limit.Adaptive()</c> is a complete limiter.
     /// </param>
     /// <param name="queueLimit">How many callers may wait for a permit. Zero refuses immediately; see <see cref="PerSecond" />.</param>
     /// <param name="name">
@@ -136,18 +146,50 @@ public static class Limit
     ///     The limiter, typed as itself rather than as <see cref="RateLimiter" /> so a dashboard can read
     ///     <see cref="AdaptiveLimiter.CurrentLimit" />. The caller owns it and should dispose it.
     /// </returns>
-    /// <exception cref="ArgumentNullException"><paramref name="options" /> is null.</exception>
+    /// <example>
+    ///     <code>
+    /// using var limiter = Limit.Adaptive(maximum: 500);
+    /// </code>
+    /// </example>
+    /// <remarks>
+    ///     <paramref name="initial" /> and <paramref name="maximum" /> are lifted out of
+    ///     <see cref="AdaptiveLimitOptions" /> because they are the two a caller sets by hand, and every
+    ///     other limiter here is one line at the call site. The options object is not mutated: the two
+    ///     arguments are applied to a copy.
+    /// </remarks>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="queueLimit" /> is negative.</exception>
     /// <exception cref="ResilienceConfigurationException">The options do not describe a limit the loop can move within.</exception>
-    public static AdaptiveLimiter Adaptive(AdaptiveLimitOptions options, int queueLimit = 0, string? name = null, TimeProvider? time = null)
+    public static AdaptiveLimiter Adaptive(
+        int? initial = null,
+        int? maximum = null,
+        AdaptiveLimitOptions? options = null,
+        int queueLimit = 0,
+        string? name = null,
+        TimeProvider? time = null)
     {
-        ArgumentNullException.ThrowIfNull(options);
-        options.Validate();
+        var settings = Merge(options, initial, maximum);
+        settings.Validate();
 
         if (queueLimit < 0)
             throw new ArgumentOutOfRangeException(nameof(queueLimit), queueLimit, "The queue limit cannot be negative.");
 
-        return new AdaptiveLimiter(options, queueLimit, name, time ?? TimeProvider.System);
+        return new AdaptiveLimiter(settings, queueLimit, name, time ?? TimeProvider.System);
+    }
+
+    // A copy rather than the caller's instance, so Adaptive(maximum: 500, options: shared) cannot
+    // reach back and change what a limiter built earlier from the same object is running on.
+    private static AdaptiveLimitOptions Merge(AdaptiveLimitOptions? options, int? initial, int? maximum)
+    {
+        options ??= new AdaptiveLimitOptions();
+
+        return new AdaptiveLimitOptions
+        {
+            Initial = initial ?? options.Initial,
+            Minimum = options.Minimum,
+            Maximum = maximum ?? options.Maximum,
+            Multiple = options.Multiple,
+            DecreaseFactor = options.DecreaseFactor,
+        };
     }
 
     private static void Check(int permits, int queueLimit)

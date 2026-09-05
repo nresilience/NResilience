@@ -19,7 +19,7 @@ public sealed class HealthCheckTests
 
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -39,7 +39,7 @@ public sealed class HealthCheckTests
 
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         Assert.DoesNotContain("breaker:api:normal", (await Check(provider)).Data.Keys);
 
@@ -65,7 +65,7 @@ public sealed class HealthCheckTests
 
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -79,13 +79,13 @@ public sealed class HealthCheckTests
     {
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = Tripped() })
-            .AddHealthChecks().AddResilience(configure: o => o.BreakerOpenStatus = HealthStatus.Unhealthy));
+            .AddHealthChecks().AddResilienceHealthCheck(configure: o => o.BreakerOpenStatus = HealthStatus.Unhealthy));
 
         Assert.Equal(HealthStatus.Unhealthy, (await Check(provider)).Status);
 
         using var lenient = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = Tripped() })
-            .AddHealthChecks().AddResilience(configure: o => o.BreakerOpenStatus = HealthStatus.Healthy));
+            .AddHealthChecks().AddResilienceHealthCheck(configure: o => o.BreakerOpenStatus = HealthStatus.Healthy));
 
         Assert.Equal(HealthStatus.Healthy, (await Check(lenient)).Status);
     }
@@ -98,7 +98,7 @@ public sealed class HealthCheckTests
 
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -113,7 +113,7 @@ public sealed class HealthCheckTests
 
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Budget = budget })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -133,7 +133,7 @@ public sealed class HealthCheckTests
 
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Budget = budget })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -151,7 +151,7 @@ public sealed class HealthCheckTests
         using var provider = Provider(services => services
             .AddResilience("off", Resilience.Default with { Budget = RetryBudget.None })
             .AddResilience("auto", Resilience.Default with { Budget = RetryBudget.Automatic })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -174,7 +174,7 @@ public sealed class HealthCheckTests
                 .AddResilience(TestPolicy.InstantHttp)
                 .ConfigurePrimaryHttpMessageHandler(() => transport);
 
-            services.AddHealthChecks().AddResilience();
+            services.AddHealthChecks().AddResilienceHealthCheck();
         });
 
         // A host gets a scope on first use, so the client has to have been used.
@@ -198,7 +198,7 @@ public sealed class HealthCheckTests
                 .AddResilience(TestPolicy.InstantHttp)
                 .ConfigurePrimaryHttpMessageHandler(() => transport);
 
-            services.AddHealthChecks().AddResilience(configure: o => o.IncludeHttpClients = false);
+            services.AddHealthChecks().AddResilienceHealthCheck(configure: o => o.IncludeHttpClients = false);
         });
 
         using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("api");
@@ -213,7 +213,7 @@ public sealed class HealthCheckTests
         var breaker = Tripped();
 
         using var provider = Provider(services => services
-            .AddHealthChecks().AddResilience(configure: o => o.Watch("payments", breaker)));
+            .AddHealthChecks().AddResilienceHealthCheck(configure: o => o.Watch("payments", breaker)));
 
         var report = await Check(provider);
 
@@ -224,7 +224,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task A_process_with_nothing_to_report_says_so_rather_than_claiming_health()
     {
-        using var provider = Provider(services => services.AddHealthChecks().AddResilience());
+        using var provider = Provider(services => services.AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -238,13 +238,13 @@ public sealed class HealthCheckTests
         var services = new ServiceCollection();
 
         Assert.Throws<ResilienceConfigurationException>(() =>
-            services.AddHealthChecks().AddResilience(configure: o => o.BudgetThreshold = 1.5));
+            services.AddHealthChecks().AddResilienceHealthCheck(configure: o => o.BudgetThreshold = 1.5));
     }
 
     [Fact]
     public async Task The_check_registers_under_a_name_of_your_choosing()
     {
-        using var provider = Provider(services => services.AddHealthChecks().AddResilience("nresilience"));
+        using var provider = Provider(services => services.AddHealthChecks().AddResilienceHealthCheck("nresilience"));
 
         var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync();
 
@@ -300,7 +300,7 @@ public sealed class HealthCheckTests
 
         using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
-            .AddHealthChecks().AddResilience());
+            .AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 

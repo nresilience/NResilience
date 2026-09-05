@@ -48,7 +48,7 @@ public sealed class HedgeTests
 
         var race = await RaceAsync(policy, time);
 
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.Equal(1, race.Calls);
     }
 
@@ -109,7 +109,7 @@ public sealed class HedgeTests
 
         var race = await RaceAsync(policy, time);
 
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.False(race.Result.IsSuccess);
         Assert.Equal(StopReason.DependencyUnavailable, race.Result.Reason);
     }
@@ -136,7 +136,7 @@ public sealed class HedgeTests
 
         var race = await RaceAsync(policy, time);
 
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.Equal(1, race.Calls);
     }
 
@@ -159,7 +159,7 @@ public sealed class HedgeTests
         var race = await RaceAsync(policy, time);
 
         // The estimate says 10 ms, the floor says 5 s, and the pump below only moves 200 ms.
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.Equal(1, race.Calls);
     }
 
@@ -207,7 +207,7 @@ public sealed class HedgeTests
 
         var during = await RaceAsync(policy, time);
 
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.Equal(1, during.Calls);
     }
 
@@ -607,7 +607,7 @@ public sealed class HedgeTests
         });
 
         Assert.Equal(7, value);
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
     }
 
     /// <summary>A hedged policy that never hedges still retries, backs off and classifies the same way.</summary>
@@ -654,7 +654,7 @@ public sealed class HedgeTests
         }, caller.Token).AsTask();
 
         // Wait for the hedge, so there are two legs to cancel rather than one.
-        for (var i = 0; i < 100 && !events.Contains(CallEventKind.HedgeStarted); i++)
+        for (var i = 0; i < 100 && events.CountOf(CallEventKind.HedgeStarted) == 0; i++)
         {
             time.Advance(TimeSpan.FromMilliseconds(20));
             await Task.Delay(1);
@@ -696,7 +696,7 @@ public sealed class HedgeTests
             });
         }
 
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
     }
 
     // ---- The reading ----

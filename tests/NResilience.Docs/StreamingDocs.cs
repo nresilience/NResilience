@@ -78,7 +78,7 @@ public sealed class StreamingDocs
     public async Task A_post_start_fault_is_the_consumers()
     {
         var midStream = new InvalidOperationException("the dependency broke mid-stream");
-        var streams = ScriptedStream.For<int>().FaultsAfter(midStream, 1, 2);
+        var streams = ScriptedStream.For<int>().ThrowsAfter(midStream, 1, 2);
 
         var received = new List<int>();
         InvalidOperationException? fault = null;

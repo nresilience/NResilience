@@ -72,7 +72,7 @@ public readonly record struct WinRate
     ///     below that, hedging at <c>0.95</c> is spending 5% extra load to shorten under 1% of calls,
     ///     which is not the trade the feature was turned on for.
     /// </summary>
-    public const double DefaultMinimum = 0.2;
+    internal const double DefaultMinimum = 0.2;
 
     /// <summary>How many hedges the estimate needs, when <see cref="MinimumSamples" /> was not set.</summary>
     private const int DefaultMinimumSamples = 10;

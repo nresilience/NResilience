@@ -68,7 +68,7 @@ public readonly record struct MeasuredBase
     ///     that the first attempt's work has plausibly cleared the dependency, short enough that a
     ///     three-attempt policy still fits inside a deadline sized for one.
     /// </summary>
-    public const double DefaultMultiple = 1.0;
+    internal const double DefaultMultiple = 1.0;
 
     /// <summary>
     ///     The quantile that counts as normal when <see cref="Quantile" /> was not set: the median.

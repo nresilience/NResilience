@@ -41,7 +41,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         await WarmAsync(policy, time, Fast, 19);
 
         Assert.Null(policy.Measured.AttemptCeiling);
-        Assert.False(events.Contains(CallEventKind.AttemptCeilingAdapted));
+        Assert.Equal(0, events.CountOf(CallEventKind.AttemptCeilingAdapted));
     }
 
     /// <summary>One more sample crosses the minimum, and the ceiling appears without anyone naming a millisecond.</summary>
@@ -141,7 +141,7 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         // And nothing is reported, because nothing was adapted. The silence is the signal that the
         // dependency has slowed past the point where measuring it buys anything.
-        Assert.False(events.Contains(CallEventKind.AttemptCeilingAdapted));
+        Assert.Equal(0, events.CountOf(CallEventKind.AttemptCeilingAdapted));
     }
 
     /// <summary>
@@ -357,7 +357,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var result = await call;
 
         Assert.True(result.IsSuccess);
-        Assert.True(events.Contains(CallEventKind.HedgeStarted));
+        Assert.True(events.CountOf(CallEventKind.HedgeStarted) > 0);
 
         // The hedge answered, and it could only have started if the first leg outlived the p95 the
         // hedge arms at - which an unfloored ceiling measured from the p50 would not have allowed.

@@ -149,7 +149,7 @@ public sealed class HedgedCallTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(1, posts);
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
     }
 
     private static Resilience Hedging(EventRecorder events) =>

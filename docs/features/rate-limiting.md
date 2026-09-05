@@ -79,9 +79,9 @@ using var perMinute = Limit.PerWindow(permits: 1_000, window: TimeSpan.FromMinut
 // The bulkhead: at most 20 calls in flight at once, whatever their rate.
 using var inFlight = Limit.Concurrency(permits: 20);
 
-// The bulkhead you do not have to size. Set the range it may move within; the number
-// inside it is measured from how the dependency responds under load.
-using var adaptive = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 });
+// The bulkhead you do not have to size. Set the ceiling it may never pass; the number
+// under it is measured from how the dependency responds under load.
+using var adaptive = Limit.Adaptive(maximum: 200);
 ```
 <!-- endsnippet -->
 
@@ -103,10 +103,11 @@ var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitO
 
 <!-- snippet: limit-adaptive -->
 ```csharp
-// No permit count. Minimum and Maximum are guardrails - what the loop may never leave -
-// and the limit between them is read from latency: a round of calls slower than this
-// dependency normally is means a queue downstream, and the limit backs off.
-using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 }, name: "payments");
+// No permit count. The bounds are guardrails - what the loop may never leave - and the
+// limit between them is read from latency: a round of calls slower than this dependency
+// normally is means a queue downstream, and the limit backs off. Pass an
+// AdaptiveLimitOptions for the rest of the knobs; every one of them has a default.
+using var limiter = Limit.Adaptive(maximum: 200, name: "payments");
 
 var api = Resilience.Http;
 
@@ -125,7 +126,7 @@ TimeSpan? normal = limiter.Baseline;
 ```
 <!-- endsnippet -->
 
-You set the range and the loop finds the number inside it:
+You set the range and the loop finds the number inside it. `initial` and `maximum` are parameters of `Limit.Adaptive` itself; the other three live on an `AdaptiveLimitOptions` you pass as `options` when you want them:
 
 | Option | Default | What it is |
 | :--- | :--- | :--- |

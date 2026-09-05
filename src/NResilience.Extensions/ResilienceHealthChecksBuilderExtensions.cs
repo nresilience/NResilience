@@ -6,15 +6,15 @@ using NResilience.Extensions.Internal;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-///     <c>AddResilience()</c> on an <see cref="IHealthChecksBuilder" /> puts every breaker and retry
-///     budget in the process on your health endpoint.
+///     <c>AddResilienceHealthCheck()</c> puts every breaker and retry budget in the process on your
+///     health endpoint.
 /// </summary>
 /// <example>
 ///     <code>
-/// services.AddHealthChecks().AddResilience();
+/// services.AddHealthChecks().AddResilienceHealthCheck();
 ///
 /// // Or with the thresholds and statuses spelled out.
-/// services.AddHealthChecks().AddResilience(configure: o =>
+/// services.AddHealthChecks().AddResilienceHealthCheck(configure: o =>
 /// {
 ///     o.BudgetThreshold = 0.75;
 ///     o.Watch("payments", Policies.PaymentsBreaker);   // a policy held in a static field
@@ -41,12 +41,15 @@ public static class ResilienceHealthChecksBuilderExtensions
     /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
     /// <remarks>
     ///     The check reads state that is already there and contacts nothing, so it is safe on a liveness
-    ///     endpoint as well as a readiness one. What it reports for an open breaker is
+    ///     endpoint as well as a readiness one. The name says <c>HealthCheck</c> where the
+    ///     <see cref="IServiceCollection" /> and <c>IHttpClientBuilder</c> overloads say only
+    ///     <c>AddResilience</c>: those two are one idea at two scopes, and this is a different thing
+    ///     that happens to hang off the same library. What it reports for an open breaker is
     ///     <see cref="HealthStatus.Degraded" /> by default rather than
     ///     <see cref="HealthStatus.Unhealthy" />; <see cref="ResilienceHealthOptions" /> carries the
     ///     reasoning, and both are configurable.
     /// </remarks>
-    public static IHealthChecksBuilder AddResilience(
+    public static IHealthChecksBuilder AddResilienceHealthCheck(
         this IHealthChecksBuilder builder,
         string name = DefaultName,
         Action<ResilienceHealthOptions>? configure = null,

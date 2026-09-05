@@ -36,7 +36,7 @@ Assert.Equal(expected: 3, actual: result.Attempts.Count);
 ```
 <!-- endsnippet -->
 
-`Sequence.For<T>()` chains `Returns`, `Throws`, and `Delays` steps. For void execution overloads, use `Sequence.ForVoid()`. 
+`Sequence.For<T>()` chains `Returns`, `Throws`, and `Delays` steps. For void execution overloads, use `Sequence.ForVoid()`, which chains the same steps with nothing to return. 
 
 ### Sequence behavior
 - **Deterministic outcomes**: Every call to `NextAsync` serves the next step in the script.

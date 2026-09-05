@@ -15,7 +15,7 @@ The `Sequence` class is a factory for scripted call sequences that return pre-de
 | Member | Description |
 | :--- | :--- |
 | `Sequence.For<T>(TimeProvider? time = null)` | Creates a scripted sequence that returns values of type `T`. |
-| `Sequence.ForVoid(TimeProvider? time = null)` | Creates a scripted sequence for void execution overloads, returning a `Sequence<Unit>`. |
+| `Sequence.ForVoid(TimeProvider? time = null)` | Creates a scripted sequence for void execution overloads, returning a `VoidSequence`. |
 
 Pass the same `TimeProvider` to the `Sequence` that you gave the resilience policy, so scripted delays stay deterministic and never become real sleeps.
 
@@ -29,7 +29,6 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 | `Throws(Exception)` / `Throws(Exception, int count)` | Appends one or more steps that throw the specified exception. The same exception instance is used for all counts, allowing for reference equality assertions in tests. |
 | `Delays(TimeSpan)` | Configures the next step to take the specified amount of time to complete. Multiple calls to `Delays` accumulate. |
 | `NextAsync(CancellationToken)` | Serves the next step in the sequence. This is the method typically used as the resilience callback. |
-| `NextVoidAsync(CancellationToken)` | Similar to `NextAsync`, but returns a `Task` to support void execution overloads. |
 | `CallCount` | The total number of calls served, including any call that exceeded the script length. |
 | `Remaining` | The number of steps remaining in the script. |
 
@@ -38,6 +37,19 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 - **Timing**: A step with no delay completes synchronously. A step with a delay suspends execution and observes the provided `CancellationToken`.
 - **Bounds**: If a call is made after the script has been exhausted, the sequence throws an `InvalidOperationException` specifying the script length and the call number.
 - **Thread Safety**: Building the script is not thread-safe, but serving the script via `NextAsync` is thread-safe.
+
+## `VoidSequence`
+
+What `Sequence.ForVoid()` returns: the same script for callbacks that return nothing. Its `NextAsync` returns a bare `Task`, which is what binds it to the void execution overloads - a `Task<T>` is a `Task`, so a result-returning script would always bind to the generic overload instead.
+
+| Member | Description |
+| :--- | :--- |
+| `Returns()` / `Returns(int count)` | Appends one or more steps that complete. |
+| `Throws(Exception)` / `Throws(Exception, int count)` | Appends one or more steps that throw the specified exception. |
+| `Delays(TimeSpan)` | Configures the next step to take the specified amount of time. Accumulates. |
+| `NextAsync(CancellationToken)` | Serves the next step. Use it as the resilience callback. |
+| `CallCount` | The total number of calls served. |
+| `Remaining` | The number of steps remaining in the script. |
 
 ## `ScriptedStream`
 
@@ -57,7 +69,7 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 | `YieldsAfter(TimeSpan delay, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements after waiting the delay before the first one. |
 | `YieldsNothing()` | Appends a step that yields nothing, which the streaming path treats as a success. |
 | `Throws(Exception)` | Appends a step that throws the exception from its first pull, after any pending delay. |
-| `FaultsAfter(Exception, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements and then throws the exception mid-stream, from the pull after the last element - the fault a source produces after the streaming path has stopped watching. |
+| `ThrowsAfter(Exception, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements and then throws the exception mid-stream, from the pull after the last element - the fault a source produces after the streaming path has stopped watching. |
 | `Delays(TimeSpan)` | Makes the next step wait the delay before its outcome. Multiple calls accumulate. |
 | `Next(CancellationToken)` | Serves the next step as a cold source. This is the method typically bound to the streaming `RunAsync` and `TryRunAsync` overloads, as a method group or a static lambda. |
 | `CallCount` | How many attempts have started, whether or not their source was ever pulled from. |

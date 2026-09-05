@@ -16,7 +16,7 @@ namespace NResilience.Extensions;
 /// </summary>
 /// <example>
 ///     <code>
-/// using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 });
+/// using var limiter = Limit.Adaptive(maximum: 200);
 /// 
 /// await policy.RunAsync(async ct =>
 /// {

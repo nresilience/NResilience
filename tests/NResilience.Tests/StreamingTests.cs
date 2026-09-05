@@ -107,7 +107,7 @@ public sealed class StreamingTests
     [Fact]
     public async Task A_post_start_fault_is_the_consumers_unclassified()
     {
-        var streams = ScriptedStream.For<int>().FaultsAfter(new InvalidOperationException("mid-stream"), 1, 2);
+        var streams = ScriptedStream.For<int>().ThrowsAfter(new InvalidOperationException("mid-stream"), 1, 2);
         var events = new List<CallEvent>();
 
         var policy = TestPolicy.Instant with

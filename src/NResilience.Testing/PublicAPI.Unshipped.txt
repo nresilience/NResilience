@@ -29,7 +29,6 @@ NResilience.Testing.ChaosHandler.Injected.get -> int
 NResilience.Testing.ChaosHandler.Slowed.get -> int
 NResilience.Testing.EventRecorder
 NResilience.Testing.EventRecorder.Clear() -> void
-NResilience.Testing.EventRecorder.Contains(NResilience.CallEventKind kind) -> bool
 NResilience.Testing.EventRecorder.Count.get -> int
 NResilience.Testing.EventRecorder.CountOf(NResilience.CallEventKind kind) -> int
 NResilience.Testing.EventRecorder.EventRecorder() -> void
@@ -53,16 +52,16 @@ NResilience.Testing.ScriptedHttpHandler.Throws(System.Func<System.Exception!>! e
 NResilience.Testing.ScriptedHttpHandler.Throws(System.Func<System.Exception!>! exception, int times) -> NResilience.Testing.ScriptedHttpHandler!
 NResilience.Testing.ScriptedStream
 NResilience.Testing.ScriptedStream<T>
+NResilience.Testing.ScriptedStream<T>.CallCount.get -> int
 NResilience.Testing.ScriptedStream<T>.Delays(System.TimeSpan delay) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.DisposedEnumerators.get -> int
-NResilience.Testing.ScriptedStream<T>.YieldsNothing() -> NResilience.Testing.ScriptedStream<T>!
-NResilience.Testing.ScriptedStream<T>.FaultsAfter(System.Exception! exception, params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.LiveEnumerators.get -> int
 NResilience.Testing.ScriptedStream<T>.Next(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T>!
-NResilience.Testing.ScriptedStream<T>.CallCount.get -> int
 NResilience.Testing.ScriptedStream<T>.Throws(System.Exception! exception) -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.ThrowsAfter(System.Exception! exception, params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.Yields(params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.YieldsAfter(System.TimeSpan delay, params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.YieldsNothing() -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.SentRequest
 NResilience.Testing.SentRequest.<Clone>$() -> NResilience.Testing.SentRequest!
 NResilience.Testing.SentRequest.Body.get -> string?
@@ -81,15 +80,21 @@ NResilience.Testing.Sequence<T>
 NResilience.Testing.Sequence<T>.CallCount.get -> int
 NResilience.Testing.Sequence<T>.Delays(System.TimeSpan delay) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.NextAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<T>!
-NResilience.Testing.Sequence<T>.NextVoidAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 NResilience.Testing.Sequence<T>.Remaining.get -> int
 NResilience.Testing.Sequence<T>.Returns(T result) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.Returns(T result, int count) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.Throws(System.Exception! exception) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.Throws(System.Exception! exception, int count) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.TestPolicy
-NResilience.Testing.Unit
-NResilience.Testing.Unit.Unit() -> void
+NResilience.Testing.VoidSequence
+NResilience.Testing.VoidSequence.CallCount.get -> int
+NResilience.Testing.VoidSequence.Delays(System.TimeSpan delay) -> NResilience.Testing.VoidSequence!
+NResilience.Testing.VoidSequence.NextAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+NResilience.Testing.VoidSequence.Remaining.get -> int
+NResilience.Testing.VoidSequence.Returns() -> NResilience.Testing.VoidSequence!
+NResilience.Testing.VoidSequence.Returns(int count) -> NResilience.Testing.VoidSequence!
+NResilience.Testing.VoidSequence.Throws(System.Exception! exception) -> NResilience.Testing.VoidSequence!
+NResilience.Testing.VoidSequence.Throws(System.Exception! exception, int count) -> NResilience.Testing.VoidSequence!
 override NResilience.Testing.Chaos.Equals(object? obj) -> bool
 override NResilience.Testing.Chaos.GetHashCode() -> int
 override NResilience.Testing.Chaos.ToString() -> string!
@@ -110,7 +115,7 @@ static NResilience.Testing.ScriptedStream.For<T>(System.TimeProvider? time = nul
 static NResilience.Testing.SentRequest.operator !=(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.SentRequest.operator ==(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.Sequence.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<T>!
-static NResilience.Testing.Sequence.ForVoid(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<NResilience.Testing.Unit>!
+static NResilience.Testing.Sequence.ForVoid(System.TimeProvider? time = null) -> NResilience.Testing.VoidSequence!
 static NResilience.Testing.TestPolicy.Instant.get -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.InstantHttp.get -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.WithClock(System.TimeProvider! time) -> NResilience.Resilience!

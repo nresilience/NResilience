@@ -173,7 +173,7 @@ public sealed class SequenceTests
     [Fact]
     public async Task A_void_sequence_scripts_the_void_overloads()
     {
-        var calls = Sequence.ForVoid().Throws(new TimeoutException()).Returns(default);
+        var calls = Sequence.ForVoid().Throws(new TimeoutException()).Returns();
 
         var policy = Resilience.Default with
         {
@@ -182,7 +182,7 @@ public sealed class SequenceTests
             Deadline = Timeout.InfiniteTimeSpan,
         };
 
-        var result = await policy.TryRunAsync(ct => calls.NextVoidAsync(ct));
+        var result = await policy.TryRunAsync(ct => calls.NextAsync(ct));
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, calls.CallCount);

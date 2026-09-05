@@ -47,9 +47,9 @@ public sealed class RateLimiting
         // The bulkhead: at most 20 calls in flight at once, whatever their rate.
         using var inFlight = Limit.Concurrency(permits: 20);
 
-        // The bulkhead you do not have to size. Set the range it may move within; the number
-        // inside it is measured from how the dependency responds under load.
-        using var adaptive = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 });
+        // The bulkhead you do not have to size. Set the ceiling it may never pass; the number
+        // under it is measured from how the dependency responds under load.
+        using var adaptive = Limit.Adaptive(maximum: 200);
 
         // </snippet:limit-shapes>
 
@@ -63,10 +63,11 @@ public sealed class RateLimiting
     public async Task An_adaptive_limit_is_discovered_rather_than_configured()
     {
         // <snippet:limit-adaptive>
-        // No permit count. Minimum and Maximum are guardrails - what the loop may never leave -
-        // and the limit between them is read from latency: a round of calls slower than this
-        // dependency normally is means a queue downstream, and the limit backs off.
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Minimum = 4, Maximum = 200 }, name: "payments");
+        // No permit count. The bounds are guardrails - what the loop may never leave - and the
+        // limit between them is read from latency: a round of calls slower than this dependency
+        // normally is means a queue downstream, and the limit backs off. Pass an
+        // AdaptiveLimitOptions for the rest of the knobs; every one of them has a default.
+        using var limiter = Limit.Adaptive(maximum: 200, name: "payments");
 
         var api = Resilience.Http;
 

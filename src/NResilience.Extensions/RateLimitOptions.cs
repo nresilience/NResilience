@@ -146,7 +146,7 @@ public sealed class RateLimitOptions
             return Limit.PerWindow(permits, window, QueueLimit);
 
         if (Adaptive is { } adaptive)
-            return Limit.Adaptive(adaptive, QueueLimit, Name);
+            return Limit.Adaptive(options: adaptive, queueLimit: QueueLimit, name: Name);
 
         return Limit.Concurrency(Concurrency!.Value, QueueLimit);
     }

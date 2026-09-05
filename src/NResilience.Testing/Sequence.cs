@@ -28,25 +28,110 @@ public static class Sequence
     public static Sequence<T> For<T>(TimeProvider? time = null) => new(time ?? TimeProvider.System);
 
     /// <summary>
-    ///     Starts a script of calls that return nothing. Shorthand for
-    ///     <c>Sequence.For&lt;bool&gt;()</c> with the result thrown away, so the void execution
-    ///     overloads can be scripted the same way.
+    ///     Starts a script of calls that return nothing, so the void execution overloads can be
+    ///     scripted the same way.
     /// </summary>
     /// <param name="time">The clock delays are served against. See <see cref="For{T}(TimeProvider)" />.</param>
-    public static Sequence<Unit> ForVoid(TimeProvider? time = null) => new(time ?? TimeProvider.System);
+    /// <example>
+    ///     <code>
+    /// var calls = Sequence.ForVoid().Throws(new TimeoutException()).Returns();
+    /// 
+    /// var result = await policy.TryRunAsync(attempt =&gt; calls.NextAsync(attempt), cancellationToken);
+    /// </code>
+    /// </example>
+    public static VoidSequence ForVoid(TimeProvider? time = null) => new(time ?? TimeProvider.System);
 }
 
 /// <summary>
-///     The result type of a scripted callback that returns nothing, so <see cref="Sequence.ForVoid" />
-///     can share one implementation with <see cref="Sequence.For{T}(TimeProvider)" />.
+///     The result type of a scripted callback that returns nothing, so <see cref="VoidSequence" /> can
+///     be one line over <see cref="Sequence{T}" /> rather than a second copy of it.
 /// </summary>
 /// <remarks>
-///     The conventional name for the one-valued type. It is deliberately not called <c>Void</c>: a
-///     public type by that name reads as <see cref="System.Void" />, which is the type no value ever
-///     has, and this is the opposite - the type whose only value carries no information.
+///     Internal, and named for the conventional one-valued type rather than <c>Void</c>, which would
+///     read as <see cref="System.Void" /> - the type no value ever has, where this is the opposite.
+///     Nothing published names it: <see cref="Sequence.ForVoid" /> hands back
+///     <see cref="VoidSequence" />, whose members take and return nothing.
 /// </remarks>
-public readonly struct Unit
+internal readonly struct Unit
 {
+}
+
+/// <summary>
+///     A scripted callback that returns nothing: the void-shaped twin of <see cref="Sequence{T}" />,
+///     for the execution overloads whose callback returns a bare <see cref="Task" />.
+/// </summary>
+/// <remarks>
+///     A type of its own rather than <c>Sequence&lt;T&gt;</c> with a type argument nobody can name.
+///     It also settles overload resolution: <c>Task&lt;T&gt;</c> is a <c>Task</c>, so a script whose
+///     <c>NextAsync</c> returned <c>Task&lt;T&gt;</c> would always bind to the generic execution
+///     overload and a void call could never be scripted at all.
+/// </remarks>
+public sealed class VoidSequence
+{
+    private readonly Sequence<Unit> _inner;
+
+    internal VoidSequence(TimeProvider time)
+    {
+        _inner = new Sequence<Unit>(time);
+    }
+
+    /// <summary>How many times <see cref="NextAsync" /> has been called. See <see cref="Sequence{T}.CallCount" />.</summary>
+    public int CallCount => _inner.CallCount;
+
+    /// <summary>How many steps the script has left to serve.</summary>
+    public int Remaining => _inner.Remaining;
+
+    /// <summary>Appends a step that completes.</summary>
+    public VoidSequence Returns()
+    {
+        _inner.Returns(default);
+        return this;
+    }
+
+    /// <summary>Appends <paramref name="count" /> steps that each complete.</summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count" /> is negative.</exception>
+    public VoidSequence Returns(int count)
+    {
+        _inner.Returns(default, count);
+        return this;
+    }
+
+    /// <summary>Appends a step that throws <paramref name="exception" />.</summary>
+    /// <remarks>See <see cref="Sequence{T}.Throws(Exception)" />: the same instance is thrown each time.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="exception" /> is null.</exception>
+    public VoidSequence Throws(Exception exception)
+    {
+        _inner.Throws(exception);
+        return this;
+    }
+
+    /// <summary>Appends <paramref name="count" /> steps that each throw <paramref name="exception" />.</summary>
+    /// <exception cref="ArgumentNullException"><paramref name="exception" /> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="count" /> is negative.</exception>
+    public VoidSequence Throws(Exception exception, int count)
+    {
+        _inner.Throws(exception, count);
+        return this;
+    }
+
+    /// <summary>
+    ///     Makes the next step take <paramref name="delay" /> before it completes. Accumulates, exactly
+    ///     as <see cref="Sequence{T}.Delays" /> does.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="delay" /> is negative.</exception>
+    public VoidSequence Delays(TimeSpan delay)
+    {
+        _inner.Delays(delay);
+        return this;
+    }
+
+    /// <summary>
+    ///     Serves the next step: waits its delay if it has one, then completes or throws its exception.
+    /// </summary>
+    /// <param name="cancellationToken">Observed while a delay is being served. See <see cref="Sequence{T}.NextAsync" />.</param>
+    /// <returns>A bare <see cref="Task" />, which is what binds the script to the void execution overloads.</returns>
+    /// <exception cref="InvalidOperationException">The script has run out of steps.</exception>
+    public Task NextAsync(CancellationToken cancellationToken = default) => _inner.NextAsync(cancellationToken);
 }
 
 /// <summary>
@@ -199,17 +284,6 @@ public sealed class Sequence<T>
             ? step.Complete()
             : DelayThenComplete(step, cancellationToken);
     }
-
-    /// <summary>
-    ///     Serves the next step and discards its result, so a script binds to the execution overloads
-    ///     that take a <see cref="Task" />-returning callback.
-    /// </summary>
-    /// <remarks>
-    ///     Needed because <c>Task&lt;T&gt;</c> is a <c>Task</c>, so overload resolution would otherwise
-    ///     always pick the generic execution overload and a void call could never be scripted.
-    /// </remarks>
-    /// <param name="cancellationToken">See <see cref="NextAsync" />.</param>
-    public Task NextVoidAsync(CancellationToken cancellationToken = default) => NextAsync(cancellationToken);
 
     private async Task<T> DelayThenComplete(Step step, CancellationToken cancellationToken)
     {

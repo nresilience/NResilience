@@ -51,7 +51,7 @@ public sealed class ConcurrentCallTests
         await Task.WhenAll(tasks);
 
         Assert.Equal(BreakerState.Open, breaker.State);
-        Assert.True(events.Contains(CallEventKind.RejectedByBreaker), "No call was rejected - the breaker never opened under load.");
+        Assert.True(events.CountOf(CallEventKind.RejectedByBreaker) > 0, "No call was rejected - the breaker never opened under load.");
     }
 
     /// <summary>

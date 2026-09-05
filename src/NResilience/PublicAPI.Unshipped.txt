@@ -423,10 +423,8 @@ NResilience.WinRate.Window.get -> System.TimeSpan
 NResilience.WinRate.Window.init -> void
 const NResilience.AmbientDeadline.Header = "X-Deadline-Ms" -> string!
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
-const NResilience.MeasuredBase.DefaultMultiple = 1 -> double
 const NResilience.NestedRetry.Header = "X-NResilience-Retrying" -> string!
 const NResilience.NestedRetry.Marker = "1" -> string!
-const NResilience.WinRate.DefaultMinimum = 0.2 -> double
 override NResilience.Attempt.ToString() -> string!
 override NResilience.AttemptCeiling.GetHashCode() -> int
 override NResilience.AttemptCeiling.ToString() -> string!

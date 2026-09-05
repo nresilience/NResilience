@@ -459,7 +459,7 @@ internal static class Program
         // The health check registers through an explicit factory rather than AddCheck<T>(), which
         // resolves through ActivatorUtilities. Publishing proves that compiled; running the check
         // and reading a row out of it is what proves nothing on the path needed reflection.
-        services.AddHealthChecks().AddResilience();
+        services.AddHealthChecks().AddResilienceHealthCheck();
 
         using var provider = services.BuildServiceProvider();
         var policies = provider.GetRequiredService<IResiliencePolicies>();

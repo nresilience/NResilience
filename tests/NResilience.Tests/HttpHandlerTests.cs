@@ -495,7 +495,7 @@ public sealed class HttpHandlerTests
 
         (await client.SendAsync(request)).Dispose();
 
-        Assert.True(recorder.Contains(CallEventKind.NestedRetry));
+        Assert.True(recorder.CountOf(CallEventKind.NestedRetry) > 0);
     }
 
     [Fact]
@@ -529,7 +529,7 @@ public sealed class HttpHandlerTests
         using var outerClient = Client(outerTransport);
         (await outerClient.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.True(recorder.Contains(CallEventKind.NestedRetry));
+        Assert.True(recorder.CountOf(CallEventKind.NestedRetry) > 0);
     }
 
     [Fact]
@@ -565,7 +565,7 @@ public sealed class HttpHandlerTests
 
         (await client.SendAsync(request)).Dispose();
 
-        Assert.False(recorder.Contains(CallEventKind.NestedRetry));
+        Assert.Equal(0, recorder.CountOf(CallEventKind.NestedRetry));
     }
 
     [Fact]
@@ -588,14 +588,14 @@ public sealed class HttpHandlerTests
         // call unable to detect that it is running inside a retrying context.
         (await outerClient.GetAsync(new Uri("https://api.test/first"))).Dispose();
 
-        Assert.True(recorder.Contains(CallEventKind.NestedRetry),
+        Assert.True(recorder.CountOf(CallEventKind.NestedRetry) > 0,
             "the inner client should report nesting on the first call");
 
         recorder.Clear();
 
         (await outerClient.GetAsync(new Uri("https://api.test/second"))).Dispose();
 
-        Assert.True(recorder.Contains(CallEventKind.NestedRetry),
+        Assert.True(recorder.CountOf(CallEventKind.NestedRetry) > 0,
             "the inner client should still report nesting on the second call");
     }
 
@@ -612,7 +612,7 @@ public sealed class HttpHandlerTests
         using var scope = NestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.True(recorder.Contains(CallEventKind.NestedRetry));
+        Assert.True(recorder.CountOf(CallEventKind.NestedRetry) > 0);
     }
 
     [Fact]
@@ -629,7 +629,7 @@ public sealed class HttpHandlerTests
         using var scope = NestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.False(recorder.Contains(CallEventKind.NestedRetry));
+        Assert.Equal(0, recorder.CountOf(CallEventKind.NestedRetry));
     }
 
     [Fact]
@@ -643,7 +643,7 @@ public sealed class HttpHandlerTests
         using var scope = NestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.False(recorder.Contains(CallEventKind.NestedRetry));
+        Assert.Equal(0, recorder.CountOf(CallEventKind.NestedRetry));
     }
 
     [Fact]
@@ -662,7 +662,7 @@ public sealed class HttpHandlerTests
         {
             (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-            Assert.True(recorder.Contains(CallEventKind.NestedRetry),
+            Assert.True(recorder.CountOf(CallEventKind.NestedRetry) > 0,
                 "the ambient flag should make the send report nesting");
         }
 
@@ -673,7 +673,7 @@ public sealed class HttpHandlerTests
         // reports nothing - nesting comes only from a source that is present, never from a leak.
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.False(recorder.Contains(CallEventKind.NestedRetry),
+        Assert.True(recorder.CountOf(CallEventKind.NestedRetry) == 0,
             "a leaked InsideRetryingClient would make a clean send report nesting");
     }
 

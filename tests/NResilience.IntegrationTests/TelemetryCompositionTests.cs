@@ -180,7 +180,7 @@ public sealed class TelemetryCompositionTests
         Assert.Equal(3, server.RequestCount);
 
         // The event recorder's terminal event is Exhausted.
-        Assert.True(events.Contains(CallEventKind.Exhausted), $"Expected Exhausted, got: {events}.");
+        Assert.True(events.CountOf(CallEventKind.Exhausted) > 0, $"Expected Exhausted, got: {events}.");
 
         // The span's outcome is attempts_exhausted. Filter by the client name to exclude spans
         // from other tests running in parallel.

@@ -56,7 +56,7 @@ public readonly record struct LogSampling
     ///     One in twenty: enough that a working policy still proves it is working, few enough that the
     ///     steady state costs a twentieth of what it did.
     /// </summary>
-    public const int DefaultKeepOneIn = 20;
+    internal const int DefaultKeepOneIn = 20;
 
     /// <summary>How many of each record are kept in full, when <see cref="MinimumSamples" /> was not set.</summary>
     private const int DefaultMinimumSamples = 20;

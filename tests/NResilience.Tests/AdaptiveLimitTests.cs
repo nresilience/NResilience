@@ -95,7 +95,7 @@ public sealed class AdaptiveLimitTests
     public void The_limiter_starts_at_the_limit_it_was_given()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 5, Minimum = 4, Maximum = 10 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 5, Minimum = 4, Maximum = 10 }, time: time);
 
         Assert.Equal(5, limiter.CurrentLimit);
         Assert.Null(limiter.Baseline);
@@ -106,7 +106,7 @@ public sealed class AdaptiveLimitTests
     public void The_limit_is_how_many_permits_are_held_at_once()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 3, Minimum = 1 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 3, Minimum = 1 }, time: time);
 
         var held = Take(limiter, 3);
 
@@ -134,7 +134,7 @@ public sealed class AdaptiveLimitTests
     public async Task Queueing_is_off_by_default()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, time: time);
 
         var held = limiter.AttemptAcquire();
         var queued = limiter.AcquireAsync().AsTask();
@@ -149,7 +149,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_queued_caller_is_admitted_when_a_slot_frees()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, 2, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 2, time: time);
 
         var held = limiter.AttemptAcquire();
         var queued = limiter.AcquireAsync().AsTask();
@@ -169,7 +169,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_full_queue_refuses_rather_than_grows()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, 1, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = limiter.AttemptAcquire();
         var queued = limiter.AcquireAsync().AsTask();
@@ -191,7 +191,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_queued_caller_that_gives_up_releases_its_reservation()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, 1, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = limiter.AttemptAcquire();
         using var abandoning = new CancellationTokenSource();
@@ -219,7 +219,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_caller_that_arrives_while_someone_is_queued_does_not_overtake_them()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, 1, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = Take(limiter, 2);
         var queued = limiter.AcquireAsync().AsTask();
@@ -241,7 +241,7 @@ public sealed class AdaptiveLimitTests
     public void Asking_for_more_permits_than_the_ceiling_is_an_argument_error()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 5, Minimum = 1, Maximum = 10 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 5, Minimum = 1, Maximum = 10 }, time: time);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => limiter.AttemptAcquire(11));
     }
@@ -256,7 +256,7 @@ public sealed class AdaptiveLimitTests
     public void A_cold_limiter_holds_at_its_initial_limit()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, time: time);
 
         // Nineteen calls, every one of them ruinously slow. One short of an opinion.
         Serial(limiter, time, Slow, 19);
@@ -274,7 +274,7 @@ public sealed class AdaptiveLimitTests
     public void Queueing_shrinks_the_limit()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, time: time);
 
         Serial(limiter, time, Fast, 20);
         Assert.Equal(20, limiter.CurrentLimit);
@@ -293,7 +293,7 @@ public sealed class AdaptiveLimitTests
     public void A_single_slow_call_in_a_healthy_round_is_not_queueing()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, time: time);
 
         Serial(limiter, time, Fast, 20);
 
@@ -314,7 +314,7 @@ public sealed class AdaptiveLimitTests
     public void A_saturated_limit_over_a_healthy_dependency_grows()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 20, Minimum = 4, Maximum = 200 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 20, Minimum = 4, Maximum = 200 }, time: time);
 
         Serial(limiter, time, Fast, 20);
         Assert.Equal(20, limiter.CurrentLimit);
@@ -334,7 +334,7 @@ public sealed class AdaptiveLimitTests
     public void An_unsaturated_limit_does_not_grow_however_long_it_waits()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 20, Minimum = 4, Maximum = 200 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 20, Minimum = 4, Maximum = 200 }, time: time);
 
         Serial(limiter, time, Fast, 20);
 
@@ -355,7 +355,7 @@ public sealed class AdaptiveLimitTests
     public void The_limit_never_goes_below_the_floor()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 8, Minimum = 4 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 8, Minimum = 4 }, time: time);
 
         Serial(limiter, time, Fast, 20);
         Serial(limiter, time, Slow, 400);
@@ -374,7 +374,7 @@ public sealed class AdaptiveLimitTests
     public void The_limit_never_goes_above_the_ceiling()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 5, Minimum = 4, Maximum = 6 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 5, Minimum = 4, Maximum = 6 }, time: time);
 
         Serial(limiter, time, Fast, 20);
 
@@ -401,7 +401,7 @@ public sealed class AdaptiveLimitTests
     public void The_limit_follows_a_dependency_whose_capacity_changes()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 200, Minimum = 4, Maximum = 200 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 200, Minimum = 4, Maximum = 200 }, time: time);
 
         // Warm the baseline on an unloaded dependency, exactly as a process warms up before its
         // traffic arrives. Without this the limiter learns the queued latency as normal - the one
@@ -426,7 +426,7 @@ public sealed class AdaptiveLimitTests
     public async Task Statistics_report_the_discovered_limit_and_what_is_waiting_on_it()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, 1, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = Take(limiter, 2);
         var queued = limiter.AcquireAsync().AsTask();
@@ -448,7 +448,7 @@ public sealed class AdaptiveLimitTests
     public void An_idle_limiter_reports_how_long_it_has_been_idle()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, time: time);
 
         time.Advance(TimeSpan.FromSeconds(3));
         Assert.Equal(TimeSpan.FromSeconds(3), limiter.IdleDuration);
@@ -470,7 +470,7 @@ public sealed class AdaptiveLimitTests
     public async Task Disposing_the_limiter_answers_everyone_still_queued()
     {
         var time = new FakeTimeProvider();
-        var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, 2, time: time);
+        var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 2, time: time);
 
         var held = limiter.AttemptAcquire();
         var queued = limiter.AcquireAsync().AsTask();
@@ -488,7 +488,7 @@ public sealed class AdaptiveLimitTests
     public void Disposing_a_lease_twice_returns_one_slot()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, time: time);
 
         var held = limiter.AttemptAcquire();
         held.Dispose();
@@ -507,7 +507,7 @@ public sealed class AdaptiveLimitTests
     {
         using var recording = new LimitRecording();
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, name: "payments", time: time);
+        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 20, Minimum = 4 }, name: "payments", time: time);
 
         Serial(limiter, time, Fast, 20);
         Assert.Empty(recording.Values);

@@ -21,8 +21,8 @@ public sealed class ListenerCompositionTests
 
         await policy.RunAsync(ct => Task.FromResult(1), CancellationToken.None);
 
-        Assert.True(first.Contains(CallEventKind.Succeeded));
-        Assert.True(second.Contains(CallEventKind.Succeeded));
+        Assert.True(first.CountOf(CallEventKind.Succeeded) > 0);
+        Assert.True(second.CountOf(CallEventKind.Succeeded) > 0);
     }
 
     [Fact]
@@ -53,14 +53,14 @@ public sealed class ListenerCompositionTests
 
         await replaced.RunAsync(ct => Task.FromResult(1), CancellationToken.None);
 
-        Assert.True(mine.Contains(CallEventKind.Succeeded));
+        Assert.True(mine.CountOf(CallEventKind.Succeeded) > 0);
         Assert.Equal(0, registered.Count);
 
         mine.Clear();
         await added.RunAsync(ct => Task.FromResult(1), CancellationToken.None);
 
-        Assert.True(mine.Contains(CallEventKind.Succeeded));
-        Assert.True(registered.Contains(CallEventKind.Succeeded));
+        Assert.True(mine.CountOf(CallEventKind.Succeeded) > 0);
+        Assert.True(registered.CountOf(CallEventKind.Succeeded) > 0);
     }
 
     [Fact]
@@ -74,7 +74,7 @@ public sealed class ListenerCompositionTests
 
         await policy.RunAsync(ct => Task.FromResult(1), CancellationToken.None);
 
-        Assert.True(mine.Contains(CallEventKind.Succeeded));
+        Assert.True(mine.CountOf(CallEventKind.Succeeded) > 0);
 
         // WithTelemetry is idempotent by reference, so the shared listener is still the one attached
         // and adding it again after ours changes nothing.

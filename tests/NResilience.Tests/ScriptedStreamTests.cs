@@ -34,10 +34,10 @@ public sealed class ScriptedStreamTests
     }
 
     [Fact]
-    public async Task FaultsAfter_serves_its_elements_and_then_throws_once()
+    public async Task ThrowsAfter_serves_its_elements_and_then_throws_once()
     {
         var boom = new InvalidOperationException("mid-stream");
-        var streams = ScriptedStream.For<int>().FaultsAfter(boom, 1, 2);
+        var streams = ScriptedStream.For<int>().ThrowsAfter(boom, 1, 2);
 
         var received = new List<int>();
 

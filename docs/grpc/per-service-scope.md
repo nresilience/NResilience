@@ -61,4 +61,4 @@ Hold an interceptor you build by hand in a `static readonly` field or a containe
 
 ## Read the scopes from a health check
 
-The registration adds every scope's breaker and budget to [`ResilienceHealthOptions`](../di/health-checks.md) under the client's name, so `AddHealthChecks().AddResilience()` reports them with no wiring of yours. An operator gets told *which* dependency opened, rather than that something did.
+The registration adds every scope's breaker and budget to [`ResilienceHealthOptions`](../di/health-checks.md) under the client's name, so `AddHealthChecks().AddResilienceHealthCheck()` reports them with no wiring of yours. An operator gets told *which* dependency opened, rather than that something did.

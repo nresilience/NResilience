@@ -64,8 +64,8 @@ public sealed class EventRecorderTests
         Assert.Equal(6, events.Count);
         Assert.Equal(3, events.CountOf(CallEventKind.Attempt));
         Assert.Equal(3, events.OfKind(CallEventKind.Attempt).Count);
-        Assert.True(events.Contains(CallEventKind.Retrying));
-        Assert.False(events.Contains(CallEventKind.DeadlineExceeded));
+        Assert.True(events.CountOf(CallEventKind.Retrying) > 0);
+        Assert.Equal(0, events.CountOf(CallEventKind.DeadlineExceeded));
         Assert.Equal(CallEventKind.Attempt, events[0].Kind);
         Assert.Equal(events.Count, events.Events.Count);
     }
@@ -138,8 +138,8 @@ public sealed class EventRecorderTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
-        Assert.True(events.Contains(CallEventKind.DeadlineExceeded));
-        Assert.False(events.Contains(CallEventKind.Retrying));
+        Assert.True(events.CountOf(CallEventKind.DeadlineExceeded) > 0);
+        Assert.Equal(0, events.CountOf(CallEventKind.Retrying));
     }
 
     [Fact]

@@ -117,16 +117,10 @@ public sealed class EventRecorder
                 $"Expected exactly one {kind} event, found {matches.Count}. Recorded: {this}.");
     }
 
-    /// <summary>Whether an event of <paramref name="kind" /> was raised at least once.</summary>
-    public bool Contains(CallEventKind kind)
-    {
-        lock (_gate)
-        {
-            return _events.Exists(e => e.Kind == kind);
-        }
-    }
-
-    /// <summary>How many events of <paramref name="kind" /> were raised.</summary>
+    /// <summary>
+    ///     How many events of <paramref name="kind" /> were raised. Also the "was it raised at all"
+    ///     assertion: <c>CountOf(kind) > 0</c>, which is why there is no <c>Contains</c>.
+    /// </summary>
     public int CountOf(CallEventKind kind)
     {
         lock (_gate)

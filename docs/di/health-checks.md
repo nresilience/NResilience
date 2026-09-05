@@ -6,7 +6,7 @@ order: 4
 
 # Health checks
 
-A circuit breaker holds the most operationally interesting fact in the process: whether a dependency is currently considered unusable. `AddResilience()` on an `IHealthChecksBuilder` puts that fact, and every retry budget's utilization, on your health endpoint.
+A circuit breaker holds the most operationally interesting fact in the process: whether a dependency is currently considered unusable. `AddResilienceHealthCheck()` on an `IHealthChecksBuilder` puts that fact, and every retry budget's utilization, on your health endpoint.
 
 ## Register the check
 
@@ -17,7 +17,7 @@ services.AddHttpClient(name: "orders").AddResilience();
 
 // One line. Every breaker behind a registered policy, every per-host breaker held by a
 // client registered with AddResilience(), and every retry budget's utilization.
-services.AddHealthChecks().AddResilience();
+services.AddHealthChecks().AddResilienceHealthCheck();
 ```
 <!-- endsnippet -->
 
@@ -61,7 +61,7 @@ A process that genuinely cannot do anything useful while its one dependency is d
 // shedding load correctly, so reporting Unhealthy invites an orchestrator to restart a pod
 // that is working. Override it when the process genuinely cannot serve without that
 // dependency.
-services.AddHealthChecks().AddResilience(configure: o =>
+services.AddHealthChecks().AddResilienceHealthCheck(configure: o =>
 {
     o.BreakerOpenStatus = HealthStatus.Unhealthy;
     o.BudgetThreshold = 0.75;

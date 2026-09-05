@@ -208,7 +208,7 @@ public sealed class DependencyInjectionDocs
 
         // One line. Every breaker behind a registered policy, every per-host breaker held by a
         // client registered with AddResilience(), and every retry budget's utilization.
-        services.AddHealthChecks().AddResilience();
+        services.AddHealthChecks().AddResilienceHealthCheck();
 
         // </snippet:di-health-checks>
 
@@ -230,7 +230,7 @@ public sealed class DependencyInjectionDocs
         // shedding load correctly, so reporting Unhealthy invites an orchestrator to restart a pod
         // that is working. Override it when the process genuinely cannot serve without that
         // dependency.
-        services.AddHealthChecks().AddResilience(configure: o =>
+        services.AddHealthChecks().AddResilienceHealthCheck(configure: o =>
         {
             o.BreakerOpenStatus = HealthStatus.Unhealthy;
             o.BudgetThreshold = 0.75;

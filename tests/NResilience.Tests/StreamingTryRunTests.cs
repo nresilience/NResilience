@@ -181,7 +181,7 @@ public sealed class StreamingTryRunTests
     public async Task A_post_start_fault_still_belongs_to_the_consumer()
     {
         var midStream = new InvalidOperationException("the dependency broke mid-stream");
-        var streams = ScriptedStream.For<int>().FaultsAfter(midStream, 1, 2);
+        var streams = ScriptedStream.For<int>().ThrowsAfter(midStream, 1, 2);
 
         var policy = TestPolicy.Instant with { Classifier = Classifier.RetryEverything };
 

@@ -272,7 +272,7 @@ public sealed class HedgeFeedbackTests
         var calls = await LoseAsync(policy, time);
 
         Assert.Single(events.OfKind(CallEventKind.HedgeSuppressed));
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.Equal(1, calls);
     }
 
@@ -296,7 +296,7 @@ public sealed class HedgeFeedbackTests
         Assert.Equal(2, await WinAsync(policy, time));
 
         Assert.Single(events.OfKind(CallEventKind.HedgeStarted));
-        Assert.False(events.Contains(CallEventKind.HedgeSuppressed));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeSuppressed));
     }
 
     /// <summary>
@@ -317,7 +317,7 @@ public sealed class HedgeFeedbackTests
 
         Assert.Equal(2, await LoseAsync(policy, time));
         Assert.Single(events.OfKind(CallEventKind.HedgeStarted));
-        Assert.False(events.Contains(CallEventKind.HedgeSuppressed));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeSuppressed));
     }
 
     /// <summary>

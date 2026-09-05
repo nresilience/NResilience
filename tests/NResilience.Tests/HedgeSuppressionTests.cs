@@ -46,7 +46,7 @@ public sealed class HedgeSuppressionTests
 
         var race = await RaceAsync(policy, time);
 
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.Equal(1, race.Calls);
     }
 
@@ -177,7 +177,7 @@ public sealed class HedgeSuppressionTests
 
         var race = await RaceAsync(policy, time);
 
-        Assert.False(events.Contains(CallEventKind.HedgeStarted));
+        Assert.Equal(0, events.CountOf(CallEventKind.HedgeStarted));
         Assert.Equal(1, race.Calls);
     }
 

@@ -117,9 +117,9 @@ public sealed partial record Resilience
 ///     </para>
 /// </summary>
 /// <remarks>
-///     There is no <see cref="ValueTask" /> equivalent of <c>Sequence.NextVoidAsync</c>.
-///     Because <c>ValueTask&lt;T&gt;</c> is distinct from <c>ValueTask</c>, result-returning
-///     callbacks only bind to result-returning overloads, making the void form unambiguous.
+///     The testing package's <c>Sequence.ForVoid</c> needs no counterpart here. Because
+///     <c>ValueTask&lt;T&gt;</c> is distinct from <c>ValueTask</c>, result-returning callbacks only
+///     bind to result-returning overloads, making the void form unambiguous.
 /// </remarks>
 public static class ValueTaskExtensions
 {

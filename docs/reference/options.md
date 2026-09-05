@@ -310,7 +310,7 @@ Set exactly one of `PermitsPerSecond`, `Permits` with `Window`, `Concurrency`, o
 | `Limit.PerSecond(int, int)` | A token bucket: permits per second, with one second of burst. |
 | `Limit.PerWindow(int, TimeSpan, int)` | A sliding window in eight segments. |
 | `Limit.Concurrency(int, int)` | A concurrency limit - the bulkhead. |
-| `Limit.Adaptive(AdaptiveLimitOptions, int, string?, TimeProvider?)` | A concurrency limit discovered from latency. Returns an `AdaptiveLimiter`. |
+| `Limit.Adaptive(int?, int?, AdaptiveLimitOptions?, int, string?, TimeProvider?)` | A concurrency limit discovered from latency. Every parameter is optional: `Limit.Adaptive()` is a complete limiter, `initial` and `maximum` are the two worth setting per dependency, and `options` carries the rest. Returns an `AdaptiveLimiter`. |
 | `RateLimiter.AcquireOrThrowAsync(...)` | Acquires one permit, or throws `RateLimitedException` carrying the limiter's own hint. |
 | `PartitionedRateLimiter<TKey>.AcquireOrThrowAsync(...)` | The same, for one partition. |
 
@@ -318,7 +318,7 @@ Call `AcquireOrThrowAsync` inside the callback you hand to `RunAsync`, so the pe
 
 ## `AdaptiveLimitOptions`
 
-The range an [adaptive concurrency limit](../features/rate-limiting.md) may move within, and how fast it may move. Every property has a working default.
+The range an [adaptive concurrency limit](../features/rate-limiting.md) may move within, and how fast it may move. Every property has a working default, so the object is optional: `Limit.Adaptive` takes `initial` and `maximum` directly, and only the three below need it.
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
