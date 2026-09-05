@@ -198,7 +198,7 @@ public sealed class ResilienceInterceptor : Interceptor
     ///     would be the one call in the client that has no retry, no breaker and no deadline, and
     ///     nothing on the surface would say so - which is a worse outcome than a compile-time-visible
     ///     failure at the one call site that uses it. The same decision
-    ///     <see cref="Http.ResilienceHandler" /> makes about synchronous sends.
+    ///     <see cref="ResilienceHandler" /> makes about synchronous sends.
     /// </remarks>
     public override TResponse BlockingUnaryCall<TRequest, TResponse>(
         TRequest request,

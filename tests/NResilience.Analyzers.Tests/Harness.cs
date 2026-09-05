@@ -27,7 +27,6 @@ internal static class Harness
                                   using System.Threading;
                                   using System.Threading.Tasks;
                                   using NResilience;
-                                  using NResilience.Http;
                                   using NResilience.Grpc;
 
                                   """;

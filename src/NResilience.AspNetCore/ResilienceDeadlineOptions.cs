@@ -13,7 +13,7 @@ public sealed class ResilienceDeadlineOptions
     /// <summary>
     ///     The header carrying how long the caller is still waiting, in whole milliseconds. Defaults to
     ///     <see cref="ResilienceDeadline.Header" />, which is what
-    ///     <see cref="Http.HttpResilienceOptions.PropagateDeadline" /> writes.
+    ///     <see cref="HttpResilienceOptions.PropagateDeadline" /> writes.
     /// </summary>
     public string Header { get; set; } = ResilienceDeadline.Header;
 

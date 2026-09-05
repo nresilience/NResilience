@@ -103,7 +103,7 @@ internal sealed class KnownSymbols
             resilience,
             compilation.GetTypeByMetadataName("NResilience.ResilienceValueTaskExtensions"),
             token,
-            compilation.GetTypeByMetadataName("NResilience.Http.HttpResilience"),
+            compilation.GetTypeByMetadataName("NResilience.HttpResilience"),
             compilation.GetTypeByMetadataName("NResilience.Breaker"),
             compilation.GetTypeByMetadataName("NResilience.RetryBudget"),
             compilation.GetTypeByMetadataName("NResilience.PolicyScope`1"),

@@ -13,7 +13,6 @@ using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using NResilience.Extensions;
 using NResilience.Grpc;
-using NResilience.Http;
 using NResilience.Probes;
 using NResilience.Testing;
 
@@ -237,8 +236,8 @@ internal static class Program
         var events = new EventRecorder();
 
         var transport = new ScriptedHttpHandler { CaptureBodies = true }
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         var policy = Resilience.Http with
         {
@@ -539,8 +538,8 @@ internal static class Program
         failures += Check("the meter records under AOT", calls == 1);
 
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         var clientServices = new ServiceCollection();
         clientServices.AddResilience("client", Resilience.Http with { Backoff = Backoff.None });

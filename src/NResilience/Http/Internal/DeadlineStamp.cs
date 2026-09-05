@@ -1,4 +1,4 @@
-namespace NResilience.Http.Internal;
+namespace NResilience.Internal;
 
 /// <summary>
 ///     The outbound half of deadline propagation: what to tell the peer, recomputed for every attempt.

@@ -1,4 +1,3 @@
-using NResilience.Http;
 
 namespace NResilience.Tests;
 

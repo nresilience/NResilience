@@ -40,8 +40,8 @@ public sealed class HttpRegistrationTests
     public async Task A_registered_client_retries_a_transient_status()
     {
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }),
@@ -65,7 +65,7 @@ public sealed class HttpRegistrationTests
     {
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(),
-            new ScriptedHttpHandler().Respond(HttpStatusCode.OK));
+            new ScriptedHttpHandler().Responds(HttpStatusCode.OK));
 
         using var client = Client(provider);
 
@@ -78,7 +78,7 @@ public sealed class HttpRegistrationTests
     {
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(configureOptions: o => o.OwnTransportTimeout = false),
-            new ScriptedHttpHandler().Respond(HttpStatusCode.OK));
+            new ScriptedHttpHandler().Responds(HttpStatusCode.OK));
 
         using var client = Client(provider);
 
@@ -103,7 +103,7 @@ public sealed class HttpRegistrationTests
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(
                 Resilience.Http with { Backoff = Backoff.None, OnEvent = e => names.Add(e.PolicyName) }),
-            new ScriptedHttpHandler().Respond(HttpStatusCode.OK));
+            new ScriptedHttpHandler().Responds(HttpStatusCode.OK));
 
         using var client = Client(provider);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -118,8 +118,8 @@ public sealed class HttpRegistrationTests
     public async Task A_client_can_use_a_policy_registered_by_name()
     {
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable, 3)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable, 3)
+            .Responds(HttpStatusCode.OK);
 
         using var provider = Provider(
             s =>
@@ -146,7 +146,7 @@ public sealed class HttpRegistrationTests
                 s.AddResilience("shared", Resilience.Http);
                 s.AddHttpClient("api").AddResilience("typo");
             },
-            new ScriptedHttpHandler().Respond(HttpStatusCode.OK));
+            new ScriptedHttpHandler().Responds(HttpStatusCode.OK));
 
         var error = Assert.Throws<ResilienceConfigurationException>(() => Client(provider));
 
@@ -163,7 +163,7 @@ public sealed class HttpRegistrationTests
     [Fact]
     public async Task A_post_is_not_retried_through_the_registration()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
 
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }),
@@ -178,7 +178,7 @@ public sealed class HttpRegistrationTests
     [Fact]
     public async Task A_client_can_opt_into_retrying_unsafe_methods()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
 
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(
@@ -214,8 +214,8 @@ public sealed class HttpRegistrationTests
         ActivitySource.AddActivityListener(listener);
 
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }),
@@ -248,7 +248,7 @@ public sealed class HttpRegistrationTests
 
         using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }, telemetry: false),
-            new ScriptedHttpHandler().Respond(HttpStatusCode.OK));
+            new ScriptedHttpHandler().Responds(HttpStatusCode.OK));
 
         using var client = Client(provider);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));

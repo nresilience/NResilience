@@ -108,8 +108,8 @@ then repeats the last step for every attempt after that:
 
 ```csharp
 var transport = new ScriptedHttpHandler()
-    .Respond(HttpStatusCode.ServiceUnavailable)
-    .Respond(HttpStatusCode.OK);
+    .Responds(HttpStatusCode.ServiceUnavailable)
+    .Responds(HttpStatusCode.OK);
 
 using HttpClient client = HttpResilience.CreateClient(
     Resilience.Http with { Backoff = Backoff.None },

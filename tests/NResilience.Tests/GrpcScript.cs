@@ -25,7 +25,7 @@ internal sealed class GrpcScript
     internal int CallCount => Seen.Count;
 
     /// <summary>Responds successfully. The last step repeats once the script runs out.</summary>
-    internal GrpcScript Respond(string response, Metadata? headers = null)
+    internal GrpcScript Responds(string response, Metadata? headers = null)
     {
         _steps.Add(_ => ScriptedCall.Succeeding(response, headers ?? []));
         return this;

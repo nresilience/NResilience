@@ -1,6 +1,4 @@
-using NResilience.Internal;
-
-namespace NResilience.Http.Internal;
+namespace NResilience.Internal;
 
 /// <summary>
 ///     The two policies one host is served by - the retrying one, and the single-attempt one a

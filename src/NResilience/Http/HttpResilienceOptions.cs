@@ -1,4 +1,4 @@
-namespace NResilience.Http;
+namespace NResilience;
 
 /// <summary>
 ///     The things the HTTP integration decides that a <see cref="Resilience" /> policy cannot, because

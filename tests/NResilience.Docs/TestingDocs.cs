@@ -1,7 +1,6 @@
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Docs;
@@ -63,7 +62,7 @@ public sealed class TestingDocs
         var down = true;
 
         var transport = new ScriptedHttpHandler()
-            .Respond(() => new HttpResponseMessage(statusCode: down ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
+            .Responds(() => new HttpResponseMessage(statusCode: down ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK));
 
         // <snippet:testing-library-clock>
         // The per-host breaker is built by the handler, so it runs on the policy's clock rather
@@ -165,8 +164,8 @@ public sealed class TestingDocs
     {
         // <snippet:testing-http-handler>
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },

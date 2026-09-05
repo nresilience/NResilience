@@ -213,8 +213,8 @@ Test resilient `HttpClient` configurations by providing a scripted `HttpMessageH
 <!-- snippet: testing-http-handler -->
 ```csharp
 var transport = new ScriptedHttpHandler()
-    .Respond(HttpStatusCode.ServiceUnavailable)
-    .Respond(HttpStatusCode.OK);
+    .Responds(HttpStatusCode.ServiceUnavailable)
+    .Responds(HttpStatusCode.OK);
 
 using var client = HttpResilience.CreateClient(
     policy: Resilience.Http with { Backoff = Backoff.None },

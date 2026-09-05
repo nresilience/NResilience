@@ -55,12 +55,12 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 | :--- | :--- |
 | `Yields(params ReadOnlySpan<T> elements)` | Appends a step that yields the specified elements. |
 | `YieldsAfter(TimeSpan delay, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements after waiting the delay before the first one. |
-| `Empty()` | Appends a step that yields nothing, which the streaming path treats as a success. |
+| `YieldsNothing()` | Appends a step that yields nothing, which the streaming path treats as a success. |
 | `Throws(Exception)` | Appends a step that throws the exception from its first pull, after any pending delay. |
 | `FaultsAfter(Exception, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements and then throws the exception mid-stream, from the pull after the last element - the fault a source produces after the streaming path has stopped watching. |
-| `Delay(TimeSpan)` | Makes the next step wait the delay before its outcome. Multiple calls accumulate. |
+| `Delays(TimeSpan)` | Makes the next step wait the delay before its outcome. Multiple calls accumulate. |
 | `Next(CancellationToken)` | Serves the next step as a cold source. This is the method typically bound to the streaming `RunAsync` overloads, as a method group or a static lambda. |
-| `Starts` | How many attempts have started, whether or not their source was ever pulled from. |
+| `CallCount` | How many attempts have started, whether or not their source was ever pulled from. |
 | `LiveEnumerators` | How many served enumerators are still undisposed - one while the caller is still enumerating, zero once done. |
 | `DisposedEnumerators` | How many served enumerators have been disposed - abandoned by the policy, or finished by the consumer. A retried stream that leaks its losing attempts reads here. |
 
@@ -107,12 +107,12 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 
 | Member | Description |
 | :--- | :--- |
-| `Respond(HttpStatusCode status)` | Serves one response with the given status. Returns this handler. |
-| `Respond(HttpStatusCode status, int times)` | Serves the status for `times` attempts before the script advances. Returns this handler. |
-| `Respond(Func<HttpResponseMessage> response)` | Serves one response built afresh per attempt, so its content can be read each time. Returns this handler. |
-| `Respond(Func<HttpResponseMessage> response, int times)` | Builds a fresh response for `times` attempts before the script advances. Returns this handler. |
-| `Throw(Func<Exception> exception)` | Throws, for the transport failures a classifier has to see. The factory is called once per attempt, so a reused instance never accumulates a shared stack trace. Returns this handler. |
-| `Throw(Func<Exception> exception, int times)` | Throws for `times` attempts before the script advances. Returns this handler. |
+| `Responds(HttpStatusCode status)` | Serves one response with the given status. Returns this handler. |
+| `Responds(HttpStatusCode status, int times)` | Serves the status for `times` attempts before the script advances. Returns this handler. |
+| `Responds(Func<HttpResponseMessage> response)` | Serves one response built afresh per attempt, so its content can be read each time. Returns this handler. |
+| `Responds(Func<HttpResponseMessage> response, int times)` | Builds a fresh response for `times` attempts before the script advances. Returns this handler. |
+| `Throws(Func<Exception> exception)` | Throws, for the transport failures a classifier has to see. The factory is called once per attempt, so a reused instance never accumulates a shared stack trace. Returns this handler. |
+| `Throws(Func<Exception> exception, int times)` | Throws for `times` attempts before the script advances. Returns this handler. |
 | `Requests` | A snapshot of what each attempt sent, in order. The live message is disposed by `HttpClient`, so the snapshot captures the method, URI, and headers before disposal. |
 | `CallCount` | How many attempts reached the handler. |
 | `CaptureBodies` | Whether `SentRequest.Body` is populated. Off by default; reading a body buffers it. |

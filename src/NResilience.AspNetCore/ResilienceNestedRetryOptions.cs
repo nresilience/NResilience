@@ -1,5 +1,3 @@
-using NResilience.Http;
-
 namespace NResilience.AspNetCore;
 
 /// <summary>What the inbound nested-retry middleware reads.</summary>

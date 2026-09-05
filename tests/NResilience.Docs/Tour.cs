@@ -15,7 +15,7 @@ public sealed class Tour
     {
         var cancellationToken = TestContext.Current.CancellationToken;
 
-        using var client = new HttpClient(handler: new ScriptedHttpHandler().Respond(() => Doubles.Json(value: new User(Name: "ada"))))
+        using var client = new HttpClient(handler: new ScriptedHttpHandler().Responds(() => Doubles.Json(value: new User(Name: "ada"))))
         {
             BaseAddress = new Uri(uriString: "https://api.example.com"),
         };

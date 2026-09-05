@@ -1,5 +1,4 @@
 using System.Net;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Docs;
@@ -75,8 +74,8 @@ public sealed class Troubleshooting
         var cancellationToken = TestContext.Current.CancellationToken;
 
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },

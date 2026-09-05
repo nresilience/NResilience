@@ -1,4 +1,4 @@
-namespace NResilience.Http.Internal;
+namespace NResilience.Internal;
 
 /// <summary>
 ///     One logical HTTP call: the state a retrying send needs and the send itself.

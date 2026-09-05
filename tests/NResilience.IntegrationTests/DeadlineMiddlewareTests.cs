@@ -3,7 +3,6 @@ using System.Net;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using NResilience.AspNetCore;
-using NResilience.Http;
 
 namespace NResilience.IntegrationTests;
 

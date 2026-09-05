@@ -1,6 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Docs;
@@ -21,8 +20,8 @@ public sealed class GettingStarted
     public async Task The_first_call_is_a_client_call()
     {
         var transport = new ScriptedHttpHandler()
-            .Respond(() => Doubles.Status(status: HttpStatusCode.ServiceUnavailable))
-            .Respond(() => Doubles.Json(value: new User(Name: "ada")));
+            .Responds(() => Doubles.Status(status: HttpStatusCode.ServiceUnavailable))
+            .Responds(() => Doubles.Json(value: new User(Name: "ada")));
 
         using var client = HttpResilience.CreateClient(
             policy: Resilience.Http with { Backoff = Backoff.None },

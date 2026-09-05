@@ -1,6 +1,6 @@
-using NResilience.Http.Internal;
+using NResilience.Internal;
 
-namespace NResilience.Http;
+namespace NResilience;
 
 /// <summary>
 ///     The resilience handler: one <see cref="DelegatingHandler" /> that runs a

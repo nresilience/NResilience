@@ -3,7 +3,6 @@ using System.Globalization;
 using System.Net;
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Extensions;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.IntegrationTests;

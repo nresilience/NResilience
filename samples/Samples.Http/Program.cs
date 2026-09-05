@@ -1,6 +1,5 @@
 using System.Net;
 using NResilience;
-using NResilience.Http;
 
 // The HTTP handler, driven against an in-process fake transport so the sample needs no network.
 var transport = new FakeTransport();

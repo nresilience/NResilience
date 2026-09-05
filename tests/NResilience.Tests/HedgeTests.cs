@@ -1,6 +1,5 @@
 using System.Net;
 using Microsoft.Extensions.Time.Testing;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Tests;

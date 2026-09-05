@@ -25,7 +25,7 @@ public sealed class StreamingDocs
         // </snippet:stream-basic>
 
         Assert.Equal(expected: [1, 2, 3], actual: received);
-        Assert.Equal(expected: 2, actual: streams.Starts);
+        Assert.Equal(expected: 2, actual: streams.CallCount);
     }
 
     [Fact]
@@ -71,7 +71,7 @@ public sealed class StreamingDocs
         // </snippet:stream-classifier>
 
         Assert.Equal(expected: [7], actual: received);
-        Assert.Equal(expected: 2, actual: streams.Starts);
+        Assert.Equal(expected: 2, actual: streams.CallCount);
     }
 
     [Fact]
@@ -146,7 +146,7 @@ public sealed class StreamingDocs
         // </snippet:stream-scripted>
 
         Assert.Equal(expected: [1, 2], actual: received);
-        Assert.Equal(expected: 2, actual: streams.Starts);
+        Assert.Equal(expected: 2, actual: streams.CallCount);
         Assert.Equal(expected: 2, actual: streams.DisposedEnumerators);
     }
 }

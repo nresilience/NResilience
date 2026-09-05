@@ -5,7 +5,7 @@ namespace NResilience.Tests;
 
 /// <summary>
 ///     The scripted cold stream, tested as itself rather than through a policy. The counters are the
-///     reason this double exists - a streaming test asserts on <see cref="ScriptedStream{T}.Starts" />
+///     reason this double exists - a streaming test asserts on <see cref="ScriptedStream{T}.CallCount" />
 ///     and <see cref="ScriptedStream{T}.LiveEnumerators" /> to prove which attempts the policy started
 ///     and which it tore down - so a counter that miscounts turns every one of those assertions into a
 ///     lie. <see cref="StreamingTests" /> covers what the policy does with it.
@@ -21,7 +21,7 @@ public sealed class ScriptedStreamTests
 
         Assert.Equal([1, 2], await CollectAsync(streams.Next()));
         Assert.Equal([3], await CollectAsync(streams.Next()));
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
     }
 
     [Fact]
@@ -57,9 +57,9 @@ public sealed class ScriptedStreamTests
     }
 
     [Fact]
-    public async Task Empty_serves_a_source_that_completes_with_nothing()
+    public async Task YieldsNothing_serves_a_source_that_completes_with_nothing()
     {
-        var streams = ScriptedStream.For<int>().Empty();
+        var streams = ScriptedStream.For<int>().YieldsNothing();
 
         Assert.Equal([], await CollectAsync(streams.Next()));
     }
@@ -75,24 +75,24 @@ public sealed class ScriptedStreamTests
 
         Assert.Contains("1 step(s)", thrown.Message, StringComparison.Ordinal);
         Assert.Contains("attempt 2", thrown.Message, StringComparison.Ordinal);
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
     }
 
     [Fact]
-    public void A_trailing_Delay_is_named_as_the_scripting_mistake_it_is()
+    public void A_trailing_Delays_is_named_as_the_scripting_mistake_it_is()
     {
-        var streams = ScriptedStream.For<int>().Yields(1).Delay(TimeSpan.FromSeconds(1));
+        var streams = ScriptedStream.For<int>().Yields(1).Delays(TimeSpan.FromSeconds(1));
 
         _ = streams.Next();
 
         var thrown = Assert.Throws<InvalidOperationException>(() => streams.Next());
 
-        Assert.Contains("trailing Delay()", thrown.Message, StringComparison.Ordinal);
+        Assert.Contains("trailing Delays()", thrown.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Negative_delays_are_rejected_where_they_are_written()
-        => Assert.Throws<ArgumentOutOfRangeException>(() => ScriptedStream.For<int>().Delay(TimeSpan.FromSeconds(-1)));
+        => Assert.Throws<ArgumentOutOfRangeException>(() => ScriptedStream.For<int>().Delays(TimeSpan.FromSeconds(-1)));
 
     [Fact]
     public async Task Delays_accumulate_onto_the_next_step_and_are_served_on_the_supplied_clock()
@@ -100,8 +100,8 @@ public sealed class ScriptedStreamTests
         var time = new FakeTimeProvider();
 
         var streams = ScriptedStream.For<int>(time)
-            .Delay(TimeSpan.FromSeconds(2))
-            .Delay(TimeSpan.FromSeconds(3))
+            .Delays(TimeSpan.FromSeconds(2))
+            .Delays(TimeSpan.FromSeconds(3))
             .Yields(1);
 
         var collected = CollectAsync(streams.Next());
@@ -164,7 +164,7 @@ public sealed class ScriptedStreamTests
         // Served but never pulled from: an attempt that started, with no enumerator yet.
         var source = streams.Next();
 
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
         Assert.Equal(0, streams.LiveEnumerators);
 
         var enumerator = source.GetAsyncEnumerator();

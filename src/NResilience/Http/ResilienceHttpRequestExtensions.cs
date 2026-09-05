@@ -1,4 +1,4 @@
-namespace NResilience.Http;
+namespace NResilience;
 
 /// <summary>
 ///     Per-request helpers over <see cref="HttpResilience" />'s option keys.

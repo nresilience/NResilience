@@ -166,7 +166,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task A_clients_per_host_breakers_are_reported()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var provider = Provider(services =>
         {
@@ -190,7 +190,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task Http_clients_can_be_excluded()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var provider = Provider(services =>
         {

@@ -1,6 +1,5 @@
 using System.Net;
 using Microsoft.Extensions.Time.Testing;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Tests;
@@ -233,7 +232,7 @@ public sealed class ChaosTests
     {
         var rolls = 0;
         var chaos = new Chaos { Enabled = true, FaultRate = 1, Gate = () => rolls++ == 0 };
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         var handler = new ChaosHandler(chaos) { InnerHandler = transport };
 
         using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.InstantHttp));
@@ -251,7 +250,7 @@ public sealed class ChaosTests
     {
         var rolls = 0;
         var chaos = new Chaos { Enabled = true, FaultRate = 1, Gate = () => rolls++ == 0 };
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var handler = new ChaosHandler(chaos, static () => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable))
         {
@@ -271,7 +270,7 @@ public sealed class ChaosTests
     [Fact]
     public async Task A_disabled_handler_forwards_every_request_untouched()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         var handler = new ChaosHandler(Chaos.None with { FaultRate = 1 }) { InnerHandler = transport };
 
         using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.InstantHttp));
@@ -287,7 +286,7 @@ public sealed class ChaosTests
     {
         var time = new FakeTimeProvider();
         var chaos = new Chaos { Enabled = true, LatencyRate = 1, Latency = TimeSpan.FromSeconds(2), Time = time };
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         var handler = new ChaosHandler(chaos) { InnerHandler = transport };
 
         using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.On(time) with { Classifier = Classifier.Http }));

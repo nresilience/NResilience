@@ -48,7 +48,7 @@ public sealed class PolicyScope<TKey>
     /// </param>
     /// <param name="maximumKeys">
     ///     How many keys to keep. The least-recently-seen are dropped past this, approximately - the
-    ///     same second-chance eviction <see cref="Http.HttpResilienceOptions.MaximumHosts" /> uses.
+    ///     same second-chance eviction <see cref="HttpResilienceOptions.MaximumHosts" /> uses.
     /// </param>
     /// <param name="comparer">How keys are compared. Defaults to <see cref="EqualityComparer{T}.Default" />.</param>
     /// <exception cref="ArgumentNullException"><paramref name="template" /> is null.</exception>

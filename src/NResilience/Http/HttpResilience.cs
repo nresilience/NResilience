@@ -1,4 +1,4 @@
-namespace NResilience.Http;
+namespace NResilience;
 
 /// <summary>
 ///     The per-request switches and the well-known header the HTTP integration reads and writes.

@@ -44,22 +44,22 @@ NResilience.Testing.ScriptedHttpHandler.CallCount.get -> int
 NResilience.Testing.ScriptedHttpHandler.CaptureBodies.get -> bool
 NResilience.Testing.ScriptedHttpHandler.CaptureBodies.init -> void
 NResilience.Testing.ScriptedHttpHandler.Requests.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.SentRequest!>!
-NResilience.Testing.ScriptedHttpHandler.Respond(System.Func<System.Net.Http.HttpResponseMessage!>! response) -> NResilience.Testing.ScriptedHttpHandler!
-NResilience.Testing.ScriptedHttpHandler.Respond(System.Func<System.Net.Http.HttpResponseMessage!>! response, int times) -> NResilience.Testing.ScriptedHttpHandler!
-NResilience.Testing.ScriptedHttpHandler.Respond(System.Net.HttpStatusCode status) -> NResilience.Testing.ScriptedHttpHandler!
-NResilience.Testing.ScriptedHttpHandler.Respond(System.Net.HttpStatusCode status, int times) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Responds(System.Func<System.Net.Http.HttpResponseMessage!>! response) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Responds(System.Func<System.Net.Http.HttpResponseMessage!>! response, int times) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Responds(System.Net.HttpStatusCode status) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Responds(System.Net.HttpStatusCode status, int times) -> NResilience.Testing.ScriptedHttpHandler!
 NResilience.Testing.ScriptedHttpHandler.ScriptedHttpHandler() -> void
-NResilience.Testing.ScriptedHttpHandler.Throw(System.Func<System.Exception!>! exception) -> NResilience.Testing.ScriptedHttpHandler!
-NResilience.Testing.ScriptedHttpHandler.Throw(System.Func<System.Exception!>! exception, int times) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Throws(System.Func<System.Exception!>! exception) -> NResilience.Testing.ScriptedHttpHandler!
+NResilience.Testing.ScriptedHttpHandler.Throws(System.Func<System.Exception!>! exception, int times) -> NResilience.Testing.ScriptedHttpHandler!
 NResilience.Testing.ScriptedStream
 NResilience.Testing.ScriptedStream<T>
-NResilience.Testing.ScriptedStream<T>.Delay(System.TimeSpan delay) -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.Delays(System.TimeSpan delay) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.DisposedEnumerators.get -> int
-NResilience.Testing.ScriptedStream<T>.Empty() -> NResilience.Testing.ScriptedStream<T>!
+NResilience.Testing.ScriptedStream<T>.YieldsNothing() -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.FaultsAfter(System.Exception! exception, params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.LiveEnumerators.get -> int
 NResilience.Testing.ScriptedStream<T>.Next(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T>!
-NResilience.Testing.ScriptedStream<T>.Starts.get -> int
+NResilience.Testing.ScriptedStream<T>.CallCount.get -> int
 NResilience.Testing.ScriptedStream<T>.Throws(System.Exception! exception) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.Yields(params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!
 NResilience.Testing.ScriptedStream<T>.YieldsAfter(System.TimeSpan delay, params System.ReadOnlySpan<T> elements) -> NResilience.Testing.ScriptedStream<T>!

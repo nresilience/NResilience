@@ -1,5 +1,4 @@
 using System.Net;
-using NResilience.Http;
 
 namespace NResilience.IntegrationTests;
 

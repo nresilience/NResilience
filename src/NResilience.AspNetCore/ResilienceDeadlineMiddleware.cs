@@ -8,7 +8,7 @@ namespace NResilience.AspNetCore;
 ///     actually still waiting.
 ///     <para>
 ///         This is the half of deadline propagation that needs a server. The other half -
-///         <see cref="Http.HttpResilienceOptions.PropagateDeadline" /> - is in the core package,
+///         <see cref="HttpResilienceOptions.PropagateDeadline" /> - is in the core package,
 ///         because a handler already owns the whole call and knows what is left of it.
 ///     </para>
 /// </summary>

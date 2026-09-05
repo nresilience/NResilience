@@ -137,7 +137,7 @@ public sealed class RateLimiting
         // </snippet:limit-http>
 
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
-            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Respond(HttpStatusCode.OK)));
+            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Responds(HttpStatusCode.OK)));
 
         using var provider = services.BuildServiceProvider();
         using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "api");
@@ -197,7 +197,7 @@ public sealed class RateLimiting
         // </snippet:limit-adaptive-http>
 
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
-            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Respond(HttpStatusCode.OK)));
+            o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Responds(HttpStatusCode.OK)));
 
         using var provider = services.BuildServiceProvider();
         using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "api");

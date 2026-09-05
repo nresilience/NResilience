@@ -14,7 +14,7 @@ public static class ScriptedStream
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="time">
-    ///     The clock <see cref="ScriptedStream{T}.Delay" /> is served against. Pass the same
+    ///     The clock <see cref="ScriptedStream{T}.Delays" /> is served against. Pass the same
     ///     <c>FakeTimeProvider</c> the policy was given, or a scripted delay is a real sleep - which is
     ///     the flakiness this package exists to remove. Defaults to <see cref="TimeProvider.System" />.
     /// </param>
@@ -70,7 +70,7 @@ public sealed class ScriptedStream<T>
     ///     How many attempts have started - how many times <see cref="Next" /> has been invoked to
     ///     produce a source, whether or not that source was ever pulled from.
     /// </summary>
-    public int Starts => Volatile.Read(ref _served);
+    public int CallCount => Volatile.Read(ref _served);
 
     /// <summary>
     ///     How many of the sources served are still undisposed. The streaming path disposes an
@@ -100,7 +100,7 @@ public sealed class ScriptedStream<T>
     /// </summary>
     public ScriptedStream<T> YieldsAfter(TimeSpan delay, params ReadOnlySpan<T> elements)
     {
-        Delay(delay);
+        Delays(delay);
         return Yields(elements);
     }
 
@@ -108,7 +108,7 @@ public sealed class ScriptedStream<T>
     ///     Appends a step that yields nothing: an empty source, which the streaming path treats as a
     ///     success.
     /// </summary>
-    public ScriptedStream<T> Empty()
+    public ScriptedStream<T> YieldsNothing()
     {
         _steps.Add(new Step(TakePendingDelay(), [], null, null));
         return this;
@@ -116,7 +116,7 @@ public sealed class ScriptedStream<T>
 
     /// <summary>
     ///     Appends a step that throws <paramref name="exception" /> from its first pull, after any
-    ///     pending <see cref="Delay" />.
+    ///     pending <see cref="Delays" />.
     /// </summary>
     /// <remarks>
     ///     The same instance is thrown each time the step is reached, so a test can assert on reference
@@ -150,11 +150,11 @@ public sealed class ScriptedStream<T>
     /// <summary>
     ///     Makes the next step wait <paramref name="delay" /> before its first pull, and its outcome
     ///     land. Accumulates, exactly as <see cref="Sequence{T}.Delays" /> accumulates, so
-    ///     <c>.Delay(a).Delay(b).Yields(x)</c> waits <c>a + b</c>. A trailing <see cref="Delay" />
+    ///     <c>.Delays(a).Delays(b).Yields(x)</c> waits <c>a + b</c>. A trailing <see cref="Delays" />
     ///     with no step after it is a scripting mistake and is reported as one.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="delay" /> is negative.</exception>
-    public ScriptedStream<T> Delay(TimeSpan delay)
+    public ScriptedStream<T> Delays(TimeSpan delay)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(delay, TimeSpan.Zero);
 
@@ -175,6 +175,11 @@ public sealed class ScriptedStream<T>
     ///         Running off the end of the script is a scripting mistake and is reported as one.
     ///     </para>
     ///     <para>
+    ///         The name carries no <c>Async</c> suffix, unlike <see cref="Sequence{T}.NextAsync" />:
+    ///         this returns a cold source for the caller to enumerate, and returning it is not itself
+    ///         asynchronous. <see cref="Sequence{T}.NextAsync" /> awaits one result, so it is awaited.
+    ///     </para>
+    ///     <para>
     ///         <paramref name="cancellationToken" /> is combined with the one the enumeration is
     ///         started with, exactly as <c>[EnumeratorCancellation]</c> combines them for a real
     ///         <c>async</c> iterator: whichever is set wins, and two different tokens are linked. The
@@ -193,7 +198,7 @@ public sealed class ScriptedStream<T>
             throw new InvalidOperationException(
                 $"The scripted stream has {_steps.Count} step(s) and attempt {index + 1} asked for one more." +
                 (_hasPendingDelay && _pendingDelay > TimeSpan.Zero
-                    ? " A trailing Delay() was scripted with no Yields(), Empty(), Throws() or FaultsAfter() after it, so it is not a step."
+                    ? " A trailing Delays() was scripted with no Yields(), YieldsNothing(), Throws() or FaultsAfter() after it, so it is not a step."
                     : " Script the attempts the policy will actually make - retries included."));
         }
 

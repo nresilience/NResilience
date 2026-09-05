@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Time.Testing;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Tests;
@@ -17,8 +16,8 @@ public sealed class HttpHandlerTests
     public async Task A_transient_status_is_retried_to_success()
     {
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -30,7 +29,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_404_is_an_answer_rather_than_a_failure()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.NotFound);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.NotFound);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/missing"));
@@ -42,7 +41,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task The_last_response_is_returned_when_the_attempts_run_out()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -55,8 +54,8 @@ public sealed class HttpHandlerTests
     public async Task Each_attempt_gets_its_own_request()
     {
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -75,8 +74,8 @@ public sealed class HttpHandlerTests
             {
                 CaptureBodies = true,
             }
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var client = Client(transport);
 
@@ -100,7 +99,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_POST_is_not_retried()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
 
         using var client = Client(transport);
         using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
@@ -112,7 +111,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_non_retryable_POST_body_reaches_the_wire()
     {
-        var transport = new ScriptedHttpHandler { CaptureBodies = true }.Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler { CaptureBodies = true }.Responds(HttpStatusCode.OK);
 
         using var client = Client(transport);
         using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
@@ -129,8 +128,8 @@ public sealed class HttpHandlerTests
             {
                 CaptureBodies = true,
             }
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
         using var response = await client.PostAsync(new Uri("https://api.test/orders"), new StringContent("order"));
@@ -144,8 +143,8 @@ public sealed class HttpHandlerTests
     public async Task A_POST_is_retried_when_the_request_declares_itself_repeatable()
     {
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var client = Client(transport);
 
@@ -165,7 +164,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_request_declared_not_repeatable_is_not_retried_even_when_its_method_is_safe()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
 
         using var client = Client(transport, new HttpResilienceOptions { RetryUnsafeMethods = true });
 
@@ -291,7 +290,7 @@ public sealed class HttpHandlerTests
     {
         var first = new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = new TrackedContent() };
         var second = new HttpResponseMessage(HttpStatusCode.OK) { Content = new TrackedContent() };
-        var transport = new ScriptedHttpHandler().Respond(() => first).Respond(() => second);
+        var transport = new ScriptedHttpHandler().Responds(() => first).Responds(() => second);
 
         using var client = Client(transport);
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -303,7 +302,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task Every_host_gets_its_own_breaker_and_budget()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic });
         using var client = new HttpClient(handler);
 
@@ -418,7 +417,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_fake_clock_on_the_policy_drives_a_per_host_budget()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.ServiceUnavailable);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
         var time = new FakeTimeProvider();
 
         // No per-host breaker: five failing calls would open one, and a refused call pauses on the
@@ -448,7 +447,7 @@ public sealed class HttpHandlerTests
     public async Task An_explicit_breaker_survives_per_host_scoping()
     {
         var shared = Breaker.Of(name: "shared");
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp with { Breaker = shared });
         using var client = new HttpClient(handler);
@@ -464,7 +463,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_retrying_client_stamps_the_nested_retry_header()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(transport);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
@@ -475,7 +474,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task A_client_that_cannot_retry_stamps_nothing()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1 });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
@@ -487,7 +486,7 @@ public sealed class HttpHandlerTests
     public async Task An_inbound_stamp_makes_the_retry_a_reported_nested_one()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
@@ -502,7 +501,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task An_inbound_stamp_is_not_duplicated_on_the_outbound_request()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(transport);
 
@@ -519,7 +518,7 @@ public sealed class HttpHandlerTests
     {
         var recorder = new EventRecorder();
 
-        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var inner = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         using var innerClient = Client(inner, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         // The outer client's transport is the inner client: exactly the shape a service that calls
@@ -536,7 +535,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task An_in_process_nested_retry_stamps_the_header_on_the_inner_request()
     {
-        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var inner = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         using var innerClient = Client(inner);
 
         // The inner transport receives a different request than the outer one, so the header
@@ -554,7 +553,7 @@ public sealed class HttpHandlerTests
     public async Task Nesting_detection_can_be_turned_off()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(
             transport,
@@ -576,7 +575,7 @@ public sealed class HttpHandlerTests
         // to its previous value in the finally block, so a second call through the same handler
         // is still detected as nested when it runs inside an outer retrying client.
         var recorder = new EventRecorder();
-        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var inner = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         using var innerClient = Client(inner, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         var outerTransport = new ConditionalTransport(async (request, ct) =>
@@ -604,7 +603,7 @@ public sealed class HttpHandlerTests
     public async Task An_ambient_caller_retrying_flag_is_reported_as_nesting()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
@@ -620,7 +619,7 @@ public sealed class HttpHandlerTests
     public async Task The_ambient_flag_is_ignored_when_detection_is_off()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(
             transport,
@@ -637,7 +636,7 @@ public sealed class HttpHandlerTests
     public async Task The_ambient_flag_is_ignored_for_a_single_attempt_client()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1, OnEvent = recorder.Record });
 
@@ -651,7 +650,7 @@ public sealed class HttpHandlerTests
     public async Task The_handler_restores_the_in_process_flag_it_found()
     {
         var recorder = new EventRecorder();
-        var inner = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var inner = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         // The regression test for the restore: wasInside is the value the finally restores, and it
         // must stay "what this handler's own AsyncLocal was before this send" - not OR-ed with the
@@ -698,7 +697,7 @@ public sealed class HttpHandlerTests
         var throttled = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
         throttled.Headers.RetryAfter = new RetryConditionHeaderValue(TimeSpan.FromMilliseconds(1));
 
-        var transport = new ScriptedHttpHandler().Respond(() => throttled).Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(() => throttled).Responds(HttpStatusCode.OK);
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { Backoff = Backoff.Constant(TimeSpan.FromMinutes(5)) });
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -712,7 +711,7 @@ public sealed class HttpHandlerTests
     public async Task Events_carry_the_host_scoped_policy_name()
     {
         var recorder = new EventRecorder();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
@@ -727,8 +726,8 @@ public sealed class HttpHandlerTests
         using var cancellation = new CancellationTokenSource();
 
         var transport = new ScriptedHttpHandler()
-            .Respond(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = tracked })
-            .Throw(() =>
+            .Responds(() => new HttpResponseMessage(HttpStatusCode.ServiceUnavailable) { Content = tracked })
+            .Throws(() =>
             {
                 cancellation.Cancel();
                 return new OperationCanceledException(cancellation.Token);

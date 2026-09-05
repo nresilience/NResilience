@@ -154,7 +154,7 @@ public sealed class GrpcDocs
     {
         var interceptor = new ResilienceInterceptor(GrpcResilience.Default with { Backoff = Backoff.None });
 
-        using (var call = Call(interceptor, new Script().Respond("ok")))
+        using (var call = Call(interceptor, new Script().Responds("ok")))
             await call.ResponseAsync;
 
         // <snippet:grpc-breakers>
@@ -208,7 +208,7 @@ public sealed class GrpcDocs
 
         internal int Calls { get; private set; }
 
-        internal Script Respond(string response)
+        internal Script Responds(string response)
         {
             _step = () => new AsyncUnaryCall<string>(
                 Task.FromResult(response),

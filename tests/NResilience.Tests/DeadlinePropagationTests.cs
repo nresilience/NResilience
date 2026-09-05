@@ -1,6 +1,5 @@
 using System.Net;
 using Microsoft.Extensions.Time.Testing;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Tests;
@@ -286,7 +285,7 @@ public sealed class DeadlinePropagationTests
     [Fact]
     public async Task Nothing_goes_on_the_wire_unless_asked()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         using var client = new HttpClient(new ResilienceHandler(transport, TestPolicy.InstantHttp));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
@@ -298,7 +297,7 @@ public sealed class DeadlinePropagationTests
     public async Task What_the_peer_is_told_is_this_attempts_own_ceiling()
     {
         var time = new FakeTimeProvider();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var policy = TestPolicy.On(time) with
         {
@@ -341,7 +340,7 @@ public sealed class DeadlinePropagationTests
     public async Task The_header_carries_the_inherited_deadline_when_that_is_the_tighter_one()
     {
         var time = new FakeTimeProvider();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var policy = TestPolicy.On(time) with
         {
@@ -364,7 +363,7 @@ public sealed class DeadlinePropagationTests
     public async Task The_header_name_is_the_callers_to_choose()
     {
         var time = new FakeTimeProvider();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
         var options = new HttpResilienceOptions { PropagateDeadline = true, DeadlineHeader = "X-Budget" };
@@ -379,7 +378,7 @@ public sealed class DeadlinePropagationTests
     [Fact]
     public async Task An_unbounded_call_has_nothing_to_say()
     {
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         // TestPolicy.InstantHttp has neither a deadline nor an attempt ceiling.
         using var client = new HttpClient(
@@ -394,7 +393,7 @@ public sealed class DeadlinePropagationTests
     public async Task Ours_replaces_whatever_the_caller_wrote()
     {
         var time = new FakeTimeProvider();
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
 

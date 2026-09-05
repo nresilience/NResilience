@@ -1,7 +1,6 @@
 using System.Data.Common;
 using System.Net;
 using Microsoft.Extensions.Time.Testing;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Docs;
@@ -308,7 +307,7 @@ public sealed class Features
     public async Task Each_attempt_tells_the_peer_how_long_it_will_be_waited_for()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var transport = new ScriptedHttpHandler().Respond(status: HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(status: HttpStatusCode.OK);
         var uri = new Uri(uriString: "https://api.example.com/orders");
 
         // <snippet:deadline-propagate>

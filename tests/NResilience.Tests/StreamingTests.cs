@@ -23,7 +23,7 @@ public sealed class StreamingTests
         var received = await CollectAsync(policy.RunAsync(streams.Next));
 
         Assert.Equal([1, 2, 3], received);
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
 
         // The abandoned attempt's enumerator is disposed, and so is the surviving one once the
         // consumer finishes - so nothing the policy started is left live.
@@ -53,7 +53,7 @@ public sealed class StreamingTests
         Assert.Empty(received);
         Assert.Equal(StopReason.Permanent, rejected.Reason);
         Assert.Single(rejected.Attempts);
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
         Assert.Equal([CallEventKind.Attempt, CallEventKind.NotRetried], events.Select(e => e.Kind));
 
         // A permanent verdict stops after one attempt, so the message must not claim the attempts
@@ -77,7 +77,7 @@ public sealed class StreamingTests
         var received = await CollectAsync(policy.RunAsync(streams.Next));
 
         Assert.Equal([5, 6], received);
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
         Assert.Equal(2, streams.DisposedEnumerators);
     }
 
@@ -136,7 +136,7 @@ public sealed class StreamingTests
     [Fact]
     public async Task An_empty_source_is_a_success()
     {
-        var streams = ScriptedStream.For<int>().Empty();
+        var streams = ScriptedStream.For<int>().YieldsNothing();
         var events = new List<CallEvent>();
 
         var policy = TestPolicy.Instant with { OnEvent = e => events.Add(e) };
@@ -158,7 +158,7 @@ public sealed class StreamingTests
         var received = await CollectAsync(policy.RunAsync(streams.Next));
 
         Assert.Equal([1], received);
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
         Assert.Equal(2, streams.DisposedEnumerators);
         Assert.Equal(0, streams.LiveEnumerators);
     }
@@ -205,7 +205,7 @@ public sealed class StreamingTests
         await cts.CancelAsync();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => drained);
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
     }
 
     [Fact]
@@ -229,7 +229,7 @@ public sealed class StreamingTests
         var failure = await Assert.ThrowsAsync<DeadlineExceededException>(() => DrainAsync(policy.RunAsync(streams.Next)));
 
         Assert.Single(failure.Attempts);
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
     }
 
     [Fact]
@@ -254,7 +254,7 @@ public sealed class StreamingTests
         time.Advance(TimeSpan.FromSeconds(6));
 
         Assert.Equal([1, 2], await collected);
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
     }
 
     [Fact]
@@ -274,7 +274,7 @@ public sealed class StreamingTests
         time.Advance(TimeSpan.FromSeconds(6));
 
         var failure = await Assert.ThrowsAsync<AttemptTimeoutException>(() => collected);
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
         Assert.Single(failure.Attempts);
     }
 
@@ -389,7 +389,7 @@ public sealed class StreamingTests
         Assert.Equal([1, 2], received);
 
         // The refused admission never invoked the source, so one attempt started it.
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
         Assert.Equal(2, admissions);
 
         // The refusal produced the same story a call's would: a throttled attempt, the retry, the
@@ -410,7 +410,7 @@ public sealed class StreamingTests
 
         Assert.Equal([1, 2], await CollectAsync(enumerable));
         Assert.Equal([3, 4], await CollectAsync(enumerable));
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
     }
 
     /// <summary>
@@ -494,7 +494,7 @@ public sealed class StreamingTests
         Assert.Null(rejected.InnerException);
         Assert.Equal(3, rejected.Attempts.Count);
         Assert.Contains("every attempt produced a result the policy refused", rejected.Message, StringComparison.Ordinal);
-        Assert.Equal(3, streams.Starts);
+        Assert.Equal(3, streams.CallCount);
     }
 
     [Fact]
@@ -529,7 +529,7 @@ public sealed class StreamingTests
         Assert.Equal(StopReason.DependencyUnavailable, rejected.Reason);
         Assert.NotNull(rejected.RetryAfter);
         Assert.Single(rejected.Attempts);
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
 
         Assert.Equal([CallEventKind.Attempt, CallEventKind.BreakerOpened, CallEventKind.Retrying, CallEventKind.RejectedByBreaker],
             events.Select(e => e.Kind));
@@ -567,7 +567,7 @@ public sealed class StreamingTests
 
         Assert.Empty(received);
         Assert.Single(exceeded.Attempts);
-        Assert.Equal(1, streams.Starts);
+        Assert.Equal(1, streams.CallCount);
     }
 
     /// <summary>
@@ -601,7 +601,7 @@ public sealed class StreamingTests
         Assert.Contains("every attempt produced a result the policy refused", rejected.Message, StringComparison.Ordinal);
 
         // The source was never pulled from: a refused admission skips it entirely.
-        Assert.Equal(0, streams.Starts);
+        Assert.Equal(0, streams.CallCount);
     }
 
     [Fact]
@@ -619,7 +619,7 @@ public sealed class StreamingTests
         var caught = await Assert.ThrowsAsync<IOException>(() => DrainAsync(policy.RunAsync(streams.Next)));
 
         Assert.Same(fault, caught);
-        Assert.Equal(3, streams.Starts);
+        Assert.Equal(3, streams.CallCount);
         Assert.Equal(3, AttemptLog.Of(caught)!.Count);
     }
 
@@ -637,7 +637,7 @@ public sealed class StreamingTests
             streams));
 
         Assert.Equal([1], received);
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
     }
 
     [Fact]
@@ -688,7 +688,7 @@ public sealed class StreamingTests
         var rejected = await Assert.ThrowsAsync<CallRejectedException>(() => collected);
 
         Assert.Equal(StopReason.BudgetExhausted, rejected.Reason);
-        Assert.Equal(2, streams.Starts);
+        Assert.Equal(2, streams.CallCount);
     }
 
     [Fact]

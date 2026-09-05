@@ -6,7 +6,7 @@ order: 9
 
 # HTTP reference
 
-The HTTP components live in the `NResilience.Http` namespace in the `NResilience` package.
+The HTTP components live in the `NResilience` namespace in the `NResilience` package.
 
 ## `ResilienceHandler`
 

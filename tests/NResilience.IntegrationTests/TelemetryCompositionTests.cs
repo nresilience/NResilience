@@ -5,7 +5,6 @@ using System.Net;
 using Microsoft.Extensions.Logging.Testing;
 using NResilience.Extensions;
 using NResilience.Extensions.Internal;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.IntegrationTests;

@@ -10,8 +10,8 @@ public static class ResilienceNestedRetryApplicationBuilderExtensions
     /// <summary>
     ///     Reads the retry marker a caller sent and publishes it for the rest of the request, so the
     ///     outbound calls this request makes - through a retrying
-    ///     <see cref="Http.ResilienceHandler" /> with
-    ///     <see cref="Http.HttpResilienceOptions.DetectNestedRetries" /> set - report
+    ///     <see cref="ResilienceHandler" /> with
+    ///     <see cref="HttpResilienceOptions.DetectNestedRetries" /> set - report
     ///     <see cref="CallEventKind.NestedRetry" /> themselves.
     /// </summary>
     /// <param name="app">The pipeline.</param>

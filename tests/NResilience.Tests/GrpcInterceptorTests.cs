@@ -1,7 +1,6 @@
 using Grpc.Core;
 using Grpc.Core.Interceptors;
 using NResilience.Grpc;
-using NResilience.Http;
 
 namespace NResilience.Tests;
 
@@ -23,7 +22,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task An_unavailable_status_is_retried_to_success()
     {
-        var script = new GrpcScript().Fail(StatusCode.Unavailable).Fail(StatusCode.Unavailable).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.Unavailable).Fail(StatusCode.Unavailable).Responds("ok");
 
         using var call = Call(Interceptor(), script);
 
@@ -48,7 +47,7 @@ public sealed class GrpcInterceptorTests
     public async Task Resource_exhausted_is_throttling_rather_than_a_transient_failure()
     {
         var events = new List<CallEvent>();
-        var script = new GrpcScript().Fail(StatusCode.ResourceExhausted).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.ResourceExhausted).Responds("ok");
 
         using var call = Call(Interceptor(Policy() with { OnEvent = events.Add }), script);
 
@@ -111,7 +110,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task The_status_after_a_retry_is_the_winning_attempt_s()
     {
-        var script = new GrpcScript().Fail(StatusCode.Unavailable).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.Unavailable).Responds("ok");
 
         using var call = Call(Interceptor(), script);
         await call.ResponseAsync;
@@ -136,7 +135,7 @@ public sealed class GrpcInterceptorTests
     public async Task The_response_headers_are_the_winning_attempt_s()
     {
         var winner = new Metadata { { "served-by", "b" } };
-        var script = new GrpcScript().Fail(StatusCode.Unavailable).Respond("ok", winner);
+        var script = new GrpcScript().Fail(StatusCode.Unavailable).Responds("ok", winner);
 
         using var call = Call(Interceptor(), script);
         await call.ResponseAsync;
@@ -160,7 +159,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task A_superseded_attempt_is_disposed_and_the_winner_is_the_caller_s()
     {
-        var script = new GrpcScript().Fail(StatusCode.Unavailable).Fail(StatusCode.Unavailable).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.Unavailable).Fail(StatusCode.Unavailable).Responds("ok");
 
         var call = Call(Interceptor(), script);
         await call.ResponseAsync;
@@ -192,7 +191,7 @@ public sealed class GrpcInterceptorTests
     public async Task The_caller_s_metadata_is_never_mutated_and_carries_exactly_one_marker_per_attempt()
     {
         var callers = new Metadata { { "tenant", "acme" } };
-        var script = new GrpcScript().Fail(StatusCode.Unavailable).Fail(StatusCode.Unavailable).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.Unavailable).Fail(StatusCode.Unavailable).Responds("ok");
 
         using var call = Call(Interceptor(), script, new CallOptions(callers));
         await call.ResponseAsync;
@@ -210,7 +209,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task A_null_metadata_collection_is_handled()
     {
-        var script = new GrpcScript().Fail(StatusCode.Unavailable).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.Unavailable).Responds("ok");
 
         using var call = Call(Interceptor(), script);
         await call.ResponseAsync;
@@ -222,7 +221,7 @@ public sealed class GrpcInterceptorTests
     public async Task An_inbound_marker_is_not_stamped_a_second_time()
     {
         var callers = new Metadata { { "x-nresilience-retrying", ResilienceNestedRetry.Marker } };
-        var script = new GrpcScript().Respond("ok");
+        var script = new GrpcScript().Responds("ok");
 
         using var call = Call(Interceptor(), script, new CallOptions(callers));
         await call.ResponseAsync;
@@ -240,7 +239,7 @@ public sealed class GrpcInterceptorTests
     public async Task A_call_made_inside_an_inbound_retry_reports_the_nesting()
     {
         var events = new List<CallEvent>();
-        var script = new GrpcScript().Respond("ok");
+        var script = new GrpcScript().Responds("ok");
 
         using var scope = ResilienceNestedRetry.Begin(true);
         using var call = Call(Interceptor(Policy() with { OnEvent = events.Add }), script);
@@ -254,7 +253,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task The_wire_deadline_is_the_attempt_ceiling_plus_the_slack()
     {
-        var script = new GrpcScript().Respond("ok");
+        var script = new GrpcScript().Responds("ok");
         var options = new GrpcResilienceOptions { DeadlineSlack = TimeSpan.FromMilliseconds(50) };
         var policy = Policy() with { AttemptTimeout = TimeSpan.FromSeconds(2), Deadline = TimeSpan.FromMinutes(5) };
 
@@ -270,7 +269,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task The_wire_deadline_is_the_remaining_call_deadline_when_that_is_tighter()
     {
-        var script = new GrpcScript().Respond("ok");
+        var script = new GrpcScript().Responds("ok");
         var policy = Policy() with { AttemptTimeout = TimeSpan.FromMinutes(5), Deadline = TimeSpan.FromSeconds(1) };
 
         var before = DateTime.UtcNow;
@@ -286,7 +285,7 @@ public sealed class GrpcInterceptorTests
     public async Task A_deadline_the_caller_set_is_never_overwritten()
     {
         var theirs = DateTime.UtcNow.AddMilliseconds(200);
-        var script = new GrpcScript().Respond("ok");
+        var script = new GrpcScript().Responds("ok");
         var policy = Policy() with { AttemptTimeout = TimeSpan.FromSeconds(30) };
 
         using var call = Call(new ResilienceInterceptor(policy), script, new CallOptions(deadline: theirs));
@@ -298,7 +297,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task No_deadline_is_written_when_propagation_is_off()
     {
-        var script = new GrpcScript().Respond("ok");
+        var script = new GrpcScript().Responds("ok");
         var options = new GrpcResilienceOptions { PropagateAttemptDeadline = false };
 
         using var call = Call(new ResilienceInterceptor(Policy(), options), script);
@@ -314,7 +313,7 @@ public sealed class GrpcInterceptorTests
         // reports DeadlineExceeded while the executor's own token is still unfired. The classifier
         // here refuses every RpcException, so only the translation can produce a retry.
         var refusing = Policy() with { Classifier = GrpcResilience.Classifier.On<RpcException>(Verdict.Permanent) };
-        var script = new GrpcScript().Fail(StatusCode.DeadlineExceeded).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.DeadlineExceeded).Responds("ok");
 
         using var call = Call(new ResilienceInterceptor(refusing), script);
 
@@ -326,7 +325,7 @@ public sealed class GrpcInterceptorTests
     public async Task A_deadline_the_caller_set_stays_an_rpc_exception_for_the_classifier_to_judge()
     {
         var refusing = Policy() with { Classifier = GrpcResilience.Classifier.On<RpcException>(Verdict.Permanent) };
-        var script = new GrpcScript().Fail(StatusCode.DeadlineExceeded).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.DeadlineExceeded).Responds("ok");
 
         using var call = Call(
             new ResilienceInterceptor(refusing),
@@ -380,7 +379,7 @@ public sealed class GrpcInterceptorTests
     {
         Assert.True(Interceptor().WillRetry(Get));
 
-        var script = new GrpcScript().Fail(StatusCode.Unavailable).Respond("ok");
+        var script = new GrpcScript().Fail(StatusCode.Unavailable).Responds("ok");
         using var call = Call(Interceptor(), script);
         await call.ResponseAsync;
 
@@ -428,12 +427,12 @@ public sealed class GrpcInterceptorTests
     {
         var interceptor = Interceptor(Policy() with { Breaker = new Breaker() });
 
-        using (var first = Call(interceptor, new GrpcScript().Respond("ok")))
+        using (var first = Call(interceptor, new GrpcScript().Responds("ok")))
         {
             await first.ResponseAsync;
         }
 
-        using (var second = Call(interceptor, new GrpcScript().Respond("ok"), method: Ship))
+        using (var second = Call(interceptor, new GrpcScript().Responds("ok"), method: Ship))
         {
             await second.ResponseAsync;
         }
@@ -447,12 +446,12 @@ public sealed class GrpcInterceptorTests
     {
         var interceptor = Interceptor(Policy() with { Breaker = new Breaker() });
 
-        using (var first = Call(interceptor, new GrpcScript().Respond("ok")))
+        using (var first = Call(interceptor, new GrpcScript().Responds("ok")))
         {
             await first.ResponseAsync;
         }
 
-        using (var second = Call(interceptor, new GrpcScript().Respond("ok"), method: Charge))
+        using (var second = Call(interceptor, new GrpcScript().Responds("ok"), method: Charge))
         {
             await second.ResponseAsync;
         }
@@ -465,12 +464,12 @@ public sealed class GrpcInterceptorTests
     {
         var interceptor = new ResilienceInterceptor(Policy(), new GrpcResilienceOptions { ScopeBy = null }, "orders");
 
-        using (var first = Call(interceptor, new GrpcScript().Respond("ok")))
+        using (var first = Call(interceptor, new GrpcScript().Responds("ok")))
         {
             await first.ResponseAsync;
         }
 
-        using (var second = Call(interceptor, new GrpcScript().Respond("ok"), method: Ship))
+        using (var second = Call(interceptor, new GrpcScript().Responds("ok"), method: Ship))
         {
             await second.ResponseAsync;
         }
@@ -489,12 +488,12 @@ public sealed class GrpcInterceptorTests
             await Assert.ThrowsAsync<RpcException>(async () => await failing.ResponseAsync);
         }
 
-        using (var rejected = Call(interceptor, new GrpcScript().Respond("ok")))
+        using (var rejected = Call(interceptor, new GrpcScript().Responds("ok")))
         {
             await Assert.ThrowsAsync<CallRejectedException>(async () => await rejected.ResponseAsync);
         }
 
-        using var other = Call(interceptor, new GrpcScript().Respond("ok"), method: Ship);
+        using var other = Call(interceptor, new GrpcScript().Responds("ok"), method: Ship);
 
         Assert.Equal("ok", await other.ResponseAsync);
     }

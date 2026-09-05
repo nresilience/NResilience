@@ -14,8 +14,8 @@ public sealed record SentRequest(HttpMethod Method, Uri? RequestUri, HttpRequest
 /// <example>
 ///     <code>
 /// var transport = new ScriptedHttpHandler()
-///     .Respond(HttpStatusCode.ServiceUnavailable, times: 2)
-///     .Respond(HttpStatusCode.OK);
+///     .Responds(HttpStatusCode.ServiceUnavailable, times: 2)
+///     .Responds(HttpStatusCode.OK);
 ///
 /// using var client = HttpResilience.CreateClient(policy, innerHandler: transport);
 /// var response = await client.GetAsync(uri, cancellationToken);
@@ -53,25 +53,25 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
     /// <summary>Serves one response with this status.</summary>
     /// <param name="status">The status code.</param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Respond(HttpStatusCode status) => Respond(status, 1);
+    public ScriptedHttpHandler Responds(HttpStatusCode status) => Responds(status, 1);
 
     /// <summary>Serves one response with this status.</summary>
     /// <param name="status">The status code.</param>
     /// <param name="times">How many attempts get this response before the script advances.</param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Respond(HttpStatusCode status, int times) =>
-        Respond(() => new HttpResponseMessage(status), times);
+    public ScriptedHttpHandler Responds(HttpStatusCode status, int times) =>
+        Responds(() => new HttpResponseMessage(status), times);
 
     /// <summary>Serves one response built afresh per attempt, so its content can be read each time.</summary>
     /// <param name="response">Builds the response. Called once per attempt that consumes this step.</param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Respond(Func<HttpResponseMessage> response) => Respond(response, 1);
+    public ScriptedHttpHandler Responds(Func<HttpResponseMessage> response) => Responds(response, 1);
 
     /// <summary>Serves one response built afresh per attempt, so its content can be read each time.</summary>
     /// <param name="response">Builds the response. Called once per attempt that consumes this step.</param>
     /// <param name="times">How many attempts get this response before the script advances.</param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Respond(Func<HttpResponseMessage> response, int times)
+    public ScriptedHttpHandler Responds(Func<HttpResponseMessage> response, int times)
     {
         ArgumentNullException.ThrowIfNull(response);
         ArgumentOutOfRangeException.ThrowIfLessThan(times, 1);
@@ -90,7 +90,7 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
     ///     <see cref="Exception.Data" />.
     /// </param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Throw(Func<Exception> exception) => Throw(exception, 1);
+    public ScriptedHttpHandler Throws(Func<Exception> exception) => Throws(exception, 1);
 
     /// <summary>Throws, for the transport failures a classifier has to see.</summary>
     /// <param name="exception">
@@ -99,7 +99,7 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
     /// </param>
     /// <param name="times">How many attempts throw this before the script advances.</param>
     /// <returns>This handler.</returns>
-    public ScriptedHttpHandler Throw(Func<Exception> exception, int times)
+    public ScriptedHttpHandler Throws(Func<Exception> exception, int times)
     {
         ArgumentNullException.ThrowIfNull(exception);
         ArgumentOutOfRangeException.ThrowIfLessThan(times, 1);
@@ -138,7 +138,7 @@ public sealed class ScriptedHttpHandler : HttpMessageHandler
         Interlocked.Increment(ref _callCount);
 
         if (_steps.Count == 0)
-            throw new InvalidOperationException("The handler was given no script. Call Respond or Throw first.");
+            throw new InvalidOperationException("The handler was given no script. Call Responds or Throws first.");
 
         var index = Math.Min(Interlocked.Increment(ref _index), _steps.Count - 1);
         return _steps[index]();

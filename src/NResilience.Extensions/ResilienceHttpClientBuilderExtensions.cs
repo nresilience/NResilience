@@ -3,7 +3,6 @@ using Microsoft.Extensions.Options;
 using NResilience;
 using NResilience.Extensions;
 using NResilience.Extensions.Internal;
-using NResilience.Http;
 
 namespace Microsoft.Extensions.DependencyInjection;
 

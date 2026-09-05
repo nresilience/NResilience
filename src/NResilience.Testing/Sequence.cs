@@ -169,6 +169,12 @@ public sealed class Sequence<T>
     ///     Serves the next step: waits its delay if it has one, then returns its result or throws its
     ///     exception.
     /// </summary>
+    /// <remarks>
+    ///     The <c>Async</c> suffix is the difference from <see cref="ScriptedStream{T}.Next" />, which
+    ///     carries none: this one awaits a single result, so it is a <see cref="Task{TResult}" /> the
+    ///     caller awaits; the streaming double hands back a cold source the caller enumerates, and
+    ///     nothing about returning it is asynchronous.
+    /// </remarks>
     /// <param name="cancellationToken">
     ///     Observed while a delay is being served. A step with no delay completes synchronously and
     ///     does not observe it - see the remarks on <see cref="Sequence{T}" />.

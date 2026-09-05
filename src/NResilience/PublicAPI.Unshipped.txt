@@ -220,38 +220,29 @@ NResilience.Hedge.WinRate.get -> NResilience.WinRate?
 NResilience.Hedge.WinRate.init -> void
 NResilience.Hedge.Window.get -> System.TimeSpan
 NResilience.Hedge.Window.init -> void
-NResilience.Http.HttpResilience
-NResilience.Http.HttpResilienceOptions
-NResilience.Http.HttpResilienceOptions.BreakerPerHost.get -> bool
-NResilience.Http.HttpResilienceOptions.BreakerPerHost.set -> void
-NResilience.Http.HttpResilienceOptions.BreakerSettings.get -> NResilience.BreakerSettings?
-NResilience.Http.HttpResilienceOptions.BreakerSettings.set -> void
-NResilience.Http.HttpResilienceOptions.BudgetPerHost.get -> bool
-NResilience.Http.HttpResilienceOptions.BudgetPerHost.set -> void
-NResilience.Http.HttpResilienceOptions.DeadlineHeader.get -> string!
-NResilience.Http.HttpResilienceOptions.DeadlineHeader.set -> void
-NResilience.Http.HttpResilienceOptions.DetectNestedRetries.get -> bool
-NResilience.Http.HttpResilienceOptions.DetectNestedRetries.set -> void
-NResilience.Http.HttpResilienceOptions.HttpResilienceOptions() -> void
-NResilience.Http.HttpResilienceOptions.MaximumHosts.get -> int?
-NResilience.Http.HttpResilienceOptions.MaximumHosts.set -> void
-NResilience.Http.HttpResilienceOptions.OwnTransportTimeout.get -> bool
-NResilience.Http.HttpResilienceOptions.OwnTransportTimeout.set -> void
-NResilience.Http.HttpResilienceOptions.PropagateDeadline.get -> bool
-NResilience.Http.HttpResilienceOptions.PropagateDeadline.set -> void
-NResilience.Http.HttpResilienceOptions.RetryUnsafeMethods.get -> bool
-NResilience.Http.HttpResilienceOptions.RetryUnsafeMethods.set -> void
-NResilience.Http.HttpResilienceOptions.Validate() -> void
-NResilience.Http.HttpResilienceOptions.Validated() -> NResilience.Http.HttpResilienceOptions!
-NResilience.Http.ResilienceHandler
-NResilience.Http.ResilienceHandler.BreakersByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.Breaker!>!
-NResilience.Http.ResilienceHandler.BudgetsByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.RetryBudget!>!
-NResilience.Http.ResilienceHandler.Options.get -> NResilience.Http.HttpResilienceOptions!
-NResilience.Http.ResilienceHandler.Policy.get -> NResilience.Resilience!
-NResilience.Http.ResilienceHandler.ResilienceHandler(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
-NResilience.Http.ResilienceHandler.ResilienceHandler(System.Net.Http.HttpMessageHandler! innerHandler, NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
-NResilience.Http.ResilienceHandler.WillRetry(System.Net.Http.HttpRequestMessage! request) -> bool
-NResilience.Http.ResilienceHttpRequestExtensions
+NResilience.HttpResilience
+NResilience.HttpResilienceOptions
+NResilience.HttpResilienceOptions.BreakerPerHost.get -> bool
+NResilience.HttpResilienceOptions.BreakerPerHost.set -> void
+NResilience.HttpResilienceOptions.BreakerSettings.get -> NResilience.BreakerSettings?
+NResilience.HttpResilienceOptions.BreakerSettings.set -> void
+NResilience.HttpResilienceOptions.BudgetPerHost.get -> bool
+NResilience.HttpResilienceOptions.BudgetPerHost.set -> void
+NResilience.HttpResilienceOptions.DeadlineHeader.get -> string!
+NResilience.HttpResilienceOptions.DeadlineHeader.set -> void
+NResilience.HttpResilienceOptions.DetectNestedRetries.get -> bool
+NResilience.HttpResilienceOptions.DetectNestedRetries.set -> void
+NResilience.HttpResilienceOptions.HttpResilienceOptions() -> void
+NResilience.HttpResilienceOptions.MaximumHosts.get -> int?
+NResilience.HttpResilienceOptions.MaximumHosts.set -> void
+NResilience.HttpResilienceOptions.OwnTransportTimeout.get -> bool
+NResilience.HttpResilienceOptions.OwnTransportTimeout.set -> void
+NResilience.HttpResilienceOptions.PropagateDeadline.get -> bool
+NResilience.HttpResilienceOptions.PropagateDeadline.set -> void
+NResilience.HttpResilienceOptions.RetryUnsafeMethods.get -> bool
+NResilience.HttpResilienceOptions.RetryUnsafeMethods.set -> void
+NResilience.HttpResilienceOptions.Validate() -> void
+NResilience.HttpResilienceOptions.Validated() -> NResilience.HttpResilienceOptions!
 NResilience.IResilienceFailure
 NResilience.IResilienceFailure.Attempts.get -> NResilience.AttemptLog!
 NResilience.IResilienceFailure.Reason.get -> NResilience.StopReason
@@ -371,6 +362,15 @@ NResilience.ResilienceDeadline
 NResilience.ResilienceDeadline.DeadlineScope
 NResilience.ResilienceDeadline.DeadlineScope.DeadlineScope() -> void
 NResilience.ResilienceDeadline.DeadlineScope.Dispose() -> void
+NResilience.ResilienceHandler
+NResilience.ResilienceHandler.BreakersByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.Breaker!>!
+NResilience.ResilienceHandler.BudgetsByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.RetryBudget!>!
+NResilience.ResilienceHandler.Options.get -> NResilience.HttpResilienceOptions!
+NResilience.ResilienceHandler.Policy.get -> NResilience.Resilience!
+NResilience.ResilienceHandler.ResilienceHandler(NResilience.Resilience? policy = null, NResilience.HttpResilienceOptions? options = null) -> void
+NResilience.ResilienceHandler.ResilienceHandler(System.Net.Http.HttpMessageHandler! innerHandler, NResilience.Resilience? policy = null, NResilience.HttpResilienceOptions? options = null) -> void
+NResilience.ResilienceHandler.WillRetry(System.Net.Http.HttpRequestMessage! request) -> bool
+NResilience.ResilienceHttpRequestExtensions
 NResilience.ResilienceNestedRetry
 NResilience.ResilienceNestedRetry.NestedRetryScope
 NResilience.ResilienceNestedRetry.NestedRetryScope.Dispose() -> void
@@ -420,7 +420,7 @@ NResilience.WinRate.WinRate() -> void
 NResilience.WinRate.Window.get -> System.TimeSpan
 NResilience.WinRate.Window.init -> void
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
-const NResilience.Http.HttpResilience.NestedRetryHeader = "X-NResilience-Retrying" -> string!
+const NResilience.HttpResilience.NestedRetryHeader = "X-NResilience-Retrying" -> string!
 const NResilience.MeasuredBase.DefaultMultiple = 1 -> double
 const NResilience.ResilienceDeadline.Header = "X-Deadline-Ms" -> string!
 const NResilience.ResilienceNestedRetry.Marker = "1" -> string!
@@ -482,10 +482,8 @@ static NResilience.Failures.operator ==(NResilience.Failures left, NResilience.F
 static NResilience.Hedge.At(double quantile = 0.95, int maximumConcurrent = 2) -> NResilience.Hedge
 static NResilience.Hedge.operator !=(NResilience.Hedge left, NResilience.Hedge right) -> bool
 static NResilience.Hedge.operator ==(NResilience.Hedge left, NResilience.Hedge right) -> bool
-static NResilience.Http.HttpResilience.CreateClient(NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
-static NResilience.Http.HttpResilience.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
-static NResilience.Http.ResilienceHttpRequestExtensions.MarkRepeatable(this System.Net.Http.HttpRequestMessage! request, string? idempotencyKey = null, string! headerName = "Idempotency-Key") -> System.Net.Http.HttpRequestMessage!
-static NResilience.Http.ResilienceHttpRequestExtensions.MarkSingleShot(this System.Net.Http.HttpRequestMessage! request) -> System.Net.Http.HttpRequestMessage!
+static NResilience.HttpResilience.CreateClient(NResilience.Resilience? policy = null, NResilience.HttpResilienceOptions? options = null, System.Net.Http.HttpMessageHandler? innerHandler = null) -> System.Net.Http.HttpClient!
+static NResilience.HttpResilience.Repeatable.get -> System.Net.Http.HttpRequestOptionsKey<bool>
 static NResilience.MeasuredBase.Times(double multiple = 1) -> NResilience.MeasuredBase
 static NResilience.MeasuredBase.operator !=(NResilience.MeasuredBase left, NResilience.MeasuredBase right) -> bool
 static NResilience.MeasuredBase.operator ==(NResilience.MeasuredBase left, NResilience.MeasuredBase right) -> bool
@@ -503,6 +501,8 @@ static NResilience.ResilienceDeadline.Begin(System.TimeSpan remaining, System.Ti
 static NResilience.ResilienceDeadline.Format(System.TimeSpan remaining) -> string?
 static NResilience.ResilienceDeadline.Remaining.get -> System.TimeSpan?
 static NResilience.ResilienceDeadline.TryParse(string? value, out System.TimeSpan remaining) -> bool
+static NResilience.ResilienceHttpRequestExtensions.MarkRepeatable(this System.Net.Http.HttpRequestMessage! request, string? idempotencyKey = null, string! headerName = "Idempotency-Key") -> System.Net.Http.HttpRequestMessage!
+static NResilience.ResilienceHttpRequestExtensions.MarkSingleShot(this System.Net.Http.HttpRequestMessage! request) -> System.Net.Http.HttpRequestMessage!
 static NResilience.ResilienceNestedRetry.Begin(bool callerRetrying) -> NResilience.ResilienceNestedRetry.NestedRetryScope
 static NResilience.ResilienceNestedRetry.IsCallerRetrying.get -> bool
 static NResilience.ResilienceNestedRetry.IsMarker(string? value) -> bool

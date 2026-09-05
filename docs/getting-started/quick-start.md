@@ -12,6 +12,17 @@ Install the package:
 dotnet add package NResilience
 ```
 
+Add the usings:
+
+<!-- snippet: quick-start-usings -->
+```csharp
+using System.Net.Http.Json;
+using NResilience;
+```
+<!-- endsnippet -->
+
+Then build the client:
+
 <!-- snippet: quick-start-http-client -->
 ```csharp
 // One client for the application's lifetime, with the policy already inside it.

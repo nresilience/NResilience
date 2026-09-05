@@ -4,7 +4,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using NResilience.Extensions;
 using NResilience.Extensions.Internal;
-using NResilience.Http;
 using NResilience.Testing;
 
 namespace NResilience.Tests;
@@ -26,8 +25,8 @@ public sealed class HttpRateLimitTests
         var limiter = new ScriptedLimiter();
 
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable, 2)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable, 2)
+            .Responds(HttpStatusCode.OK);
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
@@ -52,8 +51,8 @@ public sealed class HttpRateLimitTests
         var limiter = new ScriptedLimiter([true, false, true], TimeSpan.Zero);
 
         var transport = new ScriptedHttpHandler()
-            .Respond(HttpStatusCode.ServiceUnavailable)
-            .Respond(HttpStatusCode.OK);
+            .Responds(HttpStatusCode.ServiceUnavailable)
+            .Responds(HttpStatusCode.OK);
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
@@ -75,7 +74,7 @@ public sealed class HttpRateLimitTests
     public async Task A_refusal_is_not_charged_to_the_per_host_retry_budget()
     {
         var limiter = new ScriptedLimiter([false, false, false], TimeSpan.Zero);
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var handler = new ResilienceHandler(TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic }, new HttpResilienceOptions());
         var limitHandler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };
@@ -134,8 +133,8 @@ public sealed class HttpRateLimitTests
         using var limiter = Limit.Concurrency(1);
 
         var transport = new ScriptedHttpHandler()
-            .Throw(() => new HttpRequestException("reset"))
-            .Respond(HttpStatusCode.OK);
+            .Throws(() => new HttpRequestException("reset"))
+            .Responds(HttpStatusCode.OK);
 
         using var provider = Provider(
             services => services.AddHttpClient("api")
@@ -280,7 +279,7 @@ public sealed class HttpRateLimitTests
     public async Task A_limiter_the_caller_passed_in_outlives_the_handler()
     {
         using var limiter = Limit.Concurrency(1);
-        var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
+        var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var handler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };
         handler.Dispose();

@@ -10,7 +10,7 @@ namespace NResilience.Grpc;
 ///     A mutable options class rather than a record, because this is the type an options callback
 ///     configures - <c>o =&gt; o.ScopeBy = null</c> - and that is the shape
 ///     <c>Microsoft.Extensions.Options</c> binds to. It is the gRPC counterpart of
-///     <see cref="Http.HttpResilienceOptions" />, and the two share property names wherever they
+///     <see cref="HttpResilienceOptions" />, and the two share property names wherever they
 ///     mean the same thing.
 /// </remarks>
 public sealed class GrpcResilienceOptions
@@ -56,7 +56,7 @@ public sealed class GrpcResilienceOptions
     /// <summary>
     ///     Whether the registration sets <c>HttpClient.Timeout</c> to
     ///     <see cref="Timeout.InfiniteTimeSpan" /> for the channel. On by default, and the same
-    ///     decision <see cref="Http.HttpResilienceOptions.OwnTransportTimeout" /> makes for HTTP.
+    ///     decision <see cref="HttpResilienceOptions.OwnTransportTimeout" /> makes for HTTP.
     ///     <para>
     ///         The transport timeout covers the whole retry sequence rather than one attempt, so it
     ///         silently caps any policy whose <see cref="Resilience.Deadline" /> exceeds it. The bound
@@ -125,7 +125,7 @@ public sealed class GrpcResilienceOptions
 
     /// <summary>
     ///     Whether each <see cref="ScopeBy" /> scope gets its own circuit breaker. On by default, and
-    ///     the same decision <see cref="Http.HttpResilienceOptions.BreakerPerHost" /> makes per host.
+    ///     the same decision <see cref="HttpResilienceOptions.BreakerPerHost" /> makes per host.
     ///     <para>
     ///         A policy that already carries a <see cref="Resilience.Breaker" /> keeps it: an explicit
     ///         breaker is a deliberate scope decision and this switch does not overrule it.
