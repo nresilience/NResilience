@@ -5,9 +5,9 @@ namespace NResilience;
 ///     that across a process boundary: reading a header into an ambient flag, and recognizing the
 ///     marker a retrying handler writes.
 ///     <para>
-///         <see cref="ResilienceHandler" /> already knows when it is nested inside another
+///         <see cref="HttpResilienceHandler" /> already knows when it is nested inside another
 ///         retrying handler in this process, and it stamps
-///         <see cref="HttpResilience.NestedRetryHeader" /> so the next hop can know too. What
+///         <see cref="Header" /> so the next hop can know too. What
 ///         neither half can do is get that fact from an inbound request into the outbound calls the
 ///         request makes - the middle of a three-hop chain, which is exactly where amplification is
 ///         happening and the only place it was invisible.
@@ -15,10 +15,29 @@ namespace NResilience;
 /// </summary>
 /// <remarks>
 ///     A bool rather than a value with state: unlike a deadline, the flag does not decay, so there is
-///     no equivalent of <c>ResilienceDeadline.Ambient</c> and no clock to read it against.
+///     no equivalent of <c>AmbientDeadline.Ambient</c> and no clock to read it against.
 /// </remarks>
-public static class ResilienceNestedRetry
+public static class NestedRetry
 {
+    /// <summary>
+    ///     The header a retrying client stamps on every request it can retry, so the service receiving it
+    ///     can see that its caller will retry.
+    ///     <para>
+    ///         Retries compose multiplicatively - three layers each retrying three times is 27 attempts at
+    ///         the bottom - and the amplification is invisible from any single layer. A service that reads
+    ///         this header off its inbound request knows it is already being retried, which is the
+    ///         information it needs to stop retrying again underneath.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     A <see cref="CallEventKind.NestedRetry" /> event is raised when a request that already
+    ///     carries this header is about to be retried again, and when one retrying handler executes
+    ///     inside another's attempt in the same process. The library reports it and does nothing else:
+    ///     silently dropping the caller's configured retries would be a bigger surprise than the
+    ///     amplification.
+    /// </remarks>
+    public const string Header = "X-NResilience-Retrying";
+
     /// <summary>
     ///     The only value the retry marker header ever carries. The header is a presence marker, and a
     ///     value other than this one is not something this library wrote.
@@ -36,11 +55,11 @@ public static class ResilienceNestedRetry
     /// <summary>Publishes the flag for the current logical call, and everything it awaits.</summary>
     /// <param name="callerRetrying">Whether the caller is already retrying.</param>
     /// <returns>A scope that restores the previous value when disposed.</returns>
-    public static NestedRetryScope Begin(bool callerRetrying)
+    public static Scope Begin(bool callerRetrying)
     {
         var previous = Current.Value;
         Current.Value = callerRetrying;
-        return new NestedRetryScope(previous);
+        return new Scope(previous);
     }
 
     /// <summary>
@@ -54,14 +73,14 @@ public static class ResilienceNestedRetry
 
     /// <summary>
     ///     Restores the flag the scope replaced. A struct, and one field wide, for the same reason
-    ///     <see cref="ResilienceDeadline.DeadlineScope" /> is: the middleware that publishes it runs on
+    ///     <see cref="AmbientDeadline.Scope" /> is: the middleware that publishes it runs on
     ///     every request.
     /// </summary>
-    public readonly struct NestedRetryScope : IDisposable
+    public readonly struct Scope : IDisposable
     {
         private readonly bool _previous;
 
-        internal NestedRetryScope(bool previous)
+        internal Scope(bool previous)
         {
             _previous = previous;
         }

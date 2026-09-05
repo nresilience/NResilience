@@ -234,7 +234,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
     ///     opposite verdicts, and a diagnostic on a shape that is often correct is a diagnostic people
     ///     turn off.
     ///     <para>
-    ///         <c>ResilienceHandler</c> is deliberately not in this set, and the reason is worth
+    ///         <c>HttpResilienceHandler</c> is deliberately not in this set, and the reason is worth
     ///         recording rather than leaving as an accident of which type came up first. It is built by
     ///         the client factory from a registration callback, never by the caller per request, and a
     ///         hand-built one is always an argument to an <c>HttpClient</c> whose own lifetime is what

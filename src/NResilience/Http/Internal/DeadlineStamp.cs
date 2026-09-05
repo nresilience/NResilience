@@ -31,6 +31,6 @@ internal readonly struct DeadlineStamp(string header, TimeSpan deadline, TimeSpa
     internal string? Value()
     {
         var remaining = Resilience.Remaining(time, start, deadline);
-        return ResilienceDeadline.Format(Resilience.Effective(attemptTimeout, remaining));
+        return AmbientDeadline.Format(Resilience.Effective(attemptTimeout, remaining));
     }
 }

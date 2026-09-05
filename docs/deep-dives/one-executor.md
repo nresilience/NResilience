@@ -49,7 +49,7 @@ Instead, the library provides targeted extension points:
 | Monitor every stage of the process | `OnEvent`, or `WithListener` to add one without replacing what is attached |
 | Add a custom admission-control guard (a distributed lock, a hand-rolled limiter, anything that should refuse a call before it reaches the dependency) | The callback, plus a classifier rule - see [Building a custom guard](admission-control.md#building-a-custom-guard) |
 | Refuse an attempt as a value, without throwing | `Admit`, an opt-in second execution path - see [The Admit hook](admission-control.md#the-admit-hook) |
-| Compose arbitrary logic around an HTTP call | Chain another `DelegatingHandler` alongside `ResilienceHandler` |
+| Compose arbitrary logic around an HTTP call | Chain another `DelegatingHandler` alongside `HttpResilienceHandler` |
 
 Three of these compose and two do not, which is worth knowing before you reach for one. A `Classifier` rule always beats the one it was derived from; a `Backoff.Custom` delegate can call another curve's `Compute`; and `WithListener` adds to the listener chain. `BeforeAttempt` and `Admit` are single slots, and setting either replaces what was there - deliberately, because combining two admission guards needs a rule for which refusal wins, and that belongs to your system rather than to the library.
 

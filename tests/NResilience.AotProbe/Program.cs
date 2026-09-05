@@ -246,7 +246,7 @@ internal static class Program
             OnEvent = events.Record,
         };
 
-        using var handler = new ResilienceHandler(transport, policy);
+        using var handler = new HttpResilienceHandler(transport, policy);
         using var client = new HttpClient(handler);
 
         using var request = new HttpRequestMessage(HttpMethod.Put, new Uri("https://api.invalid/thing"))
@@ -265,7 +265,7 @@ internal static class Program
         failures += Check("http: each attempt got its own request", transport.CallCount == 2);
         failures += Check("http: the clone carried the headers and the body", lastTrace == "abc" && lastRequest.Body == "body");
         failures += Check("http: the breaker was scoped to the host", handler.BreakersByHost().ContainsKey("api.invalid"));
-        failures += Check("http: the nested-retry header was stamped", lastRequest.Headers.Contains(HttpResilience.NestedRetryHeader));
+        failures += Check("http: the nested-retry header was stamped", lastRequest.Headers.Contains(NestedRetry.Header));
 
         failures += Check(
             "http: the events came back in order",

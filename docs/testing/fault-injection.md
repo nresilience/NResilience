@@ -120,7 +120,7 @@ services.AddHttpClient(name: "orders")
 - `Injected` - how many requests were failed.
 - `Slowed` - how many requests were slowed.
 
-Chaos applies on the asynchronous path only. That is not a gap in practice: `ResilienceHandler.Send` throws `NotSupportedException`, so a pipeline with a policy in it has no synchronous path to inject into.
+Chaos applies on the asynchronous path only. That is not a gap in practice: `HttpResilienceHandler.Send` throws `NotSupportedException`, so a pipeline with a policy in it has no synchronous path to inject into.
 
 ## Test an attempt timeout with injected latency
 

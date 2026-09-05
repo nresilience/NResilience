@@ -31,13 +31,13 @@ public sealed class DeadlineMiddlewareTests
                 // After an await, and after the framework's own: the value is ambient to the request
                 // rather than to a stack frame.
                 await Task.Yield();
-                await context.Response.WriteAsync(Report(ResilienceDeadline.Remaining));
+                await context.Response.WriteAsync(Report(AmbientDeadline.Remaining));
             });
         });
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(ResilienceDeadline.Header, "5000");
+        request.Headers.TryAddWithoutValidation(AmbientDeadline.Header, "5000");
 
         using var response = await client.SendAsync(request);
         var reported = double.Parse(await response.Content.ReadAsStringAsync(), CultureInfo.InvariantCulture);
@@ -51,7 +51,7 @@ public sealed class DeadlineMiddlewareTests
         await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline();
-            pipeline.Run(context => context.Response.WriteAsync(Report(ResilienceDeadline.Remaining)));
+            pipeline.Run(context => context.Response.WriteAsync(Report(AmbientDeadline.Remaining)));
         });
 
         using var client = new HttpClient();
@@ -64,12 +64,12 @@ public sealed class DeadlineMiddlewareTests
         await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline(o => o.Maximum = TimeSpan.FromSeconds(5));
-            pipeline.Run(context => context.Response.WriteAsync(Report(ResilienceDeadline.Remaining)));
+            pipeline.Run(context => context.Response.WriteAsync(Report(AmbientDeadline.Remaining)));
         });
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(ResilienceDeadline.Header, "3600000");
+        request.Headers.TryAddWithoutValidation(AmbientDeadline.Header, "3600000");
 
         using var response = await client.SendAsync(request);
 
@@ -82,12 +82,12 @@ public sealed class DeadlineMiddlewareTests
         await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceDeadline(o => o.Reserve = TimeSpan.FromSeconds(2));
-            pipeline.Run(context => context.Response.WriteAsync(Report(ResilienceDeadline.Remaining)));
+            pipeline.Run(context => context.Response.WriteAsync(Report(AmbientDeadline.Remaining)));
         });
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(ResilienceDeadline.Header, "5000");
+        request.Headers.TryAddWithoutValidation(AmbientDeadline.Header, "5000");
 
         using var response = await client.SendAsync(request);
         var reported = double.Parse(await response.Content.ReadAsStringAsync(), CultureInfo.InvariantCulture);
@@ -123,7 +123,7 @@ public sealed class DeadlineMiddlewareTests
                 // before the outbound call begins.
                 await Task.Delay(20);
 
-                using var client = new HttpClient(new ResilienceHandler(new SocketsHttpHandler(), policy))
+                using var client = new HttpClient(new HttpResilienceHandler(new SocketsHttpHandler(), policy))
                 {
                     Timeout = Timeout.InfiniteTimeSpan,
                 };
@@ -145,7 +145,7 @@ public sealed class DeadlineMiddlewareTests
 
         // One millisecond, spent by the handler's delay before the outbound call begins, so the
         // deadline refuses the call rather than merely bounding it.
-        request.Headers.TryAddWithoutValidation(ResilienceDeadline.Header, "1");
+        request.Headers.TryAddWithoutValidation(AmbientDeadline.Header, "1");
 
         using var response = await caller.SendAsync(request);
 
@@ -174,7 +174,7 @@ public sealed class DeadlineMiddlewareTests
 
             pipeline.Run(async context =>
             {
-                using var client = new HttpClient(new ResilienceHandler(new SocketsHttpHandler(), policy, options))
+                using var client = new HttpClient(new HttpResilienceHandler(new SocketsHttpHandler(), policy, options))
                 {
                     Timeout = Timeout.InfiniteTimeSpan,
                 };
@@ -186,14 +186,14 @@ public sealed class DeadlineMiddlewareTests
 
         using var caller = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(ResilienceDeadline.Header, "4000");
+        request.Headers.TryAddWithoutValidation(AmbientDeadline.Header, "4000");
 
         using var response = await caller.SendAsync(request);
         Assert.Equal("done", await response.Content.ReadAsStringAsync());
 
         // The whole feature in one assertion: the second hop is bounded by the caller's deadline rather
         // than by the middle service's own 30 seconds, and by strictly less of it than the first hop was.
-        var forwarded = downstream.Requests.Single().Headers[ResilienceDeadline.Header.ToLowerInvariant()];
+        var forwarded = downstream.Requests.Single().Headers[AmbientDeadline.Header.ToLowerInvariant()];
         Assert.InRange(int.Parse(forwarded, CultureInfo.InvariantCulture), 1, 4000);
     }
 

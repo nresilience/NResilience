@@ -58,7 +58,7 @@ public sealed class Troubleshooting
         // HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence, so it
         // silently caps any deadline longer than that. On a client you build yourself, hand the
         // bound to the policy.
-        using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: new HttpClientHandler()))
+        using var client = new HttpClient(handler: new HttpResilienceHandler(innerHandler: new HttpClientHandler()))
         {
             Timeout = Timeout.InfiniteTimeSpan,
         };

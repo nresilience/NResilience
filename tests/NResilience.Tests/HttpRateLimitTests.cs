@@ -76,7 +76,7 @@ public sealed class HttpRateLimitTests
         var limiter = new ScriptedLimiter([false, false, false], TimeSpan.Zero);
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        var handler = new ResilienceHandler(TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic }, new HttpResilienceOptions());
+        var handler = new HttpResilienceHandler(TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic }, new HttpResilienceOptions());
         var limitHandler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };
         handler.InnerHandler = limitHandler;
 

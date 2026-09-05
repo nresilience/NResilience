@@ -136,7 +136,7 @@ public enum CallEventKind : byte
     ///         silence is itself the signal.
     ///     </para>
     /// </summary>
-    AttemptTimeoutAdapted,
+    AttemptCeilingAdapted,
 
     /// <summary>
     ///     The measured backoff base moved. <see cref="CallEvent.Delay" /> is the new base - the

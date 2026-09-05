@@ -88,7 +88,7 @@ The policy's `Time` also drives the breakers and retry budgets the library const
 // test without actually waiting.
 var time = new FakeTimeProvider();
 
-using var handler = new ResilienceHandler(
+using var handler = new HttpResilienceHandler(
     innerHandler: transport,
     policy: Resilience.Http with
     {

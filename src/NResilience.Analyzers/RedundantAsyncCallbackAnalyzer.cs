@@ -105,7 +105,7 @@ public sealed class RedundantAsyncCallbackAnalyzer : DiagnosticAnalyzer
     /// </remarks>
     private static bool CanRebindToValueTask(KnownSymbols known, AnonymousFunctionExpressionSyntax syntax, ITypeSymbol? awaited, ITypeSymbol returned)
     {
-        if (known.ResilienceValueTaskExtensions is null
+        if (known.ValueTaskExtensions is null
             || awaited is null
             || syntax is ParenthesizedLambdaExpressionSyntax { ReturnType: not null })
             return false;

@@ -20,7 +20,7 @@ namespace NResilience.Testing;
 /// </example>
 /// <remarks>
 ///     Chaos is applied on the asynchronous path only. That is not a gap in practice:
-///     <c>ResilienceHandler.Send</c> throws <see cref="NotSupportedException" />, so a pipeline with a
+///     <c>HttpResilienceHandler.Send</c> throws <see cref="NotSupportedException" />, so a pipeline with a
 ///     policy in it has no synchronous path to inject into.
 /// </remarks>
 public sealed class ChaosHandler : DelegatingHandler

@@ -32,7 +32,7 @@ info: NResilience.payments[1015] payments:api.example.com closed its circuit bre
 Startup, with the filter at `Debug`:
 
 ```
-dbug: NResilience.payments[1020] payments resolved: 4 attempts, deadline 20s, attempt timeout 3s, backoff max 1s, jitter Full, breaker 2 consecutive failures / 15s break, own budget, telemetry on, logging Default
+dbug: NResilience.payments[1020] payments resolved: 4 attempts, deadline 20s, attempt timeout 3s, backoff max 1s, jitter Full, breaker 2 consecutive failures / 15s break, own budget, telemetry on, logging Normal
 ```
 
 ## The two knobs
@@ -49,12 +49,12 @@ These knobs are independent, and the category filter is a platform feature rathe
 | Profile | What it does |
 | :--- | :--- |
 | `Off` | Attaches no listener, so suppressed calls cost nothing. |
-| `Default` | Uses the tabled levels. Healthy traffic is `Trace`, retried-then-successful calls are `Debug`, incidents are `Warning`. |
+| `Normal` | Uses the tabled levels. Healthy traffic is `Trace`, retried-then-successful calls are `Debug`, incidents are `Warning`. |
 | `Verbose` | Raises every traffic-proportional record to `Information` and leaves incident records where they are. |
 
 `Verbose` exists for sinks that enforce a minimum level. A platform that only ingests `Information` and above will never show `Debug` retry records, whatever the filter says.
 
-A value that is not `Off`, `Default` or `Verbose` fails at registration with a message naming the valid values.
+A value that is not `Off`, `Normal` or `Verbose` fails at registration with a message naming the valid values.
 
 To retune a specific record in code, set the `Level` property. Return `null` to keep the profile's level, a specific level to override it, or `LogLevel.None` to drop the record.
 

@@ -1082,7 +1082,7 @@ public sealed class HedgeTests
     {
         var policy = TestPolicy.InstantHttp.WithClock(time) with { Hedge = Hedge.At() with { Window = Window } };
 
-        return new HttpClient(new ResilienceHandler(transport, policy));
+        return new HttpClient(new HttpResilienceHandler(transport, policy));
     }
 
     private sealed class Transport(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> respond) : HttpMessageHandler

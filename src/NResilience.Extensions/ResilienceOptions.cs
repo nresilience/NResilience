@@ -168,8 +168,8 @@ public sealed class ResilienceOptions
     public bool? Telemetry { get; set; }
 
     /// <summary>
-    ///     Whether the registered policy writes log records: <c>"Off"</c>, <c>"Default"</c> or
-    ///     <c>"Verbose"</c> (case-insensitive). At <c>"Default"</c>, the policy writes nothing above
+    ///     Whether the registered policy writes log records: <c>"Off"</c>, <c>"Normal"</c> or
+    ///     <c>"Verbose"</c> (case-insensitive). At <c>"Normal"</c>, the policy writes nothing above
     ///     <see cref="Microsoft.Extensions.Logging.LogLevel.Trace" /> while the dependency is healthy -
     ///     see <see cref="ResilienceLogging" />.
     ///     <para>

@@ -24,18 +24,18 @@ public sealed class DeadlinePropagationTests
     {
         var time = new FakeTimeProvider();
 
-        Assert.Null(ResilienceDeadline.Remaining);
+        Assert.Null(AmbientDeadline.Remaining);
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromSeconds(10), time);
-        Assert.Equal(TimeSpan.FromSeconds(10), ResilienceDeadline.Remaining);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromSeconds(10), time);
+        Assert.Equal(TimeSpan.FromSeconds(10), AmbientDeadline.Remaining);
 
         time.Advance(TimeSpan.FromSeconds(4));
-        Assert.Equal(TimeSpan.FromSeconds(6), ResilienceDeadline.Remaining);
+        Assert.Equal(TimeSpan.FromSeconds(6), AmbientDeadline.Remaining);
 
         // Expired is zero, never negative: "no time left" is the fact, and how far past it we are is
         // not something any caller should have to subtract.
         time.Advance(TimeSpan.FromSeconds(30));
-        Assert.Equal(TimeSpan.Zero, ResilienceDeadline.Remaining);
+        Assert.Equal(TimeSpan.Zero, AmbientDeadline.Remaining);
     }
 
     [Fact]
@@ -43,17 +43,17 @@ public sealed class DeadlinePropagationTests
     {
         var time = new FakeTimeProvider();
 
-        using (ResilienceDeadline.Begin(TimeSpan.FromSeconds(10), time))
+        using (AmbientDeadline.Begin(TimeSpan.FromSeconds(10), time))
         {
-            using (ResilienceDeadline.Begin(TimeSpan.FromSeconds(2), time))
+            using (AmbientDeadline.Begin(TimeSpan.FromSeconds(2), time))
             {
-                Assert.Equal(TimeSpan.FromSeconds(2), ResilienceDeadline.Remaining);
+                Assert.Equal(TimeSpan.FromSeconds(2), AmbientDeadline.Remaining);
             }
 
-            Assert.Equal(TimeSpan.FromSeconds(10), ResilienceDeadline.Remaining);
+            Assert.Equal(TimeSpan.FromSeconds(10), AmbientDeadline.Remaining);
         }
 
-        Assert.Null(ResilienceDeadline.Remaining);
+        Assert.Null(AmbientDeadline.Remaining);
     }
 
     [Fact]
@@ -61,10 +61,10 @@ public sealed class DeadlinePropagationTests
     {
         var time = new FakeTimeProvider();
 
-        using var outer = ResilienceDeadline.Begin(TimeSpan.FromSeconds(10), time);
-        using var inner = ResilienceDeadline.Begin(Timeout.InfiniteTimeSpan, time);
+        using var outer = AmbientDeadline.Begin(TimeSpan.FromSeconds(10), time);
+        using var inner = AmbientDeadline.Begin(Timeout.InfiniteTimeSpan, time);
 
-        Assert.Null(ResilienceDeadline.Remaining);
+        Assert.Null(AmbientDeadline.Remaining);
     }
 
     [Theory]
@@ -72,7 +72,7 @@ public sealed class DeadlinePropagationTests
     [InlineData("1", 1)]
     public void A_header_of_whole_milliseconds_reads_as_a_deadline(string value, int milliseconds)
     {
-        Assert.True(ResilienceDeadline.TryParse(value, out var remaining));
+        Assert.True(AmbientDeadline.TryParse(value, out var remaining));
         Assert.Equal(TimeSpan.FromMilliseconds(milliseconds), remaining);
     }
 
@@ -88,18 +88,18 @@ public sealed class DeadlinePropagationTests
     [InlineData("99999999999")]
     public void Anything_else_is_no_deadline_at_all(string? value)
     {
-        Assert.False(ResilienceDeadline.TryParse(value, out var remaining));
+        Assert.False(AmbientDeadline.TryParse(value, out var remaining));
         Assert.Equal(default, remaining);
     }
 
     [Fact]
     public void What_goes_out_is_whole_milliseconds_rounded_down_but_never_to_zero()
     {
-        Assert.Equal("1500", ResilienceDeadline.Format(TimeSpan.FromMilliseconds(1500)));
-        Assert.Equal("1", ResilienceDeadline.Format(TimeSpan.FromMilliseconds(1.9)));
-        Assert.Equal("1", ResilienceDeadline.Format(TimeSpan.FromTicks(1)));
-        Assert.Null(ResilienceDeadline.Format(TimeSpan.Zero));
-        Assert.Null(ResilienceDeadline.Format(Timeout.InfiniteTimeSpan));
+        Assert.Equal("1500", AmbientDeadline.Format(TimeSpan.FromMilliseconds(1500)));
+        Assert.Equal("1", AmbientDeadline.Format(TimeSpan.FromMilliseconds(1.9)));
+        Assert.Equal("1", AmbientDeadline.Format(TimeSpan.FromTicks(1)));
+        Assert.Null(AmbientDeadline.Format(TimeSpan.Zero));
+        Assert.Null(AmbientDeadline.Format(Timeout.InfiniteTimeSpan));
     }
 
     // ---- The executor's clamp ----
@@ -122,7 +122,7 @@ public sealed class DeadlinePropagationTests
             Time = time,
         };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(200), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(200), time);
 
         var caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
             await policy.RunAsync(_ =>
@@ -146,7 +146,7 @@ public sealed class DeadlinePropagationTests
 
         var policy = TestPolicy.WithClock(time) with { Deadline = TimeSpan.FromSeconds(30), Classifier = Classifier.Http };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(200), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(200), time);
 
         var result = await policy.TryRunAsync(_ =>
         {
@@ -172,7 +172,7 @@ public sealed class DeadlinePropagationTests
             Classifier = Classifier.Http,
         };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromHours(1), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromHours(1), time);
 
         var caught = await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
             await policy.RunAsync(_ =>
@@ -192,7 +192,7 @@ public sealed class DeadlinePropagationTests
 
         var policy = TestPolicy.WithClock(time) with { UseAmbientDeadline = true };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
         time.Advance(TimeSpan.FromSeconds(1));
 
         await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
@@ -217,7 +217,7 @@ public sealed class DeadlinePropagationTests
         // without an executor frame at all.
         var policy = Resilience.None with { UseAmbientDeadline = true, Time = time };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
         time.Advance(TimeSpan.FromSeconds(1));
 
         await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
@@ -242,7 +242,7 @@ public sealed class DeadlinePropagationTests
             Admit = _ => Task.FromResult(Verdict.Ok),
         };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
         time.Advance(TimeSpan.FromSeconds(1));
 
         await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
@@ -267,7 +267,7 @@ public sealed class DeadlinePropagationTests
             Hedge = Hedge.At(),
         };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
         time.Advance(TimeSpan.FromSeconds(1));
 
         await Assert.ThrowsAsync<DeadlineExceededException>(async () =>
@@ -287,10 +287,10 @@ public sealed class DeadlinePropagationTests
     {
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        using var client = new HttpClient(new ResilienceHandler(transport, TestPolicy.InstantHttp));
+        using var client = new HttpClient(new HttpResilienceHandler(transport, TestPolicy.InstantHttp));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
-        Assert.DoesNotContain(ResilienceDeadline.Header, transport.Requests[0].Headers.Select(h => h.Key));
+        Assert.DoesNotContain(AmbientDeadline.Header, transport.Requests[0].Headers.Select(h => h.Key));
     }
 
     [Fact]
@@ -306,7 +306,7 @@ public sealed class DeadlinePropagationTests
             Classifier = Classifier.Http,
         };
 
-        using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
+        using var client = new HttpClient(new HttpResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         // Three seconds, not thirty: this side abandons the attempt at its own ceiling, so telling the
@@ -329,7 +329,7 @@ public sealed class DeadlinePropagationTests
             Classifier = Classifier.Http,
         };
 
-        using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
+        using var client = new HttpClient(new HttpResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal(HttpStatusCode.ServiceUnavailable, response.StatusCode);
@@ -349,9 +349,9 @@ public sealed class DeadlinePropagationTests
             UseAmbientDeadline = true,
         };
 
-        using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(500), time);
+        using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(500), time);
 
-        using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
+        using var client = new HttpClient(new HttpResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         // The number on the wire is what this side is actually waiting for, which is what makes the
@@ -368,11 +368,11 @@ public sealed class DeadlinePropagationTests
         var policy = TestPolicy.WithClock(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
         var options = new HttpResilienceOptions { PropagateDeadline = true, DeadlineHeader = "X-Budget" };
 
-        using var client = new HttpClient(new ResilienceHandler(transport, policy, options));
+        using var client = new HttpClient(new HttpResilienceHandler(transport, policy, options));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal("4000", Header(transport, 0, "X-Budget"));
-        Assert.DoesNotContain(ResilienceDeadline.Header, transport.Requests[0].Headers.Select(h => h.Key));
+        Assert.DoesNotContain(AmbientDeadline.Header, transport.Requests[0].Headers.Select(h => h.Key));
     }
 
     [Fact]
@@ -382,11 +382,11 @@ public sealed class DeadlinePropagationTests
 
         // TestPolicy.InstantHttp has neither a deadline nor an attempt ceiling.
         using var client = new HttpClient(
-            new ResilienceHandler(transport, TestPolicy.InstantHttp, new HttpResilienceOptions { PropagateDeadline = true }));
+            new HttpResilienceHandler(transport, TestPolicy.InstantHttp, new HttpResilienceOptions { PropagateDeadline = true }));
 
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
-        Assert.DoesNotContain(ResilienceDeadline.Header, transport.Requests[0].Headers.Select(h => h.Key));
+        Assert.DoesNotContain(AmbientDeadline.Header, transport.Requests[0].Headers.Select(h => h.Key));
     }
 
     [Fact]
@@ -397,16 +397,16 @@ public sealed class DeadlinePropagationTests
 
         var policy = TestPolicy.WithClock(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
 
-        using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
+        using var client = new HttpClient(new HttpResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Headers.TryAddWithoutValidation(ResilienceDeadline.Header, "999999");
+        request.Headers.TryAddWithoutValidation(AmbientDeadline.Header, "999999");
 
         using var response = await client.SendAsync(request);
 
         Assert.Equal("4000", Header(transport, 0));
     }
 
-    private static string? Header(ScriptedHttpHandler transport, int attempt, string name = ResilienceDeadline.Header) =>
+    private static string? Header(ScriptedHttpHandler transport, int attempt, string name = AmbientDeadline.Header) =>
         transport.Requests[attempt].Headers.TryGetValues(name, out var values) ? values.Single() : null;
 
     /// <summary>
@@ -421,7 +421,7 @@ public sealed class DeadlinePropagationTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            _deadlines.Add(request.Headers.TryGetValues(ResilienceDeadline.Header, out var values) ? values.Single() : null);
+            _deadlines.Add(request.Headers.TryGetValues(AmbientDeadline.Header, out var values) ? values.Single() : null);
             time.Advance(spend);
 
             return Task.FromResult(new HttpResponseMessage(status) { RequestMessage = request });

@@ -97,7 +97,7 @@ public sealed class GrpcStreamingIntegrationTests
 
         await FirstAsync(call);
 
-        Assert.All(Scenarios.Markers(scenario), marker => Assert.Equal(ResilienceNestedRetry.Marker, marker));
+        Assert.All(Scenarios.Markers(scenario), marker => Assert.Equal(NestedRetry.Marker, marker));
     }
 
     [Fact]

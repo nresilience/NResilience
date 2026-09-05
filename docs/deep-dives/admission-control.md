@@ -188,7 +188,7 @@ Which leaves the question of where a limiter runs, and the answer is that it nee
 - **Bounded.** The callback receives the attempt's token, which is `min(AttemptTimeout, remaining deadline)` linked with the caller's. A waiting acquire is bounded by the policy's own time budget with nothing to configure.
 - **Classified.** The callback runs inside the executor's `try`, so a `RateLimitedException` reaches the exception handling. An acquire anywhere else does not - `BeforeAttempt` is awaited outside it, and an exception thrown there escapes the executor entirely.
 
-For HTTP this falls out of the handler chain. `ResilienceHandler` executes one attempt by sending through the handler inner to it, so a limiting handler installed there is asked for a permit on every attempt, inside the `try`, with the attempt's token. With `IHttpClientFactory` the first handler registered is the outermost, which makes the correct order also the natural reading order:
+For HTTP this falls out of the handler chain. `HttpResilienceHandler` executes one attempt by sending through the handler inner to it, so a limiting handler installed there is asked for a permit on every attempt, inside the `try`, with the attempt's token. With `IHttpClientFactory` the first handler registered is the outermost, which makes the correct order also the natural reading order:
 
 ```csharp
 services.AddHttpClient("api")

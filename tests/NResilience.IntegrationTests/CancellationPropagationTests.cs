@@ -139,7 +139,7 @@ public sealed class CancellationPropagationTests
         // content the transport produces.
         var innerTracking = new TrackingHandler(new SocketsHttpHandler());
 
-        using var resilience = new ResilienceHandler(innerTracking, Resilience.Http with
+        using var resilience = new HttpResilienceHandler(innerTracking, Resilience.Http with
         {
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,

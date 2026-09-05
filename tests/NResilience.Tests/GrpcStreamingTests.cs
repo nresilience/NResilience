@@ -205,7 +205,7 @@ public sealed class GrpcStreamingTests
         await Read(call);
 
         Assert.All(script.Seen, options => Assert.Equal(
-            ResilienceNestedRetry.Marker,
+            NestedRetry.Marker,
             options.Headers?.GetValue("x-nresilience-retrying")));
     }
 

@@ -84,7 +84,7 @@ public sealed class RetryBudget
     ///     </para>
     ///     <para>
     ///         <see cref="Utilization" /> returns 0 for the marker. The actual utilization is reported
-    ///         by the resolved bucket, accessible via <c>ResilienceHandler.BudgetsByHost()</c> for
+    ///         by the resolved bucket, accessible via <c>HttpResilienceHandler.BudgetsByHost()</c> for
     ///         HTTP calls.
     ///     </para>
     /// </summary>

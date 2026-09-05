@@ -8,14 +8,14 @@ order: 4
 
 A [policy](../getting-started/key-concepts.md#what-is-a-policy) manages retries, timeouts, and circuit breaking for any call. HTTP adds constraints a general policy cannot handle alone: an `HttpRequestMessage` can only be sent once, so a retry needs a fresh request; retrying a `POST` can duplicate orders or charges; and a circuit breaker should be scoped per host so one failing server does not block calls to healthy ones.
 
-The `ResilienceHandler` is a `DelegatingHandler` that manages those HTTP-specific requirements. It ships in the core package - there is no separate HTTP install.
+The `HttpResilienceHandler` is a `DelegatingHandler` that manages those HTTP-specific requirements. It ships in the core package - there is no separate HTTP install.
 
 > [!IMPORTANT]
 > `HttpClient.Timeout` defaults to 100 seconds and covers the entire request sequence - including all attempts and backoff delays. This silently caps any policy with a longer deadline. By default, the resilience handler takes ownership of this timeout so that the policy's [deadline](../features/deadlines.md) is the only active bound.
 
 ## Handler capabilities
 
-The `ResilienceHandler` runs a [policy](../reference/resilience.md) around the HTTP send operation and provides the following capabilities:
+The `HttpResilienceHandler` runs a [policy](../reference/resilience.md) around the HTTP send operation and provides the following capabilities:
 
 - **Request regeneration**: Builds a fresh `HttpRequestMessage` for every attempt.
 - **Idempotency protection**: Prevents the retry of `POST` or `PATCH` methods unless explicitly configured to do so.
@@ -84,14 +84,14 @@ The one adaptive guard that is *not* on by default is the concurrency limit, bec
 
 When `OwnTransportTimeout` is `true`, NResilience sets `HttpClient.Timeout` to `Timeout.InfiniteTimeSpan`, leaving the [deadline](../features/deadlines.md) as the only active time bound.
 
-If you construct an `HttpClient` yourself and pass it a `ResilienceHandler`, `OwnTransportTimeout` has no effect - the handler cannot modify the client that contains it - so set the timeout manually:
+If you construct an `HttpClient` yourself and pass it an `HttpResilienceHandler`, `OwnTransportTimeout` has no effect - the handler cannot modify the client that contains it - so set the timeout manually:
 
 <!-- snippet: troubleshoot-transport-timeout -->
 ```csharp
 // HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence, so it
 // silently caps any deadline longer than that. On a client you build yourself, hand the
 // bound to the policy.
-using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: new HttpClientHandler()))
+using var client = new HttpClient(handler: new HttpResilienceHandler(innerHandler: new HttpClientHandler()))
 {
     Timeout = Timeout.InfiniteTimeSpan,
 };

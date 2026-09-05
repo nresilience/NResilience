@@ -16,54 +16,54 @@ public sealed class NestedRetryScopeTests
     [Fact]
     public void The_flag_is_false_when_nobody_published_one()
     {
-        Assert.False(ResilienceNestedRetry.IsCallerRetrying);
+        Assert.False(NestedRetry.IsCallerRetrying);
     }
 
     [Fact]
     public void Begin_publishes_the_flag_for_the_scope()
     {
-        using (ResilienceNestedRetry.Begin(true))
+        using (NestedRetry.Begin(true))
         {
-            Assert.True(ResilienceNestedRetry.IsCallerRetrying);
+            Assert.True(NestedRetry.IsCallerRetrying);
         }
 
-        Assert.False(ResilienceNestedRetry.IsCallerRetrying);
+        Assert.False(NestedRetry.IsCallerRetrying);
     }
 
     [Fact]
     public async Task The_flag_survives_an_await()
     {
-        using var scope = ResilienceNestedRetry.Begin(true);
+        using var scope = NestedRetry.Begin(true);
 
         await Task.Yield();
 
         // The awaiter resuming on another context is the case an AsyncLocal exists for: the request
         // handler awaits, and the outbound call it makes afterwards still needs to know.
-        Assert.True(ResilienceNestedRetry.IsCallerRetrying);
+        Assert.True(NestedRetry.IsCallerRetrying);
     }
 
     [Fact]
     public void Nested_scopes_restore_the_outer_value()
     {
-        using var outer = ResilienceNestedRetry.Begin(true);
+        using var outer = NestedRetry.Begin(true);
 
-        using (ResilienceNestedRetry.Begin(false))
+        using (NestedRetry.Begin(false))
         {
-            Assert.False(ResilienceNestedRetry.IsCallerRetrying);
+            Assert.False(NestedRetry.IsCallerRetrying);
         }
 
-        Assert.True(ResilienceNestedRetry.IsCallerRetrying);
+        Assert.True(NestedRetry.IsCallerRetrying);
     }
 
     [Fact]
     public void A_scope_that_publishes_false_hides_an_outer_true()
     {
-        using var outer = ResilienceNestedRetry.Begin(true);
-        using var inner = ResilienceNestedRetry.Begin(false);
+        using var outer = NestedRetry.Begin(true);
+        using var inner = NestedRetry.Begin(false);
 
         // Explicit opt-out: a sub-operation that knows its own retries are not the caller's can say
         // so, without un-publishing the flag for the rest of the request.
-        Assert.False(ResilienceNestedRetry.IsCallerRetrying);
+        Assert.False(NestedRetry.IsCallerRetrying);
     }
 
     [Theory]
@@ -75,6 +75,6 @@ public sealed class NestedRetryScopeTests
     [InlineData(" 1", false)]
     public void IsMarker_accepts_only_the_marker(string? value, bool expected)
     {
-        Assert.Equal(expected, ResilienceNestedRetry.IsMarker(value));
+        Assert.Equal(expected, NestedRetry.IsMarker(value));
     }
 }

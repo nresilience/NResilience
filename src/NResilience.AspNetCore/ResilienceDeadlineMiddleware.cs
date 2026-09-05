@@ -32,11 +32,11 @@ internal sealed class ResilienceDeadlineMiddleware(RequestDelegate next, Resilie
         // as it would without the middleware, bounded by whatever each policy says. A deadline is only
         // ever used to tighten a bound, so failing to read one is never worse than not being sent one.
         if (!context.Request.Headers.TryGetValue(options.Header, out var values)
-            || !ResilienceDeadline.TryParse(values.Count > 0 ? values[^1] : null, out var remaining)
+            || !AmbientDeadline.TryParse(values.Count > 0 ? values[^1] : null, out var remaining)
             || (options.Maximum is { } cap && remaining > cap))
             return next(context);
 
-        var scope = ResilienceDeadline.Begin(remaining - options.Reserve, time);
+        var scope = AmbientDeadline.Begin(remaining - options.Reserve, time);
 
         // Not a `using` on an async method: the middleware has nothing else to await, so keeping it
         // synchronous keeps a state-machine box off every request. The continuation restores the
@@ -58,7 +58,7 @@ internal sealed class ResilienceDeadlineMiddleware(RequestDelegate next, Resilie
         return pending.IsCompleted
             ? Finish(scope, pending)
             : pending.ContinueWith(
-                static (completed, state) => Finish((ResilienceDeadline.DeadlineScope)state!, completed),
+                static (completed, state) => Finish((AmbientDeadline.Scope)state!, completed),
                 scope,
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.DenyChildAttach,
@@ -66,7 +66,7 @@ internal sealed class ResilienceDeadlineMiddleware(RequestDelegate next, Resilie
     }
 
     /// <summary>Restores the previous ambient deadline and hands the pipeline's own outcome back.</summary>
-    private static Task Finish(ResilienceDeadline.DeadlineScope scope, Task completed)
+    private static Task Finish(AmbientDeadline.Scope scope, Task completed)
     {
         scope.Dispose();
         return completed;

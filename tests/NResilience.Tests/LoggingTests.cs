@@ -46,7 +46,7 @@ public sealed class LoggingTests
         (1022, "HedgeStarted"),
         (1023, "HedgeWon"),
         (1024, "HedgeDiscarded"),
-        (1025, "AttemptTimeoutAdapted"),
+        (1025, "AttemptCeilingAdapted"),
         (1026, "BackoffBaseAdapted"),
         (1027, "HedgeSuppressed"),
     ];
@@ -113,7 +113,7 @@ public sealed class LoggingTests
             (Log.Ids.HedgeStarted.Id, Log.Ids.HedgeStarted.Name!),
             (Log.Ids.HedgeWon.Id, Log.Ids.HedgeWon.Name!),
             (Log.Ids.HedgeDiscarded.Id, Log.Ids.HedgeDiscarded.Name!),
-            (Log.Ids.AttemptTimeoutAdapted.Id, Log.Ids.AttemptTimeoutAdapted.Name!),
+            (Log.Ids.AttemptCeilingAdapted.Id, Log.Ids.AttemptCeilingAdapted.Name!),
             (Log.Ids.BackoffBaseAdapted.Id, Log.Ids.BackoffBaseAdapted.Name!),
             (Log.Ids.HedgeSuppressed.Id, Log.Ids.HedgeSuppressed.Name!),
         ];
@@ -545,6 +545,28 @@ public sealed class LoggingTests
     }
 
     [Fact]
+    public void Normal_is_the_configuration_spelling_of_the_tabled_levels()
+    {
+        var provider = new FakeLoggerProvider();
+        var services = new ServiceCollection();
+        services.AddLogging(b => b.AddProvider(provider).SetMinimumLevel(LogLevel.Debug));
+
+        services.AddResilience("api", o =>
+        {
+            o.Logging = "normal";
+            o.Telemetry = false;
+        });
+
+        var api = services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"];
+
+        Assert.NotNull(api.OnEvent);
+
+        var resolved = provider.Collector.GetSnapshot().First(r => r.Id.Id == 1020);
+
+        Assert.Contains("logging Normal", resolved.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void An_unknown_logging_value_names_the_valid_ones()
     {
         var services = new ServiceCollection();
@@ -553,7 +575,7 @@ public sealed class LoggingTests
 
         var thrown = Assert.Throws<ResilienceConfigurationException>(() => services.BuildServiceProvider().GetRequiredService<IResiliencePolicies>()["api"]);
 
-        Assert.Contains("Off, Default or Verbose", thrown.Message, StringComparison.Ordinal);
+        Assert.Contains("Off, Normal or Verbose", thrown.Message, StringComparison.Ordinal);
         Assert.Contains("Verbse", thrown.Message, StringComparison.Ordinal);
     }
 
@@ -598,7 +620,7 @@ public sealed class LoggingTests
         Assert.Contains("4 attempts", resolved.Message, StringComparison.Ordinal);
         Assert.Contains("deadline 20s", resolved.Message, StringComparison.Ordinal);
         Assert.Contains("telemetry on", resolved.Message, StringComparison.Ordinal);
-        Assert.Contains("logging Default", resolved.Message, StringComparison.Ordinal);
+        Assert.Contains("logging Normal", resolved.Message, StringComparison.Ordinal);
     }
 
     [Fact]

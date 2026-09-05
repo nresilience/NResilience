@@ -10,9 +10,9 @@ namespace NResilience.AspNetCore;
 ///     part of.
 ///     <para>
 ///         This is the half of nested-retry detection that needs a server. The other halves are in
-///         the core package: a <see cref="ResilienceHandler" /> knows when it is nested inside
+///         the core package: an <see cref="HttpResilienceHandler" /> knows when it is nested inside
 ///         another retrying handler in this process, and it stamps
-///         <see cref="HttpResilience.NestedRetryHeader" /> so the next hop can know too.
+///         <see cref="NestedRetry.Header" /> so the next hop can know too.
 ///     </para>
 /// </summary>
 /// <remarks>
@@ -30,11 +30,11 @@ internal sealed class ResilienceNestedRetryMiddleware(RequestDelegate next, Resi
 
         // No header, or one carrying anything other than the marker: the request runs exactly as it
         // would without the middleware. Silent failure on caller-controlled input, the same rule
-        // ResilienceDeadline.TryParse follows.
+        // AmbientDeadline.TryParse follows.
         if (!context.Request.Headers.TryGetValue(options.Header, out var values) || !CarriesMarker(values))
             return next(context);
 
-        var scope = ResilienceNestedRetry.Begin(true);
+        var scope = NestedRetry.Begin(true);
 
         // Not a `using` on an async method: keeping the middleware synchronous keeps a state-machine
         // box off every request. See ResilienceDeadlineMiddleware for the same shape and reasoning.
@@ -53,7 +53,7 @@ internal sealed class ResilienceNestedRetryMiddleware(RequestDelegate next, Resi
         return pending.IsCompleted
             ? Finish(scope, pending)
             : pending.ContinueWith(
-                static (completed, state) => Finish((ResilienceNestedRetry.NestedRetryScope)state!, completed),
+                static (completed, state) => Finish((NestedRetry.Scope)state!, completed),
                 scope,
                 CancellationToken.None,
                 TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.DenyChildAttach,
@@ -62,7 +62,7 @@ internal sealed class ResilienceNestedRetryMiddleware(RequestDelegate next, Resi
 
     /// <summary>
     ///     Whether any value on the header is the marker. Any rather than the last, because this is
-    ///     the same question <c>ResilienceHandler</c> asks of an outbound request and the two halves
+    ///     the same question <c>HttpResilienceHandler</c> asks of an outbound request and the two halves
     ///     of one feature must not disagree: an intermediary that appends an empty value to a header
     ///     a retrying caller really did send must not turn the marker off. Unlike a deadline, where
     ///     the last hop's value is the only true one, a presence marker does not get less true for
@@ -72,7 +72,7 @@ internal sealed class ResilienceNestedRetryMiddleware(RequestDelegate next, Resi
     {
         for (var i = 0; i < values.Count; i++)
         {
-            if (ResilienceNestedRetry.IsMarker(values[i]))
+            if (NestedRetry.IsMarker(values[i]))
                 return true;
         }
 
@@ -80,7 +80,7 @@ internal sealed class ResilienceNestedRetryMiddleware(RequestDelegate next, Resi
     }
 
     /// <summary>Restores the previous ambient flag and hands the pipeline's own outcome back.</summary>
-    private static Task Finish(ResilienceNestedRetry.NestedRetryScope scope, Task completed)
+    private static Task Finish(NestedRetry.Scope scope, Task completed)
     {
         scope.Dispose();
         return completed;

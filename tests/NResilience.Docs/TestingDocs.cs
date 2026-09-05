@@ -70,7 +70,7 @@ public sealed class TestingDocs
         // test without actually waiting.
         var time = new FakeTimeProvider();
 
-        using var handler = new ResilienceHandler(
+        using var handler = new HttpResilienceHandler(
             innerHandler: transport,
             policy: Resilience.Http with
             {

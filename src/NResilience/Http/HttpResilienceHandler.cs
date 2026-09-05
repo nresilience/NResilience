@@ -39,7 +39,7 @@ namespace NResilience;
 /// using var response = await client.GetAsync(uri, cancellationToken);
 /// </code>
 /// </example>
-public sealed class ResilienceHandler : DelegatingHandler
+public sealed class HttpResilienceHandler : DelegatingHandler
 {
     /// <summary>
     ///     Whether this call is already running inside a retrying handler's attempt.
@@ -59,7 +59,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// <param name="policy">The policy. Defaults to <see cref="Resilience.Http" />.</param>
     /// <param name="options">The HTTP switches. Defaults to <see cref="HttpResilienceOptions" />'s own defaults.</param>
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed, or the options cannot be used.</exception>
-    public ResilienceHandler(Resilience? policy = null, HttpResilienceOptions? options = null)
+    public HttpResilienceHandler(Resilience? policy = null, HttpResilienceOptions? options = null)
     {
         Policy = policy ?? Resilience.Http;
         Policy.Validate();
@@ -74,7 +74,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// <param name="policy">The policy. Defaults to <see cref="Resilience.Http" />.</param>
     /// <param name="options">The HTTP switches. Defaults to <see cref="HttpResilienceOptions" />'s own defaults.</param>
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed, or the options cannot be used.</exception>
-    public ResilienceHandler(HttpMessageHandler innerHandler, Resilience? policy = null, HttpResilienceOptions? options = null)
+    public HttpResilienceHandler(HttpMessageHandler innerHandler, Resilience? policy = null, HttpResilienceOptions? options = null)
         : this(policy, options)
     {
         InnerHandler = innerHandler;
@@ -136,13 +136,13 @@ public sealed class ResilienceHandler : DelegatingHandler
             // half that needs a server to read it, and the one that makes the middle hop of a chain able to
             // see the amplification it is part of. The ambient read is last so a call already known to be
             // nested does not pay for it.
-            nested = wasInside || inbound || ResilienceNestedRetry.IsCallerRetrying;
+            nested = wasInside || inbound || NestedRetry.IsCallerRetrying;
 
             if (nested && policy.OnEvent is { } listener)
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
 
             if (!inbound)
-                request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
+                request.Headers.TryAddWithoutValidation(NestedRetry.Header, NestedRetry.Marker);
 
             InsideRetryingClient.Value = true;
         }
@@ -224,7 +224,7 @@ public sealed class ResilienceHandler : DelegatingHandler
         // The same clamp the executor is about to apply. Read here as well because the handler has to
         // put a number on the wire before the executor has started, and the inbound deadline is what
         // makes that number honest.
-        var deadline = policy.UseAmbientDeadline ? ResilienceDeadline.Clamp(policy.Deadline) : policy.Deadline;
+        var deadline = policy.UseAmbientDeadline ? AmbientDeadline.Clamp(policy.Deadline) : policy.Deadline;
 
         if (deadline == Timeout.InfiniteTimeSpan && policy.AttemptTimeout == Timeout.InfiniteTimeSpan)
             return null;
@@ -257,17 +257,17 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// <summary>
     ///     Whether the request already carries the retry marker. Presence is not enough: an
     ///     intermediary that forwards unknown headers can add an empty value, and only
-    ///     <see cref="ResilienceNestedRetry.Marker" /> is a value this library wrote. A loop rather
+    ///     <see cref="NestedRetry.Marker" /> is a value this library wrote. A loop rather
     ///     than LINQ - this runs on every retrying send.
     /// </summary>
     private static bool CarriesRetryMarker(HttpRequestMessage request)
     {
-        if (!request.Headers.TryGetValues(HttpResilience.NestedRetryHeader, out var values))
+        if (!request.Headers.TryGetValues(NestedRetry.Header, out var values))
             return false;
 
         foreach (var value in values)
         {
-            if (ResilienceNestedRetry.IsMarker(value))
+            if (NestedRetry.IsMarker(value))
                 return true;
         }
 

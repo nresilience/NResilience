@@ -26,7 +26,7 @@ The presets cover common scenarios:
 | `Deadline` | `TimeSpan` | 30 s | The wall-clock budget for the entire call. Use `Timeout.InfiniteTimeSpan` to disable the bound. |
 | `AttemptTimeout` | `TimeSpan` | 10 s | The maximum duration for a single attempt. The effective value is the minimum of this property and the remaining time on the deadline. |
 | `AttemptCeiling` | `AttemptCeiling?` | `AttemptCeiling.Above(3)` | A measured attempt ceiling. Set it to `null` to leave `AttemptTimeout` as the only per-attempt bound. The measured term can only lower the ceiling. No default is supplied when `AttemptTimeout` is `Timeout.InfiniteTimeSpan` or at or below `AttemptCeiling.Floor`, because there is no ceiling there to lower. |
-| `UseAmbientDeadline` | `bool` | `false` | Whether the deadline is clamped by the one the current call inherited from its caller. When set, the effective deadline is the minimum of `Deadline` and `ResilienceDeadline.Remaining`, resolved once per call. |
+| `UseAmbientDeadline` | `bool` | `false` | Whether the deadline is clamped by the one the current call inherited from its caller. When set, the effective deadline is the minimum of `Deadline` and `AmbientDeadline.Remaining`, resolved once per call. |
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
 | `Classifier` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
@@ -170,19 +170,33 @@ The `NextAttempt` `readonly struct` is passed to `BeforeAttempt`, `Admit` and `B
 | `Remaining` | The time remaining on the deadline, or `Timeout.InfiniteTimeSpan`. |
 | `CancellationToken` | The caller's cancellation token. |
 
-## `ResilienceDeadline`
+## `AmbientDeadline`
 
-`ResilienceDeadline` is a `static class` holding the deadline the current logical call inherited, plus the two helpers that put one on a wire. The executor reads it only for a policy whose `UseAmbientDeadline` is set.
+`AmbientDeadline` is a `static class` holding the deadline the current logical call inherited, plus the two helpers that put one on a wire. The executor reads it only for a policy whose `UseAmbientDeadline` is set.
 
 | Member | Description |
 | :--- | :--- |
 | `Header` | The default header name: `"X-Deadline-Ms"`. |
 | `Remaining` | How long the inbound deadline has left, or `null` when the call inherited none. `TimeSpan.Zero` when it inherited one that has expired. |
-| `Begin(remaining, time = null)` | Publishes an inbound deadline for the current logical call. Returns a `DeadlineScope` that restores the previous value when disposed. `Timeout.InfiniteTimeSpan` clears the deadline for the scope rather than publishing an unbounded one. |
+| `Begin(remaining, time = null)` | Publishes an inbound deadline for the current logical call. Returns an `AmbientDeadline.Scope` that restores the previous value when disposed. `Timeout.InfiniteTimeSpan` clears the deadline for the scope rather than publishing an unbounded one. |
 | `TryParse(value, out remaining)` | Reads a header value: whole milliseconds as a positive integer. Anything else - empty, zero, negative, unit-suffixed, or above `int.MaxValue` milliseconds - is no deadline, and the failure is silent. |
 | `Format(remaining)` | Writes a header value: whole milliseconds, rounded down, never below 1. `null` when there is nothing to say. |
 
 The effective deadline is `min(Deadline, Remaining)`, resolved once when the call starts. See [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) for both halves, and [the cancellation contract](../deep-dives/cancellation.md) for what the ambient read costs.
+
+## `NestedRetry`
+
+`NestedRetry` is a `static class` holding whether the caller of the current logical call is already retrying, plus the header and marker that carry that fact across a hop. It is the flag counterpart to `AmbientDeadline`: a bool rather than a value with state, because unlike a deadline it does not decay.
+
+| Member | Description |
+| :--- | :--- |
+| `Header` | The header a retrying client stamps on every request it can retry: `"X-NResilience-Retrying"`. |
+| `Marker` | The only value that header ever carries: `"1"`. |
+| `IsCallerRetrying` | Whether the caller said it was already retrying. `false` when nobody published a flag. |
+| `Begin(callerRetrying)` | Publishes the flag for the current logical call. Returns a `NestedRetry.Scope` that restores the previous value when disposed. |
+| `IsMarker(value)` | Whether a header value is `Marker`. The check is exact, because a value this library did not write is not evidence of anything. |
+
+See [nested retries](../http/nested-retries.md) for both halves, and [`UseResilienceNestedRetry`](options.md#useresiliencenestedretry-on-iapplicationbuilder) for the inbound middleware.
 
 ## `PolicyScope<TKey>`
 

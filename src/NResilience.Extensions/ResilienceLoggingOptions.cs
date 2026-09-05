@@ -20,7 +20,7 @@ public enum ResilienceLogProfile
     ///     call nothing above <see cref="LogLevel.Debug" />, and an incident one
     ///     <see cref="LogLevel.Warning" />.
     /// </summary>
-    Default,
+    Normal,
 
     /// <summary>
     ///     Raises every traffic-proportional record to <see cref="LogLevel.Information" /> and leaves the
@@ -41,8 +41,8 @@ public enum ResilienceLogProfile
 /// </example>
 public sealed class ResilienceLoggingOptions
 {
-    /// <summary>What level each record is emitted at. <see cref="ResilienceLogProfile.Default" />.</summary>
-    public ResilienceLogProfile Profile { get; set; } = ResilienceLogProfile.Default;
+    /// <summary>What level each record is emitted at. <see cref="ResilienceLogProfile.Normal" />.</summary>
+    public ResilienceLogProfile Profile { get; set; } = ResilienceLogProfile.Normal;
 
     /// <summary>
     ///     How often a repeated rejection may warn. Inside the window rejections are counted and logged

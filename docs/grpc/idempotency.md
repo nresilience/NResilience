@@ -50,7 +50,7 @@ using (GrpcResilience.SingleShot())
 ```
 <!-- endsnippet -->
 
-`GrpcResilience.SingleShot()` is an ambient scope, on the same pattern as [`ResilienceDeadline.Begin`](../features/deadlines.md#propagate-the-deadline-across-a-hop) and `ResilienceNestedRetry.Begin`. It applies to every gRPC call made inside it, including calls made by code you did not write, and it restores the previous value when disposed.
+`GrpcResilience.SingleShot()` is an ambient scope, on the same pattern as [`AmbientDeadline.Begin`](../features/deadlines.md#propagate-the-deadline-across-a-hop) and `NestedRetry.Begin`. It applies to every gRPC call made inside it, including calls made by code you did not write, and it restores the previous value when disposed.
 
 It is deliberately **not** a metadata entry. A header would travel to the server, making this library's internal plumbing part of your wire contract, and it would be unreachable from a generated client that never exposes `CallOptions`. The scope reaches every client.
 

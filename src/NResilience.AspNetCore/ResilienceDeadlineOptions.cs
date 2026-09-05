@@ -12,10 +12,10 @@ public sealed class ResilienceDeadlineOptions
 {
     /// <summary>
     ///     The header carrying how long the caller is still waiting, in whole milliseconds. Defaults to
-    ///     <see cref="ResilienceDeadline.Header" />, which is what
+    ///     <see cref="AmbientDeadline.Header" />, which is what
     ///     <see cref="HttpResilienceOptions.PropagateDeadline" /> writes.
     /// </summary>
-    public string Header { get; set; } = ResilienceDeadline.Header;
+    public string Header { get; set; } = AmbientDeadline.Header;
 
     /// <summary>
     ///     The longest inbound deadline this service will believe. Null - the default - believes any of

@@ -62,7 +62,7 @@ public sealed class TelemetryCompositionTests
         // The telemetry handler starts the span. Attach it as an outer delegating handler around
         // the resilience handler.
         var telemetryHandler = new ResilienceTelemetryHandler("test");
-        telemetryHandler.InnerHandler = new ResilienceHandler(new SocketsHttpHandler(), policy);
+        telemetryHandler.InnerHandler = new HttpResilienceHandler(new SocketsHttpHandler(), policy);
         using var client = new HttpClient(telemetryHandler, true);
 
         using var response = await client.GetAsync(server.BaseUri);
@@ -171,7 +171,7 @@ public sealed class TelemetryCompositionTests
         }).WithTelemetry();
 
         var telemetryHandler = new ResilienceTelemetryHandler("test");
-        telemetryHandler.InnerHandler = new ResilienceHandler(new SocketsHttpHandler(), policy);
+        telemetryHandler.InnerHandler = new HttpResilienceHandler(new SocketsHttpHandler(), policy);
         using var client = new HttpClient(telemetryHandler, true);
 
         using var response = await client.GetAsync(server.BaseUri);
@@ -199,7 +199,7 @@ public sealed class TelemetryCompositionTests
     ///     one policy, excluding other tests running in parallel.
     /// </summary>
     /// <summary>
-    ///     The name <see cref="ResilienceHandler" /> scopes its policy to for one loopback server:
+    ///     The name <see cref="HttpResilienceHandler" /> scopes its policy to for one loopback server:
     ///     the policy's own name and the authority, which includes the ephemeral port and is
     ///     therefore unique to the test that started the server.
     /// </summary>

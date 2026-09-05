@@ -121,7 +121,7 @@ public sealed partial record Resilience
 ///     Because <c>ValueTask&lt;T&gt;</c> is distinct from <c>ValueTask</c>, result-returning
 ///     callbacks only bind to result-returning overloads, making the void form unambiguous.
 /// </remarks>
-public static class ResilienceValueTaskExtensions
+public static class ValueTaskExtensions
 {
     /// <summary>Runs a callback, retrying and bounding it according to the policy.</summary>
     /// <typeparam name="T">What the callback returns. Inferred; there is nothing to declare.</typeparam>

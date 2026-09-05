@@ -122,7 +122,7 @@ public static class RateLimitHttpClientBuilderExtensions
     }
 
     /// <summary>
-    ///     The partition key, derived exactly as <c>ResilienceHandler</c> derives its host scope so the
+    ///     The partition key, derived exactly as <c>HttpResilienceHandler</c> derives its host scope so the
     ///     limiter, the breaker and the budget partition identically.
     /// </summary>
     private static string HostOf(HttpRequestMessage request) => request.RequestUri?.Authority ?? string.Empty;

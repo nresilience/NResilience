@@ -38,6 +38,46 @@ Attempts, retries, and circuit breaker transitions are recorded as span events. 
 
 The library uses `StartActivity`, which returns `null` when the tracing system is not sampling, so if no one records traces, the registered handler adds negligible overhead.
 
+### Span events
+
+| Event | Raised when |
+| :--- | :--- |
+| `nresilience.attempt` | An attempt finished. |
+| `nresilience.retrying` | A retry was decided, before the backoff delay. |
+| `nresilience.hedge_started` | A hedged leg was launched. |
+| `nresilience.hedge_won` | A hedged leg produced the answer. |
+| `nresilience.hedge_suppressed` | A hedge was withheld because the error rate is too high. |
+| `nresilience.hedge_discarded` | A hedged leg lost the race and was cancelled. |
+| `nresilience.attempt_ceiling_adapted` | The measured attempt ceiling moved. |
+| `nresilience.backoff_base_adapted` | The measured backoff base moved. |
+| `nresilience.breaker_opened`, `nresilience.breaker_closed`, `nresilience.breaker_half_opened` | The breaker changed state. |
+| `nresilience.orphaned_work` | An attempt kept running after the call returned. |
+| `nresilience.nested_retry` | The call is already inside a retrying client. |
+
+## Tag reference
+
+Every tag the library writes, and every value it can take. Tag names are as stable as method names, so query against this list rather than against what a single dashboard happens to show.
+
+| Tag | Values | Where |
+| :--- | :--- | :--- |
+| `nresilience.policy` | The policy's `Name`, or `(unnamed)`. | Every call and attempt instrument, and the span. |
+| `nresilience.limiter` | The limiter's name. | `nresilience.limiter.leases`, `nresilience.limiter.wait.duration`, `nresilience.limiter.limit`. |
+| `nresilience.verdict` | `ok`, `transient`, `throttled`, `permanent`. | `nresilience.attempts`, `nresilience.attempt.duration`, and every span event. |
+| `nresilience.reason` | `dependency_unavailable`, `budget_exhausted`, `rejected`. | `nresilience.rejections`. |
+| `nresilience.attempt` | The attempt number, 1-based. | The span, and every span event. |
+| `nresilience.delay` | Seconds. | Span events that carry a delay. |
+| `exception.type` | The exception's full type name. | Span events that carry an exception. |
+
+### `nresilience.outcome` carries three vocabularies
+
+One key, three disjoint value sets, told apart by the instrument. This is deliberate - a dashboard filters by instrument first - but it means a query on the key alone mixes three questions:
+
+| Instrument | Values | Question it answers |
+| :--- | :--- | :--- |
+| `nresilience.calls`, `nresilience.call.duration`, and the span | `succeeded`, `permanent`, `deadline_exceeded`, `dependency_unavailable`, `budget_exhausted`, `attempts_exhausted` | How did the logical call end? |
+| `nresilience.hedges` | `started`, `won`, `suppressed`, `discarded` | What happened to a hedged leg? |
+| `nresilience.limiter.leases`, `nresilience.limiter.wait.duration` | `acquired`, `denied` | Did the caller get a permit? |
+
 ## Instrument manually created policies
 
 A policy you create manually (in a static field, say) is not instrumented by default. Enable it with `WithTelemetry()`.

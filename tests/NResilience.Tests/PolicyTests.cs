@@ -164,7 +164,7 @@ public sealed class PolicyTests
         // The interceptor has always done both; the handler validated only the policy, so a bad
         // header name surfaced from the middle of a request instead of at construction.
         Assert.Throws<ResilienceConfigurationException>(
-            () => new ResilienceHandler(options: new HttpResilienceOptions { DeadlineHeader = string.Empty }));
+            () => new HttpResilienceHandler(options: new HttpResilienceOptions { DeadlineHeader = string.Empty }));
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public sealed class PolicyTests
     {
         // Eagerly, rather than when the first host is seen.
         Assert.Throws<ResilienceConfigurationException>(
-            () => new ResilienceHandler(options: new HttpResilienceOptions
+            () => new HttpResilienceHandler(options: new HttpResilienceOptions
             {
                 BreakerSettings = new BreakerSettings { MinimumCalls = 0 },
             }));

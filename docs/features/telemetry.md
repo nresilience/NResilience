@@ -108,11 +108,14 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.attempt.duration` | s | Duration of a single attempt |
 | `nresilience.hedges` | `{hedge}` | [Hedged](hedging.md) attempts, tagged `started`, `won`, `discarded` or `suppressed` |
 | `nresilience.hedge.threshold` | s | The latency quantile a hedge fired at, recorded when it fired |
-| `nresilience.attempt.timeout` | s | The measured per-attempt [ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), recorded when it changes - which, since the ceiling is measured by default, is on every policy with an `AttemptTimeout` |
+| `nresilience.attempt.ceiling` | s | The measured per-attempt [ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), recorded when it changes - which, since the ceiling is measured by default, is on every policy with an `AttemptTimeout` |
 | `nresilience.backoff.base` | s | The measured [backoff base](retry.md#measure-the-backoff-base-instead-of-guessing-it), recorded when it changes. Reported only by a policy that configures `Backoff.MeasuredBase` |
 | `nresilience.limiter.leases` | `{lease}` | Permits a [limiter](rate-limiting.md) was asked for, tagged `acquired` or `denied` |
 | `nresilience.limiter.wait.duration` | s | How long a caller waited on a limiter. Zero unless queueing is enabled |
+| `nresilience.limiter.limit` | `{permit}` | The concurrency limit an [adaptive limiter](rate-limiting.md) has settled on, recorded when it changes |
 
 The **retry fraction** is `nresilience.attempts ÷ nresilience.calls` - the primary metric for spotting retry feedback loops and retry storms.
+
+Every tag these instruments carry, and every value it can take, is listed in [Telemetry in DI](../di/telemetry.md#tag-reference).
 
 For more, see [Telemetry in DI](../di/telemetry.md).

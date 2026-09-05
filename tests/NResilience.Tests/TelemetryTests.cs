@@ -272,7 +272,7 @@ public sealed class TelemetryTests
     [InlineData(CallEventKind.HedgeStarted, false)]
     [InlineData(CallEventKind.HedgeWon, false)]
     [InlineData(CallEventKind.HedgeDiscarded, false)]
-    [InlineData(CallEventKind.AttemptTimeoutAdapted, false)]
+    [InlineData(CallEventKind.AttemptCeilingAdapted, false)]
     [InlineData(CallEventKind.BackoffBaseAdapted, false)]
     [InlineData(CallEventKind.HedgeSuppressed, false)]
     public void IsRejection_covers_the_two_refusals(CallEventKind kind, bool expected) =>
@@ -299,7 +299,7 @@ public sealed class TelemetryTests
     [InlineData(CallEventKind.HedgeStarted, false)]
     [InlineData(CallEventKind.HedgeWon, false)]
     [InlineData(CallEventKind.HedgeDiscarded, false)]
-    [InlineData(CallEventKind.AttemptTimeoutAdapted, false)]
+    [InlineData(CallEventKind.AttemptCeilingAdapted, false)]
     [InlineData(CallEventKind.BackoffBaseAdapted, false)]
     [InlineData(CallEventKind.HedgeSuppressed, false)]
     public void IsTerminal_covers_the_kinds_that_end_a_call(CallEventKind kind, bool expected) =>

@@ -287,7 +287,7 @@ public sealed partial record Resilience
         where TStarter : struct, IStreamStarter<TState, T>
     {
         // The effective deadline, resolved once, for the same reasons as the call paths.
-        var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
+        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
 
         // The budget this call charges, resolved once, likewise.
         var budget = ExecutionState.BudgetFor(this);

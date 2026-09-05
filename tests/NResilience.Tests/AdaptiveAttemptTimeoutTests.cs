@@ -41,7 +41,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         await WarmAsync(policy, time, Fast, 19);
 
         Assert.Null(policy.Measured.AttemptCeiling);
-        Assert.False(events.Contains(CallEventKind.AttemptTimeoutAdapted));
+        Assert.False(events.Contains(CallEventKind.AttemptCeilingAdapted));
     }
 
     /// <summary>One more sample crosses the minimum, and the ceiling appears without anyone naming a millisecond.</summary>
@@ -63,7 +63,7 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         // Reported once, when it moved, rather than once per attempt.
         await WarmAsync(policy, time, Fast, 20);
-        Assert.Equal(1, events.CountOf(CallEventKind.AttemptTimeoutAdapted));
+        Assert.Equal(1, events.CountOf(CallEventKind.AttemptCeilingAdapted));
     }
 
     // ---- The feature ----
@@ -141,7 +141,7 @@ public sealed class AdaptiveAttemptTimeoutTests
 
         // And nothing is reported, because nothing was adapted. The silence is the signal that the
         // dependency has slowed past the point where measuring it buys anything.
-        Assert.False(events.Contains(CallEventKind.AttemptTimeoutAdapted));
+        Assert.False(events.Contains(CallEventKind.AttemptCeilingAdapted));
     }
 
     /// <summary>

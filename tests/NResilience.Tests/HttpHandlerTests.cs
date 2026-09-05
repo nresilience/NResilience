@@ -270,7 +270,7 @@ public sealed class HttpHandlerTests
     [InlineData("MADEUP", false)]
     public void The_idempotent_methods_are_the_retryable_ones(string method, bool retried)
     {
-        using var handler = new ResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp);
+        using var handler = new HttpResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp);
         using var request = new HttpRequestMessage(new HttpMethod(method), new Uri("https://api.test/thing"));
 
         Assert.Equal(retried, handler.WillRetry(request));
@@ -279,7 +279,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public void A_single_attempt_policy_retries_nothing_whatever_the_method_says()
     {
-        using var handler = new ResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp with { Attempts = 1 });
+        using var handler = new HttpResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp with { Attempts = 1 });
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
 
         Assert.False(handler.WillRetry(request));
@@ -303,7 +303,7 @@ public sealed class HttpHandlerTests
     public async Task Every_host_gets_its_own_breaker_and_budget()
     {
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
-        using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic });
+        using var handler = new HttpResilienceHandler(transport, TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic });
         using var client = new HttpClient(handler);
 
         (await client.GetAsync(new Uri("https://one.test/a"))).Dispose();
@@ -338,7 +338,7 @@ public sealed class HttpHandlerTests
             Breaker = null,
         };
 
-        using var handler = new ResilienceHandler(
+        using var handler = new HttpResilienceHandler(
             transport,
             policy,
             new HttpResilienceOptions { BreakerSettings = new BreakerSettings { ConsecutiveFailures = 2 } });
@@ -377,7 +377,7 @@ public sealed class HttpHandlerTests
 
         var time = new FakeTimeProvider();
 
-        using var handler = new ResilienceHandler(
+        using var handler = new HttpResilienceHandler(
             transport,
             TestPolicy.InstantHttp with { Attempts = 1, Breaker = null, Time = time },
             new HttpResilienceOptions
@@ -422,7 +422,7 @@ public sealed class HttpHandlerTests
 
         // No per-host breaker: five failing calls would open one, and a refused call pauses on the
         // policy's clock, which is the clock this test is holding still.
-        using var handler = new ResilienceHandler(
+        using var handler = new HttpResilienceHandler(
             transport,
             TestPolicy.InstantHttp with { Breaker = null, Time = time, Budget = RetryBudget.Automatic },
             new HttpResilienceOptions { BreakerPerHost = false });
@@ -449,7 +449,7 @@ public sealed class HttpHandlerTests
         var shared = Breaker.Of(name: "shared");
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp with { Breaker = shared });
+        using var handler = new HttpResilienceHandler(transport, TestPolicy.InstantHttp with { Breaker = shared });
         using var client = new HttpClient(handler);
 
         (await client.GetAsync(new Uri("https://one.test/a"))).Dispose();
@@ -468,7 +468,7 @@ public sealed class HttpHandlerTests
         using var client = Client(transport);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.True(transport.Requests[0].Headers.Contains(HttpResilience.NestedRetryHeader));
+        Assert.True(transport.Requests[0].Headers.Contains(NestedRetry.Header));
     }
 
     [Fact]
@@ -479,7 +479,7 @@ public sealed class HttpHandlerTests
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1 });
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.False(transport.Requests[0].Headers.Contains(HttpResilience.NestedRetryHeader));
+        Assert.False(transport.Requests[0].Headers.Contains(NestedRetry.Header));
     }
 
     [Fact]
@@ -491,7 +491,7 @@ public sealed class HttpHandlerTests
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Headers.Add(HttpResilience.NestedRetryHeader, "1");
+        request.Headers.Add(NestedRetry.Header, "1");
 
         (await client.SendAsync(request)).Dispose();
 
@@ -506,11 +506,11 @@ public sealed class HttpHandlerTests
         using var client = Client(transport);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Headers.Add(HttpResilience.NestedRetryHeader, "1");
+        request.Headers.Add(NestedRetry.Header, "1");
 
         (await client.SendAsync(request)).Dispose();
 
-        Assert.Single(transport.Requests[0].Headers.GetValues(HttpResilience.NestedRetryHeader));
+        Assert.Single(transport.Requests[0].Headers.GetValues(NestedRetry.Header));
     }
 
     [Fact]
@@ -546,7 +546,7 @@ public sealed class HttpHandlerTests
         using var outerClient = Client(outerTransport);
         (await outerClient.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
-        Assert.True(inner.Requests[0].Headers.Contains(HttpResilience.NestedRetryHeader));
+        Assert.True(inner.Requests[0].Headers.Contains(NestedRetry.Header));
     }
 
     [Fact]
@@ -561,7 +561,7 @@ public sealed class HttpHandlerTests
             TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
-        request.Headers.Add(HttpResilience.NestedRetryHeader, "1");
+        request.Headers.Add(NestedRetry.Header, "1");
 
         (await client.SendAsync(request)).Dispose();
 
@@ -609,7 +609,7 @@ public sealed class HttpHandlerTests
 
         // The inbound half: a server published the caller's marker as an ambient flag, and the
         // outbound calls this request makes are the ones that need to know.
-        using var scope = ResilienceNestedRetry.Begin(true);
+        using var scope = NestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.True(recorder.Contains(CallEventKind.NestedRetry));
@@ -626,7 +626,7 @@ public sealed class HttpHandlerTests
             new HttpResilienceOptions { DetectNestedRetries = false },
             TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
-        using var scope = ResilienceNestedRetry.Begin(true);
+        using var scope = NestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.False(recorder.Contains(CallEventKind.NestedRetry));
@@ -640,7 +640,7 @@ public sealed class HttpHandlerTests
 
         using var client = Client(transport, policy: TestPolicy.InstantHttp with { Attempts = 1, OnEvent = recorder.Record });
 
-        using var scope = ResilienceNestedRetry.Begin(true);
+        using var scope = NestedRetry.Begin(true);
         (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
         Assert.False(recorder.Contains(CallEventKind.NestedRetry));
@@ -658,7 +658,7 @@ public sealed class HttpHandlerTests
         // false and make every later call through this context report nesting from nothing.
         using var client = Client(inner, policy: TestPolicy.InstantHttp with { OnEvent = recorder.Record });
 
-        using (ResilienceNestedRetry.Begin(true))
+        using (NestedRetry.Begin(true))
         {
             (await client.GetAsync(new Uri("https://api.test/thing"))).Dispose();
 
@@ -744,7 +744,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public void The_synchronous_send_is_refused()
     {
-        using var handler = new ResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp);
+        using var handler = new HttpResilienceHandler(new ScriptedHttpHandler(), TestPolicy.InstantHttp);
         using var client = new HttpClient(handler);
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));
 
@@ -755,7 +755,7 @@ public sealed class HttpHandlerTests
         HttpMessageHandler transport,
         HttpResilienceOptions? options = null,
         Resilience? policy = null) =>
-        new(new ResilienceHandler(transport, policy ?? TestPolicy.InstantHttp, options));
+        new(new HttpResilienceHandler(transport, policy ?? TestPolicy.InstantHttp, options));
 
     /// <summary>
     ///     A transport that routes by request, observes a mutable flag toggled from outside it, or

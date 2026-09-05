@@ -271,7 +271,7 @@ public sealed partial record Resilience
     ///     Off by default.
     ///     <para>
     ///         When set, the effective deadline is
-    ///         <c>min(<see cref="Deadline" />, <see cref="ResilienceDeadline.Remaining" />)</c>, resolved
+    ///         <c>min(<see cref="Deadline" />, <see cref="AmbientDeadline.Remaining" />)</c>, resolved
     ///         once at the start of the call. <see cref="AttemptTimeout" /> remains <c>min(configured, time left)</c>,
     ///         so a shorter deadline reduces attempt durations. Calls with an already expired inherited
     ///         deadline stop immediately with <see cref="DeadlineExceededException" />.
@@ -279,7 +279,7 @@ public sealed partial record Resilience
     ///     <para>
     ///         Reading an <see cref="AsyncLocal{T}" /> has a cost, and most calls lack an inbound deadline.
     ///         When false, the cost is one branch per call; when true, it is one read. Use
-    ///         <see cref="ResilienceDeadline.Begin" /> to publish an inbound deadline, or
+    ///         <see cref="AmbientDeadline.Begin" /> to publish an inbound deadline, or
     ///         <c>UseResilienceDeadline()</c> from <c>NResilience.AspNetCore</c> in ASP.NET Core apps.
     ///     </para>
     /// </summary>

@@ -144,7 +144,7 @@ public sealed class ResilienceInterceptor : Interceptor
             // hop of a chain able to see the amplification it is part of. The library reports it and
             // does nothing else; silently dropping the caller's configured retries would be a bigger
             // surprise than the amplification.
-            if (InsideRetryingClient.Value || call.CarriesRetryMarker || ResilienceNestedRetry.IsCallerRetrying)
+            if (InsideRetryingClient.Value || call.CarriesRetryMarker || NestedRetry.IsCallerRetrying)
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
         }
 
@@ -178,7 +178,7 @@ public sealed class ResilienceInterceptor : Interceptor
             // What is not done here is publishing the ambient flag for the duration: a stream's
             // duration is the consumer's enumeration, on whatever context they enumerate from, and
             // an AsyncLocal cannot describe that. The metadata marker still travels on every attempt.
-            if (InsideRetryingClient.Value || call.CarriesRetryMarker || ResilienceNestedRetry.IsCallerRetrying)
+            if (InsideRetryingClient.Value || call.CarriesRetryMarker || NestedRetry.IsCallerRetrying)
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));
         }
 
@@ -198,7 +198,7 @@ public sealed class ResilienceInterceptor : Interceptor
     ///     would be the one call in the client that has no retry, no breaker and no deadline, and
     ///     nothing on the surface would say so - which is a worse outcome than a compile-time-visible
     ///     failure at the one call site that uses it. The same decision
-    ///     <see cref="ResilienceHandler" /> makes about synchronous sends.
+    ///     <see cref="HttpResilienceHandler" /> makes about synchronous sends.
     /// </remarks>
     public override TResponse BlockingUnaryCall<TRequest, TResponse>(
         TRequest request,

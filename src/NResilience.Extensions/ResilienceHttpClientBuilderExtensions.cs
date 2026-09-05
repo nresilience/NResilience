@@ -26,7 +26,7 @@ public static class ResilienceHttpClientBuilderExtensions
     /// <param name="telemetry">Whether this client records to <see cref="ResilienceTelemetry" />. On by default.</param>
     /// <param name="logging">
     ///     The log level for this client's records. If null, the process default is used, which is <see cref="ResilienceLoggingOptions.Profile" />
-    ///     when <c>AddResilienceLogging</c> was called and <see cref="ResilienceLogProfile.Default" /> otherwise.
+    ///     when <c>AddResilienceLogging</c> was called and <see cref="ResilienceLogProfile.Normal" /> otherwise.
     /// </param>
     /// <returns>The client builder.</returns>
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
@@ -185,7 +185,7 @@ public static class ResilienceHttpClientBuilderExtensions
 
         builder.AddHttpMessageHandler(services =>
         {
-            var handler = new ResilienceHandler(policy(services), options);
+            var handler = new HttpResilienceHandler(policy(services), options);
             handlers.Track(client, handler);
             return handler;
         });

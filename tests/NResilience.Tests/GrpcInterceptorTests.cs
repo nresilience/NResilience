@@ -220,7 +220,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task An_inbound_marker_is_not_stamped_a_second_time()
     {
-        var callers = new Metadata { { "x-nresilience-retrying", ResilienceNestedRetry.Marker } };
+        var callers = new Metadata { { "x-nresilience-retrying", NestedRetry.Marker } };
         var script = new GrpcScript().Responds("ok");
 
         using var call = Call(Interceptor(), script, new CallOptions(callers));
@@ -232,7 +232,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public void The_marker_travels_under_the_http_header_s_name_lowercased()
     {
-        Assert.Equal("x-nresilience-retrying", HttpResilience.NestedRetryHeader.ToLowerInvariant());
+        Assert.Equal("x-nresilience-retrying", NestedRetry.Header.ToLowerInvariant());
     }
 
     [Fact]
@@ -241,7 +241,7 @@ public sealed class GrpcInterceptorTests
         var events = new List<CallEvent>();
         var script = new GrpcScript().Responds("ok");
 
-        using var scope = ResilienceNestedRetry.Begin(true);
+        using var scope = NestedRetry.Begin(true);
         using var call = Call(Interceptor(Policy() with { OnEvent = events.Add }), script);
         await call.ResponseAsync;
 

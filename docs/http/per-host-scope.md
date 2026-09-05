@@ -22,7 +22,7 @@ The registry keeps 1024 hosts by default. Use `MaximumHosts` to change the cap:
  
 <!-- snippet: http-max-hosts -->
 ```csharp
-var handler = new ResilienceHandler(options: new HttpResilienceOptions { MaximumHosts = 64 });
+var handler = new HttpResilienceHandler(options: new HttpResilienceOptions { MaximumHosts = 64 });
 ```
 <!-- endsnippet -->
  

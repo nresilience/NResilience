@@ -29,7 +29,7 @@ internal sealed class KnownSymbols
         Compilation compilation)
     {
         Resilience = resilience;
-        ResilienceValueTaskExtensions = resilienceValueTaskExtensions;
+        ValueTaskExtensions = resilienceValueTaskExtensions;
         CancellationToken = cancellationToken;
         HttpResilience = httpResilience;
         Breaker = breaker;
@@ -54,7 +54,7 @@ internal sealed class KnownSymbols
     ///     caller reached for to save an allocation - and NRES001 guards a failure that is invisible
     ///     without it.
     /// </summary>
-    internal INamedTypeSymbol? ResilienceValueTaskExtensions { get; }
+    internal INamedTypeSymbol? ValueTaskExtensions { get; }
 
     internal INamedTypeSymbol CancellationToken { get; }
 
@@ -101,7 +101,7 @@ internal sealed class KnownSymbols
 
         known = new KnownSymbols(
             resilience,
-            compilation.GetTypeByMetadataName("NResilience.ResilienceValueTaskExtensions"),
+            compilation.GetTypeByMetadataName("NResilience.ValueTaskExtensions"),
             token,
             compilation.GetTypeByMetadataName("NResilience.HttpResilience"),
             compilation.GetTypeByMetadataName("NResilience.Breaker"),
@@ -119,7 +119,7 @@ internal sealed class KnownSymbols
     internal bool IsExecution(IMethodSymbol method) =>
         (method.Name == "RunAsync" || method.Name == "TryRunAsync")
         && (SymbolEqualityComparer.Default.Equals(method.ContainingType, Resilience)
-            || Is(method.ContainingType, ResilienceValueTaskExtensions));
+            || Is(method.ContainingType, ValueTaskExtensions));
 
     internal bool IsCancellationToken(ITypeSymbol? type) => type is not null && SymbolEqualityComparer.Default.Equals(type, CancellationToken);
 

@@ -47,7 +47,7 @@ The `CallEventKind` enum defines the event types raised during a call.
 | `HedgeWon` | No | No | No |
 | `HedgeDiscarded` | No | No | No |
 | `HedgeSuppressed` | No | Yes (the latency threshold) | No |
-| `AttemptTimeoutAdapted` | No | Yes (the measured ceiling) | No |
+| `AttemptCeilingAdapted` | No | Yes (the measured ceiling) | No |
 | `BackoffBaseAdapted` | No | Yes (the measured base) | No |
 
 ### Event invariants and behavior
@@ -60,7 +60,7 @@ The `CallEventKind` enum defines the event types raised during a call.
 - **Nested retries**: `NestedRetry` events are raised only by the HTTP handler.
 - **Hedging**: `HedgeStarted` carries the live latency quantile that triggered it on `Delay`. `HedgeDiscarded` fires when a leg is cancelled because a sibling answered first; its `Duration` is how long that leg ran. A discarded leg raises no `Attempt` event, because nothing classified it. `HedgeSuppressed` fires when a call got slow enough to hedge and the hedge was held back - by `SuppressAt` or by `WinRate` - and carries the same threshold on `Delay` that `HedgeStarted` does, so the two count against each other. A hedge the retry budget refused, and one that was never armed at all, raise nothing. See [Hedging](../features/hedging.md).
 - **Measured backoff bases**: `BackoffBaseAdapted` carries the new base on `Delay`, after the `Spread` clamp - which is what the curve actually uses. It is raised on the retry decision, and only when the number differs from the last one raised for that policy instance. A policy whose previous attempt was throttled rather than transient raises nothing, because a throttled retry does not use the measured base. See [Retry](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it).
-- **Measured attempt ceilings**: `AttemptTimeoutAdapted` carries the new ceiling on `Delay`. It is raised only when the measured term is what bounds the attempt, and only when the number differs from the last one raised for that policy instance - so the rate follows how much the estimate moves rather than how much traffic there is. A policy whose ceiling has been clamped back to `AttemptTimeout` raises nothing. See [Deadlines](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it).
+- **Measured attempt ceilings**: `AttemptCeilingAdapted` carries the new ceiling on `Delay`. It is raised only when the measured term is what bounds the attempt, and only when the number differs from the last one raised for that policy instance - so the rate follows how much the estimate moves rather than how much traffic there is. A policy whose ceiling has been clamped back to `AttemptTimeout` raises nothing. See [Deadlines](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it).
 - **Breaker transitions**: Breaker state transitions are raised on the call that triggered the transition, outside the breaker's internal lock.
 
 ## Listener contract
@@ -105,7 +105,7 @@ Every record is written every time unless you opt into [sampling](../features/lo
 | 1022 | `HedgeStarted` | `Trace` | `Information` | `{Policy} started hedge attempt {Attempt}: the call has been running longer than {ThresholdMs} ms` |
 | 1023 | `HedgeWon` | `Trace` | `Information` | `{Policy} answered from hedge attempt {Attempt} after {ElapsedMs} ms` |
 | 1024 | `HedgeDiscarded` | `Trace` | `Information` | `{Policy} discarded attempt {Attempt} after {ElapsedMs} ms because a sibling answered first` |
-| 1025 | `AttemptTimeoutAdapted` | `Debug` | `Information` | `{Policy} measured a new per-attempt ceiling of {CeilingMs} ms from recent latency` |
+| 1025 | `AttemptCeilingAdapted` | `Debug` | `Information` | `{Policy} measured a new per-attempt ceiling of {CeilingMs} ms from recent latency` |
 | 1026 | `BackoffBaseAdapted` | `Debug` | `Information` | `{Policy} measured a new backoff base of {BaseMs} ms from recent latency` |
 | 1027 | `HedgeSuppressed` | `Debug` | `Information` | `{Policy} held back hedge attempt {Attempt} after {ThresholdMs} ms` |
 

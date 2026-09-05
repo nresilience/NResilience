@@ -197,7 +197,7 @@ NResilience.Extensions.ResilienceHealthOptions.Validate() -> void
 NResilience.Extensions.ResilienceHealthOptions.Watch(string! name, NResilience.Breaker! breaker) -> NResilience.Extensions.ResilienceHealthOptions!
 NResilience.Extensions.ResilienceHealthOptions.Watch(string! name, NResilience.RetryBudget! budget) -> NResilience.Extensions.ResilienceHealthOptions!
 NResilience.Extensions.ResilienceLogProfile
-NResilience.Extensions.ResilienceLogProfile.Default = 1 -> NResilience.Extensions.ResilienceLogProfile
+NResilience.Extensions.ResilienceLogProfile.Normal = 1 -> NResilience.Extensions.ResilienceLogProfile
 NResilience.Extensions.ResilienceLogProfile.Off = 0 -> NResilience.Extensions.ResilienceLogProfile
 NResilience.Extensions.ResilienceLogProfile.Verbose = 2 -> NResilience.Extensions.ResilienceLogProfile
 NResilience.Extensions.ResilienceLogging

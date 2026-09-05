@@ -235,7 +235,7 @@ public sealed class ChaosTests
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         var handler = new ChaosHandler(chaos) { InnerHandler = transport };
 
-        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.InstantHttp));
+        using var client = new HttpClient(new HttpResilienceHandler(handler, TestPolicy.InstantHttp));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -257,7 +257,7 @@ public sealed class ChaosTests
             InnerHandler = transport,
         };
 
-        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.InstantHttp));
+        using var client = new HttpClient(new HttpResilienceHandler(handler, TestPolicy.InstantHttp));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         // The 503 was classified from its status code and retried, and the second attempt reached
@@ -273,7 +273,7 @@ public sealed class ChaosTests
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         var handler = new ChaosHandler(Chaos.None with { FaultRate = 1 }) { InnerHandler = transport };
 
-        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.InstantHttp));
+        using var client = new HttpClient(new HttpResilienceHandler(handler, TestPolicy.InstantHttp));
         using var response = await client.GetAsync(new Uri("https://api.test/thing"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -289,7 +289,7 @@ public sealed class ChaosTests
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         var handler = new ChaosHandler(chaos) { InnerHandler = transport };
 
-        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.WithClock(time) with { Classifier = Classifier.Http }));
+        using var client = new HttpClient(new HttpResilienceHandler(handler, TestPolicy.WithClock(time) with { Classifier = Classifier.Http }));
         var call = client.GetAsync(new Uri("https://api.test/thing"));
 
         while (!call.IsCompleted)

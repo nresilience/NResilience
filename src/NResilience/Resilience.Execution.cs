@@ -320,7 +320,7 @@ public sealed partial record Resilience
         // deadline is a fixed point in time and re-reading the AsyncLocal it lives in would charge
         // every attempt for a value that cannot have changed. Costs 8 bytes of state-machine box on
         // the suspending path for every caller, set or not; see Budgets.AmbientDeadlineDelta.
-        var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
+        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
 
         // The one local the breaker and budget add to the box, at 8 bytes: either the policy's own
@@ -597,7 +597,7 @@ public sealed partial record Resilience
         // deadline is a fixed point in time and re-reading the AsyncLocal it lives in would charge
         // every attempt for a value that cannot have changed. Costs 8 bytes of state-machine box on
         // the suspending path for every caller, set or not; see Budgets.AmbientDeadlineDelta.
-        var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
+        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
         var start = Time.GetTimestamp();
@@ -1358,7 +1358,7 @@ public sealed partial record Resilience
             return AttemptTimeout;
 
         if (OnEvent is not null && ExecutionState.CeilingChanged(this, measured))
-            Notify(CallEventKind.AttemptTimeoutAdapted, attemptNumber, Verdict.Ok, TimeSpan.Zero, measured, null, null);
+            Notify(CallEventKind.AttemptCeilingAdapted, attemptNumber, Verdict.Ok, TimeSpan.Zero, measured, null, null);
 
         return measured;
     }

@@ -135,7 +135,7 @@ public static class GrpcResilience
 
     /// <summary>
     ///     Restores the repeatability flag the scope replaced. A struct, and one field wide, for the
-    ///     same reason <see cref="ResilienceNestedRetry.NestedRetryScope" /> is: it is on the path of
+    ///     same reason <see cref="NestedRetry.Scope" /> is: it is on the path of
     ///     every call that uses it.
     /// </summary>
     public readonly struct SingleShotScope : IDisposable

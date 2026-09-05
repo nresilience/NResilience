@@ -68,7 +68,7 @@ The optional `configure` parameter is a `Func<Resilience, Resilience>` that runs
 
 ## `AddResilience` on `IHttpClientBuilder`
 
-Add the `ResilienceHandler` to an `HttpClient` pipeline with these methods.
+Add the `HttpResilienceHandler` to an `HttpClient` pipeline with these methods.
 
 | Overload | Description |
 | :--- | :--- |
@@ -152,7 +152,7 @@ The `IResiliencePolicies` service gives access to registered policies.
 **Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`. `Backoff` carries a `MeasuredBase` subsection of its own.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
-- **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
+- **`Logging`**: A string of `"Off"`, `"Normal"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
 - **`Deadline`, `AttemptTimeout`**: Use `"Infinite"` for no bound (`"None"` and `"Unbounded"` are the same word, case-insensitive). The duration `Timeout.InfiniteTimeSpan` round-trips as - `"-00:00:00.0010000"` - still binds too. Any other word fails at registration rather than leaving the call quietly unbounded.
 
 ### Every section has an `Enabled`
@@ -396,11 +396,11 @@ At most one log listener attaches per policy; the first one attached wins.
 
 | Member | Default | Description |
 | :--- | :--- | :--- |
-| `Profile` | `Default` | The level at which each record is emitted: `Off`, `Default`, or `Verbose`. |
+| `Profile` | `Normal` | The level at which each record is emitted: `Off`, `Normal`, or `Verbose`. |
 | `RepeatWindow` | 30 seconds | How often a repeated rejection may warn. `TimeSpan.Zero` warns every time. |
 | `IncludeStackTracesOnRetry` | `false` | Attaches the exception object to per-attempt and retry records, not only terminal ones. |
 | `Level` | `null` | `Func<EventId, CallEvent, LogLevel?>`. Returns the level for one record, `null` to keep the profile's, or `LogLevel.None` to drop it. |
 
-Because `ResilienceLogProfile.Off` is the enum's zero value, an unset profile is silent.
+Because `ResilienceLogProfile.Off` is the enum's zero value, an unset profile is silent. The profile that the tabled levels describe is named `Normal` rather than `Default` for that reason: `default(ResilienceLogProfile)` is `Off`.
 
 For the event IDs and the filter, see [Logging in DI](../di/logging.md).

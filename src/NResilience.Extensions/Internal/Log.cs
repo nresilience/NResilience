@@ -144,10 +144,10 @@ internal static partial class Log
     internal static partial void HedgeDiscarded(ILogger logger, LogLevel level, string policy, int attempt, long elapsedMs);
 
     [LoggerMessage(
-        EventId = Codes.AttemptTimeoutAdapted,
-        EventName = nameof(Ids.AttemptTimeoutAdapted),
+        EventId = Codes.AttemptCeilingAdapted,
+        EventName = nameof(Ids.AttemptCeilingAdapted),
         Message = "{Policy} measured a new per-attempt ceiling of {CeilingMs} ms from recent latency")]
-    internal static partial void AttemptTimeoutAdapted(ILogger logger, LogLevel level, string policy, long ceilingMs);
+    internal static partial void AttemptCeilingAdapted(ILogger logger, LogLevel level, string policy, long ceilingMs);
 
     [LoggerMessage(
         EventId = Codes.BackoffBaseAdapted,
@@ -187,7 +187,7 @@ internal static partial class Log
         internal const int HedgeStarted = 1022;
         internal const int HedgeWon = 1023;
         internal const int HedgeDiscarded = 1024;
-        internal const int AttemptTimeoutAdapted = 1025;
+        internal const int AttemptCeilingAdapted = 1025;
         internal const int BackoffBaseAdapted = 1026;
         internal const int HedgeSuppressed = 1027;
     }
@@ -223,7 +223,7 @@ internal static partial class Log
         internal static readonly EventId HedgeStarted = new(Codes.HedgeStarted, nameof(HedgeStarted));
         internal static readonly EventId HedgeWon = new(Codes.HedgeWon, nameof(HedgeWon));
         internal static readonly EventId HedgeDiscarded = new(Codes.HedgeDiscarded, nameof(HedgeDiscarded));
-        internal static readonly EventId AttemptTimeoutAdapted = new(Codes.AttemptTimeoutAdapted, nameof(AttemptTimeoutAdapted));
+        internal static readonly EventId AttemptCeilingAdapted = new(Codes.AttemptCeilingAdapted, nameof(AttemptCeilingAdapted));
         internal static readonly EventId BackoffBaseAdapted = new(Codes.BackoffBaseAdapted, nameof(BackoffBaseAdapted));
         internal static readonly EventId HedgeSuppressed = new(Codes.HedgeSuppressed, nameof(HedgeSuppressed));
     }

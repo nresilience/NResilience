@@ -161,7 +161,7 @@ Every overload validates the profile eagerly and returns a callback of the shape
 | `Injected` | How many requests have been failed. |
 | `Slowed` | How many requests have been slowed. |
 
-Chaos applies only to the asynchronous path. This is not a limitation in practice: `ResilienceHandler.Send` throws `NotSupportedException`, so pipelines with policies have no synchronous path.
+Chaos applies only to the asynchronous path. This is not a limitation in practice: `HttpResilienceHandler.Send` throws `NotSupportedException`, so pipelines with policies have no synchronous path.
 
 ## `SentRequest`
 

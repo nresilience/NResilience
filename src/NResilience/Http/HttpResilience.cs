@@ -1,29 +1,12 @@
 namespace NResilience;
 
 /// <summary>
-///     The per-request switches and the well-known header the HTTP integration reads and writes.
+///     The per-request switches the HTTP integration reads. The headers it reads and writes are
+///     <see cref="AmbientDeadline.Header" /> and <see cref="NestedRetry.Header" />, each next to the
+///     ambient value it carries.
 /// </summary>
 public static class HttpResilience
 {
-    /// <summary>
-    ///     The header a retrying client stamps on every request it can retry, so the service receiving it
-    ///     can see that its caller will retry.
-    ///     <para>
-    ///         Retries compose multiplicatively - three layers each retrying three times is 27 attempts at
-    ///         the bottom - and the amplification is invisible from any single layer. A service that reads
-    ///         this header off its inbound request knows it is already being retried, which is the
-    ///         information it needs to stop retrying again underneath.
-    ///     </para>
-    /// </summary>
-    /// <remarks>
-    ///     A <see cref="CallEventKind.NestedRetry" /> event is raised when a request that already
-    ///     carries this header is about to be retried again, and when one retrying handler executes
-    ///     inside another's attempt in the same process. The library reports it and does nothing else:
-    ///     silently dropping the caller's configured retries would be a bigger surprise than the
-    ///     amplification.
-    /// </remarks>
-    public const string NestedRetryHeader = "X-NResilience-Retrying";
-
     /// <summary>
     ///     Per-request override of the idempotency decision.
     ///     <para>
@@ -48,7 +31,7 @@ public static class HttpResilience
     public static HttpRequestOptionsKey<bool> Repeatable { get; } = new("NResilience.Repeatable");
 
     /// <summary>
-    ///     An <see cref="HttpClient" /> with a <see cref="ResilienceHandler" /> in front of it, built the
+    ///     An <see cref="HttpClient" /> with an <see cref="HttpResilienceHandler" /> in front of it, built the
     ///     way the DI registration builds one - including taking ownership of the transport timeout.
     /// </summary>
     /// <param name="policy">The policy. Defaults to <see cref="Resilience.Http" />.</param>
@@ -68,7 +51,7 @@ public static class HttpResilience
         HttpMessageHandler? innerHandler = null)
     {
         options ??= new HttpResilienceOptions();
-        var handler = new ResilienceHandler(innerHandler ?? new HttpClientHandler(), policy, options);
+        var handler = new HttpResilienceHandler(innerHandler ?? new HttpClientHandler(), policy, options);
         var client = new HttpClient(handler, true);
 
         if (options.OwnTransportTimeout)

@@ -349,7 +349,7 @@ public sealed class ResilienceExceptionHandlerTests
                         // is meant to end on the deadline, not on a guard the handler scoped.
                         var handlerOptions = new HttpResilienceOptions { BreakerPerHost = false, BudgetPerHost = false };
 
-                        using var client = new HttpClient(new ResilienceHandler(new SocketsHttpHandler(), live, handlerOptions))
+                        using var client = new HttpClient(new HttpResilienceHandler(new SocketsHttpHandler(), live, handlerOptions))
                         {
                             Timeout = Timeout.InfiniteTimeSpan,
                         };

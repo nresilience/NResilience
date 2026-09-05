@@ -77,7 +77,7 @@ public sealed partial record Resilience
 
         // The effective deadline, resolved once per call. See the sequential loop for why the ambient
         // read happens here and not per attempt; the local functions below close over it.
-        var deadline = UseAmbientDeadline ? ResilienceDeadline.Clamp(Deadline) : Deadline;
+        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
         var start = Time.GetTimestamp();

@@ -113,7 +113,7 @@ public sealed class ConcurrentCallTests
 
         // No explicit breaker on the policy: the default BreakerPerHost scoping creates one per host,
         // which is what this test asserts. An explicit breaker would be shared across hosts.
-        var handler = new ResilienceHandler(new SocketsHttpHandler(), Resilience.Http with
+        var handler = new HttpResilienceHandler(new SocketsHttpHandler(), Resilience.Http with
         {
             Backoff = Backoff.None,
             AttemptTimeout = Timeout.InfiniteTimeSpan,

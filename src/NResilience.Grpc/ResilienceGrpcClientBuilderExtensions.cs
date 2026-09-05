@@ -42,7 +42,7 @@ public static class ResilienceGrpcClientBuilderExtensions
     /// <param name="logging">
     ///     The log level for this client's records. If null, the process default is used, which is
     ///     <see cref="ResilienceLoggingOptions.Profile" /> when <c>AddResilienceLogging</c> was called
-    ///     and <see cref="ResilienceLogProfile.Default" /> otherwise.
+    ///     and <see cref="ResilienceLogProfile.Normal" /> otherwise.
     /// </param>
     /// <returns>The client builder.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="builder" /> is null.</exception>

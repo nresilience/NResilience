@@ -13,7 +13,7 @@ namespace NResilience;
 /// </summary>
 /// <remarks>
 ///     The estimates are private to the policy instance. The HTTP handler derives one policy per host,
-///     so each host is measured independently and <c>ResilienceHandler.PoliciesByHost()</c> is where
+///     so each host is measured independently and <c>HttpResilienceHandler.PoliciesByHost()</c> is where
 ///     per-host readings come from.
 ///     <para>
 ///         The struct holds the policy and computes on read, so a value kept in a local keeps reporting

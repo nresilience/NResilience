@@ -76,7 +76,7 @@ client.Timeout = Timeout.InfiniteTimeSpan;
 ```csharp
 // HttpClient.Timeout defaults to 100 seconds and covers the whole retry sequence.
 // On a client you build yourself, set the bound to the policy.
-using var client = new HttpClient(new ResilienceHandler(new HttpClientHandler()))
+using var client = new HttpClient(new HttpResilienceHandler(new HttpClientHandler()))
 {
     Timeout = Timeout.InfiniteTimeSpan,
 };

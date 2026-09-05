@@ -21,11 +21,11 @@ namespace NResilience.Extensions.Internal;
 /// </remarks>
 internal sealed class ResilienceHandlerRegistry
 {
-    private readonly ConcurrentDictionary<string, WeakReference<ResilienceHandler>> _handlers = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, WeakReference<HttpResilienceHandler>> _handlers = new(StringComparer.Ordinal);
 
     /// <summary>Records the handler now serving a client, replacing the generation before it.</summary>
-    public void Track(string client, ResilienceHandler handler) =>
-        _handlers[client] = new WeakReference<ResilienceHandler>(handler);
+    public void Track(string client, HttpResilienceHandler handler) =>
+        _handlers[client] = new WeakReference<HttpResilienceHandler>(handler);
 
     /// <summary>
     ///     Every client whose handler is still alive, pruning the ones that are not.
@@ -35,12 +35,12 @@ internal sealed class ResilienceHandlerRegistry
     ///         on a request's.
     ///     </para>
     /// </summary>
-    public IEnumerable<KeyValuePair<string, ResilienceHandler>> Live()
+    public IEnumerable<KeyValuePair<string, HttpResilienceHandler>> Live()
     {
         foreach (var entry in _handlers)
         {
             if (entry.Value.TryGetTarget(out var handler))
-                yield return new KeyValuePair<string, ResilienceHandler>(entry.Key, handler);
+                yield return new KeyValuePair<string, HttpResilienceHandler>(entry.Key, handler);
             else
                 _handlers.TryRemove(entry.Key, out _);
         }

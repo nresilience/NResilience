@@ -83,7 +83,7 @@ Four behaviors are worth knowing:
 - **Only successful attempts are sampled.** A ceiling tight enough to cancel calls that would have succeeded starves its own estimator, so the policy reverts to `AttemptTimeout` rather than tightening further.
 - **The estimate is per policy instance.** The HTTP handler derives one policy per host, so each host's ceiling is measured from that host's own latency.
 
-Read the current value from `policy.Measured.AttemptCeiling`, or watch the `nresilience.attempt.timeout` histogram, which is recorded when the number moves. Both report the measured ceiling before `AttemptTimeout` clamps it, so a value above your `AttemptTimeout` is the reading that says the clamp is now what bounds the attempt.
+Read the current value from `policy.Measured.AttemptCeiling`, or watch the `nresilience.attempt.ceiling` histogram, which is recorded when the number moves. Both report the measured ceiling before `AttemptTimeout` clamps it, so a value above your `AttemptTimeout` is the reading that says the clamp is now what bounds the attempt.
 
 > [!NOTE]
 > When [hedging](hedging.md) is configured too, the ceiling is measured from at least the hedge's own quantile. A ceiling below the hedge threshold would cancel the first leg at the moment the second was due to start, and you would have bought a feature that never fires.
@@ -128,7 +128,7 @@ Note that a `Floor` at or above `AttemptTimeout` is refused at validation. That 
 
 `AttemptCeiling` measures across calls, so the estimate lives on the policy instance. If you need a bound that differs per request, publish it rather than deriving a policy per request:
 
-- `ResilienceDeadline.Begin(remaining)` with `UseAmbientDeadline` gives that request an exact deadline, resolved once as `min(Deadline, remaining)`. See [propagating the deadline](#propagate-the-deadline-across-a-hop).
+- `AmbientDeadline.Begin(remaining)` with `UseAmbientDeadline` gives that request an exact deadline, resolved once as `min(Deadline, remaining)`. See [propagating the deadline](#propagate-the-deadline-across-a-hop).
 - Deriving `policy with { Deadline = ... }` per request also works, but the latency estimate is keyed by the policy instance - so a policy built per request is permanently cold and `AttemptCeiling` silently does nothing. It fails safe, back to `AttemptTimeout`, but it fails quietly. [`NRES008`](../reference/analyzers.md#nres008) reports the cases the compiler can see.
 
 ## Propagate the deadline across a hop
@@ -152,7 +152,7 @@ var api = Resilience.Http with
 
 var options = new HttpResilienceOptions { PropagateDeadline = true };
 
-using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: transport, policy: api, options: options));
+using var client = new HttpClient(handler: new HttpResilienceHandler(innerHandler: transport, policy: api, options: options));
 using var response = await client.GetAsync(requestUri: uri, cancellationToken: cancellationToken);
 
 // X-Deadline-Ms: 3000 on the first attempt, and less on every attempt after it.
@@ -179,7 +179,7 @@ var api = Resilience.Http with { UseAmbientDeadline = true };
 
 // In an ASP.NET Core app, UseResilienceDeadline() publishes what the caller sent. Anywhere else -
 // a queue consumer reading a deadline off a message, or a test - publish it yourself.
-using var inbound = ResilienceDeadline.Begin(remaining: TimeSpan.FromMilliseconds(value: 200));
+using var inbound = AmbientDeadline.Begin(remaining: TimeSpan.FromMilliseconds(value: 200));
 ```
 <!-- endsnippet -->
 

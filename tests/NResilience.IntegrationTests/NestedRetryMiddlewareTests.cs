@@ -33,13 +33,13 @@ public sealed class NestedRetryMiddlewareTests
                 // After an await, and after the framework's own: the flag is ambient to the request
                 // rather than to a stack frame.
                 await Task.Yield();
-                await context.Response.WriteAsync(ResilienceNestedRetry.IsCallerRetrying ? "retrying" : "not");
+                await context.Response.WriteAsync(NestedRetry.IsCallerRetrying ? "retrying" : "not");
             });
         });
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
+        request.Headers.TryAddWithoutValidation(NestedRetry.Header, NestedRetry.Marker);
 
         using var response = await client.SendAsync(request);
 
@@ -52,7 +52,7 @@ public sealed class NestedRetryMiddlewareTests
         await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceNestedRetry();
-            pipeline.Run(context => context.Response.WriteAsync(ResilienceNestedRetry.IsCallerRetrying ? "retrying" : "not"));
+            pipeline.Run(context => context.Response.WriteAsync(NestedRetry.IsCallerRetrying ? "retrying" : "not"));
         });
 
         using var client = new HttpClient();
@@ -67,12 +67,12 @@ public sealed class NestedRetryMiddlewareTests
         await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceNestedRetry();
-            pipeline.Run(context => context.Response.WriteAsync(ResilienceNestedRetry.IsCallerRetrying ? "retrying" : "not"));
+            pipeline.Run(context => context.Response.WriteAsync(NestedRetry.IsCallerRetrying ? "retrying" : "not"));
         });
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, value);
+        request.Headers.TryAddWithoutValidation(NestedRetry.Header, value);
 
         using var response = await client.SendAsync(request);
 
@@ -82,7 +82,7 @@ public sealed class NestedRetryMiddlewareTests
     [Fact]
     public async Task The_marker_is_read_from_any_value_on_the_header()
     {
-        // The same question ResilienceHandler.CarriesRetryMarker asks of an outbound request. An
+        // The same question HttpResilienceHandler.CarriesRetryMarker asks of an outbound request. An
         // intermediary that appends its own empty value to a header a retrying caller really did
         // send must not turn the marker off - a presence marker does not get less true for having
         // something written after it.
@@ -96,14 +96,14 @@ public sealed class NestedRetryMiddlewareTests
         {
             pipeline.Use((context, next) =>
             {
-                context.Request.Headers[HttpResilience.NestedRetryHeader] =
-                    new StringValues([ResilienceNestedRetry.Marker, string.Empty]);
+                context.Request.Headers[NestedRetry.Header] =
+                    new StringValues([NestedRetry.Marker, string.Empty]);
 
                 return next(context);
             });
 
             pipeline.UseResilienceNestedRetry();
-            pipeline.Run(context => context.Response.WriteAsync(ResilienceNestedRetry.IsCallerRetrying ? "retrying" : "not"));
+            pipeline.Run(context => context.Response.WriteAsync(NestedRetry.IsCallerRetrying ? "retrying" : "not"));
         });
 
         using var client = new HttpClient();
@@ -117,12 +117,12 @@ public sealed class NestedRetryMiddlewareTests
         await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceNestedRetry(o => o.Header = "X-Custom-Retrying");
-            pipeline.Run(context => context.Response.WriteAsync(ResilienceNestedRetry.IsCallerRetrying ? "retrying" : "not"));
+            pipeline.Run(context => context.Response.WriteAsync(NestedRetry.IsCallerRetrying ? "retrying" : "not"));
         });
 
         using var client = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation("X-Custom-Retrying", ResilienceNestedRetry.Marker);
+        request.Headers.TryAddWithoutValidation("X-Custom-Retrying", NestedRetry.Marker);
 
         using var response = await client.SendAsync(request);
 
@@ -145,7 +145,7 @@ public sealed class NestedRetryMiddlewareTests
 
             pipeline.Run(async context =>
             {
-                using var client = new HttpClient(new ResilienceHandler(new SocketsHttpHandler(), policy))
+                using var client = new HttpClient(new HttpResilienceHandler(new SocketsHttpHandler(), policy))
                 {
                     Timeout = Timeout.InfiniteTimeSpan,
                 };
@@ -157,7 +157,7 @@ public sealed class NestedRetryMiddlewareTests
 
         using var caller = new HttpClient();
         using var request = new HttpRequestMessage(HttpMethod.Get, app.Uri);
-        request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
+        request.Headers.TryAddWithoutValidation(NestedRetry.Header, NestedRetry.Marker);
 
         using var response = await caller.SendAsync(request);
         Assert.Equal("done", await response.Content.ReadAsStringAsync());
@@ -185,7 +185,7 @@ public sealed class NestedRetryMiddlewareTests
 
             pipeline.Run(async context =>
             {
-                using var client = new HttpClient(new ResilienceHandler(new SocketsHttpHandler(), policy))
+                using var client = new HttpClient(new HttpResilienceHandler(new SocketsHttpHandler(), policy))
                 {
                     Timeout = Timeout.InfiniteTimeSpan,
                 };
@@ -209,14 +209,14 @@ public sealed class NestedRetryMiddlewareTests
         await using var app = await TestApp.StartAsync(pipeline =>
         {
             pipeline.UseResilienceNestedRetry();
-            pipeline.Run(context => context.Response.WriteAsync(ResilienceNestedRetry.IsCallerRetrying ? "retrying" : "not"));
+            pipeline.Run(context => context.Response.WriteAsync(NestedRetry.IsCallerRetrying ? "retrying" : "not"));
         });
 
         using var client = new HttpClient();
 
         using (var request = new HttpRequestMessage(HttpMethod.Get, app.Uri))
         {
-            request.Headers.TryAddWithoutValidation(HttpResilience.NestedRetryHeader, ResilienceNestedRetry.Marker);
+            request.Headers.TryAddWithoutValidation(NestedRetry.Header, NestedRetry.Marker);
             using var response = await client.SendAsync(request);
             Assert.Equal("retrying", await response.Content.ReadAsStringAsync());
         }

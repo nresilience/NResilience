@@ -30,7 +30,7 @@ internal static class GrpcCall
         foreach (var entry in headers)
         {
             if (!entry.IsBinary && string.Equals(entry.Key, NestedRetryKey, StringComparison.Ordinal)
-                                && ResilienceNestedRetry.IsMarker(entry.Value))
+                                && NestedRetry.IsMarker(entry.Value))
                 return true;
         }
 
@@ -58,7 +58,7 @@ internal static class GrpcCall
             }
         }
 
-        headers.Add(NestedRetryKey, ResilienceNestedRetry.Marker);
+        headers.Add(NestedRetryKey, NestedRetry.Marker);
         return options.WithHeaders(headers);
     }
 
@@ -84,10 +84,10 @@ internal static class GrpcCall
         return left < right ? left : right;
     }
 
-    /// <summary>The executor's ambient-deadline clamp, over the public half of <see cref="ResilienceDeadline" />.</summary>
+    /// <summary>The executor's ambient-deadline clamp, over the public half of <see cref="AmbientDeadline" />.</summary>
     internal static TimeSpan Clamp(TimeSpan configured)
     {
-        if (ResilienceDeadline.Remaining is not { } left)
+        if (AmbientDeadline.Remaining is not { } left)
             return configured;
 
         if (configured == Timeout.InfiniteTimeSpan)

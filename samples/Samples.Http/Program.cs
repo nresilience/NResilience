@@ -47,7 +47,7 @@ using (var post = new HttpRequestMessage(HttpMethod.Post, "https://orders.exampl
 
 Console.WriteLine();
 Console.WriteLine("The handler's own view, per host - what a health endpoint would report:");
-var handler = new ResilienceHandler(new FakeTransport(), Resilience.Http);
+var handler = new HttpResilienceHandler(new FakeTransport(), Resilience.Http);
 
 using (HttpClient probe = new(handler))
 {

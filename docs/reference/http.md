@@ -1,6 +1,6 @@
 ---
 title: HTTP reference
-description: Reference for ResilienceHandler, HttpResilienceOptions, and the HttpResilience utility class.
+description: Reference for HttpResilienceHandler, HttpResilienceOptions, and the HttpResilience utility class.
 order: 9
 ---
 
@@ -8,14 +8,14 @@ order: 9
 
 The HTTP components live in the `NResilience` namespace in the `NResilience` package.
 
-## `ResilienceHandler`
+## `HttpResilienceHandler`
 
-`ResilienceHandler` is a `sealed class` deriving from `DelegatingHandler`. It runs resilience policies around HTTP requests.
+`HttpResilienceHandler` is a `sealed class` deriving from `DelegatingHandler`. It runs resilience policies around HTTP requests.
 
 | Member | Description |
 | :--- | :--- |
-| `ResilienceHandler(Resilience? policy = null, HttpResilienceOptions? options = null)` | Creates a handler where the inner handler is assigned later (e.g., by a client factory). |
-| `ResilienceHandler(HttpMessageHandler innerHandler, Resilience? policy = null, HttpResilienceOptions? options = null)` | Creates a handler that wraps a specific transport handler. |
+| `HttpResilienceHandler(Resilience? policy = null, HttpResilienceOptions? options = null)` | Creates a handler where the inner handler is assigned later (e.g., by a client factory). |
+| `HttpResilienceHandler(HttpMessageHandler innerHandler, Resilience? policy = null, HttpResilienceOptions? options = null)` | Creates a handler that wraps a specific transport handler. |
 | `Policy` | The policy executed by the handler, before per-host scoping is applied. Defaults to `Resilience.Http`. |
 | `Options` | The `HttpResilienceOptions` used to configure the handler. |
 | `BreakersByHost()` | Returns a snapshot of the circuit breakers currently managed by the handler, keyed by host. |
@@ -26,7 +26,7 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 
 ## `HttpResilienceOptions`
 
-`HttpResilienceOptions` is a `sealed class` used to configure the `ResilienceHandler`. It is mutable to allow configuration via options callbacks.
+`HttpResilienceOptions` is a `sealed class` used to configure the `HttpResilienceHandler`. It is mutable to allow configuration via options callbacks.
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
@@ -38,26 +38,25 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `MaximumHosts` | `1024` | The number of hosts the per-host registry keeps. At least 1; the least-recently-seen hosts are dropped past the cap. There is no unbounded mode - `int.MaxValue` is as close as it gets. |
 | `DetectNestedRetries` | `true` | Whether the nested-retry header is added to requests and whether nesting is reported. |
 | `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. The gRPC switch of the same name defaults to `true`, because `grpc-timeout` is a protocol field rather than a convention. |
-| `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `ResilienceDeadline.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
+| `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `AmbientDeadline.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
 
 | Method | Description |
 | :--- | :--- |
-| `Validate()` | Throws `ResilienceConfigurationException` listing every problem at once. `ResilienceHandler`'s constructor calls it beside the policy's own `Validate()`, so a bad header name or bad `BreakerSettings` fails there rather than from the middle of a request. `MaximumHosts` below 1 is a problem it reports. |
+| `Validate()` | Throws `ResilienceConfigurationException` listing every problem at once. `HttpResilienceHandler`'s constructor calls it beside the policy's own `Validate()`, so a bad header name or bad `BreakerSettings` fails there rather than from the middle of a request. `MaximumHosts` below 1 is a problem it reports. |
 | `Validated()` | Runs `Validate()` and returns the options, so a bad configuration throws where it is written. |
 
 ## `HttpResilience`
 
-`HttpResilience` is a `static class` providing utility methods and constants for HTTP resilience.
+`HttpResilience` is a `static class` providing utility methods and constants for HTTP resilience. The two headers the integration reads and writes are `AmbientDeadline.Header` and [`NestedRetry.Header`](resilience.md#nestedretry), each declared beside the ambient value it carries.
 
 | Member | Description |
 | :--- | :--- |
-| `CreateClient(policy = null, options = null, innerHandler = null)` | Creates an `HttpClient` with a `ResilienceHandler` in its pipeline. Disposing the client also disposes the handler chain. |
+| `CreateClient(policy = null, options = null, innerHandler = null)` | Creates an `HttpClient` with an `HttpResilienceHandler` in its pipeline. Disposing the client also disposes the handler chain. |
 | `Repeatable` | An `HttpRequestOptionsKey<bool>` used to override the idempotency decision for a specific request. |
-| `NestedRetryHeader` | The constant value for the nested-retry header: `"X-NResilience-Retrying"`. |
 
-## `ResilienceHttpRequestExtensions`
+## `HttpRequestExtensions`
 
-`ResilienceHttpRequestExtensions` is a `static class` of per-request helpers over `HttpResilience`'s option keys. Both return the same request, so they compose in an initializer. See [Idempotency](../http/idempotency.md#mark-a-request-as-repeatable).
+`HttpRequestExtensions` is a `static class` of per-request helpers over `HttpResilience`'s option keys. Both return the same request, so they compose in an initializer. See [Idempotency](../http/idempotency.md#mark-a-request-as-repeatable).
 
 | Member | Description |
 | :--- | :--- |

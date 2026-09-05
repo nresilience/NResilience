@@ -174,9 +174,9 @@ internal sealed class LogListener
 
             // Raised on change rather than per call, so this is already one line per movement of the
             // estimate. No flood control for the same reason the breaker transitions need none.
-            case CallEventKind.AttemptTimeoutAdapted:
-                if (Level(Log.Ids.AttemptTimeoutAdapted, e) is { } ceiling)
-                    Log.AttemptTimeoutAdapted(_logger, ceiling, policy, Ms(e.Delay));
+            case CallEventKind.AttemptCeilingAdapted:
+                if (Level(Log.Ids.AttemptCeilingAdapted, e) is { } ceiling)
+                    Log.AttemptCeilingAdapted(_logger, ceiling, policy, Ms(e.Delay));
 
                 break;
 
@@ -309,7 +309,7 @@ internal sealed class LogListener
         var level = _options.Profile switch
         {
             ResilienceLogProfile.Verbose => Verbose(id.Id),
-            ResilienceLogProfile.Default => Ordinary(id.Id),
+            ResilienceLogProfile.Normal => Ordinary(id.Id),
             _ => LogLevel.None,
         };
 

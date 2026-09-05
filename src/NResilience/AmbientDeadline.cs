@@ -22,14 +22,14 @@ namespace NResilience;
 /// <example>
 ///     <code>
 /// // Inbound: the deadline a caller sent us, for the length of this request.
-/// using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(200));
+/// using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(200));
 /// 
 /// // Anything running inside the scope with UseAmbientDeadline set is bounded by whichever of the
 /// // two deadlines is tighter.
 /// var policy = Resilience.Default with { UseAmbientDeadline = true };
 /// </code>
 /// </example>
-public static class ResilienceDeadline
+public static class AmbientDeadline
 {
     /// <summary>
     ///     The header the HTTP integration reads and writes by default: whole milliseconds left, as a
@@ -61,7 +61,7 @@ public static class ResilienceDeadline
     ///     publishing an unbounded one: "no bound" and "no deadline" are the same statement, and a
     ///     nested call should not be told a caller is waiting forever.
     /// </remarks>
-    public static DeadlineScope Begin(TimeSpan remaining, TimeProvider? time = null)
+    public static Scope Begin(TimeSpan remaining, TimeProvider? time = null)
     {
         var previous = Current.Value;
 
@@ -69,7 +69,7 @@ public static class ResilienceDeadline
             ? null
             : new Ambient(remaining, time ?? TimeProvider.System);
 
-        return new DeadlineScope(previous);
+        return new Scope(previous);
     }
 
     /// <summary>
@@ -150,11 +150,11 @@ public static class ResilienceDeadline
     ///     scopes nest on one context - a request handler that hands part of its own budget to a
     ///     sub-operation.
     /// </remarks>
-    public readonly struct DeadlineScope : IDisposable
+    public readonly struct Scope : IDisposable
     {
         private readonly Ambient? _previous;
 
-        internal DeadlineScope(Ambient? previous)
+        internal Scope(Ambient? previous)
         {
             _previous = previous;
         }

@@ -122,7 +122,7 @@ public sealed class HttpResilienceOptions
 
     /// <summary>
     ///     The header <see cref="PropagateDeadline" /> writes. Defaults to
-    ///     <see cref="ResilienceDeadline.Header" />, which is what the inbound half reads.
+    ///     <see cref="AmbientDeadline.Header" />, which is what the inbound half reads.
     /// </summary>
     /// <remarks>
     ///     There is no standard for this on plain HTTP, so the name is yours to change - one service
@@ -130,10 +130,10 @@ public sealed class HttpResilienceOptions
     ///     format carries a unit suffix rather than a bare count of milliseconds, and the gRPC client
     ///     stack already propagates its own deadlines from <c>CallOptions.Deadline</c>.
     /// </remarks>
-    public string DeadlineHeader { get; set; } = ResilienceDeadline.Header;
+    public string DeadlineHeader { get; set; } = AmbientDeadline.Header;
 
     /// <summary>
-    ///     Whether the handler stamps <see cref="HttpResilience.NestedRetryHeader" /> on outbound
+    ///     Whether the handler stamps <see cref="NestedRetry.Header" /> on outbound
     ///     requests and reports nesting it detects. On by default; it costs one header on a request
     ///     that can be retried.
     /// </summary>
@@ -153,7 +153,7 @@ public sealed class HttpResilienceOptions
 
     /// <summary>
     ///     Checks the options and throws <see cref="ResilienceConfigurationException" /> listing every
-    ///     problem at once. Called for you by <see cref="ResilienceHandler" />'s constructor, beside the
+    ///     problem at once. Called for you by <see cref="HttpResilienceHandler" />'s constructor, beside the
     ///     policy's own <see cref="Resilience.Validate" />.
     /// </summary>
     /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
@@ -168,7 +168,7 @@ public sealed class HttpResilienceOptions
         {
             problems.Add(
                 "DeadlineHeader must not be empty; it is the name of a header. " +
-                $"Leave it alone for the default of \"{ResilienceDeadline.Header}\", or set PropagateDeadline to false to send none.");
+                $"Leave it alone for the default of \"{AmbientDeadline.Header}\", or set PropagateDeadline to false to send none.");
         }
 
         // Eagerly, rather than on the first request to the first host: the per-host breakers are

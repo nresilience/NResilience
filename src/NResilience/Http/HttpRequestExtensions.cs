@@ -3,7 +3,7 @@ namespace NResilience;
 /// <summary>
 ///     Per-request helpers over <see cref="HttpResilience" />'s option keys.
 /// </summary>
-public static class ResilienceHttpRequestExtensions
+public static class HttpRequestExtensions
 {
     /// <summary>The IETF draft header most services that deduplicate use. A draft, not a standard.</summary>
     private const string DefaultIdempotencyHeader = "Idempotency-Key";

@@ -157,7 +157,7 @@ public sealed class MetricsTests
         }
 
         var recorded = recording.Measurements
-            .Where(m => m.Instrument == "nresilience.attempt.timeout" && Equals(m.Tags["nresilience.policy"], "t-ceiling"))
+            .Where(m => m.Instrument == "nresilience.attempt.ceiling" && Equals(m.Tags["nresilience.policy"], "t-ceiling"))
             .ToList();
 
         // Once, when it moved - not forty times, once per attempt.
@@ -245,7 +245,7 @@ public sealed class MetricsTests
             ++calls < 2 ? Task.FromException<int>(new IOException("flaky")) : Task.FromResult(1));
 
         Assert.Equal("succeeded", activity.GetTagItem("nresilience.outcome"));
-        Assert.Equal(2, activity.GetTagItem("nresilience.attempts"));
+        Assert.Equal(2, activity.GetTagItem("nresilience.attempt"));
         Assert.Equal(2, activity.Events.Count(e => e.Name == "nresilience.attempt"));
         Assert.Single(activity.Events, e => e.Name == "nresilience.retrying");
     }

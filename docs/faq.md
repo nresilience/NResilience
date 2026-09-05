@@ -20,7 +20,7 @@ The result type is a property of the call, not the policy. A single policy can h
 Total attempts removes ambiguity: `Attempts = 1` means no retry, which eliminates the off-by-one errors common in retry-count configurations.
 
 ### Is there a synchronous API?
-No. A retry loop that blocks holds a thread through every backoff delay, and offering both sync and async APIs would either duplicate the engine or risk deadlocks. So `ResilienceHandler.Send` and `ResilienceInterceptor.BlockingUnaryCall` throw `NotSupportedException` rather than passing the call through unprotected.
+No. A retry loop that blocks holds a thread through every backoff delay, and offering both sync and async APIs would either duplicate the engine or risk deadlocks. So `HttpResilienceHandler.Send` and `ResilienceInterceptor.BlockingUnaryCall` throw `NotSupportedException` rather than passing the call through unprotected.
 
 ### Where is gRPC?
 In the separate `NResilience.Grpc` package: `AddGrpcResilience()` on the builder that `AddGrpcClient<T>()` returns. See [gRPC](grpc/index.md).

@@ -4,7 +4,7 @@ using System.Threading.RateLimiting;
 namespace NResilience.Extensions.Internal;
 
 /// <summary>
-///     Acquires one permit per attempt, inside <see cref="ResilienceHandler" />.
+///     Acquires one permit per attempt, inside <see cref="HttpResilienceHandler" />.
 ///     <para>
 ///         Its position in the chain is the whole design. <c>HttpCall</c> sends through the handler inner to
 ///         the resilience handler once per attempt, so a limiter installed there is asked for a permit on

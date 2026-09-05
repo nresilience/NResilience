@@ -121,15 +121,15 @@ public static class ResilienceTelemetry
     ///         dependency has slowed beyond the point where measurement is useful.
     ///     </para>
     /// </summary>
-    private static readonly Histogram<double> AttemptTimeout = Meter.CreateHistogram<double>(
-        "nresilience.attempt.timeout",
+    private static readonly Histogram<double> AttemptCeiling = Meter.CreateHistogram<double>(
+        "nresilience.attempt.ceiling",
         "s",
         "The measured per-attempt ceiling, recorded when it changes. Watching this rise is watching the dependency get slower before anything has failed.");
 
     /// <summary>
     ///     The measured backoff base, recorded when it changes.
     ///     <para>
-    ///         The companion to <c>nresilience.attempt.timeout</c>, and read the same way: the gap
+    ///         The companion to <c>nresilience.attempt.ceiling</c>, and read the same way: the gap
     ///         between this and the configured transient base is how wrong the constant was. A base
     ///         pinned to <see cref="MeasuredBase.Spread" />'s clamp stops moving, and that silence is
     ///         itself the signal that the band wants widening.
@@ -252,11 +252,11 @@ public static class ResilienceTelemetry
                 Annotate(e, "nresilience.hedge_started");
                 break;
 
-            case CallEventKind.AttemptTimeoutAdapted:
+            case CallEventKind.AttemptCeilingAdapted:
                 if (e.Delay is { } ceiling)
-                    AttemptTimeout.Record(ceiling.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
+                    AttemptCeiling.Record(ceiling.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
 
-                Annotate(e, "nresilience.attempt_timeout_adapted");
+                Annotate(e, "nresilience.attempt_ceiling_adapted");
                 break;
 
             case CallEventKind.BackoffBaseAdapted:
@@ -312,7 +312,7 @@ public static class ResilienceTelemetry
         {
             activity.SetTag("nresilience.policy", policy);
             activity.SetTag("nresilience.outcome", outcome.Value);
-            activity.SetTag("nresilience.attempts", e.AttemptNumber);
+            activity.SetTag("nresilience.attempt", e.AttemptNumber);
 
             if (e.Kind != CallEventKind.Succeeded)
                 activity.SetStatus(ActivityStatusCode.Error, e.Exception?.Message);

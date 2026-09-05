@@ -137,10 +137,10 @@ public static class ResilienceLogging
         return logging.ToUpperInvariant() switch
         {
             "OFF" => ResilienceLogProfile.Off,
-            "DEFAULT" => ResilienceLogProfile.Default,
+            "NORMAL" => ResilienceLogProfile.Normal,
             "VERBOSE" => ResilienceLogProfile.Verbose,
             _ => throw new ResilienceConfigurationException(
-                [$"Logging must be one of Off, Default or Verbose; it is \"{logging}\"."]),
+                [$"Logging must be one of Off, Normal or Verbose; it is \"{logging}\"."]),
         };
     }
 

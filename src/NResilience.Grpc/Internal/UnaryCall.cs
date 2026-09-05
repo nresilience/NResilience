@@ -76,7 +76,7 @@ internal sealed class UnaryCall<TRequest, TResponse>
         _time = policy.Time;
 
         // The same clamp the executor is about to apply, taken here as well because the wire deadline
-        // has to be computed before the executor has started. ResilienceDeadline.Remaining is the
+        // has to be computed before the executor has started. AmbientDeadline.Remaining is the
         // public half of what the executor reads.
         _deadline = GrpcCall.DeadlineFor(policy);
 

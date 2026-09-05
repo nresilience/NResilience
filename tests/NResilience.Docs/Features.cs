@@ -284,7 +284,7 @@ public sealed class Features
 
         // In an ASP.NET Core app, UseResilienceDeadline() publishes what the caller sent. Anywhere else -
         // a queue consumer reading a deadline off a message, or a test - publish it yourself.
-        using var inbound = ResilienceDeadline.Begin(remaining: TimeSpan.FromMilliseconds(value: 200));
+        using var inbound = AmbientDeadline.Begin(remaining: TimeSpan.FromMilliseconds(value: 200));
         // </snippet:deadline-inherit>
 
         var calls = Sequence.For<int>(time: time).Delays(delay: TimeSpan.FromSeconds(value: 30)).Returns(result: 1);
@@ -322,13 +322,13 @@ public sealed class Features
 
         var options = new HttpResilienceOptions { PropagateDeadline = true };
 
-        using var client = new HttpClient(handler: new ResilienceHandler(innerHandler: transport, policy: api, options: options));
+        using var client = new HttpClient(handler: new HttpResilienceHandler(innerHandler: transport, policy: api, options: options));
         using var response = await client.GetAsync(requestUri: uri, cancellationToken: cancellationToken);
 
         // X-Deadline-Ms: 3000 on the first attempt, and less on every attempt after it.
         // </snippet:deadline-propagate>
 
-        Assert.True(condition: transport.Requests[index: 0].Headers.TryGetValues(name: ResilienceDeadline.Header, out var sent));
+        Assert.True(condition: transport.Requests[index: 0].Headers.TryGetValues(name: AmbientDeadline.Header, out var sent));
         Assert.Equal(expected: "3000", actual: sent.Single());
     }
 
