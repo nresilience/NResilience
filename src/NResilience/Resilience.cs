@@ -63,10 +63,7 @@ public sealed partial record Resilience
     ///     backoff with full jitter, and <see cref="Classifier.Default" /> - which does not retry
     ///     exceptions it does not recognize.
     /// </summary>
-    public static Resilience Default { get; } = new()
-    {
-        Budget = RetryBudget.Automatic,
-    };
+    public static Resilience Default { get; } = new();
 
     /// <summary>
     ///     <see cref="Default" /> with <see cref="Classifier.Http" />, which knows that a 429 is
@@ -156,10 +153,19 @@ public sealed partial record Resilience
     public Breaker? Breaker { get; init; }
 
     /// <summary>
-    ///     A <c>null</c> value or <see cref="RetryBudget.None" /> disables the retry budget.
-    ///     <see cref="RetryBudget.Automatic" />, used by presets, creates a budget private to this policy
-    ///     instance. Use <see cref="RetryBudget.Shared(string, double, int)" /> or a shared instance to
-    ///     share a budget across policies.
+    ///     The retry budget, which bounds retries as a fraction of traffic. Three values, and the
+    ///     default is the middle one:
+    ///     <list type="bullet">
+    ///         <item>
+    ///             <see cref="RetryBudget.Automatic" /> - the default - is a budget private to this
+    ///             policy instance, or to each key when the policy is scoped.
+    ///         </item>
+    ///         <item><see cref="RetryBudget.None" /> is no budget at all.</item>
+    ///         <item>
+    ///             Any other instance is that budget, shared wherever the instance is shared. Use
+    ///             <see cref="RetryBudget.Shared(string, double, int)" /> to share one by name.
+    ///         </item>
+    ///     </list>
     ///     <para>
     ///         Retry budgets are not process-wide singletons by default. This prevents a failure
     ///         storm against one dependency from throttling retries for another.
@@ -170,7 +176,7 @@ public sealed partial record Resilience
     ///     <c>ConditionalWeakTable</c> keyed by reference identity. This ensures that lazily
     ///     created budgets do not affect record equality.
     /// </remarks>
-    public RetryBudget? Budget { get; init; }
+    public RetryBudget Budget { get; init; } = RetryBudget.Automatic;
 
     /// <summary>
     ///     Runs before every attempt, including the first. The place to build a fresh request or
@@ -334,72 +340,19 @@ public sealed partial record Resilience
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
     /// <summary>
-    ///     The current measured ceiling, including the floor and hedge floor, before <see cref="AttemptTimeout" />
-    ///     and the deadline clamp it. Returns <c>null</c> when <see cref="AttemptCeiling" /> is not configured,
-    ///     or when the estimate is still cold.
+    ///     What this policy is currently measuring: the attempt ceiling, the backoff base and the hedge
+    ///     threshold, each <c>null</c> until its feature is configured and its estimate is warm.
     ///     <para>
-    ///         This value is what the attempt gets whenever it is below <see cref="AttemptTimeout" />.
-    ///         A value above <see cref="AttemptTimeout" /> indicates that the clamp is currently bounding the attempt.
-    ///     </para>
-    ///     <para>
-    ///         This is the primary value to monitor on a dashboard. Reading it validates the policy when
-    ///         a ceiling is configured, just as executing it does.
+    ///         Readings, not configuration. The configuration that produces them is
+    ///         <see cref="AttemptCeiling" />, <see cref="NResilience.Backoff.MeasuredBase" /> and
+    ///         <see cref="Hedge" />. Reading one validates the policy, exactly as executing it does.
     ///     </para>
     /// </summary>
     /// <remarks>
-    ///     The estimate is private to the policy instance. The HTTP handler derives one policy per host,
-    ///     so each host's ceiling is measured independently.
-    ///     <para>
-    ///         Validation is a side effect of looking the estimate up, so it happens only on the path
-    ///         that looks one up: with <see cref="AttemptCeiling" /> unset this returns <c>null</c>
-    ///         without validating anything.
-    ///     </para>
+    ///     The estimates are private to the policy instance. The HTTP handler derives one policy per
+    ///     host, so each host is measured independently.
     /// </remarks>
-    /// <exception cref="ResilienceConfigurationException">
-    ///     A ceiling is configured and the policy cannot be executed.
-    /// </exception>
-    public TimeSpan? MeasuredAttemptCeiling => Measured();
-
-    /// <summary>
-    ///     The base delay the next transient retry would wait, when <see cref="NResilience.Backoff.MeasuredBase" />
-    ///     is configured: the measured baseline, after <see cref="MeasuredBase.Spread" /> has clamped it
-    ///     around <see cref="NResilience.Backoff.TransientBase" />. Returns <c>null</c> when no base is
-    ///     being measured, or when the estimate is still cold and the configured constant is what a
-    ///     retry would use.
-    ///     <para>
-    ///         The jitter and the growth factor are applied on top of this per attempt, so it is the
-    ///         first retry's delay before randomness rather than any single delay a call served.
-    ///     </para>
-    ///     <para>
-    ///         The value to put on a dashboard beside the configured base: the gap between the two is
-    ///         how wrong the constant was. Reading it validates the policy when a base is being
-    ///         measured, just as executing it does.
-    ///     </para>
-    /// </summary>
-    /// <remarks>
-    ///     The estimate is private to the policy instance. The HTTP handler derives one policy per host,
-    ///     so each host's base is measured independently.
-    ///     <para>
-    ///         Validation is a side effect of looking the estimate up, so it happens only on the path
-    ///         that looks one up: with <see cref="NResilience.Backoff.MeasuredBase" /> unset this returns
-    ///         <c>null</c> without validating anything.
-    ///     </para>
-    /// </remarks>
-    /// <exception cref="ResilienceConfigurationException">
-    ///     A base is being measured and the policy cannot be executed.
-    /// </exception>
-    public TimeSpan? MeasuredBackoffBase
-    {
-        get
-        {
-            if (Backoff.MeasuredBase is not { } measured)
-                return null;
-
-            return ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is { } normal
-                ? measured.BaseFor(Backoff.TransientBase, normal)
-                : null;
-        }
-    }
+    public MeasuredValues Measured => new(this);
 
     /// <summary>
     ///     True when the policy imposes nothing at all, so a call can hand back the callback's own
@@ -437,11 +390,11 @@ public sealed partial record Resilience
         && Breaker is null
 
         // Shared budgets are funded by all policies, including those with a single attempt. Only
-        // <c>null</c>, <see cref="RetryBudget.None" />, or <see cref="RetryBudget.Automatic" /> are free
-        // of cost for single-attempt policies.
+        // the two markers - <see cref="RetryBudget.None" /> and <see cref="RetryBudget.Automatic" /> -
+        // are free of cost for single-attempt policies.
         //
         // The automatic marker is free because budgets are only materialized when <c>Attempts > 1</c>.
-        && Budget is null or { IsNone: true } or { IsAutomatic: true };
+        && Budget is { IsNone: true } or { IsAutomatic: true };
 
     /// <summary>
     ///     Checks the policy and throws <see cref="ResilienceConfigurationException" /> listing every

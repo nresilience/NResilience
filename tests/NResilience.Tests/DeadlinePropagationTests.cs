@@ -117,7 +117,7 @@ public sealed class DeadlinePropagationTests
             Deadline = TimeSpan.FromSeconds(30),
             AttemptTimeout = Timeout.InfiniteTimeSpan,
             Backoff = Backoff.None,
-            Budget = null,
+            Budget = RetryBudget.None,
             UseAmbientDeadline = true,
             Classifier = Classifier.Http,
             Time = time,

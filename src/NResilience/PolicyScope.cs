@@ -175,11 +175,11 @@ public sealed class PolicyScope<TKey>
                 if (settings.ConfiguredTime is null)
                     settings = settings with { Time = policy.Time };
 
-                Breaker = new Breaker(settings) { Name = name };
+                Breaker = new Breaker(settings with { Name = name });
                 scoped = scoped with { Breaker = Breaker };
             }
 
-            if (policy.Budget is null or { IsAutomatic: true })
+            if (policy.Budget.IsAutomatic)
             {
                 Budget = RetryBudget.Of(time: policy.Time);
                 scoped = scoped with { Budget = Budget };

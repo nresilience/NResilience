@@ -169,7 +169,7 @@ public sealed class ResilienceExceptionHandlerTests
             // The preset's automatic budget would refuse the retries and its breaker would refuse
             // the call outright - both before the deadline had a say, and the test is about what
             // the deadline reports.
-            Budget = null,
+            Budget = RetryBudget.None,
             Breaker = null,
         };
 

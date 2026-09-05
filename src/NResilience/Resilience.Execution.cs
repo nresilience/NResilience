@@ -1348,7 +1348,7 @@ public sealed partial record Resilience
     /// </remarks>
     private TimeSpan Ceiling(int attemptNumber)
     {
-        if (Measured() is not { } measured)
+        if (ReadCeiling() is not { } measured)
             return AttemptTimeout;
 
         // InfiniteTimeSpan is negative, so it cannot take part in the comparison - a policy that set no
@@ -1369,7 +1369,7 @@ public sealed partial record Resilience
     ///     still cold, which is the case that leaves the policy behaving exactly as it does today.
     /// </summary>
     /// <returns>The ceiling the measurement asks for, or null.</returns>
-    private TimeSpan? Measured()
+    internal TimeSpan? ReadCeiling()
     {
         // Both from ExecutionState rather than the settings off `this` and the window from the table:
         // the AttemptCeiling property recomputes its default on every read, and this is the read the
@@ -1405,6 +1405,42 @@ public sealed partial record Resilience
         }
 
         return measured;
+    }
+
+    /// <summary>
+    ///     The base delay the next transient retry would wait, after the spread clamp. Null when no base
+    ///     is being measured or the estimate is still cold.
+    /// </summary>
+    /// <returns>The measured base, or null.</returns>
+    internal TimeSpan? ReadBackoffBase()
+    {
+        if (Backoff.MeasuredBase is not { } measured)
+            return null;
+
+        return ExecutionState.BackoffBaseFor(this)?.Threshold(measured.MinimumSamples) is { } normal
+            ? measured.BaseFor(Backoff.TransientBase, normal)
+            : null;
+    }
+
+    /// <summary>
+    ///     The latency a hedge arms at, floored by <see cref="NResilience.Hedge.MinimumDelay" />. Null
+    ///     when the policy does not hedge or the estimate has too few samples to fire on.
+    /// </summary>
+    /// <returns>The threshold, or null.</returns>
+    /// <remarks>
+    ///     The same two steps the hedged loop takes before it arms a delay, and deliberately only those
+    ///     two: the gates that can still refuse - the breaker, the win rate, the concurrency ceiling and
+    ///     the remaining deadline - are per call, and a reading is not a call.
+    /// </remarks>
+    internal TimeSpan? ReadHedgeThreshold()
+    {
+        if (Hedge is not { } hedge)
+            return null;
+
+        if (ExecutionState.LatencyFor(this)?.Threshold(hedge.MinimumSamples) is not { } threshold)
+            return null;
+
+        return threshold < hedge.MinimumDelay ? hedge.MinimumDelay : threshold;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

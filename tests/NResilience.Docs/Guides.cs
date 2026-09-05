@@ -197,13 +197,11 @@ public sealed class Guides
         // must not trip calls to search, and here that is a property of the code.
         public Breaker Payments { get; } = new(settings: new BreakerSettings
         {
+            Name = "payments",
             ConsecutiveFailures = 5,
             SlowCalls = SlowCalls.Above(multiple: 3), // a brownout is 3x normal, whatever normal is
             BreakDuration = TimeSpan.FromSeconds(value: 15),
-        })
-        {
-            Name = "payments",
-        };
+        });
 
         public RetryBudget PaymentsBudget { get; } = RetryBudget.Shared(name: "payments");
 

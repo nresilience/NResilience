@@ -140,7 +140,7 @@ public sealed class DependencyInjectionDocs
             .Build();
 
         var services = new ServiceCollection();
-        var shared = new Breaker { Name = "payments" };
+        var shared = Breaker.Of(name: "payments");
 
         // <snippet:di-configure-callback>
         // Runs last, after the section and after the live objects are re-attached. A classifier is
@@ -248,8 +248,8 @@ public sealed class DependencyInjectionDocs
     ///     per call and can never open. NRES005 says so at build time - including in this project,
     ///     which is analyzed exactly as a consumer's would be.
     /// </summary>
-    private static readonly Breaker Api = new() { Name = "api" };
+    private static readonly Breaker Api = Breaker.Of(name: "api");
 
     /// <summary>A breaker held the way a hand-built policy holds one, which DI cannot find on its own.</summary>
-    private static readonly Breaker Payments = new() { Name = "payments" };
+    private static readonly Breaker Payments = Breaker.Of(name: "payments");
 }

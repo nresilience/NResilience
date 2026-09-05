@@ -188,7 +188,8 @@ public static class ResilienceLogging
 
         text.Append(policy.Budget switch
         {
-            null => ", automatic budget",
+            { IsNone: true } => ", no budget",
+            { IsAutomatic: true } => ", automatic budget",
             { Name: { } shared } => $", budget shared as \"{shared}\"",
             _ => ", own budget",
         });

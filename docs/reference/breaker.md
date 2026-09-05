@@ -11,7 +11,8 @@ The `Breaker` is a `sealed class` implementing the circuit breaker pattern. It i
 | Member | Description |
 | :--- | :--- |
 | `Breaker(BreakerSettings? settings = null)` | Creates a new breaker. This constructor validates the settings and throws a `ResilienceConfigurationException` if they are invalid. |
-| `Name` | An `init`-only property used for diagnostics and health endpoints. |
+| `Breaker.Of(int consecutiveFailures = 5, TimeSpan? breakDuration = null, string? name = null)` | The breaker most people mean, in one call: trip after so many failures in a row, break for so long, under a name. Everything else lives in `BreakerSettings`. A `breakDuration` above the two-minute default `MaximumBreakDuration` raises that ceiling to match. |
+| `Name` | The name from `Settings.Name`, used in diagnostics and health endpoints. Read-only: set it on the settings. |
 | `Settings` | The `BreakerSettings` used to configure the breaker. |
 | `State` | The current state of the breaker. If a breaker is open but the break duration has elapsed, it reports `HalfOpen` because the next call will be treated as a probe; if it is recovering and its ramp has run out, it reports `Closed` for the same reason. Reading this property does not consume a probe slot. |
 | `OpenedAt` | The timestamp of when the breaker last opened, or `null` if it is currently closed. A recovering breaker still reports this timestamp, as the ramp is a continuation of the previous open state. |
@@ -40,6 +41,7 @@ The `BreakerState` enum defines the breaker's states:
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
+| `Name` | `null` | A name for the breaker, used in diagnostics and health endpoints. Part of the settings, so it joins their equality: two breakers named differently are differently configured. |
 | `Adaptive` | `true` | Whether the breaker measures the dependency and trips on what it measures. `false` turns off both relative trips - `SlowCalls` and `Failures` - with a single setting, leaving `ConsecutiveFailures` and any configured absolute rates. Setting it `false` alongside a configured `SlowCalls` or `Failures` results in an error. `Recovery` is unaffected. |
 | `ConsecutiveFailures` | 5 | The number of consecutive failures required to trip the breaker. |
 | `FailureRatio` | `null` | An optional rate-based trip threshold in the range (0, 1]. This is evaluated alongside the consecutive failure counter. |

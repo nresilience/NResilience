@@ -186,7 +186,7 @@ public sealed class TestingDocs
         var cancellationToken = TestContext.Current.CancellationToken;
         var orders = new OrderService();
 
-        var policy = Resilience.Default with { Attempts = 3, Backoff = Backoff.None, Budget = null };
+        var policy = Resilience.Default with { Attempts = 3, Backoff = Backoff.None, Budget = RetryBudget.None };
 
         // <snippet:chaos-callback>
         // One call in ten fails and one in five is slow. Chaos wraps the callback rather than the
@@ -216,7 +216,7 @@ public sealed class TestingDocs
         var orders = new OrderService();
         var tenant = "acme";
 
-        var policy = Resilience.Default with { Attempts = 3, Backoff = Backoff.None, Budget = null };
+        var policy = Resilience.Default with { Attempts = 3, Backoff = Backoff.None, Budget = RetryBudget.None };
 
         // <snippet:chaos-deterministic>
         // Seed fixes the random stream, so a test that asserts how many calls were injected is

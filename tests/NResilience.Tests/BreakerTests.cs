@@ -468,6 +468,58 @@ public sealed class BreakerTests
         Assert.Equal(4, problem.Problems.Count);
     }
 
+    /// <summary>
+    ///     The 90% case in one call, mirroring <c>RetryBudget.Of</c>. Everything it does not name is left
+    ///     at the settings' own defaults, so <c>Of</c> is a shorthand rather than a second configuration.
+    /// </summary>
+    [Fact]
+    public void Of_builds_the_breaker_most_people_mean()
+    {
+        var breaker = Breaker.Of(consecutiveFailures: 3, breakDuration: TimeSpan.FromSeconds(5), name: "orders");
+
+        Assert.Equal(3, breaker.Settings.ConsecutiveFailures);
+        Assert.Equal(TimeSpan.FromSeconds(5), breaker.Settings.BreakDuration);
+        Assert.Equal("orders", breaker.Name);
+        Assert.Equal("orders", breaker.Settings.Name);
+
+        // The relative trips the defaults turn on are still on: Of names three things, not four.
+        Assert.NotNull(breaker.Settings.SlowCalls);
+        Assert.NotNull(breaker.Settings.Failures);
+
+        var bare = Breaker.Of();
+        Assert.Equal(new BreakerSettings().ConsecutiveFailures, bare.Settings.ConsecutiveFailures);
+        Assert.Equal(new BreakerSettings().BreakDuration, bare.Settings.BreakDuration);
+        Assert.Null(bare.Name);
+    }
+
+    /// <summary>
+    ///     A break longer than the default two-minute ceiling raises the ceiling to match rather than
+    ///     failing validation. A shorthand that refuses its own argument would be a worse shorthand than
+    ///     none.
+    /// </summary>
+    [Fact]
+    public void Of_raises_the_maximum_to_fit_a_long_break()
+    {
+        var breaker = Breaker.Of(breakDuration: TimeSpan.FromMinutes(10));
+
+        Assert.Equal(TimeSpan.FromMinutes(10), breaker.Settings.BreakDuration);
+        Assert.Equal(TimeSpan.FromMinutes(10), breaker.Settings.MaximumBreakDuration);
+    }
+
+    /// <summary>
+    ///     The name is part of the settings, so it joins their equality: two breakers named differently
+    ///     are differently configured, which is what a name that reaches telemetry should be.
+    /// </summary>
+    [Fact]
+    public void The_name_is_part_of_the_settings_and_of_their_equality()
+    {
+        var settings = new BreakerSettings { Name = "orders" };
+
+        Assert.Equal(settings, settings with { Name = "orders" });
+        Assert.NotEqual(settings, settings with { Name = "search" });
+        Assert.Equal("orders", new Breaker(settings).Name);
+    }
+
     // ---- Scope ----
 
     [Fact]

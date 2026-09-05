@@ -311,7 +311,7 @@ public sealed class BackoffOptions
     ///     the documented behavior. Jitter on its own is a modifier rather than a reason to rebuild, so
     ///     a section naming only <see cref="Jitter" /> leaves a Constant curve constant.
     /// </remarks>
-    public Backoff ToBackoff(Backoff baseline)
+    internal Backoff ToBackoff(Backoff baseline)
     {
         if (!HasCurve)
             return Jitter is { } only ? baseline with { Jitter = only } : baseline;
@@ -369,7 +369,7 @@ public sealed class MeasuredBaseOptions
     /// <summary>Converts the options to a <see cref="NResilience.MeasuredBase" /> value, using defaults for any unset properties.</summary>
     /// <returns>The configuration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which is the shape an off switch would take.</exception>
-    public MeasuredBase ToMeasuredBase()
+    internal MeasuredBase ToMeasuredBase()
     {
         if (Multiple is 0)
         {
@@ -446,7 +446,7 @@ public sealed class BudgetOptions
     /// </param>
     /// <returns>The budget, or null when the section named nothing and the base policy's should stand.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Fraction" /> is zero, which used to be the off switch.</exception>
-    public RetryBudget? ToBudget(TimeProvider? time = null)
+    internal RetryBudget? ToBudget(TimeProvider? time = null)
     {
         if (Enabled is false)
             return RetryBudget.None;
@@ -520,7 +520,7 @@ public sealed class HedgeOptions
 
     /// <summary>Projects onto the value the policy carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
-    public Hedge ToHedge()
+    internal Hedge ToHedge()
     {
         var hedge = Hedge.At(Quantile ?? 0.95);
 
@@ -581,7 +581,7 @@ public sealed class WinRateOptions
     /// <summary>Projects onto the value the policy carries, or null when the section turned it off.</summary>
     /// <returns>The configuration, or null.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Minimum" /> is zero, which is the shape an off switch would take.</exception>
-    public WinRate? ToWinRate()
+    internal WinRate? ToWinRate()
     {
         if (Enabled is false)
             return null;
@@ -646,7 +646,7 @@ public sealed class AttemptCeilingOptions
     /// <summary>Converts the options to an <see cref="NResilience.AttemptCeiling" /> value, using defaults for any unset properties.</summary>
     /// <returns>The configuration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which used to be the off switch.</exception>
-    public AttemptCeiling ToAttemptCeiling()
+    internal AttemptCeiling ToAttemptCeiling()
     {
         if (Multiple is 0)
         {
@@ -792,7 +792,7 @@ public sealed class BreakerOptions
     ///     "no breaker". <see cref="ResilienceOptions.ToPolicy(Resilience?)" /> checks it before calling
     ///     this.
     /// </remarks>
-    public Breaker ToBreaker(string? name = null, TimeProvider? time = null, bool? adaptive = null)
+    internal Breaker ToBreaker(string? name = null, TimeProvider? time = null, bool? adaptive = null)
     {
         var settings = time is null ? new BreakerSettings() : new BreakerSettings { Time = time };
 
@@ -843,7 +843,7 @@ public sealed class BreakerOptions
         if (SlowCallRatio is { } slowRatio)
             settings = settings with { SlowCallRatio = slowRatio };
 
-        return new Breaker(settings) { Name = name };
+        return new Breaker(settings with { Name = name });
     }
 }
 
@@ -881,7 +881,7 @@ public sealed class FailuresOptions
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which used to be the off switch.</exception>
-    public Failures ToFailures()
+    internal Failures ToFailures()
     {
         if (Multiple is 0)
         {
@@ -941,7 +941,7 @@ public sealed class RecoveryOptions
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Length" /> is zero, which used to be the off switch.</exception>
-    public Recovery ToRecovery()
+    internal Recovery ToRecovery()
     {
         if (Length is 0)
         {
@@ -999,7 +999,7 @@ public sealed class SlowCallsOptions
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
     /// <exception cref="ResilienceConfigurationException"><see cref="Multiple" /> is zero, which used to be the off switch.</exception>
-    public SlowCalls ToSlowCalls()
+    internal SlowCalls ToSlowCalls()
     {
         if (Multiple is 0)
         {

@@ -277,9 +277,9 @@ public sealed class DependencyInjectionTests
 
     /// <summary>
     ///     The same rule for the budget, including the default one. A budget's whole job is to remember
-    ///     how much traffic succeeded recently, and a null <see cref="Resilience.Budget" /> means the
-    ///     core creates one keyed by policy <i>instance</i> - so reload would silently reset it. The
-    ///     registration pins it to the name instead.
+    ///     how much traffic succeeded recently, and <see cref="RetryBudget.Automatic" /> - the default
+    ///     <see cref="Resilience.Budget" /> - means the core creates one keyed by policy <i>instance</i>,
+    ///     so reload would silently reset it. The registration pins it to the name instead.
     /// </summary>
     [Fact]
     public void A_live_budget_survives_a_reload_even_when_it_was_never_configured()
@@ -287,7 +287,7 @@ public sealed class DependencyInjectionTests
         var source = new Source(new Dictionary<string, string?> { ["Resilience:api:Attempts"] = "3" });
         var policies = Build(s => s.AddResilience(source.Configuration.GetSection("Resilience")));
 
-        var budget = policies["api"].Budget!;
+        var budget = policies["api"].Budget;
 
         source.Replace(new Dictionary<string, string?> { ["Resilience:api:Attempts"] = "9" });
 
@@ -314,7 +314,7 @@ public sealed class DependencyInjectionTests
     [Fact]
     public void A_breaker_shared_through_the_configure_callback_is_kept()
     {
-        var shared = new Breaker { Name = "shared" };
+        var shared = Breaker.Of(name: "shared");
 
         var policies = Build(s => s
             .AddResilience("api", Resilience.Http, p => p with { Breaker = shared })

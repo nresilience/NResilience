@@ -137,6 +137,16 @@ public sealed record BreakerSettings
     /// </summary>
     public bool Adaptive { get; init; } = true;
 
+    /// <summary>
+    ///     A name for the breaker these settings describe, used in diagnostics and health endpoints.
+    ///     <para>
+    ///         Part of the settings rather than of the live <see cref="Breaker" />, so one object fully
+    ///         describes a breaker: <c>settings with { Name = "orders" }</c> is a differently-configured
+    ///         breaker and compares unequal, which is what a name that appears in telemetry should do.
+    ///     </para>
+    /// </summary>
+    public string? Name { get; init; }
+
     /// <summary>Consecutive failures before opening. The reading most people have of "circuit breaker".</summary>
     public int ConsecutiveFailures { get; init; } = 5;
 
@@ -605,8 +615,8 @@ public sealed record BreakerSettings
 ///     <code>
 /// public sealed class Dependencies
 /// {
-///     public Breaker Payments { get; } = new() { Name = "payments" };
-///     public Breaker Search   { get; } = new() { Name = "search" };
+///     public Breaker Payments { get; } = Breaker.Of(name: "payments");
+///     public Breaker Search   { get; } = Breaker.Of(name: "search");
 /// }
 /// 
 /// var payments = Resilience.Http with { Breaker = deps.Payments };
@@ -770,8 +780,45 @@ public sealed class Breaker
         _recovery = Settings.Recovery;
     }
 
-    /// <summary>A name for this breaker, used in diagnostics and health endpoints.</summary>
-    public string? Name { get; init; }
+    /// <summary>
+    ///     The breaker most people mean: open after <paramref name="consecutiveFailures" /> failures in a
+    ///     row, stay open for <paramref name="breakDuration" />, and keep the two relative trips the
+    ///     defaults turn on.
+    ///     <para>
+    ///         The long form is <c>new Breaker(new BreakerSettings { ... })</c>, and everything this
+    ///         helper does not name lives there.
+    ///     </para>
+    /// </summary>
+    /// <param name="consecutiveFailures">Failures in a row before it opens. Default 5.</param>
+    /// <param name="breakDuration">
+    ///     How long it stays open on the first trip. Default 15 s. A value above
+    ///     <see cref="BreakerSettings.MaximumBreakDuration" />'s default of two minutes raises that
+    ///     ceiling to match, so the first break is the duration asked for rather than a validation
+    ///     failure.
+    /// </param>
+    /// <param name="name">A name for diagnostics and health endpoints.</param>
+    /// <returns>The breaker.</returns>
+    /// <exception cref="ResilienceConfigurationException">The parameters cannot be used.</exception>
+    public static Breaker Of(int consecutiveFailures = 5, TimeSpan? breakDuration = null, string? name = null)
+    {
+        var settings = new BreakerSettings { ConsecutiveFailures = consecutiveFailures, Name = name };
+
+        if (breakDuration is { } duration)
+        {
+            settings = settings with { BreakDuration = duration };
+
+            if (duration > settings.MaximumBreakDuration)
+                settings = settings with { MaximumBreakDuration = duration };
+        }
+
+        return new Breaker(settings);
+    }
+
+    /// <summary>
+    ///     A name for this breaker, used in diagnostics and health endpoints. Set through
+    ///     <see cref="BreakerSettings.Name" />, which is where a breaker's configuration lives.
+    /// </summary>
+    public string? Name => Settings.Name;
 
     /// <summary>The settings this breaker was built with.</summary>
     public BreakerSettings Settings { get; }

@@ -31,15 +31,15 @@ internal sealed class HostScope : Scoped
             if (settings.ConfiguredTime is null)
                 settings = settings with { Time = policy.Time };
 
-            Breaker = new Breaker(settings) { Name = host };
+            Breaker = new Breaker(settings with { Name = host });
             scoped = scoped with { Breaker = Breaker };
         }
         else
             Breaker = policy.Breaker;
 
-        // A null budget and the Automatic marker both mean "no deliberate scope decision was made",
-        // which is what per-host scoping is allowed to override. An explicit instance is not.
-        if (options.BudgetPerHost && policy.Budget is null or { IsAutomatic: true })
+        // The Automatic marker means "no deliberate scope decision was made", which is what per-host
+        // scoping is allowed to override. An explicit instance, RetryBudget.None included, is not.
+        if (options.BudgetPerHost && policy.Budget.IsAutomatic)
         {
             Budget = RetryBudget.Of(time: policy.Time);
             scoped = scoped with { Budget = Budget };

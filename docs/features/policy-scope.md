@@ -42,7 +42,8 @@ Each key is derived on first use and cached. `For` is a dictionary lookup after 
 | :--- | :--- |
 | `Breaker = new Breaker()` | Its own breaker with those settings. The template's instance is a prototype and is never used for execution. |
 | No breaker | No breaker. A scope with no breaker still gives each key its own budget and latency estimate. |
-| `Budget = null` or `RetryBudget.Automatic` | Its own retry budget. |
+| `Budget = RetryBudget.Automatic` (the default) | Its own retry budget. |
+| `Budget = RetryBudget.None` | No retry budget. |
 | `Budget = RetryBudget.Shared("name")` | The shared budget. Use `Shared` to maintain a single retry ceiling across all keys. |
 | `Hedge = Hedge.At(0.95)` | Its own latency estimate. A slow tenant does not lower the hedge threshold for a fast one. |
 | `Name = "orders"` | `Name = "orders:<key>"`, so a log line says which key it came from. |

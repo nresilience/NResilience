@@ -335,8 +335,7 @@ public sealed class ResilienceOptionsTests
     {
         var policy = new ResilienceOptions { Budget = new BudgetOptions { Enabled = true } }.ToPolicy();
 
-        Assert.NotNull(policy.Budget);
-        Assert.False(policy.Budget!.IsNone);
+        Assert.False(policy.Budget.IsNone);
         Assert.False(policy.Budget.IsAutomatic);
     }
 
@@ -908,7 +907,7 @@ public sealed class ResilienceOptionsTests
 
         // The budget's clock is not readable, so it is asserted through the refill it drives: on
         // TimeProvider.System no measurable time passes here and the bucket stays empty.
-        var budget = policy.Budget!;
+        var budget = policy.Budget;
 
         while (budget.Utilization < 1)
         {
@@ -981,7 +980,7 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.MaximumDelay);
         Assert.Equal(Jitter.Equal, policy.Backoff.Jitter);
         Assert.Same(Classifier.Http, policy.Classifier);
-        Assert.NotNull(policy.Budget);
+        Assert.False(policy.Budget.IsNone);
         Assert.Equal(8, policy.Breaker!.Settings.ConsecutiveFailures);
         Assert.Equal(TimeSpan.FromSeconds(2), policy.Breaker.Settings.SlowCallThreshold);
 

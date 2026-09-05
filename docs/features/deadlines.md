@@ -83,7 +83,7 @@ Four behaviors are worth knowing:
 - **Only successful attempts are sampled.** A ceiling tight enough to cancel calls that would have succeeded starves its own estimator, so the policy reverts to `AttemptTimeout` rather than tightening further.
 - **The estimate is per policy instance.** The HTTP handler derives one policy per host, so each host's ceiling is measured from that host's own latency.
 
-Read the current value from `MeasuredAttemptCeiling`, or watch the `nresilience.attempt.timeout` histogram, which is recorded when the number moves. Both report the measured ceiling before `AttemptTimeout` clamps it, so a value above your `AttemptTimeout` is the reading that says the clamp is now what bounds the attempt.
+Read the current value from `policy.Measured.AttemptCeiling`, or watch the `nresilience.attempt.timeout` histogram, which is recorded when the number moves. Both report the measured ceiling before `AttemptTimeout` clamps it, so a value above your `AttemptTimeout` is the reading that says the clamp is now what bounds the attempt.
 
 > [!NOTE]
 > When [hedging](hedging.md) is configured too, the ceiling is measured from at least the hedge's own quantile. A ceiling below the hedge threshold would cancel the first leg at the moment the second was due to start, and you would have bought a feature that never fires.

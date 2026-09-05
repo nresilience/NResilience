@@ -371,7 +371,7 @@ internal static class Program
             AttemptTimeout = Timeout.InfiniteTimeSpan,
         };
 
-        var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2 }) { Name = "aot" };
+        var breaker = new Breaker(new BreakerSettings { Name = "aot", ConsecutiveFailures = 2 });
         var guarded = instant with { Breaker = breaker, Attempts = 2, Budget = RetryBudget.None };
 
         var ran = false;

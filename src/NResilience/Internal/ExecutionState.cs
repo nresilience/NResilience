@@ -123,12 +123,11 @@ internal sealed class ExecutionState
     /// </remarks>
     public static RetryBudget? BudgetFor(Resilience policy)
     {
-        // A null budget is genuinely "no budget", and so is RetryBudget.None.
-        if (policy.Budget is not { } configured || configured.IsNone)
+        if (policy.Budget.IsNone)
             return null;
 
-        if (!configured.IsAutomatic)
-            return configured;
+        if (!policy.Budget.IsAutomatic)
+            return policy.Budget;
 
         // EnsureValidated ran first, from the entry point, so the warm path here is the reference
         // comparison it just primed.

@@ -13,10 +13,9 @@ The `RetryBudget` is a `sealed class` that bounds retries as a fraction of total
 | `RetryBudget.Of(fraction = 0.1, minimumPerSecond = 3, time = null)` | Creates a budget private to the instance that holds it. |
 | `RetryBudget.Shared(name, fraction = 0.1, minimumPerSecond = 3)` | Creates or retrieves a process-wide budget looked up by name. Policies that share the same name share the same budget. The parameters provided by the first caller are used. |
 | `RetryBudget.None` | Disables the budget. Every retry allowed by other policy bounds is funded. |
-| `RetryBudget.Automatic` | A marker used by presets that resolves to a private budget with default settings. |
+| `RetryBudget.Automatic` | The default. A marker that resolves to a budget private to the policy instance, or to each key when the policy is scoped. |
 | `Name` | The name used to look up a shared budget, if applicable. |
-| `IsAutomatic` | True for `RetryBudget.Automatic`. |
-| `Utilization` | A value from 0 to 1 indicating how much of the current budget has been spent. Reads 0 on `RetryBudget.Automatic` itself, which holds no tokens. |
+| `Utilization` | A value from 0 to 1 indicating how much of the current budget has been spent. Reads 0 on `RetryBudget.None` and on `RetryBudget.Automatic` itself, neither of which holds tokens. The bucket `Automatic` resolves to is reported by `ResilienceHandler.BudgetsByHost()`, `ResilienceInterceptor.Budgets()` and `PolicyScope<TKey>.Budgets()`. |
 
 Both factories throw `ResilienceConfigurationException` when `fraction` is outside (0, 1] or `minimumPerSecond` is negative. Disable the budget with `RetryBudget.None`, not a fraction of zero.
 

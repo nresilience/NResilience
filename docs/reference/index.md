@@ -10,7 +10,7 @@ The **executor** is the internal loop that runs each attempt: it applies deadlin
 
 | Topic | Types and Members |
 | :--- | :--- |
-| [`Resilience`](resilience.md) | `Resilience`, execution methods, `NextAttempt`, `ResilienceDeadline`, `PolicyScope<TKey>` |
+| [`Resilience`](resilience.md) | `Resilience`, execution methods, `MeasuredValues`, `NextAttempt`, `ResilienceDeadline`, `PolicyScope<TKey>` |
 | [`CallResult<T>`](call-result.md) | `CallResult<T>`, `CallResult`, `StopReason`, `AttemptLog`, `Attempt` |
 | [Classifier and verdicts](classifier.md) | `Classifier`, `Verdict`, `VerdictKind` |
 | [`Backoff`](backoff.md) | `Backoff`, `BackoffKind`, `Jitter` |

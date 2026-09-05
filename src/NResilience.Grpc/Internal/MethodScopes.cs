@@ -70,12 +70,12 @@ internal sealed class MethodScopes
         }
 
         // One scope. The same two decisions PolicyScope makes per key, made once: the breaker is
-        // whatever the template ended up with, and a null or automatic budget becomes a real
-        // instance so that a health endpoint has something to report.
+        // whatever the template ended up with, and an automatic budget becomes a real instance so
+        // that a health endpoint has something to report.
         var scoped = template;
         _oneBreaker = template.Breaker;
 
-        if (template.Budget is null or { IsAutomatic: true })
+        if (template.Budget.IsAutomatic)
         {
             _oneBudget = RetryBudget.Of(time: template.Time);
             scoped = scoped with { Budget = _oneBudget };

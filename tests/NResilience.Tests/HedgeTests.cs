@@ -700,6 +700,79 @@ public sealed class HedgeTests
         Assert.False(events.Contains(CallEventKind.HedgeStarted));
     }
 
+    // ---- The reading ----
+
+    /// <summary>
+    ///     The threshold is the one measured term an operator has to watch, because it is the latency at
+    ///     which the library starts duplicating load. It reads null while the estimate is too cold to fire
+    ///     on, which is the same gate the loop applies.
+    /// </summary>
+    [Fact]
+    public async Task The_hedge_threshold_is_null_until_the_estimate_can_fire()
+    {
+        var time = new FakeTimeProvider();
+        var policy = Hedging(time, out _);
+
+        Assert.Null(policy.Measured.HedgeThreshold);
+
+        await WarmAsync(policy, time, Fast, 19);
+        Assert.Null(policy.Measured.HedgeThreshold);
+
+        await WarmAsync(policy, time, Fast, 1);
+        Assert.NotNull(policy.Measured.HedgeThreshold);
+    }
+
+    /// <summary>
+    ///     And it is the same number the loop arms on: the quantile, floored by <c>MinimumDelay</c>. Read
+    ///     against the delay <c>HedgeStarted</c> carries, which is the threshold that actually fired.
+    /// </summary>
+    [Fact]
+    public async Task The_hedge_threshold_is_what_the_loop_arms_on()
+    {
+        var time = new FakeTimeProvider();
+        var policy = Hedging(time, out var events, p => p with
+        {
+            Hedge = Hedge.At() with { Window = Window, MinimumDelay = TimeSpan.Zero },
+        });
+
+        await WarmAsync(policy, time, Fast, 40);
+
+        var threshold = policy.Measured.HedgeThreshold;
+        Assert.NotNull(threshold);
+
+        var race = await RaceAsync(policy, time);
+
+        Assert.True(race.Result.IsSuccess);
+        Assert.Equal(threshold, events.Events.Single(e => e.Kind == CallEventKind.HedgeStarted).Delay);
+    }
+
+    /// <summary>
+    ///     A dependency whose quantile sits below <c>MinimumDelay</c> arms at the floor, and the reading
+    ///     says so rather than reporting the raw quantile the loop would never use.
+    /// </summary>
+    [Fact]
+    public async Task The_hedge_threshold_reports_the_floor_when_the_quantile_is_below_it()
+    {
+        var time = new FakeTimeProvider();
+        var floor = TimeSpan.FromSeconds(5);
+        var policy = Hedging(time, out _, p => p with
+        {
+            Hedge = Hedge.At() with { Window = Window, MinimumDelay = floor },
+        });
+
+        await WarmAsync(policy, time, Fast, 40);
+
+        Assert.Equal(floor, policy.Measured.HedgeThreshold);
+    }
+
+    /// <summary>A policy that does not hedge measures no threshold, and reads one without validating.</summary>
+    [Fact]
+    public void A_policy_without_a_hedge_measures_no_threshold()
+    {
+        Assert.Null(Resilience.Default.Measured.HedgeThreshold);
+        Assert.Null(Resilience.None.Measured.HedgeThreshold);
+    }
+
     // ---- Configuration ----
 
     [Fact]

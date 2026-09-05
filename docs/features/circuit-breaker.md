@@ -18,7 +18,7 @@ Create a `Breaker` object and assign it to your policy.
 ```csharp
 // Breaker scope is a variable with a name and a lifetime. `with` copies the reference,
 // so every policy derived from `payments` shares this breaker.
-var breaker = new Breaker { Name = "payments" };
+var breaker = Breaker.Of(name: "payments");
 
 var payments = Resilience.Http with { Breaker = breaker };
 var paymentsWrites = payments with { Attempts = 1 };
@@ -72,6 +72,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 // incident, because the responses are not failing - they are just slow.
 var breaker = new Breaker(settings: new BreakerSettings
 {
+    Name = "search",
     ConsecutiveFailures = 5, // the default trip condition
     SlowCallThreshold = TimeSpan.FromSeconds(value: 2), // anything slower counts against
     SlowCallRatio = 0.5, // half the window being slow trips it
@@ -80,10 +81,7 @@ var breaker = new Breaker(settings: new BreakerSettings
     BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
     MaximumBreakDuration = TimeSpan.FromMinutes(value: 2),
     ProbeSuccesses = 2, // two good probes to close, not one
-})
-{
-    Name = "search",
-};
+});
 ```
 <!-- endsnippet -->
 
@@ -103,13 +101,11 @@ Set both when the dependency has a real, externally fixed budget you never want 
 // successful attempts it already samples.
 var breaker = new Breaker(settings: new BreakerSettings
 {
+    Name = "search",
     SlowCalls = SlowCalls.Above(multiple: 3), // slow = 3x the recent median
     SlowCallRatio = 0.5, // half the window being slow trips it
     MinimumCalls = 20,
-})
-{
-    Name = "search",
-};
+});
 
 // What the dependency normally costs, as this breaker measures it. Worth graphing; null
 // until 20 successful calls have landed, and the trip is not armed until then either.
@@ -142,13 +138,11 @@ The retry loop uses this baseline: it does not start a retry if the time remaini
 // itself, from the outcomes it already samples.
 var breaker = new Breaker(settings: new BreakerSettings
 {
+    Name = "search",
     Failures = Failures.Above(multiple: 5), // too many = 5x the recent error rate
     FailureRatio = 0.5, // and never more than half the window, whatever the baseline
     MinimumCalls = 20,
-})
-{
-    Name = "search",
-};
+});
 
 // How often the dependency normally fails, as this breaker measures it. Worth graphing;
 // null until 100 outcomes have landed, and the relative trip is not armed until then.
@@ -179,12 +173,10 @@ Every pod's breaker opens within a second of the others, because they are all wa
 // dependency halfway through recovering takes the whole fleet's probes at once.
 var breaker = new Breaker(settings: new BreakerSettings
 {
+    Name = "search",
     BreakDuration = TimeSpan.FromSeconds(value: 15), // now half of that, plus up to half again
     BreakJitter = Jitter.Equal, // the default
-})
-{
-    Name = "search",
-};
+});
 ```
 <!-- endsnippet -->
 
@@ -204,12 +196,10 @@ Two successful probes indicate the dependency can serve some traffic. Closing th
 // more of each period cold. The ramp gives it a trickle it can actually serve.
 var breaker = new Breaker(settings: new BreakerSettings
 {
+    Name = "search",
     Recovery = Recovery.Over(length: 0.25), // ramp back over a quarter of the break served
     BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
-})
-{
-    Name = "search",
-};
+});
 ```
 <!-- endsnippet -->
 

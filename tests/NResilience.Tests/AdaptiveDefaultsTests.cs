@@ -61,7 +61,7 @@ public sealed class AdaptiveDefaultsTests
     public void The_passthrough_preset_measures_nothing()
     {
         Assert.Null(Resilience.None.AttemptCeiling);
-        Assert.Null(Resilience.None.MeasuredAttemptCeiling);
+        Assert.Null(Resilience.None.Measured.AttemptCeiling);
     }
 
     // ---- What a default must never do: bound a call nobody bounded ----
@@ -77,7 +77,7 @@ public sealed class AdaptiveDefaultsTests
         var policy = Resilience.Default with { AttemptTimeout = Timeout.InfiniteTimeSpan };
 
         Assert.Null(policy.AttemptCeiling);
-        Assert.Null(policy.MeasuredAttemptCeiling);
+        Assert.Null(policy.Measured.AttemptCeiling);
     }
 
     /// <summary>Writing it is a different statement, and that one is honoured.</summary>
@@ -270,7 +270,7 @@ public sealed class AdaptiveDefaultsTests
         var policy = Resilience.Http with { Adaptive = false };
 
         Assert.Null(policy.AttemptCeiling);
-        Assert.Null(policy.MeasuredAttemptCeiling);
+        Assert.Null(policy.Measured.AttemptCeiling);
 
         var settings = new BreakerSettings { Adaptive = false };
 

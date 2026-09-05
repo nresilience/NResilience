@@ -99,7 +99,7 @@ Four behaviors are worth knowing:
 - **Only successful attempts are sampled.** A dependency failing fast has a very short latency distribution, and a base measured from it would turn the retry curve into a tight loop at the moment the dependency could least afford one.
 - **The estimate is per policy instance.** The [HTTP handler](../http/index.md) derives one policy per host, so each host's base is measured from that host's own latency. A policy rebuilt per call never warms its estimate - [`NRES008`](../reference/analyzers.md#nres008) reports that shape.
 
-Read the current value from `MeasuredBackoffBase`, or watch the `nresilience.backoff.base` histogram, which is recorded when the number moves. Both report the base after the clamp, so the gap between it and your `transientBase` is how wrong the constant was.
+Read the current value from `policy.Measured.BackoffBase`, or watch the `nresilience.backoff.base` histogram, which is recorded when the number moves. Both report the base after the clamp, so the gap between it and your `transientBase` is how wrong the constant was.
 
 > [!NOTE]
 > This is opt-in. It is the one measured term the library does not turn on for you, because it is the one that can lengthen a delay rather than only shorten one. `Adaptive = false` on the policy refuses it alongside every other measured term.

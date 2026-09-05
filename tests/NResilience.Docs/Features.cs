@@ -81,7 +81,7 @@ public sealed class Features
         Assert.NotNull(api.Backoff.MeasuredBase);
 
         // Cold until the estimate has samples, and the retry waits the configured base until then.
-        Assert.Null(api.MeasuredBackoffBase);
+        Assert.Null(api.Measured.BackoffBase);
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public sealed class Features
         }
 
         // Three times the measured p95, and two orders of magnitude under the configured 5 s.
-        Assert.InRange(actual: policy.MeasuredAttemptCeiling!.Value, low: TimeSpan.FromMilliseconds(value: 120), high: TimeSpan.FromMilliseconds(value: 135));
+        Assert.InRange(actual: policy.Measured.AttemptCeiling!.Value, low: TimeSpan.FromMilliseconds(value: 120), high: TimeSpan.FromMilliseconds(value: 135));
     }
 
     [Fact]
@@ -237,7 +237,7 @@ public sealed class Features
         }
 
         // The floor is what the attempt gets, not the measurement.
-        Assert.Equal(expected: TimeSpan.FromSeconds(value: 2), actual: policy.MeasuredAttemptCeiling);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 2), actual: policy.Measured.AttemptCeiling);
     }
 
     [Fact]

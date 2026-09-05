@@ -249,14 +249,16 @@ public sealed class BudgetTests
     }
 
     /// <summary>
-    ///     Null is off and <see cref="RetryBudget.None" /> is off and says so; the storm protection users
-    ///     get without asking for it is the marker the presets carry.
+    ///     <see cref="RetryBudget.None" /> is the one spelling of off, and the storm protection users get
+    ///     without asking for it is the marker every policy carries by default. There is no null: a
+    ///     policy nobody configured a budget on still has one.
     /// </summary>
     [Fact]
-    public void A_null_budget_is_no_budget_and_the_presets_carry_the_marker()
+    public void The_budget_defaults_to_the_marker_and_None_is_the_one_spelling_of_off()
     {
-        Assert.Null(ExecutionState.BudgetFor(Resilience.Default with { Budget = null }));
+        Assert.Null(ExecutionState.BudgetFor(Resilience.Default with { Budget = RetryBudget.None }));
 
+        Assert.Same(RetryBudget.Automatic, new Resilience().Budget);
         Assert.Same(RetryBudget.Automatic, Resilience.Default.Budget);
         Assert.Same(RetryBudget.Automatic, Resilience.Http.Budget);
 
@@ -345,7 +347,7 @@ public sealed class BudgetTests
             Budget = RetryBudget.Of(0.25, 2, time),
         };
 
-        var budget = policy.Budget!;
+        var budget = policy.Budget;
 
         while (budget.TrySpend())
         {

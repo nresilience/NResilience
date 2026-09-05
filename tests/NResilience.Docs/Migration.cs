@@ -23,7 +23,7 @@ public sealed class Migration
             Attempts = 3, // total, including the first
             AttemptTimeout = TimeSpan.FromSeconds(value: 3), // per attempt
             Deadline = TimeSpan.FromSeconds(value: 10), // the whole call
-            Breaker = new Breaker { Name = "api" },
+            Breaker = Breaker.Of(name: "api"),
         };
 
         // </snippet:migration-pipeline>

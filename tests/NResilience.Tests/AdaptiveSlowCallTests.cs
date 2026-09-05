@@ -93,8 +93,8 @@ public sealed class AdaptiveSlowCallTests
     public void One_configuration_fits_a_fast_dependency_and_a_slow_one()
     {
         var time = new FakeTimeProvider();
-        var cache = new Breaker(Adaptive(time)) { Name = "cache" };
-        var report = new Breaker(Adaptive(time)) { Name = "report" };
+        var cache = new Breaker(Adaptive(time) with { Name = "cache" });
+        var report = new Breaker(Adaptive(time) with { Name = "report" });
 
         // The cache answers in a millisecond and then degrades to ten.
         Sample(cache, VerdictKind.Ok, 20, TimeSpan.FromMilliseconds(1));

@@ -304,7 +304,7 @@ public sealed class HttpHandlerTests
     public async Task Every_host_gets_its_own_breaker_and_budget()
     {
         var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
-        using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp);
+        using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp with { Budget = RetryBudget.Automatic });
         using var client = new HttpClient(handler);
 
         (await client.GetAsync(new Uri("https://one.test/a"))).Dispose();
@@ -315,7 +315,8 @@ public sealed class HttpHandlerTests
         Assert.Equal(2, breakers.Count);
         Assert.NotSame(breakers["one.test"], breakers["two.test"]);
 
-        // The preset carries RetryBudget.Automatic, which per-host scoping is allowed to override.
+        // RetryBudget.Automatic is what per-host scoping is allowed to override; the test policy
+        // turns the budget off, so the override is asked for here rather than inherited.
         // Counting the entries is not enough: one shared bucket behind two keys would let a storm
         // against one host throttle retries to the other, with BudgetPerHost still reporting true.
         var budgets = handler.BudgetsByHost();
@@ -424,7 +425,7 @@ public sealed class HttpHandlerTests
         // policy's clock, which is the clock this test is holding still.
         using var handler = new ResilienceHandler(
             transport,
-            TestPolicy.InstantHttp with { Breaker = null, Time = time },
+            TestPolicy.InstantHttp with { Breaker = null, Time = time, Budget = RetryBudget.Automatic },
             new HttpResilienceOptions { BreakerPerHost = false });
 
         using var client = new HttpClient(handler);
@@ -446,7 +447,7 @@ public sealed class HttpHandlerTests
     [Fact]
     public async Task An_explicit_breaker_survives_per_host_scoping()
     {
-        var shared = new Breaker { Name = "shared" };
+        var shared = Breaker.Of(name: "shared");
         var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
         using var handler = new ResilienceHandler(transport, TestPolicy.InstantHttp with { Breaker = shared });

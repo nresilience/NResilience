@@ -271,7 +271,7 @@ public sealed class RetryTests
             AttemptTimeout = Timeout.InfiniteTimeSpan,
             Deadline = TimeSpan.FromTicks(200 * TimeSpan.TicksPerMillisecond + TimeSpan.TicksPerMillisecond / 2),
             Attempts = 3,
-            Budget = null,
+            Budget = RetryBudget.None,
         };
 
         var call = policy.RunAsync(async ct =>
@@ -311,7 +311,7 @@ public sealed class RetryTests
             AttemptTimeout = TimeSpan.FromMilliseconds(50),
             Deadline = TimeSpan.FromSeconds(30),
             Attempts = 3,
-            Budget = null,
+            Budget = RetryBudget.None,
         };
 
         var result = await policy.TryRunAsync(async ct =>

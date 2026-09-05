@@ -31,7 +31,7 @@ The presets cover common scenarios:
 | `Classifier` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
 | `Hedge` | `Hedge?` | `null` | Hedging. A `null` value indicates no hedging. Requires `Attempts` greater than 1. |
-| `Budget` | `RetryBudget?` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` creates a budget private to the policy instance. `null` and `RetryBudget.None` disable the budget. |
+| `Budget` | `RetryBudget` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` creates a budget private to the policy instance, or to each key when the policy is scoped. `RetryBudget.None` is no budget. Any other instance is shared wherever the instance is shared. |
 | `BeforeAttempt` | `Func<NextAttempt, Task>?` | `null` | A function that runs before every attempt, including the first. |
 | `OnEvent` | `Action<CallEvent>?` | `null` | The telemetry listener. If `null`, no events are raised and no performance cost is incurred. |
 | `Adaptive` | `bool` | `true` | Whether the policy measures the dependency and bounds itself by what it measures. `false` suppresses every measured term the library would supply - such as `AttemptCeiling` - and leaves only the constants written here. It does not reach `Breaker`, which has its own switch. Setting it `false` alongside a configured `AttemptCeiling` or `Hedge` results in an error. |
@@ -42,8 +42,19 @@ One property is computed rather than configured:
 
 | Property | Type | Description |
 | :--- | :--- | :--- |
-| `MeasuredBackoffBase` | `TimeSpan?` | The base delay the next transient retry would wait when `Backoff.MeasuredBase` is configured, after the `Spread` clamp. `null` when no base is being measured or the estimate is still cold. Reading it validates the policy, exactly as executing it does. |
-| `MeasuredAttemptCeiling` | `TimeSpan?` | What `AttemptCeiling` currently measures the ceiling to be, before `AttemptTimeout` and the deadline clamp it. `null` when `AttemptCeiling` is not configured or the estimate is still cold. Reading it validates the policy, exactly as executing it does. |
+| `Measured` | `MeasuredValues` | What the policy is currently measuring. See [`MeasuredValues`](#measuredvalues). |
+
+## `MeasuredValues`
+
+`policy.Measured` is the one place a dashboard looks. Every property is a *reading*, never configuration - the configuration that produces it is `AttemptCeiling`, `Backoff.MeasuredBase` and `Hedge` respectively. Each returns `null` when its feature is not configured, or when the estimate is still cold, and reading one validates the policy exactly as executing it does.
+
+| Property | Type | Description |
+| :--- | :--- | :--- |
+| `AttemptCeiling` | `TimeSpan?` | What `AttemptCeiling` currently measures the ceiling to be, before `AttemptTimeout` and the deadline clamp it. A value above `AttemptTimeout` means the clamp is what bounds the attempt. |
+| `BackoffBase` | `TimeSpan?` | The base delay the next transient retry would wait when `Backoff.MeasuredBase` is configured, after the `Spread` clamp. |
+| `HedgeThreshold` | `TimeSpan?` | How long a call has to run before a hedge arms, after `Hedge.MinimumDelay` has floored it. This is the latency at which the library starts duplicating load. The gates that can still refuse a hedge - the breaker, the win rate, the concurrency ceiling, the remaining deadline - are asked when the threshold fires, so a reading is when a hedge *would* be considered rather than a promise that one starts. |
+
+The estimates are private to the policy instance. The HTTP handler derives one policy per host, so each host is measured independently.
 
 ## Methods
 
@@ -180,7 +191,7 @@ The effective deadline is `min(Deadline, Remaining)`, resolved once when the cal
 | `MaximumKeys` | How many keys the scope keeps. |
 | `Count` | How many keys it currently holds. Approximate under concurrency, and briefly above `MaximumKeys` while a sweep catches up. |
 
-A `Breaker` on the template is a **prototype**: each key gets its own breaker with those settings, and the template's instance is never executed against. A `Budget` that is `null` or `RetryBudget.Automatic` becomes one budget per key; an explicit instance, such as `RetryBudget.Shared(name)`, is left alone.
+A `Breaker` on the template is a **prototype**: each key gets its own breaker with those settings, and the template's instance is never executed against. A `Budget` of `RetryBudget.Automatic` becomes one budget per key; any other value, including `RetryBudget.None` and `RetryBudget.Shared(name)`, is left alone.
 
 ## Equality
 

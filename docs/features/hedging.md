@@ -209,6 +209,8 @@ var api = Resilience.Http with
 
 In `NResilience.Extensions`, the same facts arrive as `nresilience.hedges` tagged `started`, `won`, `discarded` and `suppressed`, plus `nresilience.hedge.threshold` - the adaptive threshold, recorded each time a hedge fires. Watching that number during an incident tells a brownout from a tail.
 
+Read the threshold directly from `policy.Measured.HedgeThreshold`, which is the same number without waiting for a hedge to fire - `null` until the estimate has `MinimumSamples` samples and no hedge can fire yet. It is the latency at which the library starts duplicating load, so it belongs on the same dashboard as the extra traffic it explains. The gates below are asked when the threshold fires, so a reading is when a hedge *would* be considered rather than a promise that one starts.
+
 The [attempt log](../reference/call-result.md) shows both legs, and a discarded one reads as what it is:
 
 ```text

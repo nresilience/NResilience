@@ -41,7 +41,7 @@ public sealed class AdaptiveBackoffTests
 
         await WarmAsync(policy, time, Normal, 19);
 
-        Assert.Null(policy.MeasuredBackoffBase);
+        Assert.Null(policy.Measured.BackoffBase);
     }
 
     /// <summary>One more sample crosses the minimum, and the base appears without anyone naming a millisecond.</summary>
@@ -53,7 +53,7 @@ public sealed class AdaptiveBackoffTests
 
         await WarmAsync(policy, time, Normal, 20);
 
-        var measured = policy.MeasuredBackoffBase;
+        var measured = policy.Measured.BackoffBase;
 
         Assert.NotNull(measured);
 
@@ -71,7 +71,7 @@ public sealed class AdaptiveBackoffTests
 
         await WarmAsync(policy, time, Normal, 40);
 
-        Assert.Null(policy.MeasuredBackoffBase);
+        Assert.Null(policy.Measured.BackoffBase);
     }
 
     // ---- The feature ----
@@ -116,8 +116,8 @@ public sealed class AdaptiveBackoffTests
         await WarmAsync(quick, time, TimeSpan.FromMilliseconds(2), 40);
         await WarmAsync(slow, time, TimeSpan.FromSeconds(2), 40);
 
-        Assert.InRange(quick.MeasuredBackoffBase!.Value, TimeSpan.FromMilliseconds(2), TimeSpan.FromMilliseconds(2.3));
-        Assert.InRange(slow.MeasuredBackoffBase!.Value, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2.3));
+        Assert.InRange(quick.Measured.BackoffBase!.Value, TimeSpan.FromMilliseconds(2), TimeSpan.FromMilliseconds(2.3));
+        Assert.InRange(slow.Measured.BackoffBase!.Value, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2.3));
     }
 
     /// <summary>
@@ -156,7 +156,7 @@ public sealed class AdaptiveBackoffTests
 
         // And the base itself is reported where a dashboard can read it, once, because it moved once.
         Assert.Equal(1, events.CountOf(CallEventKind.BackoffBaseAdapted));
-        Assert.Equal(policy.MeasuredBackoffBase, events.Events.Single(e => e.Kind == CallEventKind.BackoffBaseAdapted).Delay);
+        Assert.Equal(policy.Measured.BackoffBase, events.Events.Single(e => e.Kind == CallEventKind.BackoffBaseAdapted).Delay);
     }
 
     // ---- The clamp, which is the safety argument ----
@@ -175,7 +175,7 @@ public sealed class AdaptiveBackoffTests
         await WarmAsync(policy, time, TimeSpan.FromSeconds(60), 40);
 
         // Ten times the configured 100 ms, exactly, whatever the dependency did.
-        Assert.Equal(TimeSpan.FromSeconds(1), policy.MeasuredBackoffBase);
+        Assert.Equal(TimeSpan.FromSeconds(1), policy.Measured.BackoffBase);
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public sealed class AdaptiveBackoffTests
         await WarmAsync(policy, time, TimeSpan.FromMicroseconds(100), 40);
 
         // A tenth of the configured 100 ms, exactly.
-        Assert.Equal(TimeSpan.FromMilliseconds(10), policy.MeasuredBackoffBase);
+        Assert.Equal(TimeSpan.FromMilliseconds(10), policy.Measured.BackoffBase);
     }
 
     // ---- What is deliberately not measured ----
@@ -247,7 +247,7 @@ public sealed class AdaptiveBackoffTests
         var policy = Adaptive(time, out _);
 
         await WarmAsync(policy, time, Normal, 20);
-        var before = policy.MeasuredBackoffBase;
+        var before = policy.Measured.BackoffBase;
 
         // Sixty fast failures against twenty slow successes. Were failures sampled, the median would
         // now be a microsecond and the base would be pinned to the bottom of the band.
@@ -260,7 +260,7 @@ public sealed class AdaptiveBackoffTests
             });
         }
 
-        Assert.Equal(before, policy.MeasuredBackoffBase);
+        Assert.Equal(before, policy.Measured.BackoffBase);
     }
 
     /// <summary>
@@ -277,8 +277,8 @@ public sealed class AdaptiveBackoffTests
 
         await WarmAsync(one, time, Normal, 40);
 
-        Assert.NotNull(one.MeasuredBackoffBase);
-        Assert.Null(other.MeasuredBackoffBase);
+        Assert.NotNull(one.Measured.BackoffBase);
+        Assert.Null(other.Measured.BackoffBase);
     }
 
     // ---- Configuration ----

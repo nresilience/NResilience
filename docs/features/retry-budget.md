@@ -10,7 +10,7 @@ A per-call attempt limit cannot prevent a retry storm, because each caller indep
 
 A **retry budget** prevents this by bounding retries as a fraction of total traffic rather than per call.
 
-The budget is on by default. `Resilience.Default` and `Resilience.Http` use `RetryBudget.Automatic`, which creates a budget private to each policy instance with more than one attempt. Disable it with `Budget = null` or `RetryBudget.None`.
+The budget is on by default: `Budget` is `RetryBudget.Automatic` unless you say otherwise, which creates a budget private to each policy instance with more than one attempt. `RetryBudget.None` is the one spelling of off.
 
 ## Configure and share the budget
 
@@ -19,8 +19,8 @@ You can tune the parameters or turn the feature off entirely.
 <!-- snippet: budget-off -->
 ```csharp
 // Presets use `RetryBudget.Automatic` to provide a private budget by default.
-// `RetryBudget.None` disables the budget, which is appropriate for dependencies
-// that are not shared. `null` also disables the budget.
+// `RetryBudget.None` is the one spelling of off, which is appropriate for a
+// dependency that is not shared.
 var unbudgeted = Resilience.Default with { Budget = RetryBudget.None };
 
 // Or tune it, privately to whoever holds the instance.

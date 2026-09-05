@@ -12,7 +12,7 @@ public sealed class Guards
         // <snippet:breaker-construct>
         // Breaker scope is a variable with a name and a lifetime. `with` copies the reference,
         // so every policy derived from `payments` shares this breaker.
-        var breaker = new Breaker { Name = "payments" };
+        var breaker = Breaker.Of(name: "payments");
 
         var payments = Resilience.Http with { Breaker = breaker };
         var paymentsWrites = payments with { Attempts = 1 };
@@ -32,6 +32,7 @@ public sealed class Guards
         // incident, because the responses are not failing - they are just slow.
         var breaker = new Breaker(settings: new BreakerSettings
         {
+            Name = "search",
             ConsecutiveFailures = 5, // the default trip condition
             SlowCallThreshold = TimeSpan.FromSeconds(value: 2), // anything slower counts against
             SlowCallRatio = 0.5, // half the window being slow trips it
@@ -40,10 +41,7 @@ public sealed class Guards
             BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
             MaximumBreakDuration = TimeSpan.FromMinutes(value: 2),
             ProbeSuccesses = 2, // two good probes to close, not one
-        })
-        {
-            Name = "search",
-        };
+        });
 
         // </snippet:breaker-slow-calls>
 
@@ -60,13 +58,11 @@ public sealed class Guards
         // successful attempts it already samples.
         var breaker = new Breaker(settings: new BreakerSettings
         {
+            Name = "search",
             SlowCalls = SlowCalls.Above(multiple: 3), // slow = 3x the recent median
             SlowCallRatio = 0.5, // half the window being slow trips it
             MinimumCalls = 20,
-        })
-        {
-            Name = "search",
-        };
+        });
 
         // What the dependency normally costs, as this breaker measures it. Worth graphing; null
         // until 20 successful calls have landed, and the trip is not armed until then either.
@@ -88,13 +84,11 @@ public sealed class Guards
         // itself, from the outcomes it already samples.
         var breaker = new Breaker(settings: new BreakerSettings
         {
+            Name = "search",
             Failures = Failures.Above(multiple: 5), // too many = 5x the recent error rate
             FailureRatio = 0.5, // and never more than half the window, whatever the baseline
             MinimumCalls = 20,
-        })
-        {
-            Name = "search",
-        };
+        });
 
         // How often the dependency normally fails, as this breaker measures it. Worth graphing;
         // null until 100 outcomes have landed, and the relative trip is not armed until then.
@@ -115,12 +109,10 @@ public sealed class Guards
         // dependency halfway through recovering takes the whole fleet's probes at once.
         var breaker = new Breaker(settings: new BreakerSettings
         {
+            Name = "search",
             BreakDuration = TimeSpan.FromSeconds(value: 15), // now half of that, plus up to half again
             BreakJitter = Jitter.Equal, // the default
-        })
-        {
-            Name = "search",
-        };
+        });
 
         // </snippet:breaker-jitter>
 
@@ -137,12 +129,10 @@ public sealed class Guards
         // more of each period cold. The ramp gives it a trickle it can actually serve.
         var breaker = new Breaker(settings: new BreakerSettings
         {
+            Name = "search",
             Recovery = Recovery.Over(length: 0.25), // ramp back over a quarter of the break served
             BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
-        })
-        {
-            Name = "search",
-        };
+        });
 
         // </snippet:breaker-recovery>
 
@@ -152,7 +142,7 @@ public sealed class Guards
     [Fact]
     public void A_breaker_can_be_read_and_driven_by_an_operator()
     {
-        var breaker = new Breaker { Name = "payments" };
+        var breaker = Breaker.Of(name: "payments");
 
         // <snippet:breaker-admin>
         var state = breaker.State; // Closed, Open, HalfOpen, Recovering or Isolated
@@ -172,7 +162,7 @@ public sealed class Guards
     public async Task An_open_breaker_rejects_the_call()
     {
         var time = new FakeTimeProvider();
-        var breaker = new Breaker(settings: new BreakerSettings { ConsecutiveFailures = 1, Time = time }) { Name = "payments" };
+        var breaker = new Breaker(settings: new BreakerSettings { Name = "payments", ConsecutiveFailures = 1, Time = time });
         var api = Resilience.Default with { Time = time, Attempts = 1, Breaker = breaker, Backoff = Backoff.None };
         var calls = Sequence.For<int>(time: time).Throws(exception: new IOException(), count: 2).Returns(result: 1);
 
@@ -225,8 +215,8 @@ public sealed class Guards
 
         // <snippet:budget-off>
         // Presets use `RetryBudget.Automatic` to provide a private budget by default.
-        // `RetryBudget.None` disables the budget, which is appropriate for dependencies
-        // that are not shared. `null` also disables the budget.
+        // `RetryBudget.None` is the one spelling of off, which is appropriate for a
+        // dependency that is not shared.
         var unbudgeted = Resilience.Default with { Budget = RetryBudget.None };
 
         // Or tune it, privately to whoever holds the instance.
@@ -237,7 +227,7 @@ public sealed class Guards
 
         Assert.Same(expected: RetryBudget.Automatic, actual: Resilience.Default.Budget);
         Assert.Same(expected: RetryBudget.None, actual: unbudgeted.Budget);
-        Assert.Equal(expected: 0, actual: generous.Budget!.Utilization);
+        Assert.Equal(expected: 0, actual: generous.Budget.Utilization);
     }
 
     [Fact]

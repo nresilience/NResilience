@@ -13,7 +13,7 @@ public static class TestPolicy
         Deadline = Timeout.InfiniteTimeSpan,
         AttemptTimeout = Timeout.InfiniteTimeSpan,
         Backoff = Backoff.None,
-        Budget = null, // null is off - see RetryBudget.Automatic vs. RetryBudget.None
+        Budget = RetryBudget.None,
     };
 
     /// <summary><see cref="Instant" /> with <see cref="Classifier.Http" />.</summary>
@@ -40,7 +40,7 @@ public static class TestPolicy
         {
             Time = time,
             Breaker = policy.Breaker is { } breaker
-                ? new Breaker(breaker.Settings with { Time = time }) { Name = breaker.Name }
+                ? new Breaker(breaker.Settings with { Time = time })
                 : null,
         };
 }

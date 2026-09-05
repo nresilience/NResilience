@@ -184,7 +184,7 @@ that used to stand in for the `null` a section cannot say: `"Multiple": 0`, `"Fr
 | `Factor` | `2` | The multiplier applied per attempt. `1` makes the backoff constant. |
 | `Jitter` | `Full` | How much of the computed delay is randomized. |
 
-- **`ToBackoff(Backoff baseline)`**: Patches `baseline` with whatever the section named. `Jitter` on its own is a modifier rather than a reason to rebuild, so a section naming only `Jitter` leaves a `Constant` curve constant. A non-exponential baseline whose section sets a curve knob gets a fresh exponential built on the shipped defaults.
+`ToPolicy` patches the base policy's `Backoff` with whatever the section named. `Jitter` on its own is a modifier rather than a reason to rebuild, so a section naming only `Jitter` leaves a `Constant` curve constant. A non-exponential baseline whose section sets a curve knob gets a fresh exponential built on the shipped defaults.
 
 ## `BudgetOptions`
 
@@ -197,7 +197,7 @@ that used to stand in for the `null` a section cannot say: `"Multiple": 0`, `"Fr
 | `MinimumPerSecond` | `3` | The floor, in retries per second, below which the fraction does not apply - so a quiet service can still retry at all. |
 | `Shared` | `null` | Names a shared budget, so several policies throttle against one pool. Null gives this policy its own. |
 
-- **`ToBudget(TimeProvider? time = null)`**: Builds the budget, or returns `null` when the section named nothing and the base policy's should stand. A private budget adopts `time`; a shared one does not, because it is process-wide and the first caller's parameters win.
+`ToPolicy` leaves the base policy's `Budget` alone when the section named nothing. A private budget adopts the policy's `Time`; a shared one does not, because it is process-wide and the first caller's parameters win.
 
 For more information on the configuration structure, see [Configuration](../di/configuration.md).
 
@@ -266,7 +266,7 @@ Naming this section rebuilds a `Constant` or `Custom` base curve into an exponen
 
 `BreakerOptions` provides the bindable shape of [`BreakerSettings`](breaker.md) with nullable properties.
 
-- **`ToBreaker(string? name = null)`**: Builds a live `Breaker` instance. A configured breaker is created once per policy and survives configuration reloads, keeping its state.
+`ToPolicy` builds a live `Breaker` instance, named after the policy. A configured breaker is created once per policy and survives configuration reloads, keeping its state.
 
 `Enabled` is `false` for no breaker at all - the only way a later configuration layer can remove one an earlier layer added.
 

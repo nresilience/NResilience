@@ -67,7 +67,6 @@ NResilience.Breaker
 NResilience.Breaker.Breaker(NResilience.BreakerSettings? settings = null) -> void
 NResilience.Breaker.Isolate() -> void
 NResilience.Breaker.Name.get -> string?
-NResilience.Breaker.Name.init -> void
 NResilience.Breaker.NormalFailureRate.get -> double?
 NResilience.Breaker.NormalLatency.get -> System.TimeSpan?
 NResilience.Breaker.OpenedAt.get -> System.DateTimeOffset?
@@ -96,6 +95,8 @@ NResilience.BreakerSettings.MaximumBreakDuration.get -> System.TimeSpan
 NResilience.BreakerSettings.MaximumBreakDuration.init -> void
 NResilience.BreakerSettings.MinimumCalls.get -> int
 NResilience.BreakerSettings.MinimumCalls.init -> void
+NResilience.BreakerSettings.Name.get -> string?
+NResilience.BreakerSettings.Name.init -> void
 NResilience.BreakerSettings.ProbeSuccesses.get -> int
 NResilience.BreakerSettings.ProbeSuccesses.init -> void
 NResilience.BreakerSettings.Recovery.get -> NResilience.Recovery?
@@ -271,6 +272,12 @@ NResilience.MeasuredBase.Spread.get -> double
 NResilience.MeasuredBase.Spread.init -> void
 NResilience.MeasuredBase.Window.get -> System.TimeSpan
 NResilience.MeasuredBase.Window.init -> void
+NResilience.MeasuredValues
+NResilience.MeasuredValues.AttemptCeiling.get -> System.TimeSpan?
+NResilience.MeasuredValues.BackoffBase.get -> System.TimeSpan?
+NResilience.MeasuredValues.Equals(NResilience.MeasuredValues other) -> bool
+NResilience.MeasuredValues.HedgeThreshold.get -> System.TimeSpan?
+NResilience.MeasuredValues.MeasuredValues() -> void
 NResilience.NextAttempt
 NResilience.NextAttempt.CancellationToken.get -> System.Threading.CancellationToken
 NResilience.NextAttempt.NextAttempt() -> void
@@ -322,7 +329,7 @@ NResilience.Resilience.BeforeAttempt.get -> System.Func<NResilience.NextAttempt,
 NResilience.Resilience.BeforeAttempt.init -> void
 NResilience.Resilience.Breaker.get -> NResilience.Breaker?
 NResilience.Resilience.Breaker.init -> void
-NResilience.Resilience.Budget.get -> NResilience.RetryBudget?
+NResilience.Resilience.Budget.get -> NResilience.RetryBudget!
 NResilience.Resilience.Budget.init -> void
 NResilience.Resilience.Classifier.get -> NResilience.Classifier!
 NResilience.Resilience.Classifier.init -> void
@@ -331,8 +338,7 @@ NResilience.Resilience.Deadline.init -> void
 NResilience.Resilience.Equals(NResilience.Resilience? other) -> bool
 NResilience.Resilience.Hedge.get -> NResilience.Hedge?
 NResilience.Resilience.Hedge.init -> void
-NResilience.Resilience.MeasuredAttemptCeiling.get -> System.TimeSpan?
-NResilience.Resilience.MeasuredBackoffBase.get -> System.TimeSpan?
+NResilience.Resilience.Measured.get -> NResilience.MeasuredValues
 NResilience.Resilience.Name.get -> string?
 NResilience.Resilience.Name.init -> void
 NResilience.Resilience.OnEvent.get -> System.Action<NResilience.CallEvent>?
@@ -371,8 +377,6 @@ NResilience.ResilienceNestedRetry.NestedRetryScope.Dispose() -> void
 NResilience.ResilienceNestedRetry.NestedRetryScope.NestedRetryScope() -> void
 NResilience.ResilienceValueTaskExtensions
 NResilience.RetryBudget
-NResilience.RetryBudget.IsAutomatic.get -> bool
-NResilience.RetryBudget.IsNone.get -> bool
 NResilience.RetryBudget.Name.get -> string?
 NResilience.RetryBudget.Utilization.get -> double
 NResilience.SlowCalls
@@ -437,6 +441,8 @@ override NResilience.Hedge.GetHashCode() -> int
 override NResilience.Hedge.ToString() -> string!
 override NResilience.MeasuredBase.GetHashCode() -> int
 override NResilience.MeasuredBase.ToString() -> string!
+override NResilience.MeasuredValues.Equals(object? obj) -> bool
+override NResilience.MeasuredValues.GetHashCode() -> int
 override NResilience.Recovery.GetHashCode() -> int
 override NResilience.Recovery.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
@@ -462,6 +468,7 @@ static NResilience.Backoff.Measured(double multiple = 1, System.TimeSpan? transi
 static NResilience.Backoff.None.get -> NResilience.Backoff
 static NResilience.Backoff.operator !=(NResilience.Backoff left, NResilience.Backoff right) -> bool
 static NResilience.Backoff.operator ==(NResilience.Backoff left, NResilience.Backoff right) -> bool
+static NResilience.Breaker.Of(int consecutiveFailures = 5, System.TimeSpan? breakDuration = null, string? name = null) -> NResilience.Breaker!
 static NResilience.BreakerSettings.operator !=(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
 static NResilience.BreakerSettings.operator ==(NResilience.BreakerSettings? left, NResilience.BreakerSettings? right) -> bool
 static NResilience.CallEvent.Create(NResilience.CallEventKind kind, string? policyName = null, int attemptNumber = 1, NResilience.Verdict verdict = default(NResilience.Verdict), System.TimeSpan duration = default(System.TimeSpan), System.TimeSpan? delay = null, System.Exception? exception = null, object? result = null, NResilience.StopReason? reason = null) -> NResilience.CallEvent
@@ -482,6 +489,8 @@ static NResilience.Http.ResilienceHttpRequestExtensions.MarkSingleShot(this Syst
 static NResilience.MeasuredBase.Times(double multiple = 1) -> NResilience.MeasuredBase
 static NResilience.MeasuredBase.operator !=(NResilience.MeasuredBase left, NResilience.MeasuredBase right) -> bool
 static NResilience.MeasuredBase.operator ==(NResilience.MeasuredBase left, NResilience.MeasuredBase right) -> bool
+static NResilience.MeasuredValues.operator !=(NResilience.MeasuredValues left, NResilience.MeasuredValues right) -> bool
+static NResilience.MeasuredValues.operator ==(NResilience.MeasuredValues left, NResilience.MeasuredValues right) -> bool
 static NResilience.Recovery.Over(double length = 0.25) -> NResilience.Recovery
 static NResilience.Recovery.operator !=(NResilience.Recovery left, NResilience.Recovery right) -> bool
 static NResilience.Recovery.operator ==(NResilience.Recovery left, NResilience.Recovery right) -> bool
