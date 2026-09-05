@@ -109,8 +109,8 @@ public sealed class ChaosTests
         var time = new FakeTimeProvider();
         var chaos = new Chaos { Enabled = true, LatencyRate = 1, Latency = TimeSpan.FromMinutes(5), Time = time };
 
-        var policy = (TestPolicy.On(time) with { Attempts = 1, AttemptTimeout = TimeSpan.FromSeconds(1) })
-            .UseClock(time);
+        var policy = (TestPolicy.WithClock(time) with { Attempts = 1, AttemptTimeout = TimeSpan.FromSeconds(1) })
+            .WithClock(time);
 
         var call = policy.TryRunAsync(chaos.Inject(static _ => Task.FromResult(1)));
 
@@ -289,7 +289,7 @@ public sealed class ChaosTests
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
         var handler = new ChaosHandler(chaos) { InnerHandler = transport };
 
-        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.On(time) with { Classifier = Classifier.Http }));
+        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.WithClock(time) with { Classifier = Classifier.Http }));
         var call = client.GetAsync(new Uri("https://api.test/thing"));
 
         while (!call.IsCompleted)

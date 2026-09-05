@@ -29,7 +29,7 @@ foreach (var (service, breaker) in interceptor.Breakers())
 | `static m => m.FullName` | Per method. | One method has failure modes the others do not share - an expensive report next to a cheap lookup. |
 | `null` | One scope for the whole client. | The client fronts one coherent service and you want its breaker to see every call. |
 
-The registry is bounded by `MaxScopes`, which defaults to 1024 - far above the method count of any real service. Keys past that bound drop the least-recently-seen entries. There is no unbounded mode: unbounded keying is a memory leak with a breaker and a budget on every entry.
+The registry is bounded by `MaximumScopes`, which defaults to 1024 - far above the method count of any real service. Keys past that bound drop the least-recently-seen entries. There is no unbounded mode: unbounded keying is a memory leak with a breaker and a budget on every entry.
 
 ## Where the breaker comes from
 
@@ -37,7 +37,19 @@ The registry is bounded by `MaxScopes`, which defaults to 1024 - far above the m
 
 A policy that already carries a `Breaker` keeps it: an explicit breaker is a deliberate scope decision, and this switch does not overrule it. That breaker then acts as a *prototype* - each key gets one of its own with those settings, because sharing a single breaker's state across every key would defeat the point of keying.
 
-The retry budget follows the same rule. `RetryBudget.Automatic` - the shipped default - means "no scope decision was made", so each key gets its own. A [shared budget](../features/retry-budget.md) is a deliberate decision and is left as is.
+## Where the budget comes from
+
+`BudgetPerScope` is on by default, and for the same reason `BreakerPerScope` is: a storm against one service must not throttle retries to another. It is the gRPC counterpart of the HTTP handler's [`BudgetPerHost`](../http/per-host-scope.md).
+
+`RetryBudget.Automatic` - the shipped default - means "no scope decision was made", so each key gets its own budget. A [shared budget](../features/retry-budget.md) is a deliberate decision and is left as is, `RetryBudget.None` included.
+
+Turning `BudgetPerScope` off gives every scope one budget between them, which is the right reading for a client whose methods all front one dependency:
+
+| Desired scope | Configuration |
+| :--- | :--- |
+| One budget per scope (default) | No change required. |
+| One budget for the whole client | `BudgetPerScope = false`, or set `Budget` to a `RetryBudget.Of(...)` or `RetryBudget.Shared(...)` instance. |
+| No retry budget | Set `Budget` to `RetryBudget.None`. |
 
 ## Where the state lives
 

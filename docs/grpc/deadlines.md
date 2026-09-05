@@ -16,7 +16,7 @@ var options = new GrpcResilienceOptions
 {
     // Each attempt's ceiling is written into CallOptions.Deadline, which grpc-dotnet sends
     // as the standard grpc-timeout header. On by default.
-    PropagateAttemptDeadline = true,
+    PropagateDeadline = true,
 
     // How much longer than the attempt ceiling the wire deadline is set. Not zero: it is
     // what keeps NResilience's own timer ahead of grpc-dotnet's, so a timed-out attempt
@@ -30,6 +30,8 @@ var options = new GrpcResilienceOptions
 <!-- endsnippet -->
 
 With the shipped preset, a gRPC call gets a 10-second per-attempt ceiling the server can see, inside a 30-second overall deadline.
+
+`PropagateDeadline` is the same switch the [HTTP handler](../http/index.md) carries under the same name, and the one difference between them is deliberate: it is **on** here and **off** for HTTP. `grpc-timeout` is a protocol field every gRPC peer already honors, so sending it costs nothing and is never misread. The HTTP header is a convention this library invented, and a header the other side does not read is not worth sending by default.
 
 ## Why the slack is not zero
 

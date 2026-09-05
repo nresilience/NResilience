@@ -233,7 +233,7 @@ NResilience.HttpResilienceOptions.DeadlineHeader.set -> void
 NResilience.HttpResilienceOptions.DetectNestedRetries.get -> bool
 NResilience.HttpResilienceOptions.DetectNestedRetries.set -> void
 NResilience.HttpResilienceOptions.HttpResilienceOptions() -> void
-NResilience.HttpResilienceOptions.MaximumHosts.get -> int?
+NResilience.HttpResilienceOptions.MaximumHosts.get -> int
 NResilience.HttpResilienceOptions.MaximumHosts.set -> void
 NResilience.HttpResilienceOptions.OwnTransportTimeout.get -> bool
 NResilience.HttpResilienceOptions.OwnTransportTimeout.set -> void

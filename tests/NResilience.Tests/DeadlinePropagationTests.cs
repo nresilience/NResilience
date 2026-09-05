@@ -144,7 +144,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var attempts = 0;
 
-        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(30), Classifier = Classifier.Http };
+        var policy = TestPolicy.WithClock(time) with { Deadline = TimeSpan.FromSeconds(30), Classifier = Classifier.Http };
 
         using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(200), time);
 
@@ -165,7 +165,7 @@ public sealed class DeadlinePropagationTests
     {
         var time = new FakeTimeProvider();
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Deadline = TimeSpan.FromSeconds(1),
             UseAmbientDeadline = true,
@@ -190,7 +190,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var ran = false;
 
-        var policy = TestPolicy.On(time) with { UseAmbientDeadline = true };
+        var policy = TestPolicy.WithClock(time) with { UseAmbientDeadline = true };
 
         using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(50), time);
         time.Advance(TimeSpan.FromSeconds(1));
@@ -236,7 +236,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var ran = false;
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             UseAmbientDeadline = true,
             Admit = _ => Task.FromResult(Verdict.Ok),
@@ -261,7 +261,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var ran = false;
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             UseAmbientDeadline = true,
             Hedge = Hedge.At(),
@@ -299,7 +299,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Deadline = TimeSpan.FromSeconds(30),
             AttemptTimeout = TimeSpan.FromSeconds(3),
@@ -322,7 +322,7 @@ public sealed class DeadlinePropagationTests
         // Each attempt burns two seconds of the ten the deadline allows.
         var transport = new AdvancingTransport(time, TimeSpan.FromSeconds(2), HttpStatusCode.ServiceUnavailable);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 3,
             Deadline = TimeSpan.FromSeconds(10),
@@ -342,7 +342,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Deadline = TimeSpan.FromSeconds(30),
             Classifier = Classifier.Http,
@@ -365,7 +365,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
+        var policy = TestPolicy.WithClock(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
         var options = new HttpResilienceOptions { PropagateDeadline = true, DeadlineHeader = "X-Budget" };
 
         using var client = new HttpClient(new ResilienceHandler(transport, policy, options));
@@ -395,7 +395,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
+        var policy = TestPolicy.WithClock(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
 
         using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));

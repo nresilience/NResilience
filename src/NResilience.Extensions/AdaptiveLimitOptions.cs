@@ -33,7 +33,7 @@ namespace NResilience.Extensions;
 ///         <b>The signal.</b> Latency under load reveals queueing, and queueing is the only observable
 ///         difference between a dependency that is keeping up and one that is not. The limiter compares
 ///         the fastest call of a recent round against a baseline of what fast has recently meant; when
-///         even the fastest call of the round is <see cref="Threshold" /> times the baseline, there is a
+///         even the fastest call of the round is <see cref="Multiple" /> times the baseline, there is a
 ///         queue somewhere downstream and the limit shrinks by <see cref="DecreaseFactor" />. When there
 ///         is not, and the limit is what is actually constraining the caller, it grows by one.
 ///     </para>
@@ -90,7 +90,7 @@ public sealed class AdaptiveLimitOptions
     ///         higher tolerates more queueing before reacting.
     ///     </para>
     /// </summary>
-    public double Threshold { get; set; } = 2.0;
+    public double Multiple { get; set; } = 2.0;
 
     /// <summary>
     ///     What the limit is multiplied by when a round says there is queueing. Default 0.9, and it must
@@ -122,8 +122,8 @@ public sealed class AdaptiveLimitOptions
         if (Initial < Minimum || Initial > Maximum)
             problems.Add($"Initial must be between Minimum and Maximum; it is {Initial}, and the range is {Minimum} to {Maximum}.");
 
-        if (double.IsNaN(Threshold) || Threshold <= 1)
-            problems.Add($"Threshold must be greater than 1; it is {Threshold}. A threshold of 1 or less makes every round look congested.");
+        if (double.IsNaN(Multiple) || Multiple <= 1)
+            problems.Add($"Multiple must be greater than 1; it is {Multiple}. A multiple of 1 or less makes every round look congested.");
 
         if (double.IsNaN(DecreaseFactor) || DecreaseFactor <= 0 || DecreaseFactor >= 1)
             problems.Add($"DecreaseFactor must be strictly between 0 and 1; it is {DecreaseFactor}. At 1 the limit never shrinks.");

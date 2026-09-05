@@ -113,5 +113,5 @@ static NResilience.Testing.Sequence.For<T>(System.TimeProvider? time = null) -> 
 static NResilience.Testing.Sequence.ForVoid(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<NResilience.Testing.Unit>!
 static NResilience.Testing.TestPolicy.Instant.get -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.InstantHttp.get -> NResilience.Resilience!
-static NResilience.Testing.TestPolicy.On(System.TimeProvider! time) -> NResilience.Resilience!
-static NResilience.Testing.TestPolicy.UseClock(this NResilience.Resilience! policy, System.TimeProvider! time) -> NResilience.Resilience!
+static NResilience.Testing.TestPolicy.WithClock(System.TimeProvider! time) -> NResilience.Resilience!
+static NResilience.Testing.TestPolicy.WithClock(this NResilience.Resilience! policy, System.TimeProvider! time) -> NResilience.Resilience!

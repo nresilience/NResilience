@@ -44,7 +44,7 @@ public sealed class AdaptiveLimitTests
         Assert.Equal(20, options.Initial);
         Assert.Equal(4, options.Minimum);
         Assert.Equal(200, options.Maximum);
-        Assert.Equal(2.0, options.Threshold);
+        Assert.Equal(2.0, options.Multiple);
         Assert.Equal(0.9, options.DecreaseFactor);
     }
 
@@ -59,27 +59,27 @@ public sealed class AdaptiveLimitTests
             Minimum = 0,
             Maximum = 5,
             Initial = 50,
-            Threshold = 1,
+            Multiple = 1,
             DecreaseFactor = 1,
         }.Validate());
 
         Assert.Equal(4, error.Problems.Count);
         Assert.Contains(error.Problems, p => p.StartsWith("Minimum", StringComparison.Ordinal));
         Assert.Contains(error.Problems, p => p.StartsWith("Initial", StringComparison.Ordinal));
-        Assert.Contains(error.Problems, p => p.StartsWith("Threshold", StringComparison.Ordinal));
+        Assert.Contains(error.Problems, p => p.StartsWith("Multiple", StringComparison.Ordinal));
         Assert.Contains(error.Problems, p => p.StartsWith("DecreaseFactor", StringComparison.Ordinal));
     }
 
     /// <summary>
-    ///     A threshold of 1 or less makes every round look congested, so the limit would walk to its
+    ///     A multiple of 1 or less makes every round look congested, so the limit would walk to its
     ///     floor and stay there whatever the dependency was doing.
     /// </summary>
     [Theory]
     [InlineData(1.0)]
     [InlineData(0.5)]
     [InlineData(double.NaN)]
-    public void A_threshold_that_calls_everything_congested_is_refused(double threshold) =>
-        Assert.Throws<ResilienceConfigurationException>(() => new AdaptiveLimitOptions { Threshold = threshold }.Validate());
+    public void A_multiple_that_calls_everything_congested_is_refused(double multiple) =>
+        Assert.Throws<ResilienceConfigurationException>(() => new AdaptiveLimitOptions { Multiple = multiple }.Validate());
 
     /// <summary>At 1 the limit never shrinks, which is the one thing the loop is for.</summary>
     [Theory]
@@ -391,7 +391,7 @@ public sealed class AdaptiveLimitTests
     ///     process discovers, and when that capacity halves the limit follows it down without anybody
     ///     redeploying a number.
     ///     <para>
-    ///         The equilibrium is around <c>Threshold x capacity</c> rather than capacity itself, and
+    ///         The equilibrium is around <c>Multiple x capacity</c> rather than capacity itself, and
     ///         that is what the threshold means: two times the baseline latency is the queue depth this
     ///         configuration is willing to tolerate. What matters is that it converges there instead of
     ///         at the ceiling, and that it moves when the capacity does.

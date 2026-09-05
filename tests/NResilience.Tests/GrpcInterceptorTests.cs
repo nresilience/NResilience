@@ -298,7 +298,7 @@ public sealed class GrpcInterceptorTests
     public async Task No_deadline_is_written_when_propagation_is_off()
     {
         var script = new GrpcScript().Responds("ok");
-        var options = new GrpcResilienceOptions { PropagateAttemptDeadline = false };
+        var options = new GrpcResilienceOptions { PropagateDeadline = false };
 
         using var call = Call(new ResilienceInterceptor(Policy(), options), script);
         await call.ResponseAsync;
@@ -389,7 +389,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task A_method_the_registration_marked_unrepeatable_gets_one_attempt()
     {
-        var options = new GrpcResilienceOptions { IsRepeatable = static m => m.Name != "ChargeCard" };
+        var options = new GrpcResilienceOptions { RepeatableWhen = static m => m.Name != "ChargeCard" };
         var interceptor = new ResilienceInterceptor(Policy(), options);
         var script = new GrpcScript().Fail(StatusCode.Unavailable);
 
@@ -439,6 +439,55 @@ public sealed class GrpcInterceptorTests
 
         Assert.Equal(["orders.Orders", "shipping.Shipping"], interceptor.Breakers().Keys.Order());
         Assert.Equal(["orders.Orders", "shipping.Shipping"], interceptor.Budgets().Keys.Order());
+    }
+
+    /// <summary>
+    ///     The gRPC counterpart of <c>HttpResilienceOptions.BudgetPerHost</c>: off, the scopes share
+    ///     one budget instead of getting one each, so a storm against one service does throttle
+    ///     retries to the next - which is the whole reason the switch defaults to on.
+    /// </summary>
+    [Fact]
+    public async Task Budget_per_scope_off_gives_two_services_one_budget()
+    {
+        var interceptor = Interceptor(Policy(), new GrpcResilienceOptions { BudgetPerScope = false });
+
+        using (var first = Call(interceptor, new GrpcScript().Responds("ok")))
+        {
+            await first.ResponseAsync;
+        }
+
+        using (var second = Call(interceptor, new GrpcScript().Responds("ok"), method: Ship))
+        {
+            await second.ResponseAsync;
+        }
+
+        var budgets = interceptor.Budgets();
+
+        Assert.Equal(["orders.Orders", "shipping.Shipping"], budgets.Keys.Order());
+        Assert.Same(budgets["orders.Orders"], budgets["shipping.Shipping"]);
+    }
+
+    /// <summary>
+    ///     An explicit budget is a deliberate scope decision, so the switch being on does not
+    ///     overrule it - the same rule the breaker follows.
+    /// </summary>
+    [Fact]
+    public async Task An_explicit_budget_survives_budget_per_scope()
+    {
+        var shared = RetryBudget.Of();
+        var interceptor = Interceptor(Policy() with { Budget = shared });
+
+        using (var first = Call(interceptor, new GrpcScript().Responds("ok")))
+        {
+            await first.ResponseAsync;
+        }
+
+        using (var second = Call(interceptor, new GrpcScript().Responds("ok"), method: Ship))
+        {
+            await second.ResponseAsync;
+        }
+
+        Assert.All(interceptor.Budgets().Values, budget => Assert.Same(shared, budget));
     }
 
     [Fact]
@@ -521,7 +570,7 @@ public sealed class GrpcInterceptorTests
     /// <summary>The shipped policy with the backoff taken out, so a suite of retries costs no wall clock.</summary>
     private static Resilience Policy() => GrpcResilience.Default with { Backoff = Backoff.None };
 
-    private static ResilienceInterceptor Interceptor(Resilience? policy = null) => new(policy ?? Policy());
+    private static ResilienceInterceptor Interceptor(Resilience? policy = null, GrpcResilienceOptions? options = null) => new(policy ?? Policy(), options);
 
     private static AsyncUnaryCall<string> Call(
         ResilienceInterceptor interceptor,

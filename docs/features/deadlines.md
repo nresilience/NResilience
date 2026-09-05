@@ -164,6 +164,8 @@ The value is the attempt's own ceiling - `min(AttemptTimeout, time left on the d
 > [!NOTE]
 > `grpc-timeout` is not a drop-in name for it. gRPC's value carries a unit suffix rather than a bare count of milliseconds, and the gRPC client stack already propagates its own deadlines from `CallOptions.Deadline`.
 
+The [gRPC integration](../grpc/deadlines.md) carries the same switch under the same name, and the one difference is deliberate: it is **on** there and **off** here. `grpc-timeout` is a protocol field every gRPC peer already honors; `X-Deadline-Ms` is a convention this library invented, and a header the other side does not read is not worth sending by default.
+
 ### Inherit the deadline
 
 Set `UseAmbientDeadline` on the policy, and the effective deadline becomes `min(Deadline, the time the caller is still waiting)`:

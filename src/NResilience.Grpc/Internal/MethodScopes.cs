@@ -61,11 +61,20 @@ internal sealed class MethodScopes
             template = policy with { Breaker = new Breaker(settings) };
         }
 
+        // The Automatic marker means "no deliberate scope decision was made", which is what per-scope
+        // scoping is allowed to override. An explicit instance, RetryBudget.None included, is not.
+        // Turning the switch off is itself a decision, so it is spelled the way a caller would spell
+        // it by hand: one real budget on the template, which PolicyScope then shares across keys
+        // rather than replacing.
+        if (!options.BudgetPerScope && policy.Budget.IsAutomatic)
+            template = template with { Budget = RetryBudget.Of(time: policy.Time) };
+
         if (_scopeBy is not null)
         {
             // The template's breaker is a prototype: PolicyScope gives each key one of its own with
-            // those settings, which is the whole point of keying.
-            _keyed = new PolicyScope<string>(template, maximumKeys: options.MaxScopes, comparer: StringComparer.Ordinal);
+            // those settings, which is the whole point of keying. Its budget is not - an explicit
+            // instance is shared, which is how BudgetPerScope = false takes effect.
+            _keyed = new PolicyScope<string>(template, maximumKeys: options.MaximumScopes, comparer: StringComparer.Ordinal);
             return;
         }
 

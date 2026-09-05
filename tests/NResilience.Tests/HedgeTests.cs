@@ -687,7 +687,7 @@ public sealed class HedgeTests
         for (var i = 0; i < 40; i++)
         {
             // A fresh instance every time, which is a fresh estimate every time.
-            var fresh = TestPolicy.On(time) with { Hedge = Hedge.At() with { Window = Window }, OnEvent = events.Record };
+            var fresh = TestPolicy.WithClock(time) with { Hedge = Hedge.At() with { Window = Window }, OnEvent = events.Record };
 
             await fresh.RunAsync(_ =>
             {
@@ -979,7 +979,7 @@ public sealed class HedgeTests
         var recorder = new EventRecorder();
         events = recorder;
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Name = "api",
             Hedge = Hedge.At() with { Window = Window },
@@ -1080,7 +1080,7 @@ public sealed class HedgeTests
     /// <summary>An <see cref="HttpClient" /> whose handler hedges, on the test clock.</summary>
     private static HttpClient HedgingClient(HttpMessageHandler transport, FakeTimeProvider time)
     {
-        var policy = TestPolicy.InstantHttp.UseClock(time) with { Hedge = Hedge.At() with { Window = Window } };
+        var policy = TestPolicy.InstantHttp.WithClock(time) with { Hedge = Hedge.At() with { Window = Window } };
 
         return new HttpClient(new ResilienceHandler(transport, policy));
     }

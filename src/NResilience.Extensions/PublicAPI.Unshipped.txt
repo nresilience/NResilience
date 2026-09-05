@@ -13,8 +13,8 @@ NResilience.Extensions.AdaptiveLimitOptions.Maximum.get -> int
 NResilience.Extensions.AdaptiveLimitOptions.Maximum.set -> void
 NResilience.Extensions.AdaptiveLimitOptions.Minimum.get -> int
 NResilience.Extensions.AdaptiveLimitOptions.Minimum.set -> void
-NResilience.Extensions.AdaptiveLimitOptions.Threshold.get -> double
-NResilience.Extensions.AdaptiveLimitOptions.Threshold.set -> void
+NResilience.Extensions.AdaptiveLimitOptions.Multiple.get -> double
+NResilience.Extensions.AdaptiveLimitOptions.Multiple.set -> void
 NResilience.Extensions.AdaptiveLimitOptions.Validate() -> void
 NResilience.Extensions.AdaptiveLimiter
 NResilience.Extensions.AdaptiveLimiter.Baseline.get -> System.TimeSpan?

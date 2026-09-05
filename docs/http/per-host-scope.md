@@ -18,7 +18,7 @@ Each of those breakers measures that host's own normal latency and error rate, b
 
 ## Bound the host registry
  
-The registry keeps 1024 hosts by default. Use `MaximumHosts` to change the cap, or set it to `null` to remove it:
+The registry keeps 1024 hosts by default. Use `MaximumHosts` to change the cap:
  
 <!-- snippet: http-max-hosts -->
 ```csharp
@@ -29,6 +29,8 @@ var handler = new ResilienceHandler(options: new HttpResilienceOptions { Maximum
 The set of hosts a client talks to is usually a property of the application, not its traffic, so the cap is usually invisible. For a proxy, a crawler, or a webhook dispatcher that reaches it, the least-recently-seen hosts are dropped.
  
 Eviction is approximate: a host seen since the last sweep survives the next one, and the registry can briefly exceed its cap while a sweep catches up. The cap bounds growth, and no request ever waits on a sweep.
+
+There is no unbounded mode, for the reason [`PolicyScope<TKey>`](../features/policy-scope.md) has none: unbounded keying is a memory leak with a breaker and a budget on every entry. `MaximumHosts` must be at least 1, and `int.MaxValue` is how you say "effectively unbounded" if you want it anyway.
  
 > [!IMPORTANT]
 > Eviction discards state. A dropped host forgets if its breaker was open. If this loss of protection is unacceptable, set `BreakerPerHost` and `BudgetPerHost` to `false` and define the guard scope directly on the policy instead.

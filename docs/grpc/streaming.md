@@ -50,7 +50,7 @@ Dispose the call. `IAsyncStreamReader<T>` is not disposable, so disposing the ca
 
 ## Repeatability applies here too
 
-[`IsRepeatable`](idempotency.md) and [`GrpcResilience.SingleShot()`](idempotency.md#per-call-singleshot) gate a stream exactly as they gate a unary call, with the same default. A server-streaming method that is not repeatable gets one attempt, and a failure before its first message reaches you directly.
+[`RepeatableWhen`](idempotency.md) and [`GrpcResilience.SingleShot()`](idempotency.md#per-call-singleshot) gate a stream exactly as they gate a unary call, with the same default. A server-streaming method that is not repeatable gets one attempt, and a failure before its first message reaches you directly.
 
 ## Client-streaming and duplex calls pass through
 

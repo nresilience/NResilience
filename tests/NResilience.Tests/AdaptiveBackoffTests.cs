@@ -398,7 +398,7 @@ public sealed class AdaptiveBackoffTests
         var recorder = new EventRecorder();
         events = recorder;
 
-        return TestPolicy.On(time) with
+        return TestPolicy.WithClock(time) with
         {
             Name = "api",
             Attempts = 1,

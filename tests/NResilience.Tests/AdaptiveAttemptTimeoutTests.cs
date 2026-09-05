@@ -417,7 +417,7 @@ public sealed class AdaptiveAttemptTimeoutTests
     {
         var time = new FakeTimeProvider();
 
-        var policy = Resilience.None.UseClock(time) with
+        var policy = Resilience.None.WithClock(time) with
         {
             Adaptive = true,
             AttemptCeiling = AttemptCeiling.Above() with { Window = Window },
@@ -476,7 +476,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var recorder = new EventRecorder();
         events = recorder;
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Name = "api",
             Attempts = 1,

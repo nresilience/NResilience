@@ -9,19 +9,21 @@ NResilience.Grpc.GrpcResilienceOptions.BreakerPerScope.get -> bool
 NResilience.Grpc.GrpcResilienceOptions.BreakerPerScope.set -> void
 NResilience.Grpc.GrpcResilienceOptions.BreakerSettings.get -> NResilience.BreakerSettings?
 NResilience.Grpc.GrpcResilienceOptions.BreakerSettings.set -> void
+NResilience.Grpc.GrpcResilienceOptions.BudgetPerScope.get -> bool
+NResilience.Grpc.GrpcResilienceOptions.BudgetPerScope.set -> void
 NResilience.Grpc.GrpcResilienceOptions.DeadlineSlack.get -> System.TimeSpan
 NResilience.Grpc.GrpcResilienceOptions.DeadlineSlack.set -> void
 NResilience.Grpc.GrpcResilienceOptions.DetectNestedRetries.get -> bool
 NResilience.Grpc.GrpcResilienceOptions.DetectNestedRetries.set -> void
 NResilience.Grpc.GrpcResilienceOptions.GrpcResilienceOptions() -> void
-NResilience.Grpc.GrpcResilienceOptions.IsRepeatable.get -> System.Func<Grpc.Core.IMethod!, bool>!
-NResilience.Grpc.GrpcResilienceOptions.IsRepeatable.set -> void
-NResilience.Grpc.GrpcResilienceOptions.MaxScopes.get -> int
-NResilience.Grpc.GrpcResilienceOptions.MaxScopes.set -> void
+NResilience.Grpc.GrpcResilienceOptions.MaximumScopes.get -> int
+NResilience.Grpc.GrpcResilienceOptions.MaximumScopes.set -> void
 NResilience.Grpc.GrpcResilienceOptions.OwnTransportTimeout.get -> bool
 NResilience.Grpc.GrpcResilienceOptions.OwnTransportTimeout.set -> void
-NResilience.Grpc.GrpcResilienceOptions.PropagateAttemptDeadline.get -> bool
-NResilience.Grpc.GrpcResilienceOptions.PropagateAttemptDeadline.set -> void
+NResilience.Grpc.GrpcResilienceOptions.PropagateDeadline.get -> bool
+NResilience.Grpc.GrpcResilienceOptions.PropagateDeadline.set -> void
+NResilience.Grpc.GrpcResilienceOptions.RepeatableWhen.get -> System.Func<Grpc.Core.IMethod!, bool>!
+NResilience.Grpc.GrpcResilienceOptions.RepeatableWhen.set -> void
 NResilience.Grpc.GrpcResilienceOptions.ScopeBy.get -> System.Func<Grpc.Core.IMethod!, string!>?
 NResilience.Grpc.GrpcResilienceOptions.ScopeBy.set -> void
 NResilience.Grpc.GrpcResilienceOptions.Validate() -> void

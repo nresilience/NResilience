@@ -191,7 +191,7 @@ public sealed class DoomedAttemptTests
     ///     that the estimate is the only thing standing between a failure and the next attempt.
     /// </summary>
     private static Resilience Measured(FakeTimeProvider time, BreakerSettings? settings = null) =>
-        TestPolicy.On(time) with
+        TestPolicy.WithClock(time) with
         {
             Name = "api",
             Attempts = 3,

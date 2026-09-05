@@ -137,11 +137,11 @@ var api = TestPolicy.Instant;
 
 `TestPolicy.InstantHttp` is the same shape with `Classifier = Classifier.Http`, for a test that scripts HTTP status codes rather than a custom classifier.
 
-To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.On(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker, and its budget all advance together - the same pairing the [Control the clock](#control-the-clock) section makes by hand with `Time = time`:
+To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.WithClock(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker, and its budget all advance together - the same pairing the [Control the clock](#control-the-clock) section makes by hand with `Time = time`:
 
 ```csharp
 var time = new FakeTimeProvider();
-var api = TestPolicy.On(time);
+var api = TestPolicy.WithClock(time);
 ```
 
 ## Verify policy behavior

@@ -35,14 +35,14 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `BreakerPerHost` | `true` | Enables per-host circuit breakers. If the policy already carries an explicit `Breaker`, that breaker is used instead. |
 | `BreakerSettings` | `null` | The settings used to create per-host breakers. |
 | `BudgetPerHost` | `true` | Enables per-host retry budgets. An explicit `Budget` (including `RetryBudget.None`) takes precedence. `RetryBudget.Automatic` does not specify a scope, so per-host scoping applies. |
-| `MaximumHosts` | `1024` | The number of hosts the per-host registry keeps. `null` is unbounded; the least-recently-seen hosts are dropped past the cap. |
+| `MaximumHosts` | `1024` | The number of hosts the per-host registry keeps. At least 1; the least-recently-seen hosts are dropped past the cap. There is no unbounded mode - `int.MaxValue` is as close as it gets. |
 | `DetectNestedRetries` | `true` | Whether the nested-retry header is added to requests and whether nesting is reported. |
-| `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. |
+| `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. The gRPC switch of the same name defaults to `true`, because `grpc-timeout` is a protocol field rather than a convention. |
 | `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `ResilienceDeadline.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
 
 | Method | Description |
 | :--- | :--- |
-| `Validate()` | Throws `ResilienceConfigurationException` listing every problem at once. `ResilienceHandler`'s constructor calls it beside the policy's own `Validate()`, so a bad header name or bad `BreakerSettings` fails there rather than from the middle of a request. `MaximumHosts` is not checked: zero or less is documented as unbounded rather than as a mistake. |
+| `Validate()` | Throws `ResilienceConfigurationException` listing every problem at once. `ResilienceHandler`'s constructor calls it beside the policy's own `Validate()`, so a bad header name or bad `BreakerSettings` fails there rather than from the middle of a request. `MaximumHosts` below 1 is a problem it reports. |
 | `Validated()` | Runs `Validate()` and returns the options, so a bad configuration throws where it is written. |
 
 ## `HttpResilience`

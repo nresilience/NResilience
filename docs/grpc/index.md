@@ -54,7 +54,7 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
         o =>
         {
             // A charge must not be repeated, whatever the transport says.
-            o.IsRepeatable = static method => method.Name != "ChargeCard";
+            o.RepeatableWhen = static method => method.Name != "ChargeCard";
 
             // One breaker per method rather than per service.
             o.ScopeBy = static method => method.FullName;
@@ -64,12 +64,13 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
 
 | Option | Default | Description | Reference |
 | :--- | :--- | :--- | :--- |
-| `IsRepeatable` | every method | Decides whether a method may be repeated. | [Idempotency](idempotency.md) |
+| `RepeatableWhen` | every method | Decides whether a method may be repeated. | [Idempotency](idempotency.md) |
 | `ScopeBy` | `m => m.ServiceName` | The breaker, budget, and latency-window scope key. `null` is one scope per client. | [Per-service scope](per-service-scope.md) |
-| `MaxScopes` | `1024` | Bounds the scope registry. | [Per-service scope](per-service-scope.md) |
+| `MaximumScopes` | `1024` | Bounds the scope registry. | [Per-service scope](per-service-scope.md) |
 | `BreakerPerScope` | `true` | Gives each scope its own circuit breaker. | [Per-service scope](per-service-scope.md) |
 | `BreakerSettings` | `null` | The settings those breakers are built with. | [Breaker](../reference/breaker.md) |
-| `PropagateAttemptDeadline` | `true` | Writes the attempt ceiling into `CallOptions.Deadline`. | [Deadlines](deadlines.md) |
+| `BudgetPerScope` | `true` | Gives each scope its own retry budget. | [Per-service scope](per-service-scope.md#where-the-budget-comes-from) |
+| `PropagateDeadline` | `true` | Writes the attempt ceiling into `CallOptions.Deadline`. On here and off for HTTP, on purpose. | [Deadlines](deadlines.md) |
 | `DeadlineSlack` | `50 ms` | How much longer than the ceiling that deadline is set. | [Deadlines](deadlines.md#why-the-slack-is-not-zero) |
 | `OwnTransportTimeout` | `true` | Sets `HttpClient.Timeout` to infinite so it stops competing with the deadline. | [Deadlines](deadlines.md#who-bounds-what) |
 | `DetectNestedRetries` | `true` | Stamps and reads the nested-retry marker. | [Nested retries](../http/nested-retries.md) |

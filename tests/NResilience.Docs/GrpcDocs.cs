@@ -41,7 +41,7 @@ public sealed class GrpcDocs
                 o =>
                 {
                     // A charge must not be repeated, whatever the transport says.
-                    o.IsRepeatable = static method => method.Name != "ChargeCard";
+                    o.RepeatableWhen = static method => method.Name != "ChargeCard";
 
                     // One breaker per method rather than per service.
                     o.ScopeBy = static method => method.FullName;
@@ -132,7 +132,7 @@ public sealed class GrpcDocs
         {
             // Each attempt's ceiling is written into CallOptions.Deadline, which grpc-dotnet sends
             // as the standard grpc-timeout header. On by default.
-            PropagateAttemptDeadline = true,
+            PropagateDeadline = true,
 
             // How much longer than the attempt ceiling the wire deadline is set. Not zero: it is
             // what keeps NResilience's own timer ahead of grpc-dotnet's, so a timed-out attempt

@@ -212,7 +212,7 @@ public sealed class GrpcStreamingTests
     [Fact]
     public async Task A_method_that_may_not_be_repeated_gets_one_attempt()
     {
-        var options = new GrpcResilienceOptions { IsRepeatable = static method => method.Name != "Drain" };
+        var options = new GrpcResilienceOptions { RepeatableWhen = static method => method.Name != "Drain" };
         var script = new GrpcStreamScript().Fail(StatusCode.Unavailable);
 
         using var call = Call(new ResilienceInterceptor(Policy(), options), script, method: Drain);

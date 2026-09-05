@@ -143,7 +143,7 @@ public sealed class StreamingTryRunTests
             .Throws(new IOException())
             .YieldsAfter(TimeSpan.FromSeconds(30), 1);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.RetryEverything,
             Deadline = TimeSpan.FromSeconds(1),

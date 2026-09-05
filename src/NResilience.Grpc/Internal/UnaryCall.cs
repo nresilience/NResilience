@@ -229,7 +229,7 @@ internal sealed class UnaryCall<TRequest, TResponse>
         ours = false;
         ceiling = Timeout.InfiniteTimeSpan;
 
-        if (!_options.PropagateAttemptDeadline)
+        if (!_options.PropagateDeadline)
             return options;
 
         ceiling = GrpcCall.Tighter(Policy.AttemptTimeout, Remaining());

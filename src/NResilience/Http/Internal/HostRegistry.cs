@@ -88,7 +88,7 @@ internal sealed class HostRegistry
     {
         _scopes = new ScopeRegistry<string, HostScope>(
             host => new HostScope(policy, host, options),
-            options.MaximumHosts ?? 0,
+            options.MaximumHosts,
             StringComparer.OrdinalIgnoreCase);
     }
 

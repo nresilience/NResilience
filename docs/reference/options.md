@@ -325,7 +325,7 @@ The range an [adaptive concurrency limit](../features/rate-limiting.md) may move
 | `Initial` | `20` | Where the limit starts, before there is anything to measure. |
 | `Minimum` | `4` | The floor. A liveness guarantee: without one, a persistently slow dependency drives the limit to zero and the recovery is never sampled. |
 | `Maximum` | `200` | The ceiling. What bounds the damage when the baseline is measured wrong. |
-| `Threshold` | `2.0` | How many times the baseline latency counts as queueing. Must be greater than 1. |
+| `Multiple` | `2.0` | How many times the baseline latency counts as queueing. Must be greater than 1. |
 | `DecreaseFactor` | `0.9` | What the limit is multiplied by on a congested round. Strictly between 0 and 1. |
 
 | Member | Description |

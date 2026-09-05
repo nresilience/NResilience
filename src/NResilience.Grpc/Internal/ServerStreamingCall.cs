@@ -164,7 +164,7 @@ internal sealed class ServerStreamingCall<TRequest, TResponse>
         if (_stamping && !CarriesRetryMarker)
             options = GrpcCall.Stamp(options);
 
-        if (!_options.PropagateAttemptDeadline)
+        if (!_options.PropagateDeadline)
             return options;
 
         var remaining = GrpcCall.Remaining(_time, _start, _deadline);

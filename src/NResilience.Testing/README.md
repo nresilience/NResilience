@@ -93,12 +93,12 @@ test pays for neither a sleep nor a wall-clock bound it does not care about. `Te
 var api = TestPolicy.Instant;
 ```
 
-To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.On(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker
+To run `Instant` on a `FakeTimeProvider`, call `TestPolicy.WithClock(time)`. It rebuilds any breaker the policy carries on that same clock, so the policy, its breaker
 and its budget all advance together:
 
 ```csharp
 var time = new FakeTimeProvider();
-var api = TestPolicy.On(time);
+var api = TestPolicy.WithClock(time);
 ```
 
 ## Test an HTTP client

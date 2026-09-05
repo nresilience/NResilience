@@ -71,7 +71,7 @@ public sealed class GrpcRegistrationTests
         var services = new ServiceCollection();
         var builder = services.AddGrpcClient<TestGrpcClient>("orders", o => o.Address = new Uri("https://orders.test"));
 
-        Assert.Throws<ResilienceConfigurationException>(() => builder.AddGrpcResilience(configureOptions: o => o.MaxScopes = 0));
+        Assert.Throws<ResilienceConfigurationException>(() => builder.AddGrpcResilience(configureOptions: o => o.MaximumScopes = 0));
     }
 
     [Fact]
@@ -101,6 +101,6 @@ public sealed class GrpcRegistrationTests
         Assert.Same(good, good.Validated());
 
         Assert.Throws<ResilienceConfigurationException>(
-            () => new GrpcResilienceOptions { MaxScopes = 0 }.Validated());
+            () => new GrpcResilienceOptions { MaximumScopes = 0 }.Validated());
     }
 }

@@ -139,7 +139,7 @@ public sealed class MetricsTests
         using var recording = new Recording();
         var time = new FakeTimeProvider();
 
-        var policy = (TestPolicy.On(time) with
+        var policy = (TestPolicy.WithClock(time) with
         {
             Name = "t-ceiling",
             Attempts = 1,

@@ -208,5 +208,5 @@ public sealed class ResilienceInterceptor : Interceptor
             "NResilience is async-only: a retry loop that blocks holds a thread through every backoff delay. Use the generated client's Async overload.");
 
     private bool ShouldRetry(IMethod method) =>
-        Policy.Attempts > 1 && !GrpcResilience.IsSingleShot && Options.IsRepeatable(method);
+        Policy.Attempts > 1 && !GrpcResilience.IsSingleShot && Options.RepeatableWhen(method);
 }

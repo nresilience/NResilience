@@ -29,8 +29,15 @@ public sealed class GrpcResilienceOptions
     ///         A deadline the caller set on the call is never overwritten: the effective one is
     ///         whichever of the two is tighter.
     ///     </para>
+    ///     <para>
+    ///         The same switch as <see cref="HttpResilienceOptions.PropagateDeadline" />, and the one
+    ///         asymmetry between them is deliberate: this one is on by default and the HTTP one is
+    ///         off. <c>grpc-timeout</c> is a protocol field every gRPC peer already honors, so sending
+    ///         it costs nothing and is never misread; the HTTP header is a convention this library
+    ///         invented, and a header the other side does not read is not worth sending by default.
+    ///     </para>
     /// </summary>
-    public bool PropagateAttemptDeadline { get; set; } = true;
+    public bool PropagateDeadline { get; set; } = true;
 
     /// <summary>
     ///     How much longer than the attempt ceiling the wire deadline is set. 50 ms by default, and
@@ -97,13 +104,20 @@ public sealed class GrpcResilienceOptions
     ///         puts <see cref="IMethod.Type" /> in reach: <c>m =&gt; m.Type == MethodType.Unary</c> is
     ///         the whole of a "retry reads, not writes" rule.
     ///     </para>
+    ///     <para>
+    ///         A predicate rather than the <see cref="bool" /> that
+    ///         <see cref="HttpResilienceOptions.RetryUnsafeMethods" /> is, because the shapes of the
+    ///         two protocols differ: HTTP has a method table with an established safety rule to
+    ///         switch on, and gRPC has no equivalent - which method is safe to repeat is a fact about
+    ///         your service, so the only honest knob is one that asks.
+    ///     </para>
     /// </summary>
     /// <example>
     ///     <code>
-    /// o.IsRepeatable = static m =&gt; m.FullName != "/orders.Orders/ChargeCard";
+    /// o.RepeatableWhen = static m =&gt; m.FullName != "/orders.Orders/ChargeCard";
     /// </code>
     /// </example>
-    public Func<IMethod, bool> IsRepeatable { get; set; } = static _ => true;
+    public Func<IMethod, bool> RepeatableWhen { get; set; } = static _ => true;
 
     /// <summary>
     ///     The breaker, budget and latency-window scope key for a method. Per service by default;
@@ -140,6 +154,19 @@ public sealed class GrpcResilienceOptions
     public BreakerSettings? BreakerSettings { get; set; }
 
     /// <summary>
+    ///     Whether each <see cref="ScopeBy" /> scope gets its own retry budget. On by default, and the
+    ///     same decision <see cref="HttpResilienceOptions.BudgetPerHost" /> makes per host: a storm
+    ///     against one service must not throttle retries to another.
+    ///     <para>
+    ///         A policy carrying an explicit <see cref="Resilience.Budget" /> keeps it, including
+    ///         <see cref="RetryBudget.None" />. Turning this off leaves every scope sharing the
+    ///         policy's one budget, which is the right reading for a client whose methods all front
+    ///         one dependency.
+    ///     </para>
+    /// </summary>
+    public bool BudgetPerScope { get; set; } = true;
+
+    /// <summary>
     ///     How many <see cref="ScopeBy" /> keys to keep. The least-recently-seen are dropped past
     ///     this. Ignored when <see cref="ScopeBy" /> is null, since there is then one scope.
     /// </summary>
@@ -148,7 +175,7 @@ public sealed class GrpcResilienceOptions
     ///     unbounded keying is a memory leak with a breaker and a budget on every entry. The default
     ///     is far above the method count of any real service.
     /// </remarks>
-    public int MaxScopes { get; set; } = 1024;
+    public int MaximumScopes { get; set; } = 1024;
 
     /// <summary>
     ///     Runs <see cref="Validate" /> and returns these options, so a bad configuration throws where
@@ -168,14 +195,14 @@ public sealed class GrpcResilienceOptions
     {
         var problems = new List<string>();
 
-        if (IsRepeatable is null)
-            problems.Add("IsRepeatable must not be null; use `static _ => true` for the default.");
+        if (RepeatableWhen is null)
+            problems.Add("RepeatableWhen must not be null; use `static _ => true` for the default.");
 
         if (DeadlineSlack < TimeSpan.Zero)
             problems.Add($"DeadlineSlack must not be negative; it is {DeadlineSlack}. Zero arms two timers for the same instant - see the property's remarks.");
 
-        if (MaxScopes < 1)
-            problems.Add($"MaxScopes must be at least 1; it is {MaxScopes}.");
+        if (MaximumScopes < 1)
+            problems.Add($"MaximumScopes must be at least 1; it is {MaximumScopes}.");
 
         if (problems.Count > 0)
             throw new ResilienceConfigurationException(problems);

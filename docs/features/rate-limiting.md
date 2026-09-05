@@ -132,7 +132,7 @@ You set the range and the loop finds the number inside it:
 | `Minimum` | 4 | The floor. A liveness guarantee: without one, a dependency that is slow for reasons unrelated to your concurrency drives the limit to zero and the recovery is never sampled. |
 | `Maximum` | 200 | The ceiling. The one worth setting per dependency, because it is what bounds the damage when the measurement is wrong. |
 | `Initial` | 20 | Where it starts, before there is anything to measure. |
-| `Threshold` | 2.0 | How many times the baseline latency counts as queueing. Dimensionless, like [`SlowCalls.Above`](circuit-breaker.md). |
+| `Multiple` | 2.0 | How many times the baseline latency counts as queueing. Dimensionless, like [`SlowCalls.Above`](circuit-breaker.md). |
 | `DecreaseFactor` | 0.9 | What the limit is multiplied by when a round says there is queueing. |
 
 ### How it decides
@@ -140,7 +140,7 @@ You set the range and the loop finds the number inside it:
 A **round** is one limit's worth of calls - so the loop reacts at the pace the dependency is actually being driven at, not on a timer. At the end of each round:
 
 - The round's **fastest** call is compared against a **baseline**: the 10th percentile of the last five minutes. One slow call among many is a tail; even the fastest call being slow is a queue.
-- Fastest above `Threshold` x baseline, and the limit is multiplied by `DecreaseFactor`.
+- Fastest above `Multiple` x baseline, and the limit is multiplied by `DecreaseFactor`.
 - Otherwise, if the limit was what was actually constraining you during the round, it grows by one.
 
 Multiplicative decrease against additive increase, in that pairing, for the reason TCP uses it: the cost of being too high is paid by the dependency, the cost of being too low by you, so the two directions must not move at the same speed.

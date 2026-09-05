@@ -12,7 +12,7 @@ This is not an inconsistency. Every gRPC call is a `POST` at the transport, but 
 
 The direction of the declaration flips instead. In HTTP you name the writes that *are* safe to repeat; in gRPC you name the ones that are not.
 
-## Per client: `IsRepeatable`
+## Per client: `RepeatableWhen`
 
 The registration decides, per method, using anything on `IMethod` - the method name, the service name, the full name, or `MethodType`:
 
@@ -24,7 +24,7 @@ services.AddGrpcClient<OrdersClient>(o => o.Address = new Uri("https://orders.in
         o =>
         {
             // A charge must not be repeated, whatever the transport says.
-            o.IsRepeatable = static method => method.Name != "ChargeCard";
+            o.RepeatableWhen = static method => method.Name != "ChargeCard";
 
             // One breaker per method rather than per service.
             o.ScopeBy = static method => method.FullName;
@@ -38,7 +38,7 @@ A method that is not repeatable gets exactly one attempt. The breaker still sees
 
 ## Per call: `SingleShot()`
 
-`IsRepeatable` is a statement about a whole client. When one call site is the exception, wrap it:
+`RepeatableWhen` is a statement about a whole client. When one call site is the exception, wrap it:
 
 <!-- snippet: grpc-single-shot -->
 ```csharp
@@ -58,8 +58,8 @@ It is deliberately **not** a metadata entry. A header would travel to the server
 
 | Situation | Use |
 | :--- | :--- |
-| A method is never safe to repeat | `IsRepeatable` on the registration |
-| Only reads should be retried on this client | `IsRepeatable = static m => m.Type == MethodType.Unary` plus your own naming rule |
+| A method is never safe to repeat | `RepeatableWhen` on the registration |
+| Only reads should be retried on this client | `RepeatableWhen = static m => m.Type == MethodType.Unary` plus your own naming rule |
 | One call site is the exception | `GrpcResilience.SingleShot()` |
 | The server deduplicates on a key you send | Neither - the call is safe to repeat, so leave the default as is |
 

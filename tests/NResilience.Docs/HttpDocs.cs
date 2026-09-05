@@ -53,7 +53,7 @@ public sealed class HttpDocs
                 OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
                 BreakerPerHost = true, // a dead host does not trip calls to the healthy ones
                 BudgetPerHost = true,
-                MaximumHosts = 1024, // the per-host registry is bounded; null is unbounded
+                MaximumHosts = 1024, // the per-host registry is bounded; int.MaxValue is as close to unbounded as it gets
                 DetectNestedRetries = true,
             });
 

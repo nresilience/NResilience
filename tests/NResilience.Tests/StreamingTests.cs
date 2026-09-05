@@ -217,7 +217,7 @@ public sealed class StreamingTests
             .Throws(new IOException())
             .Yields(1);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.RetryEverything,
             Deadline = TimeSpan.FromSeconds(1),
@@ -241,7 +241,7 @@ public sealed class StreamingTests
             .YieldsAfter(TimeSpan.FromSeconds(30), 0)
             .Yields(1, 2);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.RetryEverything,
             AttemptTimeout = TimeSpan.FromSeconds(5),
@@ -263,7 +263,7 @@ public sealed class StreamingTests
         var time = new FakeTimeProvider();
         var streams = ScriptedStream.For<int>(time).YieldsAfter(TimeSpan.FromSeconds(30), 0);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.RetryEverything,
             Attempts = 1,
@@ -291,7 +291,7 @@ public sealed class StreamingTests
         var streams = new RudeStream(time);
         var events = new List<CallEvent>();
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.RetryEverything,
             AttemptTimeout = TimeSpan.FromSeconds(5),
@@ -324,7 +324,7 @@ public sealed class StreamingTests
         var time = new FakeTimeProvider();
         var streams = new TailObservingStream(time);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.RetryEverything,
             AttemptTimeout = TimeSpan.FromSeconds(5),
@@ -507,7 +507,7 @@ public sealed class StreamingTests
 
         var streams = ScriptedStream.For<int>(time).Yields(-1);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Breaker = breaker,
             Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
@@ -550,7 +550,7 @@ public sealed class StreamingTests
             .Yields(-1)
             .Yields(-1);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
             Deadline = TimeSpan.FromSeconds(1),
@@ -673,7 +673,7 @@ public sealed class StreamingTests
             .Throws(new IOException())
             .Throws(new IOException());
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Classifier = Classifier.RetryEverything,
             Budget = budget,

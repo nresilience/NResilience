@@ -132,7 +132,7 @@ Drive it with `FakeTimeProvider` on both the profile and the policy, and advanci
 var time = new FakeTimeProvider();
 
 var chaos = new Chaos { Enabled = true, LatencyRate = 1, Latency = TimeSpan.FromMinutes(5), Time = time };
-var policy = (Resilience.Default with { AttemptTimeout = TimeSpan.FromSeconds(1) }).UseClock(time);
+var policy = (Resilience.Default with { AttemptTimeout = TimeSpan.FromSeconds(1) }).WithClock(time);
 ```
 
 ## Run a game day in production

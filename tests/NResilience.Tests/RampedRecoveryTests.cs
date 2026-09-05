@@ -350,7 +350,7 @@ public sealed class RampedRecoveryTests
 
         // Nothing has been offered yet, so the ramp is at Recovery.Initial and one call in twenty
         // gets through. This one does not.
-        var policy = TestPolicy.On(time) with { Breaker = breaker, Attempts = 1 };
+        var policy = TestPolicy.WithClock(time) with { Breaker = breaker, Attempts = 1 };
         var call = policy.TryRunAsync(_ => Task.FromResult(1)).AsTask();
 
         time.Advance(TimeSpan.FromMilliseconds(100));

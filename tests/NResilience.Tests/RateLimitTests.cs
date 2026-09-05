@@ -79,7 +79,7 @@ public sealed class RateLimitTests
     {
         var time = new FakeTimeProvider();
         var budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
-        var policy = TestPolicy.On(time) with { Attempts = 4, Budget = budget };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 4, Budget = budget };
 
         var result = await RunAsync(
             policy,
@@ -100,7 +100,7 @@ public sealed class RateLimitTests
         var time = new FakeTimeProvider();
         var budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 4,
             Budget = budget,
@@ -127,7 +127,7 @@ public sealed class RateLimitTests
         {
         }
 
-        var policy = TestPolicy.On(time) with { Attempts = 3, Budget = budget };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 3, Budget = budget };
 
         var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
@@ -142,7 +142,7 @@ public sealed class RateLimitTests
     {
         var time = new FakeTimeProvider();
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2, Time = time });
-        var policy = TestPolicy.On(time) with { Attempts = 6, Breaker = breaker };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 6, Breaker = breaker };
 
         var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
@@ -163,7 +163,7 @@ public sealed class RateLimitTests
             Time = time,
         });
 
-        var single = TestPolicy.On(time) with { Attempts = 1, Breaker = breaker };
+        var single = TestPolicy.WithClock(time) with { Attempts = 1, Breaker = breaker };
 
         // Trip it, then wait out the break so the next call becomes a probe.
         await RunAsync(single, _ => throw new IOException("down"), time);
@@ -218,7 +218,7 @@ public sealed class RateLimitTests
         var time = new FakeTimeProvider();
         var seen = new List<Type>();
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 2,
             Classifier = Classifier.RetryEverything.On<Exception>(ex =>
@@ -243,7 +243,7 @@ public sealed class RateLimitTests
 
         // Six attempts, so four land in the inline buffer and two in the spill array. The flag
         // rides in the packed verdict byte and has to survive both paths.
-        var policy = TestPolicy.On(time) with { Attempts = 6, Budget = RetryBudget.None };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 6, Budget = RetryBudget.None };
 
         var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
@@ -262,7 +262,7 @@ public sealed class RateLimitTests
         var time = new FakeTimeProvider();
         var calls = 0;
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 3,
             Budget = RetryBudget.None,
@@ -287,7 +287,7 @@ public sealed class RateLimitTests
     public async Task The_refusal_is_what_surfaces_when_the_attempts_run_out()
     {
         var time = new FakeTimeProvider();
-        var policy = TestPolicy.On(time) with { Attempts = 2, Budget = RetryBudget.None };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 2, Budget = RetryBudget.None };
 
         var call = policy.RunAsync(_ => Task.FromException<int>(new RateLimitedException(TimeSpan.FromSeconds(4), "payments"))).AsTask();
 
@@ -341,7 +341,7 @@ public sealed class RateLimitTests
         using var limiter = Limit.Concurrency(2);
         var held = new List<RateLimitLease>();
 
-        var policy = TestPolicy.On(time) with { Attempts = 3, Budget = RetryBudget.None };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 3, Budget = RetryBudget.None };
 
         var result = await RunAsync(
             policy,

@@ -117,7 +117,7 @@ public sealed class AdaptiveLimiter : RateLimiter
         _minimum = options.Minimum;
         _maximum = options.Maximum;
         _limit = options.Initial;
-        _threshold = options.Threshold;
+        _threshold = options.Multiple;
         _decreaseFactor = options.DecreaseFactor;
         _queueLimit = queueLimit;
         _name = name ?? "(unnamed)";

@@ -31,7 +31,7 @@ public sealed class ConcurrentCallTests
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 5, Time = time });
         var events = new EventRecorder();
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Breaker = breaker,
             Attempts = 1,
@@ -66,7 +66,7 @@ public sealed class ConcurrentCallTests
         var budget = RetryBudget.Shared("test-throttle", 0.10, 1);
         var events = new EventRecorder();
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Budget = budget,
             Attempts = 5,
@@ -162,7 +162,7 @@ public sealed class ConcurrentCallTests
         var time = new FakeTimeProvider();
         var events = new EventRecorder();
 
-        var policy = (TestPolicy.On(time) with
+        var policy = (TestPolicy.WithClock(time) with
         {
             Attempts = 3,
             OnEvent = events.Record,

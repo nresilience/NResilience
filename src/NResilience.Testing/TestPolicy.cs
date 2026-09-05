@@ -25,7 +25,7 @@ public static class TestPolicy
     /// </summary>
     /// <param name="time">The clock.</param>
     /// <returns>The policy.</returns>
-    public static Resilience On(TimeProvider time) => Instant.UseClock(time);
+    public static Resilience WithClock(TimeProvider time) => Instant.WithClock(time);
 
     /// <summary>
     ///     This policy on the given clock, rebuilding the breaker it carries on that clock too. A
@@ -35,7 +35,12 @@ public static class TestPolicy
     /// <param name="policy">The policy.</param>
     /// <param name="time">The clock.</param>
     /// <returns>The policy, on one clock throughout.</returns>
-    public static Resilience UseClock(this Resilience policy, TimeProvider time) =>
+    /// <remarks>
+    ///     Named for <see cref="Resilience.Time" />, the property it sets, and shaped like the
+    ///     <c>WithListener</c> / <c>WithLogging</c> / <c>WithTelemetry</c> family: it returns a new
+    ///     policy and mutates nothing.
+    /// </remarks>
+    public static Resilience WithClock(this Resilience policy, TimeProvider time) =>
         policy with
         {
             Time = time,

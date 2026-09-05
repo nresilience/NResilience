@@ -48,7 +48,7 @@ services
         },
 
         // ChargeCard takes money. One attempt, whatever the transport says.
-        options => options.IsRepeatable = static method => method.Name != "ChargeCard");
+        options => options.RepeatableWhen = static method => method.Name != "ChargeCard");
 
 await using var provider = services.BuildServiceProvider();
 var client = provider.GetRequiredService<Orders.OrdersClient>();

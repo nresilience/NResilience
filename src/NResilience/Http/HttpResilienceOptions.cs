@@ -77,8 +77,8 @@ public sealed class HttpResilienceOptions
     public bool BudgetPerHost { get; set; } = true;
 
     /// <summary>
-    ///     The number of hosts the handler keeps a breaker and a budget for. 1024 by default; null is
-    ///     unbounded.
+    ///     The number of hosts the handler keeps a breaker and a budget for. 1024 by default, and at
+    ///     least 1.
     ///     <para>
     ///         The set of hosts one client talks to is normally a property of the application, and the
     ///         cap is invisible to it. A proxy, a crawler or a webhook dispatcher reaches the cap, and
@@ -88,14 +88,19 @@ public sealed class HttpResilienceOptions
     ///     </para>
     ///     <para>
     ///         Eviction is approximate, so the registry can sit a little over the cap while a sweep
-    ///         catches up. A value of zero or less is read as unbounded.
+    ///         catches up. There is no unbounded mode, for the reason <see cref="PolicyScope{TKey}" />
+    ///         has none - unbounded keying is a memory leak with a breaker and a budget on every
+    ///         entry - and <see cref="int.MaxValue" /> is how you say "effectively unbounded" if you
+    ///         want it anyway.
     ///     </para>
     /// </summary>
-    public int? MaximumHosts { get; set; } = 1024;
+    public int MaximumHosts { get; set; } = 1024;
 
     /// <summary>
     ///     Whether each outbound attempt carries how long this side is going to wait for it. Off by
-    ///     default.
+    ///     default, which is the one place this differs from the gRPC integration's switch of the same
+    ///     name: <c>grpc-timeout</c> is a protocol field every gRPC peer already honors, and this
+    ///     header is a convention the library invented.
     ///     <para>
     ///         The value is the attempt's own ceiling -
     ///         <c>
@@ -152,13 +157,12 @@ public sealed class HttpResilienceOptions
     ///     policy's own <see cref="Resilience.Validate" />.
     /// </summary>
     /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
-    /// <remarks>
-    ///     <see cref="MaximumHosts" /> is not checked here: zero or less is documented as unbounded rather
-    ///     than as a mistake.
-    /// </remarks>
     public void Validate()
     {
         var problems = new List<string>();
+
+        if (MaximumHosts < 1)
+            problems.Add($"MaximumHosts must be at least 1; it is {MaximumHosts}. Use int.MaxValue for an effectively unbounded registry.");
 
         if (string.IsNullOrWhiteSpace(DeadlineHeader))
         {

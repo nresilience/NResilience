@@ -117,10 +117,14 @@ public sealed class HostRegistryTests
         Assert.InRange(registry.Scopes.Count(), 1, max * 4);
     }
 
+    /// <summary>
+    ///     There is no unbounded mode, so <c>int.MaxValue</c> is how "effectively unbounded" is
+    ///     spelled - and a registry that far from its cap never sweeps.
+    /// </summary>
     [Fact]
-    public void A_null_cap_never_sweeps()
+    public void A_cap_of_int_MaxValue_never_sweeps()
     {
-        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaximumHosts = null });
+        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaximumHosts = int.MaxValue });
 
         for (var i = 0; i < 2048; i++)
         {
@@ -132,4 +136,19 @@ public sealed class HostRegistryTests
 
     [Fact]
     public void The_default_cap_is_1024() => Assert.Equal(1024, new HttpResilienceOptions().MaximumHosts);
+
+    /// <summary>
+    ///     A cap below one is a mistake rather than a spelling of "unbounded", which is the reason
+    ///     <see cref="PolicyScope{TKey}" /> and <c>GrpcResilienceOptions.MaximumScopes</c> refuse it too.
+    /// </summary>
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void A_cap_below_one_is_refused(int max)
+    {
+        var error = Assert.Throws<ResilienceConfigurationException>(
+            () => new HttpResilienceOptions { MaximumHosts = max }.Validate());
+
+        Assert.Contains(error.Problems, p => p.StartsWith("MaximumHosts", StringComparison.Ordinal));
+    }
 }

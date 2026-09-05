@@ -33,7 +33,7 @@ public sealed class AdmitTests
     public async Task An_admitted_attempt_runs_the_callback()
     {
         var time = new FakeTimeProvider();
-        var policy = TestPolicy.On(time) with { Admit = _ => Task.FromResult(Verdict.Ok) };
+        var policy = TestPolicy.WithClock(time) with { Admit = _ => Task.FromResult(Verdict.Ok) };
 
         var result = await RunAsync(policy, _ => Task.FromResult(42), time);
 
@@ -47,7 +47,7 @@ public sealed class AdmitTests
         var time = new FakeTimeProvider();
         var calls = 0;
 
-        var policy = TestPolicy.On(time) with { Attempts = 3, Admit = _ => Task.FromResult(Verdict.Refused()) };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 3, Admit = _ => Task.FromResult(Verdict.Refused()) };
 
         var result = await RunAsync(
             policy,
@@ -75,7 +75,7 @@ public sealed class AdmitTests
         var seen = new List<(int Number, VerdictKind Previous)>();
         var attempt = 0;
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 3,
             Admit = next =>
@@ -96,7 +96,7 @@ public sealed class AdmitTests
         var time = new FakeTimeProvider();
         var budget = RetryBudget.Of(minimumPerSecond: 1, time: time);
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 4,
             Budget = budget,
@@ -116,7 +116,7 @@ public sealed class AdmitTests
         var time = new FakeTimeProvider();
         var breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 2, Time = time });
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 6,
             Breaker = breaker,
@@ -135,7 +135,7 @@ public sealed class AdmitTests
         var time = new FakeTimeProvider();
         var seen = new List<Type>();
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 2,
             Classifier = Classifier.RetryEverything.On<InvalidOperationException>(ex =>
@@ -158,7 +158,7 @@ public sealed class AdmitTests
         var time = new FakeTimeProvider();
         CancellationToken? seen = null;
 
-        var policy = TestPolicy.On(time) with
+        var policy = TestPolicy.WithClock(time) with
         {
             Attempts = 1,
             AttemptTimeout = TimeSpan.FromSeconds(5),
@@ -202,7 +202,7 @@ public sealed class AdmitTests
     {
         var time = new FakeTimeProvider();
 
-        var policy = TestPolicy.On(time) with { Attempts = 2, Admit = _ => Task.FromResult(Verdict.Refused()) };
+        var policy = TestPolicy.WithClock(time) with { Attempts = 2, Admit = _ => Task.FromResult(Verdict.Refused()) };
 
         var result = await RunAsync(policy, _ => Task.FromResult(1), time);
 

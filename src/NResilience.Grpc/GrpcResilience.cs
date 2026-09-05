@@ -63,7 +63,7 @@ public static class GrpcResilience
 
     /// <summary>
     ///     Refuses repetition for the calls made inside the scope, whatever
-    ///     <see cref="GrpcResilienceOptions.IsRepeatable" /> says.
+    ///     <see cref="GrpcResilienceOptions.RepeatableWhen" /> says.
     ///     <para>
     ///         The per-call hatch is an ambient scope rather than a metadata entry on purpose: a
     ///         header would travel to the server, making this library's internal plumbing part of a
