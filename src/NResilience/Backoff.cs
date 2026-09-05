@@ -208,12 +208,27 @@ public readonly record struct Backoff
     /// <returns>The configured backoff.</returns>
     public static Backoff Constant(TimeSpan delay) => new(BackoffKind.Constant, delay, delay, DefaultFactor, delay, null);
 
-    /// <summary>Compute the delay yourself.</summary>
+    /// <summary>
+    ///     Compute the delay yourself. The curve ignores <see cref="Max" /> and <see cref="Jitter" />:
+    ///     the delegate's answer is the delay, clamped only at zero.
+    ///     <para>
+    ///         A custom curve does not have to start from nothing. <see cref="Compute(in NextAttempt)" />
+    ///         is public, so a built-in curve can be the baseline and the delegate can adjust it -
+    ///         which is how you add a term to exponential backoff without reimplementing it.
+    ///     </para>
+    /// </summary>
     /// <param name="compute">
     ///     Given the attempt that is about to happen - including the verdict and exception that ended
     ///     the previous one, and the time left on the deadline - returns the delay before it.
     /// </param>
     /// <returns>The configured backoff.</returns>
+    /// <example>
+    ///     <code>
+    /// // Exponential, plus a second for every attempt after the first.
+    /// var baseline = Backoff.Exponential();
+    /// var curve = Backoff.Custom(next => baseline.Compute(next) + TimeSpan.FromSeconds(next.Number - 1));
+    /// </code>
+    /// </example>
     public static Backoff Custom(Func<NextAttempt, TimeSpan> compute)
     {
         ArgumentNullException.ThrowIfNull(compute);

@@ -10,8 +10,29 @@ When a resilience operation fails, NResilience rethrows the original exception u
 
 The library only introduces new exception types for failures it generates, such as deadlines it enforces or calls it refuses to make.
 
+### `IResilienceFailure`
+
+The three exceptions that mean "this operation is over" - `CallRejectedException`, `DeadlineExceededException`, and `AttemptTimeoutException` - implement `IResilienceFailure`, so one catch reaches the attempt log and the reason without a type switch:
+
+```csharp
+catch (Exception e) when (e is IResilienceFailure failure)
+{
+    logger.LogWarning("{Reason} after {Count} attempt(s)", failure.Reason, failure.Attempts.Count);
+    throw;
+}
+```
+
+| Member | Description |
+| :--- | :--- |
+| `Attempts` | Everything that happened before the operation stopped. |
+| `Reason` | The `StopReason` the executor decided on. |
+
+It is an interface rather than a base class because two of the three derive from `TimeoutException` on purpose, and a caller that catches `TimeoutException` should keep catching them.
+
+`RateLimitedException` is deliberately not one: it is thrown by *your* code, inside an attempt, and is classified and retried like any other failure. `ResilienceConfigurationException` is not one either - it reports a policy that cannot run, which is a startup failure with no call behind it.
+
 ### Accessing the attempt log
-For any exception thrown by the library, the attempt log is stored in `Exception.Data` under the `AttemptLog.DataKey`. You can retrieve this log using `AttemptLog.Of(exception)`.
+For any exception thrown by the library - including the one your callback threw, which the executor rethrows unchanged - the attempt log is stored in `Exception.Data` under the `AttemptLog.DataKey`. Retrieve it with `AttemptLog.Of(exception)`. That is the general mechanism; `IResilienceFailure` is the typed one for the three exceptions the library invents to end a call.
 
 ## `CallRejectedException`
 
@@ -37,6 +58,7 @@ A `DeadlineExceededException` is thrown when the whole call's wall-clock budget 
 | :--- | :--- |
 | `Deadline` | The budget that was exceeded. |
 | `Attempts` | All attempts that occurred before the deadline was reached. |
+| `Reason` | Always `DeadlineExceeded`; this exception has one meaning. |
 
 ## `AttemptTimeoutException`
 
@@ -46,6 +68,7 @@ An `AttemptTimeoutException` is thrown when a single attempt exceeds its ceiling
 | :--- | :--- |
 | `Timeout` | The ceiling that the attempt exceeded. |
 | `Attempts` | The complete attempt log, if this was the final exception of the call. |
+| `Reason` | Why the call stopped, when this was the exception it stopped on. Normally `AttemptsExhausted`: the last attempt the policy allowed ran out of time. A timeout that spent the whole deadline is a `DeadlineExceededException` instead, so `DeadlineExceeded` never appears here. |
 
 The [executor](index.md) always classifies `AttemptTimeoutException` as `Transient`, regardless of the configured classifier.
 
@@ -70,7 +93,7 @@ A `ResilienceConfigurationException` is thrown when a policy, breaker setting, o
 | :--- | :--- |
 | `Problems` | A collection of all configuration problems found. |
 
-This exception comes from `Resilience.Validate()`, `BreakerSettings.Validate()`, and the `RetryBudget` factories. It can also be thrown during DI registration or lazily on a policy instance's first execution.
+This exception comes from `Resilience.Validate()`, `BreakerSettings.Validate()`, `HttpResilienceOptions.Validate()`, `GrpcResilienceOptions.Validate()`, and the `RetryBudget` factories. Each has a `Validated()` companion that runs the check and returns the receiver, so a `static readonly` field fails where it is written. It can also be thrown during DI registration or lazily on a policy instance's first execution.
 
 ## Caller cancellation
 

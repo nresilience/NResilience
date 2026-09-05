@@ -150,6 +150,18 @@ public sealed class GrpcResilienceOptions
     /// </remarks>
     public int MaxScopes { get; set; } = 1024;
 
+    /// <summary>
+    ///     Runs <see cref="Validate" /> and returns these options, so a bad configuration throws where
+    ///     it is written rather than when the interceptor is built.
+    /// </summary>
+    /// <returns>These options.</returns>
+    /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
+    public GrpcResilienceOptions Validated()
+    {
+        Validate();
+        return this;
+    }
+
     /// <summary>Checks the options and throws <see cref="ResilienceConfigurationException" /> listing every problem at once.</summary>
     /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
     public void Validate()

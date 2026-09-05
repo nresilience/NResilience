@@ -58,12 +58,13 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// <summary>A handler whose inner handler is assigned later, as a client factory does.</summary>
     /// <param name="policy">The policy. Defaults to <see cref="Resilience.Http" />.</param>
     /// <param name="options">The HTTP switches. Defaults to <see cref="HttpResilienceOptions" />'s own defaults.</param>
-    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
+    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed, or the options cannot be used.</exception>
     public ResilienceHandler(Resilience? policy = null, HttpResilienceOptions? options = null)
     {
         Policy = policy ?? Resilience.Http;
         Policy.Validate();
         Options = options ?? new HttpResilienceOptions();
+        Options.Validate();
         _hosts = new HostRegistry(Policy, Options);
         _send = SendCoreAsync;
     }
@@ -72,7 +73,7 @@ public sealed class ResilienceHandler : DelegatingHandler
     /// <param name="innerHandler">The transport.</param>
     /// <param name="policy">The policy. Defaults to <see cref="Resilience.Http" />.</param>
     /// <param name="options">The HTTP switches. Defaults to <see cref="HttpResilienceOptions" />'s own defaults.</param>
-    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
+    /// <exception cref="ResilienceConfigurationException">The policy cannot be executed, or the options cannot be used.</exception>
     public ResilienceHandler(HttpMessageHandler innerHandler, Resilience? policy = null, HttpResilienceOptions? options = null)
         : this(policy, options)
     {

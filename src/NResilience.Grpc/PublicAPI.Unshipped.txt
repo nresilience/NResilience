@@ -25,6 +25,7 @@ NResilience.Grpc.GrpcResilienceOptions.PropagateAttemptDeadline.set -> void
 NResilience.Grpc.GrpcResilienceOptions.ScopeBy.get -> System.Func<Grpc.Core.IMethod!, string!>?
 NResilience.Grpc.GrpcResilienceOptions.ScopeBy.set -> void
 NResilience.Grpc.GrpcResilienceOptions.Validate() -> void
+NResilience.Grpc.GrpcResilienceOptions.Validated() -> NResilience.Grpc.GrpcResilienceOptions!
 NResilience.Grpc.ResilienceInterceptor
 NResilience.Grpc.ResilienceInterceptor.Breakers() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.Breaker!>!
 NResilience.Grpc.ResilienceInterceptor.Budgets() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.RetryBudget!>!

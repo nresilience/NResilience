@@ -124,7 +124,13 @@ internal static class FailureException
         if (error is not null)
         {
             if (error is AttemptTimeoutException timedOut)
+            {
                 timedOut.Attempts = attempts;
+
+                // Reported rather than left at its default, so IResilienceFailure.Reason says what
+                // the executor actually decided rather than what a timeout usually means.
+                timedOut.Reason = reason;
+            }
 
             attempts.AttachTo(error);
             return error;

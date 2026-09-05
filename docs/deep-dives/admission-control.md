@@ -146,6 +146,29 @@ returning a non-`Ok` verdict is processed exactly where a classified `RateLimite
 An exception `Admit` throws is not special-cased. It falls into the same exception handling the
 attempt's own exceptions do, and is classified like any other.
 
+**A guard that answers from memory should not allocate to say so.** The hook returns `Task<Verdict>`
+rather than `ValueTask<Verdict>` for the reason below, which leaves a synchronous guard - a
+semaphore, a load shedder, a cached lease - wrapping its answer in a task on every attempt. Hand back
+`Verdict.OkTask` instead:
+
+```csharp
+var policy = Resilience.Default with
+{
+    Admit = _ => gate.Wait(0)
+        ? Verdict.OkTask
+        : Task.FromResult(Verdict.Limited(TimeSpan.FromMilliseconds(50))),
+};
+```
+
+`Verdict.TransientTask` and `Verdict.PermanentTask` are the same thing for the other two constant
+verdicts. There is no cached task for `Throttled`, `Limited` or `Refused`: each takes a pushback, so
+there is no single value to cache - and a guard that refuses is on the slow path anyway, where the
+retry it causes costs far more than the task wrapping its answer.
+
+`Admit` is one slot, and setting it replaces whatever was there. That is deliberate: combining two
+guards needs a rule for which refusal wins, and that is a decision about your system rather than one
+the library should make for you. Two guards are one hook that checks both.
+
 **The cost is opt-in, and only the callers who opt in pay it.** Configuring `Admit` selects a second,
 separate execution path - a second `async` method with the loop's shell repeated and one extra
 `await Admit(...)` added - rather than adding the await to the one shared loop. This is the only

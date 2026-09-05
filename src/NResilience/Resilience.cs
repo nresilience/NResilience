@@ -79,7 +79,11 @@ public sealed partial record Resilience
     public static Resilience Http => HttpHolder.Instance;
 
     /// <summary>
-    ///     TOTAL attempts including the first. 3 means try, retry, retry.
+    ///     How many attempts to make. <c>1</c> means no retry; <c>3</c> means try, then retry twice.
+    ///     <para>
+    ///         A count of calls, not a count of retries. Most libraries configure the retries and leave
+    ///         you to add one; this is the total, so there is no off-by-one to get wrong.
+    ///     </para>
     /// </summary>
     public int Attempts { get; init; } = 3;
 
@@ -186,6 +190,11 @@ public sealed partial record Resilience
     ///         telemetry belongs inside the callback instead, classified like any other outcome. See
     ///         "Building a custom guard" in the admission control deep dive.
     ///     </para>
+    ///     <para>
+    ///         One slot, and setting it replaces whatever was there - there is no combinator, unlike
+    ///         <see cref="WithListener" /> for <see cref="OnEvent" />. Two pieces of setup are one hook
+    ///         that does both, in the order you write them.
+    ///     </para>
     /// </summary>
     public Func<NextAttempt, Task>? BeforeAttempt { get; init; }
 
@@ -212,6 +221,15 @@ public sealed partial record Resilience
     ///         that field whether or not the hook is set - see "One bit, zero bytes" in the admission
     ///         control deep dive. Callers who never set this pay nothing for it: the shipping baseline is
     ///         unchanged, gated in <c>NResilience.Gates</c>.
+    ///     </para>
+    ///     <para>
+    ///         A guard that answers from memory should hand back <see cref="Verdict.OkTask" /> rather than
+    ///         <c>Task.FromResult(Verdict.Ok)</c>, which allocates once per admitted attempt.
+    ///     </para>
+    ///     <para>
+    ///         One slot, and setting it replaces whatever was there. Deliberately: combining two guards
+    ///         needs a rule for which refusal wins, and that is a decision about your system rather than
+    ///         one the library should make for you. Two guards are one hook that checks both.
     ///     </para>
     /// </summary>
     public Func<NextAttempt, Task<Verdict>>? Admit { get; init; }
@@ -270,6 +288,11 @@ public sealed partial record Resilience
     ///         blocks the call. Log, count, enqueue; do not do I/O. An exception thrown by a listener is
     ///         swallowed: telemetry that can fail the operation it is observing is worse than no
     ///         telemetry.
+    ///     </para>
+    ///     <para>
+    ///         Setting this in a <c>with</c> expression <i>replaces</i> what is here, which silently drops
+    ///         the telemetry and logging a container registration attached. Use
+    ///         <see cref="WithListener" /> to add one without taking one away.
     ///     </para>
     /// </summary>
     public Action<CallEvent>? OnEvent { get; init; }
@@ -507,6 +530,36 @@ public sealed partial record Resilience
 
         if (problems.Count > 0)
             throw new ResilienceConfigurationException(problems);
+    }
+
+    /// <summary>
+    ///     This policy with one more listener on <see cref="OnEvent" />, <i>added</i> to whatever is
+    ///     already there rather than replacing it.
+    ///     <para>
+    ///         <c>with { OnEvent = mine }</c> replaces, which silently drops the telemetry or logging a
+    ///         registration attached - <c>AddResilience()</c> attaches both. This is the way to add one
+    ///         without taking one away, and it is what <c>WithTelemetry()</c> and <c>WithLogging()</c>
+    ///         do to each other.
+    ///     </para>
+    ///     <para>
+    ///         Listeners run in the order they were added, on the executor's own thread, and one that
+    ///         throws is swallowed - see <see cref="OnEvent" /> for what a listener may do. Adding a
+    ///         listener takes the policy out of passthrough for the reason given there.
+    ///     </para>
+    /// </summary>
+    /// <param name="listener">The listener to add.</param>
+    /// <returns>A new policy. The receiver is unchanged.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="listener" /> is null.</exception>
+    /// <example>
+    ///     <code>
+    /// var counted = Policies.Api.WithListener(e => Metrics.Record(e.Kind));
+    /// </code>
+    /// </example>
+    public Resilience WithListener(Action<CallEvent> listener)
+    {
+        ArgumentNullException.ThrowIfNull(listener);
+
+        return this with { OnEvent = OnEvent + listener };
     }
 
     /// <summary>

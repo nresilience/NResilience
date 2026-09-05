@@ -1,3 +1,5 @@
+using NResilience.Http;
+
 namespace NResilience.Tests;
 
 /// <summary>Tests for the policy value: including presets, derivation, equality, and validation.</summary>
@@ -131,5 +133,49 @@ public sealed class PolicyTests
         };
 
         Assert.Equal("one", byPolicy[Resilience.Default with { Name = "one" }]);
+    }
+
+    [Fact]
+    public void BreakerSettings_validate_where_they_are_written()
+    {
+        var good = new BreakerSettings { ConsecutiveFailures = 3 };
+
+        Assert.Same(good, good.Validated());
+
+        Assert.Throws<ResilienceConfigurationException>(
+            () => new BreakerSettings { ConsecutiveFailures = 0 }.Validated());
+    }
+
+    [Fact]
+    public void Http_options_validate_where_they_are_written()
+    {
+        var good = new HttpResilienceOptions();
+
+        Assert.Same(good, good.Validated());
+
+        var problem = Assert.Throws<ResilienceConfigurationException>(
+            () => new HttpResilienceOptions { DeadlineHeader = "  " }.Validated());
+
+        Assert.Contains(problem.Problems, p => p.Contains("DeadlineHeader", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void The_handler_validates_its_options_the_way_it_validates_its_policy()
+    {
+        // The interceptor has always done both; the handler validated only the policy, so a bad
+        // header name surfaced from the middle of a request instead of at construction.
+        Assert.Throws<ResilienceConfigurationException>(
+            () => new ResilienceHandler(options: new HttpResilienceOptions { DeadlineHeader = string.Empty }));
+    }
+
+    [Fact]
+    public void The_handler_validates_the_breaker_settings_its_hosts_will_be_built_from()
+    {
+        // Eagerly, rather than when the first host is seen.
+        Assert.Throws<ResilienceConfigurationException>(
+            () => new ResilienceHandler(options: new HttpResilienceOptions
+            {
+                BreakerSettings = new BreakerSettings { MinimumCalls = 0 },
+            }));
     }
 }

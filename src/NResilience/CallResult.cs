@@ -55,6 +55,17 @@ public readonly struct CallResult<T>
         return IsSuccess;
     }
 
+    /// <summary>
+    ///     Rethrows the failure, with its original stack intact, if there was one. The member this
+    ///     shares with the void <see cref="CallResult" />, for the case where you want the exception
+    ///     but not the value.
+    /// </summary>
+    public void ThrowIfFailed()
+    {
+        if (!IsSuccess)
+            CallFailure.Rethrow(Exception, StopReason, Attempts);
+    }
+
     /// <summary>The value, or the failure - rethrown with its original stack intact.</summary>
     /// <returns>The value.</returns>
     public T ValueOrThrow()
@@ -70,7 +81,11 @@ public readonly struct CallResult<T>
     }
 }
 
-/// <summary>The void form of <see cref="CallResult{T}" />. Same members, no value.</summary>
+/// <summary>
+///     The void form of <see cref="CallResult{T}" />. The same members, minus the four about a value:
+///     <see cref="CallResult{T}.Value" />, <see cref="CallResult{T}.HasValue" />,
+///     <see cref="CallResult{T}.TryGetValue" /> and <see cref="CallResult{T}.ValueOrThrow" />.
+/// </summary>
 public readonly struct CallResult
 {
     internal CallResult(bool isSuccess, Exception? exception, StopReason stopReason, AttemptLog attempts)

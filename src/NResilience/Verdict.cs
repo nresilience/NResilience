@@ -131,6 +131,49 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// <summary>A failure that will recur.</summary>
     public static Verdict Permanent => new(VerdictKind.Permanent, null);
 
+    /// <summary>
+    ///     <see cref="Ok" /> as a completed task, allocated once for the process. What a synchronous
+    ///     <see cref="Resilience.Admit" /> guard should hand back.
+    ///     <para>
+    ///         The hook returns <see cref="Task{TResult}" /> deliberately - see
+    ///         <see cref="Resilience.Admit" /> for why a <see cref="ValueTask{TResult}" /> hook would
+    ///         charge every suspending call in the library an awaiter field whether or not the hook is
+    ///         set. The cost of that lands on a guard answering from memory - a semaphore, a load
+    ///         shedder, a cached lease - which has to wrap its answer in a task per attempt.
+    ///     </para>
+    /// </summary>
+    /// <example>
+    ///     <code>
+    /// Admit = _ => Gate.Wait(0) ? Verdict.OkTask : Task.FromResult(Verdict.Limited()),
+    /// </code>
+    /// </example>
+    /// <remarks>
+    ///     <para>
+    ///         Measured against <c>Task.FromResult</c> on both target frameworks:
+    ///         <see cref="TransientTask" /> and <see cref="PermanentTask" /> each save 80 B per call, and
+    ///         this one saves nothing - because <see cref="Ok" /> is bit-for-bit
+    ///         <c>default(Verdict)</c> (<see cref="VerdictKind.Ok" /> is zero and the pushback is biased
+    ///         so that zero reads as "none"), and the runtime keeps one cached task for a default result.
+    ///         That is an implementation detail of <c>Task.FromResult</c> rather than a documented
+    ///         contract, and it stops holding the moment either the enum's member order or the packing
+    ///         changes. It is shipped alongside the other two so that the guarantee belongs to this
+    ///         library, and so a guard does not have to know which of the three verdicts is the free one.
+    ///     </para>
+    ///     <para>
+    ///         One for each verdict this type exposes as a constant. The factory methods -
+    ///         <see cref="Throttled" />, <see cref="Limited" /> and <see cref="Refused" /> - take a
+    ///         pushback and so have no single value to cache; a guard that refuses is on the slow path
+    ///         anyway, where the retry it causes costs far more than the task wrapping its answer.
+    ///     </para>
+    /// </remarks>
+    public static Task<Verdict> OkTask { get; } = Task.FromResult(Ok);
+
+    /// <summary><see cref="Transient" /> as a completed task. See <see cref="OkTask" />.</summary>
+    public static Task<Verdict> TransientTask { get; } = Task.FromResult(Transient);
+
+    /// <summary><see cref="Permanent" /> as a completed task. See <see cref="OkTask" />.</summary>
+    public static Task<Verdict> PermanentTask { get; } = Task.FromResult(Permanent);
+
     /// <summary>The dependency is defending itself.</summary>
     /// <param name="retryAfter">When the server said to come back, if it said so.</param>
     /// <returns>A throttled verdict carrying the pushback.</returns>

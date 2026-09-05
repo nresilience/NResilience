@@ -133,4 +133,46 @@ public sealed class HttpResilienceOptions
     ///     that can be retried.
     /// </summary>
     public bool DetectNestedRetries { get; set; } = true;
+
+    /// <summary>
+    ///     Runs <see cref="Validate" /> and returns these options, so a bad configuration throws where
+    ///     it is written rather than when the handler is built.
+    /// </summary>
+    /// <returns>These options.</returns>
+    /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
+    public HttpResilienceOptions Validated()
+    {
+        Validate();
+        return this;
+    }
+
+    /// <summary>
+    ///     Checks the options and throws <see cref="ResilienceConfigurationException" /> listing every
+    ///     problem at once. Called for you by <see cref="ResilienceHandler" />'s constructor, beside the
+    ///     policy's own <see cref="Resilience.Validate" />.
+    /// </summary>
+    /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
+    /// <remarks>
+    ///     <see cref="MaxHosts" /> is not checked here: zero or less is documented as unbounded rather
+    ///     than as a mistake.
+    /// </remarks>
+    public void Validate()
+    {
+        var problems = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(DeadlineHeader))
+        {
+            problems.Add(
+                "DeadlineHeader must not be empty; it is the name of a header. " +
+                $"Leave it alone for the default of \"{ResilienceDeadline.Header}\", or set PropagateDeadline to false to send none.");
+        }
+
+        // Eagerly, rather than on the first request to the first host: the per-host breakers are
+        // built lazily as hosts are seen, so a bad setting here would otherwise surface as a
+        // configuration error thrown from the middle of a call.
+        BreakerSettings?.Validate();
+
+        if (problems.Count > 0)
+            throw new ResilienceConfigurationException(problems);
+    }
 }

@@ -137,6 +137,13 @@ var api = Resilience.Default with
 
 The `Backoff.Custom` function receives the next attempt's details: its number, the previous verdict and exception, the remaining deadline time, and the cancellation token. Custom curves ignore the `max` setting and jitter.
 
+A custom curve does not have to start from nothing. `Compute` is public, so a built-in curve can be the baseline and the delegate can adjust it - which is how you add a term to exponential backoff without reimplementing it:
+
+```csharp
+var baseline = Backoff.Exponential();
+var curve = Backoff.Custom(next => baseline.Compute(next) + TimeSpan.FromSeconds(next.Number - 1));
+```
+
 ## Rebuild work between attempts
 
 A retry re-invokes your callback from the beginning, so rebuild any single-use objects inside the callback. The `BeforeAttempt` hook is the place for setup work.

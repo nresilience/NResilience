@@ -22,7 +22,7 @@ The presets cover common scenarios:
 
 | Property | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `Attempts` | `int` | 3 | The total number of attempts, including the first. |
+| `Attempts` | `int` | 3 | How many attempts to make. `1` means no retry; `3` means try, then retry twice. A count of calls, not a count of retries. |
 | `Deadline` | `TimeSpan` | 30 s | The wall-clock budget for the entire call. Use `Timeout.InfiniteTimeSpan` to disable the bound. |
 | `AttemptTimeout` | `TimeSpan` | 10 s | The maximum duration for a single attempt. The effective value is the minimum of this property and the remaining time on the deadline. |
 | `AttemptCeiling` | `AttemptCeiling?` | `AttemptCeiling.Above(3)` | A measured attempt ceiling. Set it to `null` to leave `AttemptTimeout` as the only per-attempt bound. The measured term can only lower the ceiling. No default is supplied when `AttemptTimeout` is `Timeout.InfiniteTimeSpan` or at or below `AttemptCeiling.Floor`, because there is no ceiling there to lower. |
@@ -63,6 +63,7 @@ The `Resilience` record provides the execution methods.
 | `RunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `IAsyncEnumerable<T>` |
 | `Validate()` | `void` |
 | `Validated()` | `Resilience` |
+| `WithListener(Action<CallEvent>)` | `Resilience` |
 
 The eight execution overloads have counterparts that take `ValueTask`-returning callbacks, for `Channel`, `PipeReader`, `Socket`, `Stream` and anything else built on `IValueTaskSource`. These counterparts use the same names and argument order:
 
@@ -126,9 +127,22 @@ public static class Policies
 > [!NOTE]
 > The parentheses are required. C# does not allow member access directly on a `with` expression.
 
+`BreakerSettings`, `HttpResilienceOptions` and `GrpcResilienceOptions` each have the same `Validate()` / `Validated()` pair, for the same reason.
+
+#### Adding a listener
+`WithListener(listener)` returns the policy with one more listener on `OnEvent`, *added* to whatever is already there:
+
+```csharp
+var counted = Policies.Api.WithListener(e => Metrics.Record(e.Kind));
+```
+
+Assigning `OnEvent` in a `with` expression replaces it instead, which silently drops the telemetry and logging a container registration attached. `WithListener` is what `WithTelemetry()` and `WithLogging()` do to each other. Listeners run in the order they were added.
+
+`BeforeAttempt` and `Admit` have no equivalent and are single slots by design: two pieces of setup are one hook that does both, and combining two admission guards needs a rule for which refusal wins that belongs to your system rather than to the library.
+
 ## `NextAttempt`
 
-The `NextAttempt` `readonly struct` is passed to `BeforeAttempt` and `Backoff.Custom`.
+The `NextAttempt` `readonly struct` is passed to `BeforeAttempt`, `Admit` and `Backoff.Custom`.
 
 | Member | Description |
 | :--- | :--- |

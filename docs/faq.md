@@ -80,6 +80,8 @@ The callback-based approach fits NResilience's design: an explicit insertion poi
 ### Can I add my own policy layer?
 Not through composition - the engine is [one flat method](./deep-dives/one-executor.md). The extension points are the [classifier](./features/classification.md), `Backoff.Custom`, `BeforeAttempt`, `Admit`, and `OnEvent`. The restricted surface is what keeps the API stable long-term.
 
+Three of the five compose: a classifier rule beats the one it was derived from, a custom curve can call another curve's public `Compute`, and `policy.WithListener(...)` adds a listener to whatever is attached. `BeforeAttempt` and `Admit` are single slots by design - two pieces of setup are one hook that does both, and combining two guards needs a rule for which refusal wins that belongs to your system.
+
 A custom admission-control guard - a distributed lock, a hand-rolled limiter, anything that should
 refuse a call before it reaches the dependency - is not a sixth item on that list. It composes
 through the callback and the classifier, or through `Admit` directly, and gets the same treatment as

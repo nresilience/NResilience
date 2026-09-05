@@ -92,4 +92,15 @@ public sealed class GrpcRegistrationTests
     {
         public CallInvoker CallInvoker { get; } = callInvoker;
     }
+
+    [Fact]
+    public void Grpc_options_validate_where_they_are_written()
+    {
+        var good = new GrpcResilienceOptions();
+
+        Assert.Same(good, good.Validated());
+
+        Assert.Throws<ResilienceConfigurationException>(
+            () => new GrpcResilienceOptions { MaxScopes = 0 }.Validated());
+    }
 }

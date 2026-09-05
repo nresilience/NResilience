@@ -347,6 +347,19 @@ public sealed record BreakerSettings
     /// </remarks>
     internal TimeProvider? ConfiguredTime { get; private set; }
 
+    /// <summary>
+    ///     Runs <see cref="Validate" /> and returns these settings, so a bad configuration throws where
+    ///     it is written. The shape for the <c>static readonly</c> field a shared breaker's settings
+    ///     usually live in; a <c>with</c> expression needs parentheses before the call.
+    /// </summary>
+    /// <returns>These settings.</returns>
+    /// <exception cref="ResilienceConfigurationException">The settings cannot be used.</exception>
+    public BreakerSettings Validated()
+    {
+        Validate();
+        return this;
+    }
+
     /// <summary>Checks the settings and throws listing every problem at once.</summary>
     /// <exception cref="ResilienceConfigurationException">The settings cannot be used.</exception>
     public void Validate()

@@ -1,6 +1,48 @@
 namespace NResilience;
 
 /// <summary>
+///     What the library throws to end a call: the attempt log and why it stopped, under one name so a
+///     caller does not need a three-arm type switch to reach either.
+///     <para>
+///         Implemented by <see cref="CallRejectedException" />, <see cref="DeadlineExceededException" />
+///         and <see cref="AttemptTimeoutException" /> - the three exceptions that mean "this operation
+///         is over". <see cref="RateLimitedException" /> is not one of them: it is thrown by <i>your</i>
+///         code, inside an attempt, and is classified and retried like any other failure.
+///         <see cref="ResilienceConfigurationException" /> is not one either - it reports a policy that
+///         cannot run, which is a startup failure with no call behind it.
+///     </para>
+///     <para>
+///         An interface rather than a base class, because
+///         <see cref="DeadlineExceededException" /> and <see cref="AttemptTimeoutException" /> derive
+///         from <see cref="TimeoutException" /> on purpose and a caller that catches
+///         <see cref="TimeoutException" /> should keep catching them.
+///     </para>
+///     <para>
+///         For an exception the library did <i>not</i> invent - the one your callback threw, which
+///         <see cref="Resilience.RunAsync{T}(Func{CancellationToken, Task{T}}, CancellationToken)" />
+///         rethrows unchanged - use <see cref="AttemptLog.Of(Exception)" />, which reads the log the
+///         executor attaches to any exception it lets through.
+///     </para>
+/// </summary>
+/// <example>
+///     <code>
+/// catch (Exception e) when (e is IResilienceFailure failure)
+/// {
+///     logger.LogWarning("{Reason} after {Count} attempt(s)", failure.Reason, failure.Attempts.Count);
+///     throw;
+/// }
+/// </code>
+/// </example>
+public interface IResilienceFailure
+{
+    /// <summary>Everything that happened before the operation stopped.</summary>
+    AttemptLog Attempts { get; }
+
+    /// <summary>Why it stopped.</summary>
+    StopReason Reason { get; }
+}
+
+/// <summary>
 ///     An operation that produced no answer anything threw, and no answer the policy would accept.
 ///     Two shapes, told apart by <see cref="Reason" />:
 ///     <list type="bullet">
@@ -27,7 +69,7 @@ namespace NResilience;
 ///         stop waits for neither, and carries no hint - there is nothing to come back to.
 ///     </para>
 /// </summary>
-public sealed class CallRejectedException : Exception
+public sealed class CallRejectedException : Exception, IResilienceFailure
 {
     /// <summary>Creates a rejection.</summary>
     /// <param name="reason">Why the call was refused.</param>
@@ -99,7 +141,7 @@ public sealed class CallRejectedException : Exception
 }
 
 /// <summary>The wall-clock budget for the whole operation ran out.</summary>
-public sealed class DeadlineExceededException : TimeoutException
+public sealed class DeadlineExceededException : TimeoutException, IResilienceFailure
 {
     /// <summary>Creates the exception.</summary>
     /// <param name="deadline">The budget that was exceeded.</param>
@@ -140,6 +182,9 @@ public sealed class DeadlineExceededException : TimeoutException
 
     /// <summary>Everything that happened before it ran out.</summary>
     public AttemptLog Attempts { get; }
+
+    /// <summary>Always <see cref="StopReason.DeadlineExceeded" />; this exception has one meaning.</summary>
+    public StopReason Reason => StopReason.DeadlineExceeded;
 }
 
 /// <summary>
@@ -148,7 +193,7 @@ public sealed class DeadlineExceededException : TimeoutException
 ///     caller cancellation is the classic bug in timeout implementations, and it is not something a
 ///     classifier should be able to get wrong.
 /// </summary>
-public sealed class AttemptTimeoutException : TimeoutException
+public sealed class AttemptTimeoutException : TimeoutException, IResilienceFailure
 {
     /// <summary>Creates the exception.</summary>
     /// <param name="timeout">The ceiling the attempt exceeded.</param>
@@ -196,6 +241,19 @@ public sealed class AttemptTimeoutException : TimeoutException
     ///     still running, so the log can only be attached afterwards.
     /// </summary>
     public AttemptLog Attempts { get; internal set; } = AttemptLog.Empty;
+
+    /// <summary>
+    ///     Why the call stopped on this timeout, set beside <see cref="Attempts" /> when it is the
+    ///     exception a call ends on. Normally <see cref="StopReason.AttemptsExhausted" />: the last
+    ///     attempt the policy allowed ran out of time.
+    /// </summary>
+    /// <remarks>
+    ///     Reported rather than derived, because the same exception is also raised for an attempt the
+    ///     executor goes on to retry - one that never ends a call keeps the default. A timeout that
+    ///     exhausted the whole deadline is a <see cref="DeadlineExceededException" /> instead, so
+    ///     <see cref="StopReason.DeadlineExceeded" /> never appears here.
+    /// </remarks>
+    public StopReason Reason { get; internal set; } = StopReason.AttemptsExhausted;
 }
 
 /// <summary>

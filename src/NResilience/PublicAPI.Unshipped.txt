@@ -40,6 +40,7 @@ NResilience.AttemptTimeoutException.AttemptTimeoutException(System.TimeSpan time
 NResilience.AttemptTimeoutException.AttemptTimeoutException(string! message) -> void
 NResilience.AttemptTimeoutException.AttemptTimeoutException(string! message, System.Exception! innerException) -> void
 NResilience.AttemptTimeoutException.Attempts.get -> NResilience.AttemptLog!
+NResilience.AttemptTimeoutException.Reason.get -> NResilience.StopReason
 NResilience.AttemptTimeoutException.Timeout.get -> System.TimeSpan
 NResilience.Backoff
 NResilience.Backoff.Backoff() -> void
@@ -110,6 +111,7 @@ NResilience.BreakerSettings.Time.init -> void
 NResilience.BreakerSettings.TripWindow.get -> System.TimeSpan
 NResilience.BreakerSettings.TripWindow.init -> void
 NResilience.BreakerSettings.Validate() -> void
+NResilience.BreakerSettings.Validated() -> NResilience.BreakerSettings!
 NResilience.BreakerState
 NResilience.BreakerState.Closed = 0 -> NResilience.BreakerState
 NResilience.BreakerState.HalfOpen = 2 -> NResilience.BreakerState
@@ -171,6 +173,7 @@ NResilience.CallResult<T>.Exception.get -> System.Exception?
 NResilience.CallResult<T>.HasValue.get -> bool
 NResilience.CallResult<T>.IsSuccess.get -> bool
 NResilience.CallResult<T>.StopReason.get -> NResilience.StopReason
+NResilience.CallResult<T>.ThrowIfFailed() -> void
 NResilience.CallResult<T>.TryGetValue(out T value) -> bool
 NResilience.CallResult<T>.Value.get -> T?
 NResilience.CallResult<T>.ValueOrThrow() -> T
@@ -187,6 +190,7 @@ NResilience.DeadlineExceededException.DeadlineExceededException() -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(System.TimeSpan deadline, NResilience.AttemptLog! attempts, System.Exception? innerException = null) -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message) -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message, System.Exception! innerException) -> void
+NResilience.DeadlineExceededException.Reason.get -> NResilience.StopReason
 NResilience.Failures
 NResilience.Failures.Equals(NResilience.Failures other) -> bool
 NResilience.Failures.Failures() -> void
@@ -236,6 +240,8 @@ NResilience.Http.HttpResilienceOptions.PropagateDeadline.get -> bool
 NResilience.Http.HttpResilienceOptions.PropagateDeadline.set -> void
 NResilience.Http.HttpResilienceOptions.RetryUnsafeMethods.get -> bool
 NResilience.Http.HttpResilienceOptions.RetryUnsafeMethods.set -> void
+NResilience.Http.HttpResilienceOptions.Validate() -> void
+NResilience.Http.HttpResilienceOptions.Validated() -> NResilience.Http.HttpResilienceOptions!
 NResilience.Http.ResilienceHandler
 NResilience.Http.ResilienceHandler.BreakersByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.Breaker!>!
 NResilience.Http.ResilienceHandler.BudgetsByHost() -> System.Collections.Generic.IReadOnlyDictionary<string!, NResilience.RetryBudget!>!
@@ -245,6 +251,9 @@ NResilience.Http.ResilienceHandler.ResilienceHandler(NResilience.Resilience? pol
 NResilience.Http.ResilienceHandler.ResilienceHandler(System.Net.Http.HttpMessageHandler! innerHandler, NResilience.Resilience? policy = null, NResilience.Http.HttpResilienceOptions? options = null) -> void
 NResilience.Http.ResilienceHandler.WillRetry(System.Net.Http.HttpRequestMessage! request) -> bool
 NResilience.Http.ResilienceHttpRequestExtensions
+NResilience.IResilienceFailure
+NResilience.IResilienceFailure.Attempts.get -> NResilience.AttemptLog!
+NResilience.IResilienceFailure.Reason.get -> NResilience.StopReason
 NResilience.Jitter
 NResilience.Jitter.Equal = 1 -> NResilience.Jitter
 NResilience.Jitter.Full = 0 -> NResilience.Jitter
@@ -345,6 +354,7 @@ NResilience.Resilience.UseAmbientDeadline.get -> bool
 NResilience.Resilience.UseAmbientDeadline.init -> void
 NResilience.Resilience.Validate() -> void
 NResilience.Resilience.Validated() -> NResilience.Resilience!
+NResilience.Resilience.WithListener(System.Action<NResilience.CallEvent>! listener) -> NResilience.Resilience!
 NResilience.ResilienceConfigurationException
 NResilience.ResilienceConfigurationException.Problems.get -> System.Collections.Generic.IReadOnlyList<string!>!
 NResilience.ResilienceConfigurationException.ResilienceConfigurationException() -> void
@@ -504,10 +514,13 @@ static NResilience.SlowCalls.operator !=(NResilience.SlowCalls left, NResilience
 static NResilience.SlowCalls.operator ==(NResilience.SlowCalls left, NResilience.SlowCalls right) -> bool
 static NResilience.Verdict.Limited(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Ok.get -> NResilience.Verdict
+static NResilience.Verdict.OkTask.get -> System.Threading.Tasks.Task<NResilience.Verdict>!
 static NResilience.Verdict.Permanent.get -> NResilience.Verdict
+static NResilience.Verdict.PermanentTask.get -> System.Threading.Tasks.Task<NResilience.Verdict>!
 static NResilience.Verdict.Refused(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Throttled(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Transient.get -> NResilience.Verdict
+static NResilience.Verdict.TransientTask.get -> System.Threading.Tasks.Task<NResilience.Verdict>!
 static NResilience.Verdict.operator !=(NResilience.Verdict left, NResilience.Verdict right) -> bool
 static NResilience.Verdict.operator ==(NResilience.Verdict left, NResilience.Verdict right) -> bool
 static NResilience.WinRate.AtLeast(double minimum = 0.2) -> NResilience.WinRate

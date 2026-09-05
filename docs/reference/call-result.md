@@ -18,8 +18,9 @@ order: 2
 | `Attempts` | The log of all attempts made during the call. |
 | `TryGetValue(out T value)` | `true` if the call succeeded. This is the recommended method for most call sites to check for success. |
 | `ValueOrThrow()` | Returns the value if the call succeeded, otherwise rethrows the failure exception with its original stack trace intact. |
+| `ThrowIfFailed()` | Rethrows the failure exception, with its original stack trace intact, if there was one. Use it when you want the exception but not the value. |
 
-`CallResult` (the non-generic version) provides the same members without `Value`, `HasValue`, or `TryGetValue`, and adds the `ThrowIfFailed()` method.
+`CallResult` (the non-generic version) provides the same members without the four about a value: `Value`, `HasValue`, `TryGetValue`, and `ValueOrThrow`.
 
 **Note**: `TryRunAsync` still throws an exception if the caller's `CancellationToken` is cancelled.
 

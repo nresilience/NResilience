@@ -78,7 +78,10 @@ public sealed class ResilienceOptions
     /// <summary>A name for the policy, used in diagnostics and in every telemetry tag. Defaults to the registration name.</summary>
     public string? Name { get; set; }
 
-    /// <summary><see cref="Resilience.Attempts" /> - TOTAL attempts including the first.</summary>
+    /// <summary>
+    ///     <see cref="Resilience.Attempts" /> - how many attempts to make. <c>1</c> means no retry;
+    ///     <c>3</c> means try, then retry twice.
+    /// </summary>
     public int? Attempts { get; set; }
 
     /// <summary><see cref="Resilience.Deadline" />. Use <c>"-00:00:00.0010000"</c> - <see cref="Timeout.InfiniteTimeSpan" /> - for no bound.</summary>

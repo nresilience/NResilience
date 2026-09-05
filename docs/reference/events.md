@@ -69,7 +69,8 @@ The `OnEvent` listener runs synchronously on the [executor's](index.md) thread.
 
 - **Blocking**: A listener that blocks blocks the whole call.
 - **Exceptions**: Any exception a listener throws is swallowed, so telemetry cannot crash the application.
-- **Multiple listeners**: Chain them: `OnEvent = first + second`.
+- **Multiple listeners**: `policy.WithListener(listener)` adds one to whatever is already attached. Assigning `OnEvent` in a `with` expression replaces it instead, which drops the telemetry and logging a registration attached.
+- **Order**: Listeners run in the order they were added.
 
 ## Log event IDs
 

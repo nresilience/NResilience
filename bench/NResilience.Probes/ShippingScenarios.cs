@@ -91,14 +91,13 @@ public static class ShippingScenarios
         DefaultWithListener.WithLogging(SilentLogger.Instance);
 
     /// <summary>
-    ///     The completed task <see cref="AdmitHook" /> hands back on every attempt. Cached rather than
-    ///     built with <c>Task.FromResult</c> per call, so this arm measures only what the executor's
-    ///     second, <see cref="Lib.Resilience.Admit" />-configured loop costs - not the cost of a hook
-    ///     that allocates its own return value.
+    ///     A hook that admits every attempt, handing back the shipped <see cref="Lib.Verdict.OkTask" />
+    ///     rather than building one with <c>Task.FromResult</c> per call. This is the shape the library
+    ///     documents for a synchronous guard, so the arm measures what the executor's second,
+    ///     <see cref="Lib.Resilience.Admit" />-configured loop costs - not the cost of a hook that
+    ///     allocates its own return value.
     /// </summary>
-    private static readonly Task<Lib.Verdict> AdmitOk = Task.FromResult(Lib.Verdict.Ok);
-
-    private static readonly Func<NextAttempt, Task<Lib.Verdict>> AdmitHook = static _ => AdmitOk;
+    private static readonly Func<NextAttempt, Task<Lib.Verdict>> AdmitHook = static _ => Lib.Verdict.OkTask;
 
     /// <summary>
     ///     <see cref="Lib.Resilience.Default" /> with <see cref="Lib.Resilience.Admit" /> configured to

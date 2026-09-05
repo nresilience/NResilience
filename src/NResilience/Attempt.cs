@@ -154,8 +154,8 @@ public readonly struct Attempt
 }
 
 /// <summary>
-///     An attempt that is about to happen. What <see cref="Resilience.BeforeAttempt" /> and
-///     <see cref="Backoff.Custom" /> receive.
+///     An attempt that is about to happen. What <see cref="Resilience.BeforeAttempt" />,
+///     <see cref="Resilience.Admit" /> and <see cref="Backoff.Custom" /> receive.
 /// </summary>
 public readonly struct NextAttempt
 {

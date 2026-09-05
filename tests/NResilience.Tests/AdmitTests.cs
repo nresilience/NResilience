@@ -209,4 +209,64 @@ public sealed class AdmitTests
         Assert.False(result.IsSuccess);
         Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
     }
+
+    [Fact]
+    public void The_constant_verdicts_have_a_cached_task_apiece()
+    {
+        // The point of them: a synchronous guard hands back a task it did not allocate.
+        Assert.Same(Verdict.OkTask, Verdict.OkTask);
+        Assert.Same(Verdict.TransientTask, Verdict.TransientTask);
+        Assert.Same(Verdict.PermanentTask, Verdict.PermanentTask);
+    }
+
+    [Fact]
+    public void Only_one_of_the_three_would_have_been_free_without_the_cache()
+    {
+        // Task.FromResult builds a new task per call for a struct result - except when the value is
+        // default(TResult), which the runtime keeps one cached task for. Verdict.Ok is bit-for-bit
+        // default(Verdict), so it lands on that path and the other two do not.
+        Assert.True(EqualityComparer<Verdict>.Default.Equals(Verdict.Ok, default));
+        Assert.False(EqualityComparer<Verdict>.Default.Equals(Verdict.Transient, default));
+        Assert.False(EqualityComparer<Verdict>.Default.Equals(Verdict.Permanent, default));
+
+        Assert.NotSame(Task.FromResult(Verdict.Transient), Task.FromResult(Verdict.Transient));
+        Assert.NotSame(Task.FromResult(Verdict.Permanent), Task.FromResult(Verdict.Permanent));
+
+        // Ok's free ride is a runtime implementation detail resting on VerdictKind.Ok being zero.
+        // The statics exist so a guard does not have to know that, and so it stays true if it changes.
+        Assert.Equal(0, (int)VerdictKind.Ok);
+    }
+
+    [Fact]
+    public async Task Each_cached_task_carries_its_own_verdict_already_completed()
+    {
+        Assert.True(Verdict.OkTask.IsCompletedSuccessfully);
+        Assert.True(Verdict.TransientTask.IsCompletedSuccessfully);
+        Assert.True(Verdict.PermanentTask.IsCompletedSuccessfully);
+
+        Assert.Equal(Verdict.Ok, await Verdict.OkTask);
+        Assert.Equal(Verdict.Transient, await Verdict.TransientTask);
+        Assert.Equal(Verdict.Permanent, await Verdict.PermanentTask);
+    }
+
+    [Fact]
+    public async Task A_guard_built_on_the_cached_task_admits_every_attempt()
+    {
+        var admitted = 0;
+
+        var policy = TestPolicy.Instant with
+        {
+            Attempts = 3,
+            Admit = _ =>
+            {
+                admitted++;
+                return Verdict.OkTask;
+            },
+        };
+
+        var result = await policy.RunAsync(ct => Task.FromResult(7), CancellationToken.None);
+
+        Assert.Equal(7, result);
+        Assert.Equal(1, admitted);
+    }
 }

@@ -38,7 +38,12 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `MaxHosts` | `1024` | The number of hosts the per-host registry keeps. `null` is unbounded; the least-recently-seen hosts are dropped past the cap. |
 | `DetectNestedRetries` | `true` | Whether the nested-retry header is added to requests and whether nesting is reported. |
 | `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. |
-| `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `ResilienceDeadline.Header` is the same value, and is what the inbound middleware reads. |
+| `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `ResilienceDeadline.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
+
+| Method | Description |
+| :--- | :--- |
+| `Validate()` | Throws `ResilienceConfigurationException` listing every problem at once. `ResilienceHandler`'s constructor calls it beside the policy's own `Validate()`, so a bad header name or bad `BreakerSettings` fails there rather than from the middle of a request. `MaxHosts` is not checked: zero or less is documented as unbounded rather than as a mistake. |
+| `Validated()` | Runs `Validate()` and returns the options, so a bad configuration throws where it is written. |
 
 ## `HttpResilience`
 

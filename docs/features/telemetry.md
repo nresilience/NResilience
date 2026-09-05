@@ -31,7 +31,13 @@ var api = Resilience.Http with
 
 The listener is synchronous and runs on the executor's thread. Keep it fast - logging, counting, enqueuing - and avoid synchronous I/O. Any exception a listener throws is swallowed so telemetry cannot fail the operation it is observing.
 
-To use multiple listeners, combine them using the `+` operator: `OnEvent = first + second`.
+To add a listener without removing one, use `WithListener`:
+
+```csharp
+var counted = api.WithListener(e => Metrics.Record(e.Kind));
+```
+
+This matters because `with { OnEvent = mine }` *replaces* the listener, which silently drops the telemetry and logging that [a container registration](../di/telemetry.md) attaches. `WithListener` adds to whatever is already there, which is what `WithTelemetry()` and `WithLogging()` do to each other. Listeners run in the order they were added.
 
 A lambda is still the right answer for anything that is not an `ILogger`. If it is, a ready-made listener already exists and says what each event means: see [Logging](logging.md).
 

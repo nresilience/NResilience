@@ -303,4 +303,32 @@ public sealed class CallResultTests
         Assert.Equal(0, allocated);
         Assert.True(total > 0);
     }
+
+    [Fact]
+    public async Task ThrowIfFailed_is_the_member_both_forms_share()
+    {
+        var failed = await TestPolicy.Instant.TryRunAsync(
+            ct => Task.FromException<int>(new IOException("down")),
+            CancellationToken.None);
+
+        Assert.Throws<IOException>(failed.ThrowIfFailed);
+
+        var succeeded = await TestPolicy.Instant.TryRunAsync(ct => Task.FromResult(42), CancellationToken.None);
+
+        succeeded.ThrowIfFailed();
+        Assert.Equal(42, succeeded.Value);
+    }
+
+    [Fact]
+    public async Task ThrowIfFailed_and_ValueOrThrow_report_the_same_failure()
+    {
+        var result = await TestPolicy.Instant.TryRunAsync(
+            ct => Task.FromException<int>(new IOException("down")),
+            CancellationToken.None);
+
+        var fromThrowIfFailed = Assert.Throws<IOException>(result.ThrowIfFailed);
+        var fromValueOrThrow = Assert.Throws<IOException>(() => result.ValueOrThrow());
+
+        Assert.Same(fromThrowIfFailed, fromValueOrThrow);
+    }
 }

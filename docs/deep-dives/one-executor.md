@@ -44,12 +44,14 @@ Instead, the library provides targeted extension points:
 | Need | Mechanism |
 | :--- | :--- |
 | Decide what counts as what | [`Classifier`](../features/classification.md) |
-| Compute your own delay between attempts | `Backoff.Custom` |
+| Compute your own delay between attempts | `Backoff.Custom`, which can build on a built-in curve because `Compute` is public |
 | Run code before each attempt (refresh a token, build a fresh request) | `BeforeAttempt` |
-| Monitor every stage of the process | `OnEvent` |
+| Monitor every stage of the process | `OnEvent`, or `WithListener` to add one without replacing what is attached |
 | Add a custom admission-control guard (a distributed lock, a hand-rolled limiter, anything that should refuse a call before it reaches the dependency) | The callback, plus a classifier rule - see [Building a custom guard](admission-control.md#building-a-custom-guard) |
 | Refuse an attempt as a value, without throwing | `Admit`, an opt-in second execution path - see [The Admit hook](admission-control.md#the-admit-hook) |
 | Compose arbitrary logic around an HTTP call | Chain another `DelegatingHandler` alongside `ResilienceHandler` |
+
+Three of these compose and two do not, which is worth knowing before you reach for one. A `Classifier` rule always beats the one it was derived from; a `Backoff.Custom` delegate can call another curve's `Compute`; and `WithListener` adds to the listener chain. `BeforeAttempt` and `Admit` are single slots, and setting either replaces what was there - deliberately, because combining two admission guards needs a rule for which refusal wins, and that belongs to your system rather than to the library.
 
 The two admission rows and the HTTP row are easy to miss because none reads as "the pipeline": a
 custom guard is an ordinary exception (or, via `Admit`, an ordinary return value) classified to a
