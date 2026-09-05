@@ -17,7 +17,7 @@ internal sealed class KnownSymbols
 
     private KnownSymbols(
         INamedTypeSymbol resilience,
-        INamedTypeSymbol? resilienceValueTask,
+        INamedTypeSymbol? resilienceValueTaskExtensions,
         INamedTypeSymbol cancellationToken,
         INamedTypeSymbol? httpResilience,
         INamedTypeSymbol? breaker,
@@ -29,7 +29,7 @@ internal sealed class KnownSymbols
         Compilation compilation)
     {
         Resilience = resilience;
-        ResilienceValueTask = resilienceValueTask;
+        ResilienceValueTaskExtensions = resilienceValueTaskExtensions;
         CancellationToken = cancellationToken;
         HttpResilience = httpResilience;
         Breaker = breaker;
@@ -54,7 +54,7 @@ internal sealed class KnownSymbols
     ///     caller reached for to save an allocation - and NRES001 guards a failure that is invisible
     ///     without it.
     /// </summary>
-    internal INamedTypeSymbol? ResilienceValueTask { get; }
+    internal INamedTypeSymbol? ResilienceValueTaskExtensions { get; }
 
     internal INamedTypeSymbol CancellationToken { get; }
 
@@ -101,7 +101,7 @@ internal sealed class KnownSymbols
 
         known = new KnownSymbols(
             resilience,
-            compilation.GetTypeByMetadataName("NResilience.ResilienceValueTask"),
+            compilation.GetTypeByMetadataName("NResilience.ResilienceValueTaskExtensions"),
             token,
             compilation.GetTypeByMetadataName("NResilience.Http.HttpResilience"),
             compilation.GetTypeByMetadataName("NResilience.Breaker"),
@@ -119,7 +119,7 @@ internal sealed class KnownSymbols
     internal bool IsExecution(IMethodSymbol method) =>
         (method.Name == "RunAsync" || method.Name == "TryRunAsync")
         && (SymbolEqualityComparer.Default.Equals(method.ContainingType, Resilience)
-            || Is(method.ContainingType, ResilienceValueTask));
+            || Is(method.ContainingType, ResilienceValueTaskExtensions));
 
     internal bool IsCancellationToken(ITypeSymbol? type) => type is not null && SymbolEqualityComparer.Default.Equals(type, CancellationToken);
 

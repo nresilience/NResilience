@@ -32,7 +32,7 @@ public sealed class ResilienceOptionsTests
     ///     whole DTO rests on and the next binder version may move it again - in either direction.
     /// </summary>
     /// <remarks>
-    ///     <c>Backoff:Max</c> is here because it used to be an exhibit in the test below: the cap was a
+    ///     <c>Backoff:MaximumDelay</c> is here because it used to be an exhibit in the test below: the cap was a
     ///     computed property with no setter, so it was dropped while <c>Backoff:Jitter</c> beside it in
     ///     the same section was honored. <see cref="NResilience.Backoff" /> now carries the same
     ///     nullable-backed <c>init</c> properties every other value type in the library does, so the
@@ -51,9 +51,9 @@ public sealed class ResilienceOptionsTests
 
         var curve = new Resilience();
 
-        Config(("Backoff:Max", "00:00:05"), ("Backoff:Jitter", "None")).Bind(curve);
+        Config(("Backoff:MaximumDelay", "00:00:05"), ("Backoff:Jitter", "None")).Bind(curve);
 
-        Assert.Equal(TimeSpan.FromSeconds(5), curve.Backoff.Max);
+        Assert.Equal(TimeSpan.FromSeconds(5), curve.Backoff.MaximumDelay);
         Assert.Equal(Jitter.None, curve.Backoff.Jitter);
     }
 
@@ -63,7 +63,7 @@ public sealed class ResilienceOptionsTests
     ///     <list type="number">
     ///         <item>
     ///             <description>
-    ///                 <c>Classify</c> names a classifier and gets none, silently - so a policy configured
+    ///                 <c>Classifier</c> names a classifier and gets none, silently - so a policy configured
     ///                 <c>"Http"</c> keeps <see cref="Classifier.Default" />, which does not retry a 503.
     ///                 A classifier is a set of predicates and no binder can conjure one from a string.
     ///             </description>
@@ -89,9 +89,9 @@ public sealed class ResilienceOptionsTests
     public void Binding_onto_the_record_is_silently_partial()
     {
         var classified = new Resilience();
-        Config(("Classify", "Http")).Bind(classified);
+        Config(("Classifier", "Http")).Bind(classified);
 
-        Assert.Same(Classifier.Default, classified.Classify);
+        Assert.Same(Classifier.Default, classified.Classifier);
 
         var broken = new Resilience();
         Config(("Breaker:ConsecutiveFailures", "2")).Bind(broken);
@@ -108,14 +108,14 @@ public sealed class ResilienceOptionsTests
 
         Config(
             ("Preset", "Http"),
-            ("Backoff:Max", "00:00:05"),
+            ("Backoff:MaximumDelay", "00:00:05"),
             ("Backoff:Jitter", "None"),
             ("Breaker:ConsecutiveFailures", "2")).Bind(options);
 
         var policy = options.ToPolicy();
 
-        Assert.Same(Classifier.Http, policy.Classify);
-        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
+        Assert.Same(Classifier.Http, policy.Classifier);
+        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.MaximumDelay);
         Assert.Equal(Jitter.None, policy.Backoff.Jitter);
         Assert.Equal(2, policy.Breaker!.Settings.ConsecutiveFailures);
     }
@@ -156,7 +156,7 @@ public sealed class ResilienceOptionsTests
     {
         var policy = new ResilienceOptions { Preset = preset }.ToPolicy();
 
-        Assert.Same(Classifier.Http, policy.Classify);
+        Assert.Same(Classifier.Http, policy.Classifier);
     }
 
     /// <summary>A preset beats the baseline, because naming one is the more specific statement.</summary>
@@ -189,14 +189,14 @@ public sealed class ResilienceOptionsTests
         {
             Backoff = new BackoffOptions
             {
-                Max = TimeSpan.FromSeconds(5),
+                MaximumDelay = TimeSpan.FromSeconds(5),
                 Jitter = Jitter.None,
                 TransientBase = TimeSpan.FromMilliseconds(50),
                 Factor = 3,
             },
         }.ToPolicy();
 
-        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
+        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.MaximumDelay);
         Assert.Equal(Jitter.None, policy.Backoff.Jitter);
 
         // 50ms, then ×3, with jitter off so the arithmetic is the assertion.
@@ -225,10 +225,10 @@ public sealed class ResilienceOptionsTests
 
         var policy = new ResilienceOptions
         {
-            Backoff = new BackoffOptions { Max = TimeSpan.FromSeconds(5) },
+            Backoff = new BackoffOptions { MaximumDelay = TimeSpan.FromSeconds(5) },
         }.ToPolicy(baseline);
 
-        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
+        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.MaximumDelay);
         Assert.Equal(TimeSpan.FromMilliseconds(500), policy.Backoff.TransientBase);
         Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.ThrottledBase);
         Assert.Equal(3.0, policy.Backoff.Factor);
@@ -246,11 +246,11 @@ public sealed class ResilienceOptionsTests
 
         var policy = new ResilienceOptions
         {
-            Backoff = new BackoffOptions { Max = TimeSpan.FromSeconds(5), Jitter = Jitter.None },
+            Backoff = new BackoffOptions { MaximumDelay = TimeSpan.FromSeconds(5), Jitter = Jitter.None },
         }.ToPolicy(baseline);
 
         Assert.Equal(BackoffKind.Exponential, policy.Backoff.Kind);
-        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.Max);
+        Assert.Equal(TimeSpan.FromSeconds(5), policy.Backoff.MaximumDelay);
         Assert.Equal(Backoff.Default.TransientBase, policy.Backoff.TransientBase);
         Assert.Equal(Backoff.Default.ThrottledBase, policy.Backoff.ThrottledBase);
         Assert.Equal(Backoff.Default.Factor, policy.Backoff.Factor);
@@ -516,7 +516,7 @@ public sealed class ResilienceOptionsTests
             Config(
                 ("Preset", "Http"),
                 ("Adaptive", "true"),
-                ("Backoff:Max", "00:00:04"),
+                ("Backoff:MaximumDelay", "00:00:04"),
                 ("Budget:Fraction", "0.25"),
                 ("AttemptCeiling:Multiple", "5"),
                 ("Breaker:TripWindow", "00:00:30"),
@@ -526,7 +526,7 @@ public sealed class ResilienceOptionsTests
         using var provider = services.BuildServiceProvider();
         var policy = provider.GetRequiredService<IResiliencePolicies>()["api"];
 
-        Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.Max);
+        Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.MaximumDelay);
         Assert.Equal(5, policy.AttemptCeiling!.Value.Multiple);
         Assert.Equal(TimeSpan.FromSeconds(30), policy.Breaker!.Settings.TripWindow);
         Assert.Equal(0.5, policy.Breaker.Settings.Recovery!.Value.Length);
@@ -587,7 +587,7 @@ public sealed class ResilienceOptionsTests
 
         Assert.Equal(0.95, hedge.Quantile);
         Assert.Equal(50, hedge.MinimumSamples);
-        Assert.Equal(2, hedge.MaxConcurrent);
+        Assert.Equal(2, hedge.MaximumConcurrent);
     }
 
     [Fact]
@@ -806,7 +806,7 @@ public sealed class ResilienceOptionsTests
             Hedge = new HedgeOptions
             {
                 Quantile = 0.99,
-                MaxConcurrent = 3,
+                MaximumConcurrent = 3,
                 MinimumSamples = 5,
                 MinimumDelay = TimeSpan.FromMilliseconds(25),
                 Window = TimeSpan.FromSeconds(10),
@@ -824,7 +824,7 @@ public sealed class ResilienceOptionsTests
         var hedge = Assert.NotNull(policy.Hedge);
 
         Assert.Equal(0.99, hedge.Quantile);
-        Assert.Equal(3, hedge.MaxConcurrent);
+        Assert.Equal(3, hedge.MaximumConcurrent);
         Assert.Equal(5, hedge.MinimumSamples);
         Assert.Equal(TimeSpan.FromMilliseconds(25), hedge.MinimumDelay);
         Assert.Equal(TimeSpan.FromSeconds(10), hedge.Window);
@@ -964,7 +964,7 @@ public sealed class ResilienceOptionsTests
                 ("Deadline", "00:00:10"),
                 ("AttemptTimeout", "00:00:03"),
                 ("UseAmbientDeadline", "true"),
-                ("Backoff:Max", "00:00:04"),
+                ("Backoff:MaximumDelay", "00:00:04"),
                 ("Backoff:Jitter", "Equal"),
                 ("Budget:Fraction", "0.25"),
                 ("Budget:MinimumPerSecond", "10"),
@@ -978,9 +978,9 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(TimeSpan.FromSeconds(10), policy.Deadline);
         Assert.Equal(TimeSpan.FromSeconds(3), policy.AttemptTimeout);
         Assert.True(policy.UseAmbientDeadline);
-        Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.Max);
+        Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.MaximumDelay);
         Assert.Equal(Jitter.Equal, policy.Backoff.Jitter);
-        Assert.Same(Classifier.Http, policy.Classify);
+        Assert.Same(Classifier.Http, policy.Classifier);
         Assert.NotNull(policy.Budget);
         Assert.Equal(8, policy.Breaker!.Settings.ConsecutiveFailures);
         Assert.Equal(TimeSpan.FromSeconds(2), policy.Breaker.Settings.SlowCallThreshold);

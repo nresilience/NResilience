@@ -37,7 +37,7 @@ public enum BackoffKind
 ///     <para>
 ///         A factory chooses the curve and <c>with</c> changes one term of it:
 ///         <c>Backoff.Exponential()</c> is a complete configuration, and
-///         <c>Backoff.Exponential() with { Max = TimeSpan.FromSeconds(5) }</c> is the way to change the
+///         <c>Backoff.Exponential() with { MaximumDelay = TimeSpan.FromSeconds(5) }</c> is the way to change the
 ///         cap without restating the three knobs beside it. The defaults are supplied on read rather
 ///         than by a constructor, for the reason <see cref="AttemptCeiling" /> and <see cref="Hedge" />
 ///         give: a struct's default instance is the one thing a constructor cannot reach, and
@@ -95,7 +95,7 @@ public readonly record struct Backoff
     ///     <para>
     ///         Only <see cref="BackoffKind.Exponential" /> curves can carry one, and it moves only the
     ///         transient base: <see cref="ThrottledBase" />, <see cref="Factor" />, <see cref="Jitter" />,
-    ///         <see cref="Max" /> and the <see cref="Verdict.RetryAfter" /> pushback precedence are all
+    ///         <see cref="MaximumDelay" /> and the <see cref="Verdict.RetryAfter" /> pushback precedence are all
     ///         unchanged. See <see cref="NResilience.MeasuredBase" /> for why, and
     ///         <see cref="Measured" /> for the short way to write it.
     ///     </para>
@@ -144,7 +144,7 @@ public readonly record struct Backoff
     ///     The hard cap on any single delay. Defaults to 30 s;
     ///     <see cref="Timeout.InfiniteTimeSpan" /> for none.
     /// </summary>
-    public TimeSpan Max
+    public TimeSpan MaximumDelay
     {
         get => _max ?? DefaultMax;
         init => _max = value;
@@ -169,14 +169,14 @@ public readonly record struct Backoff
     /// <param name="transientBase">Base delay for <see cref="VerdictKind.Transient" />. Defaults to 100 ms.</param>
     /// <param name="throttledBase">Base delay for <see cref="VerdictKind.Throttled" />. Defaults to 1 s.</param>
     /// <param name="factor">Growth per attempt. Defaults to 2.0.</param>
-    /// <param name="max">Hard cap on any single delay. Defaults to 30 s. Uncapped exponential backoff is not hypothetical.</param>
+    /// <param name="maximumDelay">Hard cap on any single delay. Defaults to 30 s. Uncapped exponential backoff is not hypothetical.</param>
     /// <returns>The configured backoff.</returns>
     public static Backoff Exponential(
         TimeSpan? transientBase = null,
         TimeSpan? throttledBase = null,
         double factor = DefaultFactor,
-        TimeSpan? max = null)
-        => new(BackoffKind.Exponential, transientBase, throttledBase, factor, max, null);
+        TimeSpan? maximumDelay = null)
+        => new(BackoffKind.Exponential, transientBase, throttledBase, factor, maximumDelay, null);
 
     /// <summary>
     ///     Exponential backoff whose transient base is measured from the dependency's own recent
@@ -189,18 +189,18 @@ public readonly record struct Backoff
     /// <param name="transientBase">The base the measurement is clamped around. Defaults to 100 ms.</param>
     /// <param name="throttledBase">Base delay for <see cref="VerdictKind.Throttled" />, which is never measured. Defaults to 1 s.</param>
     /// <param name="factor">Growth per attempt. Defaults to 2.0.</param>
-    /// <param name="max">Hard cap on any single delay. Defaults to 30 s.</param>
+    /// <param name="maximumDelay">Hard cap on any single delay. Defaults to 30 s.</param>
     /// <returns>The configured backoff.</returns>
     public static Backoff Measured(
         double multiple = NResilience.MeasuredBase.DefaultMultiple,
         TimeSpan? transientBase = null,
         TimeSpan? throttledBase = null,
         double factor = DefaultFactor,
-        TimeSpan? max = null)
-        => Exponential(transientBase, throttledBase, factor, max)
+        TimeSpan? maximumDelay = null)
+        => Exponential(transientBase, throttledBase, factor, maximumDelay)
             with
             {
-                MeasuredBase = NResilience.MeasuredBase.Of(multiple),
+                MeasuredBase = NResilience.MeasuredBase.Times(multiple),
             };
 
     /// <summary>The same delay every time.</summary>
@@ -209,7 +209,7 @@ public readonly record struct Backoff
     public static Backoff Constant(TimeSpan delay) => new(BackoffKind.Constant, delay, delay, DefaultFactor, delay, null);
 
     /// <summary>
-    ///     Compute the delay yourself. The curve ignores <see cref="Max" /> and <see cref="Jitter" />:
+    ///     Compute the delay yourself. The curve ignores <see cref="MaximumDelay" /> and <see cref="Jitter" />:
     ///     the delegate's answer is the delay, clamped only at zero.
     ///     <para>
     ///         A custom curve does not have to start from nothing. <see cref="Compute(in NextAttempt)" />
@@ -248,20 +248,20 @@ public readonly record struct Backoff
         && TransientBase == other.TransientBase
         && ThrottledBase == other.ThrottledBase
         && Factor.Equals(other.Factor)
-        && Max == other.Max
+        && MaximumDelay == other.MaximumDelay
         && Nullable.Equals(MeasuredBase, other.MeasuredBase)
         && _custom == other._custom;
 
     /// <inheritdoc />
     public override int GetHashCode() =>
-        HashCode.Combine(Kind, Jitter, TransientBase, ThrottledBase, Factor, Max, MeasuredBase, _custom);
+        HashCode.Combine(Kind, Jitter, TransientBase, ThrottledBase, Factor, MaximumDelay, MeasuredBase, _custom);
 
     /// <summary>
     ///     The delay before <paramref name="next" />.
     ///     <para>
     ///         Server pushback wins over every curve: when the previous verdict carried a
     ///         <see cref="Verdict.RetryAfter" />, that value is honored verbatim (capped by
-    ///         <see cref="Max" />) and no jitter is applied - a server telling you when to come back is
+    ///         <see cref="MaximumDelay" />) and no jitter is applied - a server telling you when to come back is
     ///         strictly better information than a client-side guess.
     ///     </para>
     /// </summary>
@@ -293,7 +293,7 @@ public readonly record struct Backoff
             return custom > TimeSpan.Zero ? custom : TimeSpan.Zero;
         }
 
-        var max = Max;
+        var max = MaximumDelay;
 
         if (next.PreviousVerdict.RetryAfter is { } pushback)
         {
@@ -351,8 +351,8 @@ public readonly record struct Backoff
         if (ThrottledBase < TimeSpan.Zero)
             problems.Add($"Backoff throttled base delay must not be negative; it is {ThrottledBase}.");
 
-        if (Max < TimeSpan.Zero && Max != Timeout.InfiniteTimeSpan)
-            problems.Add($"Backoff maximum delay must not be negative; it is {Max}.");
+        if (MaximumDelay < TimeSpan.Zero && MaximumDelay != Timeout.InfiniteTimeSpan)
+            problems.Add($"Backoff maximum delay must not be negative; it is {MaximumDelay}.");
 
         if (MeasuredBase is { } measured)
         {

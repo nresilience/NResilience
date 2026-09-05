@@ -8,7 +8,7 @@ namespace NResilience.Extensions;
 ///         is <b>silently partial</b>. Measured against
 ///         <c>Microsoft.Extensions.Configuration.Binder</c> 10.0.0 on both target frameworks: scalars and
 ///         <c>init</c> properties bind - <c>Attempts</c>, <c>Deadline</c> and every term of
-///         <c>Backoff</c> among them - but <c>Classify</c> is ignored (leaving a policy that does not
+///         <c>Backoff</c> among them - but <c>Classifier</c> is ignored (leaving a policy that does not
 ///         retry a 503), and <c>Breaker:ConsecutiveFailures</c> constructs a live circuit breaker with
 ///         default settings while ignoring the configured value.
 ///     </para>
@@ -16,7 +16,7 @@ namespace NResilience.Extensions;
 ///         Neither failure is a missing setter, and neither can be fixed by adding one: a classifier is a
 ///         set of predicates that no binder can conjure from a string, and a breaker is a live, stateful
 ///         guard that configuration should not be able to construct by accident. Partial binding leads to
-///         unexpected behavior - a section that sets <c>Attempts</c> and silently drops <c>Classify</c>
+///         unexpected behavior - a section that sets <c>Attempts</c> and silently drops <c>Classifier</c>
 ///         appears to work while the resulting policy does not retry what it was told to. To eliminate
 ///         this class of silent failures, the binding target is a DTO and
 ///         <see cref="ToPolicy(Resilience?)" /> performs the projection manually. Both failures are gated
@@ -56,7 +56,7 @@ namespace NResilience.Extensions;
 ///         delete a key.
 ///     </para>
 ///     <para>
-///         <see cref="Resilience.Classify" />, <see cref="Resilience.BeforeAttempt" /> and
+///         <see cref="Resilience.Classifier" />, <see cref="Resilience.BeforeAttempt" /> and
 ///         <see cref="Resilience.OnEvent" /> are not bindable and are not represented here: a classifier
 ///         is a lambda and JSON cannot hold one. The <c>configure</c> callback on every registration is
 ///         where they go, and it runs after this projection so it always wins.
@@ -276,7 +276,7 @@ public sealed class BackoffOptions
     public TimeSpan? ThrottledBase { get; set; }
 
     /// <summary>The ceiling on any single backoff delay.</summary>
-    public TimeSpan? Max { get; set; }
+    public TimeSpan? MaximumDelay { get; set; }
 
     /// <summary>The multiplier applied per attempt. 2 doubles; 1 makes the backoff constant.</summary>
     public double? Factor { get; set; }
@@ -295,7 +295,7 @@ public sealed class BackoffOptions
     private bool HasCurve =>
         TransientBase is not null
         || ThrottledBase is not null
-        || Max is not null
+        || MaximumDelay is not null
         || Factor is not null
 
         // A measured base is only carried by an exponential curve, so naming one is a reason to
@@ -323,7 +323,7 @@ public sealed class BackoffOptions
             TransientBase = TransientBase ?? existing.TransientBase,
             ThrottledBase = ThrottledBase ?? existing.ThrottledBase,
             Factor = Factor ?? existing.Factor,
-            Max = Max ?? existing.Max,
+            MaximumDelay = MaximumDelay ?? existing.MaximumDelay,
             Jitter = Jitter ?? baseline.Jitter,
             MeasuredBase = MeasuredBase is { } measured
                 ? measured.Enabled is false ? null : measured.ToMeasuredBase()
@@ -379,7 +379,7 @@ public sealed class MeasuredBaseOptions
                 "Zero normal calls is not a delay anyone could mean.");
         }
 
-        var measured = MeasuredBase.Of(Multiple ?? MeasuredBase.DefaultMultiple);
+        var measured = MeasuredBase.Times(Multiple ?? MeasuredBase.DefaultMultiple);
 
         if (Quantile is { } quantile)
             measured = measured with { Quantile = quantile };
@@ -493,8 +493,8 @@ public sealed class HedgeOptions
     /// </summary>
     public double? Quantile { get; set; }
 
-    /// <summary><see cref="NResilience.Hedge.MaxConcurrent" />.</summary>
-    public int? MaxConcurrent { get; set; }
+    /// <summary><see cref="NResilience.Hedge.MaximumConcurrent" />.</summary>
+    public int? MaximumConcurrent { get; set; }
 
     /// <summary><see cref="NResilience.Hedge.MinimumSamples" />.</summary>
     public int? MinimumSamples { get; set; }
@@ -524,8 +524,8 @@ public sealed class HedgeOptions
     {
         var hedge = Hedge.At(Quantile ?? 0.95);
 
-        if (MaxConcurrent is { } concurrent)
-            hedge = hedge with { MaxConcurrent = concurrent };
+        if (MaximumConcurrent is { } concurrent)
+            hedge = hedge with { MaximumConcurrent = concurrent };
 
         if (MinimumSamples is { } samples)
             hedge = hedge with { MinimumSamples = samples };
@@ -733,8 +733,8 @@ public sealed class BreakerOptions
     /// <summary><see cref="BreakerSettings.BreakDuration" />.</summary>
     public TimeSpan? BreakDuration { get; set; }
 
-    /// <summary><see cref="BreakerSettings.MaxBreakDuration" />.</summary>
-    public TimeSpan? MaxBreakDuration { get; set; }
+    /// <summary><see cref="BreakerSettings.MaximumBreakDuration" />.</summary>
+    public TimeSpan? MaximumBreakDuration { get; set; }
 
     /// <summary>
     ///     <see cref="BreakerSettings.BreakJitter" /> - how much randomness the break duration carries,
@@ -819,8 +819,8 @@ public sealed class BreakerOptions
         if (BreakDuration is { } breakDuration)
             settings = settings with { BreakDuration = breakDuration };
 
-        if (MaxBreakDuration is { } maxBreak)
-            settings = settings with { MaxBreakDuration = maxBreak };
+        if (MaximumBreakDuration is { } maximumBreak)
+            settings = settings with { MaximumBreakDuration = maximumBreak };
 
         if (BreakJitter is { } jitter)
             settings = settings with { BreakJitter = jitter };

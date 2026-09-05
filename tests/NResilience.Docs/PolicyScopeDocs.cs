@@ -41,7 +41,7 @@ public sealed class PolicyScopeDocs
         },
 
         // How many keys to keep. The least-recently-seen are dropped past this.
-        maxKeys: 64);
+        maximumKeys: 64);
 
     // </snippet:policy-scope-shape>
 

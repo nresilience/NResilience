@@ -35,7 +35,7 @@ public sealed class Hedging
         // hedges 1% of calls and shortens a smaller part of the tail than 0.95 does.
         var api = Resilience.Http with
         {
-            Hedge = Hedge.At(quantile: 0.99, maxConcurrent: 3) with
+            Hedge = Hedge.At(quantile: 0.99, maximumConcurrent: 3) with
             {
                 MinimumSamples = 50, // wait for 50 recent calls before hedging anything
                 MinimumDelay = TimeSpan.FromMilliseconds(value: 25), // never hedge sooner than this
@@ -46,7 +46,7 @@ public sealed class Hedging
         // </snippet:hedging-tuning>
 
         api.Validate();
-        Assert.Equal(expected: 3, actual: api.Hedge!.Value.MaxConcurrent);
+        Assert.Equal(expected: 3, actual: api.Hedge!.Value.MaximumConcurrent);
     }
 
     /// <summary>

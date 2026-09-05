@@ -69,7 +69,7 @@ public sealed class CallResultTests
         var policy = TestPolicy.Instant with
         {
             Attempts = 2,
-            Classify = Classifier.Default.OnResult<int>(static v => v == 503 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         var result = await policy.TryRunAsync(ct => Task.FromResult(503));
@@ -185,7 +185,7 @@ public sealed class CallResultTests
         var policy = TestPolicy.Instant with
         {
             Attempts = 2,
-            Classify = Classifier.Default.OnResult<int>(status => status == 503 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(status => status == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         var result = await policy.TryRunAsync(ct =>
@@ -208,7 +208,7 @@ public sealed class CallResultTests
         var policy = TestPolicy.Instant with
         {
             Attempts = 2,
-            Classify = Classifier.Default.OnResult<int>(status => status == 503 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(status => status == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         var result = await policy.TryRunAsync(ValueTask<int> (ct) =>

@@ -311,7 +311,7 @@ public sealed partial record Resilience
                                 // consumer never sees this element.
                                 value = enumerator.Current;
                                 hasValue = true;
-                                verdict = Classify.ClassifyResult(value);
+                                verdict = Classifier.ClassifyResult(value);
                                 surviving = verdict.Kind == VerdictKind.Ok;
                             }
                         }
@@ -348,7 +348,7 @@ public sealed partial record Resilience
                 }
                 catch (Exception exception)
                 {
-                    verdict = Classify.ClassifyException(exception);
+                    verdict = Classifier.ClassifyException(exception);
 
                     if (verdict.Kind == VerdictKind.Ok)
                         verdict = Verdict.Permanent;

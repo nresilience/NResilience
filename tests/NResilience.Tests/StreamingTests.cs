@@ -19,7 +19,7 @@ public sealed class StreamingTests
             .Throws(new IOException())
             .Yields(1, 2, 3);
 
-        var policy = TestPolicy.Instant with { Classify = Classifier.RetryEverything };
+        var policy = TestPolicy.Instant with { Classifier = Classifier.RetryEverything };
         var received = await CollectAsync(policy.RunAsync(streams.Next));
 
         Assert.Equal([1, 2, 3], received);
@@ -40,7 +40,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Permanent : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Permanent : Verdict.Ok),
             OnEvent = e => events.Add(e),
         };
 
@@ -71,7 +71,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
         };
 
         var received = await CollectAsync(policy.RunAsync(streams.Next));
@@ -89,7 +89,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.Default.OnResult<int>(v =>
+            Classifier = Classifier.Default.OnResult<int>(v =>
             {
                 judged++;
                 return v < 0 ? Verdict.Permanent : Verdict.Ok;
@@ -112,7 +112,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             OnEvent = e => events.Add(e),
         };
 
@@ -154,7 +154,7 @@ public sealed class StreamingTests
             .Throws(new IOException())
             .Yields(1);
 
-        var policy = TestPolicy.Instant with { Classify = Classifier.RetryEverything };
+        var policy = TestPolicy.Instant with { Classifier = Classifier.RetryEverything };
         var received = await CollectAsync(policy.RunAsync(streams.Next));
 
         Assert.Equal([1], received);
@@ -195,7 +195,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             Backoff = Backoff.Constant(TimeSpan.FromSeconds(30)),
         };
 
@@ -219,7 +219,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.On(time) with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             Deadline = TimeSpan.FromSeconds(1),
             Backoff = Backoff.Constant(TimeSpan.FromSeconds(30)),
         };
@@ -243,7 +243,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.On(time) with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             AttemptTimeout = TimeSpan.FromSeconds(5),
         };
 
@@ -265,7 +265,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.On(time) with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             Attempts = 1,
             AttemptTimeout = TimeSpan.FromSeconds(5),
         };
@@ -293,7 +293,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.On(time) with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             AttemptTimeout = TimeSpan.FromSeconds(5),
             OnEvent = e => events.Add(e),
         };
@@ -326,7 +326,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.On(time) with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             AttemptTimeout = TimeSpan.FromSeconds(5),
         };
 
@@ -375,7 +375,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             Admit = _ =>
             {
                 admissions++;
@@ -405,7 +405,7 @@ public sealed class StreamingTests
             .Yields(1, 2)
             .Yields(3, 4);
 
-        var policy = TestPolicy.Instant with { Classify = Classifier.RetryEverything };
+        var policy = TestPolicy.Instant with { Classifier = Classifier.RetryEverything };
         var enumerable = policy.RunAsync(streams.Next);
 
         Assert.Equal([1, 2], await CollectAsync(enumerable));
@@ -478,7 +478,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
         };
 
         var received = new List<int>();
@@ -510,7 +510,7 @@ public sealed class StreamingTests
         var policy = TestPolicy.On(time) with
         {
             Breaker = breaker,
-            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
             OnEvent = e => events.Add(e),
         };
 
@@ -552,7 +552,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.On(time) with
         {
-            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
             Deadline = TimeSpan.FromSeconds(1),
             Backoff = Backoff.Constant(TimeSpan.FromSeconds(30)),
         };
@@ -584,7 +584,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             Admit = static _ => Task.FromResult(Verdict.Refused()),
             Attempts = 2,
         };
@@ -614,7 +614,7 @@ public sealed class StreamingTests
             .Throws(fault)
             .Throws(fault);
 
-        var policy = TestPolicy.Instant with { Classify = Classifier.RetryEverything };
+        var policy = TestPolicy.Instant with { Classifier = Classifier.RetryEverything };
 
         var caught = await Assert.ThrowsAsync<IOException>(() => DrainAsync(policy.RunAsync(streams.Next)));
 
@@ -630,7 +630,7 @@ public sealed class StreamingTests
             .Throws(new IOException())
             .Yields(1);
 
-        var policy = TestPolicy.Instant with { Classify = Classifier.RetryEverything };
+        var policy = TestPolicy.Instant with { Classifier = Classifier.RetryEverything };
 
         var received = await CollectAsync(policy.RunAsync(
             static (streams, ct) => streams.Next(ct),
@@ -651,7 +651,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             BeforeAttempt = _ =>
             {
                 runs++;
@@ -675,7 +675,7 @@ public sealed class StreamingTests
 
         var policy = TestPolicy.On(time) with
         {
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
             Budget = budget,
         };
 

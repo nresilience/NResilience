@@ -41,8 +41,8 @@ NResilience.Extensions.BackoffOptions.Factor.get -> double?
 NResilience.Extensions.BackoffOptions.Factor.set -> void
 NResilience.Extensions.BackoffOptions.Jitter.get -> NResilience.Jitter?
 NResilience.Extensions.BackoffOptions.Jitter.set -> void
-NResilience.Extensions.BackoffOptions.Max.get -> System.TimeSpan?
-NResilience.Extensions.BackoffOptions.Max.set -> void
+NResilience.Extensions.BackoffOptions.MaximumDelay.get -> System.TimeSpan?
+NResilience.Extensions.BackoffOptions.MaximumDelay.set -> void
 NResilience.Extensions.BackoffOptions.MeasuredBase.get -> NResilience.Extensions.MeasuredBaseOptions?
 NResilience.Extensions.BackoffOptions.MeasuredBase.set -> void
 NResilience.Extensions.BackoffOptions.ThrottledBase.get -> System.TimeSpan?
@@ -68,8 +68,8 @@ NResilience.Extensions.BreakerOptions.Failures.get -> NResilience.Extensions.Fai
 NResilience.Extensions.BreakerOptions.Failures.set -> void
 NResilience.Extensions.BreakerOptions.HalfOpenProbes.get -> int?
 NResilience.Extensions.BreakerOptions.HalfOpenProbes.set -> void
-NResilience.Extensions.BreakerOptions.MaxBreakDuration.get -> System.TimeSpan?
-NResilience.Extensions.BreakerOptions.MaxBreakDuration.set -> void
+NResilience.Extensions.BreakerOptions.MaximumBreakDuration.get -> System.TimeSpan?
+NResilience.Extensions.BreakerOptions.MaximumBreakDuration.set -> void
 NResilience.Extensions.BreakerOptions.MinimumCalls.get -> int?
 NResilience.Extensions.BreakerOptions.MinimumCalls.set -> void
 NResilience.Extensions.BreakerOptions.ProbeSuccesses.get -> int?
@@ -113,8 +113,8 @@ NResilience.Extensions.HedgeOptions
 NResilience.Extensions.HedgeOptions.Enabled.get -> bool?
 NResilience.Extensions.HedgeOptions.Enabled.set -> void
 NResilience.Extensions.HedgeOptions.HedgeOptions() -> void
-NResilience.Extensions.HedgeOptions.MaxConcurrent.get -> int?
-NResilience.Extensions.HedgeOptions.MaxConcurrent.set -> void
+NResilience.Extensions.HedgeOptions.MaximumConcurrent.get -> int?
+NResilience.Extensions.HedgeOptions.MaximumConcurrent.set -> void
 NResilience.Extensions.HedgeOptions.MinimumDelay.get -> System.TimeSpan?
 NResilience.Extensions.HedgeOptions.MinimumDelay.set -> void
 NResilience.Extensions.HedgeOptions.MinimumSamples.get -> int?

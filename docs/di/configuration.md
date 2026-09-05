@@ -32,7 +32,7 @@ Every child of the section becomes a policy, named by its key.
       "Backoff": {
         "TransientBase": "00:00:00.200",
         "ThrottledBase": "00:00:02",
-        "Max": "00:00:10"
+        "MaximumDelay": "00:00:10"
       },
       "Breaker": {
         "ConsecutiveFailures": 5,
@@ -61,7 +61,7 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `Name` | The policy name. Defaults to the registration name. |
 | `Attempts` | The total number of attempts, including the first call. |
 | `Deadline`, `AttemptTimeout` | Time bounds for the call. Use `"-00:00:00.0010000"` for `Timeout.InfiniteTimeSpan`. |
-| `Backoff` | A `BackoffOptions` section: `TransientBase`, `ThrottledBase`, `Max`, `Factor`, `Jitter`. |
+| `Backoff` | A `BackoffOptions` section: `TransientBase`, `ThrottledBase`, `MaximumDelay`, `Factor`, `Jitter`. |
 | `Budget` | A `BudgetOptions` section: `Enabled`, `Fraction`, `MinimumPerSecond`, `Shared`. |
 | `AttemptCeiling` | An `AttemptCeilingOptions` section. On by default; `"AttemptCeiling": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |
 | `Backoff:MeasuredBase` | A `MeasuredBaseOptions` subsection. Off by default; `"Backoff": { "MeasuredBase": { "Multiple": 1 } }` measures the transient base from recent latency. |
@@ -124,7 +124,7 @@ to surprise. `"Breaker": { "Adaptive": true }` overrides it for the breaker only
 then configures `AttemptCeiling`, `Hedge`, `Breaker:SlowCalls`, `Breaker:Failures` or
 `Backoff:MeasuredBase` has said two incompatible things, and registration fails naming both.
  
-The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `TripWindow`, `BreakDuration`, `MaxBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `Recovery` is a subsection of its own - `"Recovery": {}` turns the [recovery ramp](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) on at its defaults, `"Recovery": { "Length": 0.5 }` changes it, and `"Enabled": false` turns it back off. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
+The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and supports `ConsecutiveFailures`, `FailureRatio`, `MinimumCalls`, `TripWindow`, `BreakDuration`, `MaximumBreakDuration`, `BreakJitter`, `HalfOpenProbes`, `ProbeSuccesses`, `SlowCallThreshold`, and `SlowCallRatio`. `Recovery` is a subsection of its own - `"Recovery": {}` turns the [recovery ramp](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) on at its defaults, `"Recovery": { "Length": 0.5 }` changes it, and `"Enabled": false` turns it back off. `BreakJitter` binds by name - `"Equal"` (the default), `"Full"`, or `"None"` for a break that expires at exactly `BreakDuration`.
 
 `Breaker:SlowCalls` is a nested section rather than a flat property, and the [adaptive brownout trip](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number) it configures is on by default. Every setting has a default, so the section is only needed to change one; it accepts `Multiple`, `Quantile`, `Window`, and `MinimumSamples`. `"SlowCalls": { "Enabled": false }` turns the trip off. Naming `SlowCallThreshold` as well composes rather than colliding - a call is slow when it is above either threshold.
 
@@ -139,7 +139,7 @@ The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and s
 NResilience binds configuration onto `ResilienceOptions`, a flat, mutable Data Transfer Object (DTO), and the `ToPolicy` method projects that DTO into a `Resilience` policy.
 
 > [!NOTE]
-> Avoid binding a configuration section directly onto a `Resilience` instance. Direct binding is silently partial: scalars and `init` properties bind correctly, but complex objects do not. `Classify: "Http"` is ignored, leaving a policy that does not retry a 503 - a classifier is a set of predicates and no binder can build one from a string. `Breaker:ConsecutiveFailures` is worse: it constructs a live circuit breaker with default settings, ignoring the value you set. Neither is something a setter could fix, which is why the binding target is `ResilienceOptions`.
+> Avoid binding a configuration section directly onto a `Resilience` instance. Direct binding is silently partial: scalars and `init` properties bind correctly, but complex objects do not. `Classifier: "Http"` is ignored, leaving a policy that does not retry a 503 - a classifier is a set of predicates and no binder can build one from a string. `Breaker:ConsecutiveFailures` is worse: it constructs a live circuit breaker with default settings, ignoring the value you set. Neither is something a setter could fix, which is why the binding target is `ResilienceOptions`.
 
 The middle case is the dangerous one, because the half that worked is the evidence people use to conclude the other half did too. The DTO ensures the final policy matches the section exactly. All three failures are gated by a test.
 
@@ -168,7 +168,7 @@ limiter is built eagerly.
 A section that sets some of the backoff knobs patches the curve the base policy already carries: any
 knob the section does not mention keeps the base policy's value rather than falling back to a factory
 default. So a base policy built with `Backoff.Exponential(transientBase: TimeSpan.FromMilliseconds(500))`
-plus a section setting only `"Backoff": { "Max": "00:00:05" }` keeps the 500 ms transient base and gets the 5 s cap.
+plus a section setting only `"Backoff": { "MaximumDelay": "00:00:05" }` keeps the 500 ms transient base and gets the 5 s cap.
 
 Patching only makes sense against an exponential curve. If the base policy carries a
 `Backoff.Constant(...)` or a `Backoff.Custom(...)`, any backoff knob in the section replaces it with a
@@ -193,7 +193,7 @@ services.AddResilience(
     section: configuration.GetSection(key: "Resilience:api"),
     policy => policy with
     {
-        Classify = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
+        Classifier = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
         Breaker = shared,
     });
 ```

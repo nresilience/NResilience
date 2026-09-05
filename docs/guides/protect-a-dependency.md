@@ -47,7 +47,7 @@ public sealed class Dependencies
 
 - **Breaker scope**: The [circuit breaker](../features/circuit-breaker.md) is defined as a field. Every policy that uses the `Charge` property shares this breaker, so state is consistent across all calls to the payment service.
 - **Slow call detection**: `SlowCalls` makes the breaker trip during brownouts (the service is slow but not failing) as well as outright failures. It measures what normal looks like for this dependency, so you supply a multiple rather than a millisecond figure. It is on by default; stating it here keeps the example self-contained. See [Trip on brownouts](../features/circuit-breaker.md#trip-on-brownouts-without-guessing-a-number).
-- **Exponential backoff**: `BreakDuration` doubles on each consecutive open state (up to `MaxBreakDuration`), so the breaker does not reopen on a fixed schedule and pile onto the dependency during a long outage.
+- **Exponential backoff**: `BreakDuration` doubles on each consecutive open state (up to `MaximumBreakDuration`), so the breaker does not reopen on a fixed schedule and pile onto the dependency during a long outage.
 - **Shared retry budget**: The [retry budget](../features/retry-budget.md) is shared by name. Multiple policies (charges and refunds, say) throttle against one pool, while unrelated services are unaffected.
 - **Observability**: The `Name` property appears in every event and metric tag, so you can tell this dependency from others on your dashboard.
 

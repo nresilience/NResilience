@@ -39,7 +39,7 @@ The `AddResilience` method expects a configuration section structured as follows
       "Backoff": {
         "TransientBase": "00:00:00.200",
         "ThrottledBase": "00:00:02",
-        "Max": "00:00:10"
+        "MaximumDelay": "00:00:10"
       },
       "Breaker": {
         "ConsecutiveFailures": 5,
@@ -101,7 +101,7 @@ services.AddResilience(
     section: configuration.GetSection(key: "Resilience:api"),
     policy => policy with
     {
-        Classify = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
+        Classifier = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
         Breaker = shared,
     });
 ```

@@ -206,7 +206,7 @@ If every attempt is refused, the call ends with `StopReason.AttemptsExhausted` a
 
 `QueueLimit` is `0` by default: a call that cannot get a permit is refused immediately rather than queued.
 
-That is deliberate, because the library is already good at waiting. A refusal becomes a retry on the throttled curve, capped by `Backoff.Max` and by the time left on the deadline, and visible in telemetry as a retry. Queue time instead counts against `AttemptTimeout`, where it is indistinguishable from a slow dependency.
+That is deliberate, because the library is already good at waiting. A refusal becomes a retry on the throttled curve, capped by `Backoff.MaximumDelay` and by the time left on the deadline, and visible in telemetry as a retry. Queue time instead counts against `AttemptTimeout`, where it is indistinguishable from a slow dependency.
 
 > [!CAUTION]
 > If you set `QueueLimit` above zero, raise `AttemptTimeout` to cover the wait. A queued call that exceeds the attempt timeout reports as a timeout, and a `SlowCallThreshold` breaker will count it against a dependency that is perfectly healthy.

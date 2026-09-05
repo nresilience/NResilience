@@ -37,7 +37,7 @@ public sealed class ResilienceFailureTests
             Attempts = 2,
             Deadline = TimeSpan.FromMilliseconds(1),
             AttemptTimeout = Timeout.InfiniteTimeSpan,
-            Classify = Classifier.RetryEverything,
+            Classifier = Classifier.RetryEverything,
         };
 
         var thrown = await Assert.ThrowsAsync<DeadlineExceededException>(

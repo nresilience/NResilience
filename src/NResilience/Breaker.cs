@@ -266,7 +266,7 @@ public sealed record BreakerSettings
     ///         flap on a fixed cadence forever. The counter resets on a clean close.
     ///     </para>
     /// </summary>
-    public TimeSpan MaxBreakDuration { get; init; } = TimeSpan.FromMinutes(2);
+    public TimeSpan MaximumBreakDuration { get; init; } = TimeSpan.FromMinutes(2);
 
     /// <summary>
     ///     How much randomness to apply to the break duration. <see cref="Jitter.Equal" /> by default:
@@ -426,8 +426,8 @@ public sealed record BreakerSettings
         if (BreakDuration <= TimeSpan.Zero)
             problems.Add($"{nameof(BreakDuration)} must be positive; it is {BreakDuration}.");
 
-        if (MaxBreakDuration < BreakDuration)
-            problems.Add($"{nameof(MaxBreakDuration)} must be at least {nameof(BreakDuration)}; they are {MaxBreakDuration} and {BreakDuration}.");
+        if (MaximumBreakDuration < BreakDuration)
+            problems.Add($"{nameof(MaximumBreakDuration)} must be at least {nameof(BreakDuration)}; they are {MaximumBreakDuration} and {BreakDuration}.");
 
         if (Recovery is { } ramp)
             ramp.Validate(problems);
@@ -631,7 +631,7 @@ public sealed class Breaker
     private const int BucketCount = 10;
 
     /// <summary>
-    ///     Cap on the doubling exponent. <c>MaxBreakDuration</c> is the real bound; this only keeps the
+    ///     Cap on the doubling exponent. <c>MaximumBreakDuration</c> is the real bound; this only keeps the
     ///     shift from overflowing after a very long outage.
     /// </summary>
     private const int MaxGrowthShift = 40;
@@ -1300,9 +1300,9 @@ public sealed class Breaker
         _openedAt = _time.GetUtcNow();
 
         // Exponential backoff applied to the breaker itself. The first open serves BreakDuration;
-        // each consecutive one doubles, capped by MaxBreakDuration, and a clean close resets it.
+        // each consecutive one doubles, capped by MaximumBreakDuration, and a clean close resets it.
         var grown = Settings.BreakDuration.Ticks << Math.Min(_consecutiveOpens, MaxGrowthShift);
-        var capped = Math.Min(grown <= 0 ? long.MaxValue : grown, Settings.MaxBreakDuration.Ticks);
+        var capped = Math.Min(grown <= 0 ? long.MaxValue : grown, Settings.MaximumBreakDuration.Ticks);
 
         // Jittered once, here, so RetryAfterHint reports the break this breaker is actually serving
         // rather than the nominal one. The growth above is computed from the nominal duration, so
@@ -1366,7 +1366,7 @@ public sealed class Breaker
 
         // The accumulated growth is not forgotten yet. A ramp that fails is not a clean close, and
         // the break it re-opens with has to be the doubled one or a dependency that fails every ramp
-        // gets probed on a fixed cadence forever - the exact flapping MaxBreakDuration exists to stop.
+        // gets probed on a fixed cadence forever - the exact flapping MaximumBreakDuration exists to stop.
         ClearWindow();
     }
 
@@ -1460,7 +1460,7 @@ public sealed class Breaker
 
     /// <summary>
     ///     The break this open actually serves. Never longer than the computed duration, so
-    ///     <see cref="BreakerSettings.MaxBreakDuration" /> still bounds it.
+    ///     <see cref="BreakerSettings.MaximumBreakDuration" /> still bounds it.
     /// </summary>
     /// <param name="ticks">The computed break duration.</param>
     /// <returns>The jittered break duration.</returns>

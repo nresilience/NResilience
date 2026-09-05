@@ -54,7 +54,7 @@ A 404 is an answer, not a failure, so it is not retried. If a status is transien
 // equivalent to Classifier.Default.
 var db = Resilience.Default with
 {
-    Classify = Classifier.Data,
+    Classifier = Classifier.Data,
     Backoff = Backoff.Constant(delay: TimeSpan.FromMilliseconds(value: 50)),
 };
 ```
@@ -72,11 +72,11 @@ What the provider cannot tell you is that a failure was the dependency *defendin
 // For example, Azure SQL reports resource limits as 10928 and 10929. Both are
 // throttling: they use a long backoff curve and do not count as evidence against the
 // dependency's health.
-var classify = Classifier.Data.On<SqlLikeException>(e => e.Number is 10928 or 10929
+var classifier = Classifier.Data.On<SqlLikeException>(e => e.Number is 10928 or 10929
     ? Verdict.Throttled()
     : Classifier.Data.ClassifyException(exception: e));
 
-var db = Resilience.Default with { Classify = classify };
+var db = Resilience.Default with { Classifier = classifier };
 ```
 <!-- endsnippet -->
 
@@ -91,7 +91,7 @@ Teach a classifier about your exception types with `On`.
 // about yours is one line, and the receiver is unchanged.
 var api = Resilience.Default with
 {
-    Classify = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
+    Classifier = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
     Backoff = Backoff.None,
 };
 ```
@@ -103,12 +103,12 @@ A predicate can inspect the exception for finer control:
 
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
-var classify = Classifier.Http
+var classifier = Classifier.Http
     .On<MyTransportException>(verdict: Verdict.Transient) // retried, short curve
     .On<MyQuotaException>(ex => Verdict.Throttled(retryAfter: ex.RetryAfter)) // retried, long curve or the server's own delay
     .On<MyValidationException>(verdict: Verdict.Permanent); // never retried
 
-var api = Resilience.Http with { Classify = classify };
+var api = Resilience.Http with { Classifier = classifier };
 ```
 <!-- endsnippet -->
 
@@ -128,7 +128,7 @@ public sealed class ConsensusRefusedException(TimeSpan? retryAfter = null) : Exc
 
 var api = Resilience.Default with
 {
-    Classify = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Refused(ex.RetryAfter)),
+    Classifier = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Refused(ex.RetryAfter)),
 };
 ```
 
@@ -145,7 +145,7 @@ Some dependencies report failures in a response envelope instead of throwing. Ad
 // read by retry, the breaker and the budget alike, because they all read one classifier.
 var api = Resilience.Default with
 {
-    Classify = Classifier.Default.OnResult<Reply>(reply => reply.Code switch
+    Classifier = Classifier.Default.OnResult<Reply>(reply => reply.Code switch
     {
         "OK" => Verdict.Ok,
         "BUSY" => Verdict.Throttled(retryAfter: TimeSpan.FromMilliseconds(value: 50)),

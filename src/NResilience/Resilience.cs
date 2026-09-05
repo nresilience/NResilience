@@ -147,7 +147,7 @@ public sealed partial record Resilience
     public Backoff Backoff { get; init; } = Backoff.Default;
 
     /// <summary>What counts as what. Said once, and read by everything.</summary>
-    public Classifier Classify { get; init; } = Classifier.Default;
+    public Classifier Classifier { get; init; } = Classifier.Default;
 
     /// <summary>
     ///     Null means no circuit breaking. Breakers are shared only where you share the object: this is
@@ -242,7 +242,7 @@ public sealed partial record Resilience
     ///         The threshold is always a live quantile rather than a constant, which is what makes the
     ///         feature safe to leave on: see <see cref="NResilience.Hedge" /> for the argument.
     ///         <see cref="Attempts" /> still bounds the total number of calls that reach the dependency,
-    ///         and <see cref="NResilience.Hedge.MaxConcurrent" /> bounds how many of them overlap.
+    ///         and <see cref="NResilience.Hedge.MaximumConcurrent" /> bounds how many of them overlap.
     ///     </para>
     ///     <para>
     ///         A hedge is charged to the <see cref="Budget" /> exactly like a retry, fires only while the
@@ -465,8 +465,8 @@ public sealed partial record Resilience
         CheckDuration(Deadline, nameof(Deadline), problems);
         CheckDuration(AttemptTimeout, nameof(AttemptTimeout), problems);
 
-        if (Classify is null)
-            problems.Add("Classify must not be null.");
+        if (Classifier is null)
+            problems.Add("Classifier must not be null.");
 
         if (Time is null)
             problems.Add("Time must not be null.");
@@ -629,6 +629,6 @@ public sealed partial record Resilience
 
     private static class HttpHolder
     {
-        internal static readonly Resilience Instance = Default with { Classify = Classifier.Http, Name = "http" };
+        internal static readonly Resilience Instance = Default with { Classifier = Classifier.Http, Name = "http" };
     }
 }

@@ -90,7 +90,7 @@ public sealed class HedgeTests
         var time = new FakeTimeProvider();
 
         var breaker = new Breaker(new BreakerSettings
-            { ConsecutiveFailures = 1, BreakDuration = TimeSpan.FromMinutes(10), MaxBreakDuration = TimeSpan.FromMinutes(10), Time = time });
+            { ConsecutiveFailures = 1, BreakDuration = TimeSpan.FromMinutes(10), MaximumBreakDuration = TimeSpan.FromMinutes(10), Time = time });
 
         var policy = Hedging(time, out var events, p => p with { Breaker = breaker });
 
@@ -397,7 +397,7 @@ public sealed class HedgeTests
         {
             // Two, so the round cannot arm a third leg while the first one is still blocked.
             Attempts = 2,
-            Classify = Classifier.RetryEverything.OnResult<int>(static v => v == 0 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.RetryEverything.OnResult<int>(static v => v == 0 ? Verdict.Transient : Verdict.Ok),
         });
 
         await WarmAsync(policy, time, Fast, 40);
@@ -498,7 +498,7 @@ public sealed class HedgeTests
 
         var policy = Hedging(time, out _, p => p with
         {
-            Classify = Classifier.Default.OnResult<Closeable>(c => c.Ok ? Verdict.Ok : Verdict.Transient),
+            Classifier = Classifier.Default.OnResult<Closeable>(c => c.Ok ? Verdict.Ok : Verdict.Transient),
         });
 
         var first = new Closeable { Ok = false };
@@ -554,7 +554,7 @@ public sealed class HedgeTests
     }
 
     /// <summary>
-    ///     <see cref="NResilience.Hedge.MaxConcurrent" /> bounds how many attempts overlap, and it is a
+    ///     <see cref="NResilience.Hedge.MaximumConcurrent" /> bounds how many attempts overlap, and it is a
     ///     separate question from how many there are in total.
     /// </summary>
     [Fact]
@@ -717,7 +717,7 @@ public sealed class HedgeTests
         var hedge = Hedge.At();
 
         Assert.Equal(0.95, hedge.Quantile);
-        Assert.Equal(2, hedge.MaxConcurrent);
+        Assert.Equal(2, hedge.MaximumConcurrent);
         Assert.Equal(20, hedge.MinimumSamples);
         Assert.Equal(TimeSpan.FromMilliseconds(10), hedge.MinimumDelay);
         Assert.Equal(TimeSpan.FromSeconds(30), hedge.Window);
@@ -733,7 +733,7 @@ public sealed class HedgeTests
     public void Naming_a_default_explicitly_changes_nothing()
     {
         var left = Hedge.At(0.99);
-        var right = new Hedge { Quantile = 0.99, MaxConcurrent = 2, MinimumSamples = 20, MinimumDelay = TimeSpan.FromMilliseconds(10) };
+        var right = new Hedge { Quantile = 0.99, MaximumConcurrent = 2, MinimumSamples = 20, MinimumDelay = TimeSpan.FromMilliseconds(10) };
 
         Assert.Equal(left, right);
         Assert.Equal(left.GetHashCode(), right.GetHashCode());
@@ -752,10 +752,10 @@ public sealed class HedgeTests
     [Theory]
     [InlineData(0.4, 2, "Quantile")]
     [InlineData(1.0, 2, "Quantile")]
-    [InlineData(0.95, 1, "MaxConcurrent")]
-    public void A_hedge_that_cannot_work_is_refused(double quantile, int maxConcurrent, string named)
+    [InlineData(0.95, 1, "MaximumConcurrent")]
+    public void A_hedge_that_cannot_work_is_refused(double quantile, int maximumConcurrent, string named)
     {
-        var policy = Resilience.Default with { Hedge = new Hedge { Quantile = quantile, MaxConcurrent = maxConcurrent } };
+        var policy = Resilience.Default with { Hedge = new Hedge { Quantile = quantile, MaximumConcurrent = maximumConcurrent } };
 
         var problems = Assert.Throws<ResilienceConfigurationException>(policy.Validate).Problems;
         Assert.Contains(problems, problem => problem.Contains(named, StringComparison.Ordinal));

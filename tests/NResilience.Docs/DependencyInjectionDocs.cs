@@ -151,7 +151,7 @@ public sealed class DependencyInjectionDocs
             section: configuration.GetSection(key: "Resilience:api"),
             policy => policy with
             {
-                Classify = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
+                Classifier = Classifier.Http.On<MyTransportException>(verdict: Verdict.Transient),
                 Breaker = shared,
             });
 
@@ -161,7 +161,7 @@ public sealed class DependencyInjectionDocs
         var api = provider.GetRequiredService<IResiliencePolicies>()[name: "api"];
 
         Assert.Same(expected: shared, actual: api.Breaker);
-        Assert.Equal(expected: VerdictKind.Transient, actual: api.Classify.ClassifyException(exception: new MyTransportException()).Kind);
+        Assert.Equal(expected: VerdictKind.Transient, actual: api.Classifier.ClassifyException(exception: new MyTransportException()).Kind);
     }
 
     [Fact]

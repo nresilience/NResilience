@@ -180,7 +180,7 @@ that used to stand in for the `null` a section cannot say: `"Multiple": 0`, `"Fr
 | :--- | :--- | :--- |
 | `TransientBase` | `200 ms` | The first delay after a `Transient` failure. |
 | `ThrottledBase` | `2 s` | The first delay after a `Throttled` failure, which starts higher because the dependency has said so. |
-| `Max` | `30 s` | The ceiling on any single backoff delay. |
+| `MaximumDelay` | `30 s` | The ceiling on any single backoff delay. |
 | `Factor` | `2` | The multiplier applied per attempt. `1` makes the backoff constant. |
 | `Jitter` | `Full` | How much of the computed delay is randomized. |
 
@@ -208,7 +208,7 @@ For more information on the configuration structure, see [Configuration](../di/c
 | Property | Default | Description |
 | :--- | :--- | :--- |
 | `Quantile` | `0.95` | The quantile of recent latency a hedge fires at. Also the extra load: 0.95 costs about 5%. |
-| `MaxConcurrent` | `2` | How many attempts may be in flight at once, counting the first. |
+| `MaximumConcurrent` | `2` | How many attempts may be in flight at once, counting the first. |
 | `MinimumSamples` | `20` | How many recent calls the latency estimate needs before any hedge fires. |
 | `MinimumDelay` | `10 ms` | A floor under the hedge delay. |
 | `Window` | `30 s` | How much history the latency estimate covers. |

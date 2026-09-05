@@ -65,7 +65,7 @@ internal sealed class MethodScopes
         {
             // The template's breaker is a prototype: PolicyScope gives each key one of its own with
             // those settings, which is the whole point of keying.
-            _keyed = new PolicyScope<string>(template, maxKeys: options.MaxScopes, comparer: StringComparer.Ordinal);
+            _keyed = new PolicyScope<string>(template, maximumKeys: options.MaxScopes, comparer: StringComparer.Ordinal);
             return;
         }
 

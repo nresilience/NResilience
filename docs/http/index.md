@@ -61,7 +61,7 @@ using var client = HttpResilience.CreateClient(
         OwnTransportTimeout = true, // HttpClient.Timeout stops competing with the deadline.
         BreakerPerHost = true, // a dead host does not trip calls to the healthy ones
         BudgetPerHost = true,
-        MaxHosts = 1024, // the per-host registry is bounded; null is unbounded
+        MaximumHosts = 1024, // the per-host registry is bounded; null is unbounded
         DetectNestedRetries = true,
     });
 ```
@@ -73,7 +73,7 @@ using var client = HttpResilience.CreateClient(
 | `OwnTransportTimeout` | `true` | Sets `HttpClient.Timeout` to infinite so it does not conflict with the deadline. | below |
 | `BreakerPerHost` | `true` | Scopes the circuit breaker to the target host. | [Per-host scope](per-host-scope.md) |
 | `BudgetPerHost` | `true` | Scopes the retry budget to the target host. | [Per-host scope](per-host-scope.md) |
-| `MaxHosts` | `1024` | Bounds the per-host registry. `null` is unbounded. | [Per-host scope](per-host-scope.md) |
+| `MaximumHosts` | `1024` | Bounds the per-host registry. `null` is unbounded. | [Per-host scope](per-host-scope.md) |
 | `DetectNestedRetries` | `true` | Detects nested retry loops. | [Nested retries](nested-retries.md) |
 
 Three things the handler does without being asked, because `Resilience.Http` and the per-host `BreakerSettings` carry them: each attempt is bounded by three times that host's measured p95, each host's breaker trips on an error rate five times that host's own, and each host's breaker trips on half a window of calls three times slower than that host's own normal. All three are measured per host, none is armed until it has a baseline, and each can be turned off - see [attempt timeouts](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) and [trip conditions](../features/circuit-breaker.md#trip-conditions).

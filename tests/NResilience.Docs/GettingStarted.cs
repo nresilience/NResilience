@@ -113,18 +113,18 @@ public sealed class GettingStarted
     public void Every_outcome_gets_one_of_four_verdicts()
     {
         // <snippet:key-concepts-verdicts>
-        var classify = Classifier.Http
+        var classifier = Classifier.Http
             .On<MyTransportException>(verdict: Verdict.Transient) // retried, short curve
             .On<MyQuotaException>(ex => Verdict.Throttled(retryAfter: ex.RetryAfter)) // retried, long curve or the server's own delay
             .On<MyValidationException>(verdict: Verdict.Permanent); // never retried
 
-        var api = Resilience.Http with { Classify = classify };
+        var api = Resilience.Http with { Classifier = classifier };
 
         // </snippet:key-concepts-verdicts>
 
-        Assert.Equal(expected: VerdictKind.Transient, actual: api.Classify.ClassifyException(exception: new MyTransportException()).Kind);
-        Assert.Equal(expected: VerdictKind.Permanent, actual: api.Classify.ClassifyException(exception: new MyValidationException()).Kind);
-        Assert.Equal(expected: TimeSpan.FromSeconds(value: 4), actual: api.Classify.ClassifyException(exception: new MyQuotaException()).RetryAfter);
+        Assert.Equal(expected: VerdictKind.Transient, actual: api.Classifier.ClassifyException(exception: new MyTransportException()).Kind);
+        Assert.Equal(expected: VerdictKind.Permanent, actual: api.Classifier.ClassifyException(exception: new MyValidationException()).Kind);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 4), actual: api.Classifier.ClassifyException(exception: new MyQuotaException()).RetryAfter);
     }
 
     private static Task<User> FetchAsync(CancellationToken cancellationToken) =>

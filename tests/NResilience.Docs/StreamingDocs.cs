@@ -57,7 +57,7 @@ public sealed class StreamingDocs
 
         var api = Resilience.Default with
         {
-            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Transient : Verdict.Ok),
         };
 
         var received = new List<int>();

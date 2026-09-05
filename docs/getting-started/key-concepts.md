@@ -100,12 +100,12 @@ Calls return a value or throw. The library then decides whether to retry, give u
 
 <!-- snippet: key-concepts-verdicts -->
 ```csharp
-var classify = Classifier.Http
+var classifier = Classifier.Http
     .On<MyTransportException>(verdict: Verdict.Transient) // retried, short curve
     .On<MyQuotaException>(ex => Verdict.Throttled(retryAfter: ex.RetryAfter)) // retried, long curve or the server's own delay
     .On<MyValidationException>(verdict: Verdict.Permanent); // never retried
 
-var api = Resilience.Http with { Classify = classify };
+var api = Resilience.Http with { Classifier = classifier };
 ```
 <!-- endsnippet -->
 

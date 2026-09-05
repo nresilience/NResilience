@@ -108,7 +108,7 @@ public sealed class AdaptiveBackoffTests
 
         // The clamp is opened up on purpose: this test is about the multiple porting, and the default
         // band around 100 ms is what both bases would otherwise come from.
-        var wide = MeasuredBase.Of() with { Window = Window, Spread = 1000 };
+        var wide = MeasuredBase.Times() with { Window = Window, Spread = 1000 };
 
         var quick = Adaptive(time, out _) with { Backoff = Backoff.Measured(1, Configured) with { MeasuredBase = wide } };
         var slow = Adaptive(time, out _) with { Backoff = Backoff.Measured(1, Configured) with { MeasuredBase = wide } };
@@ -296,7 +296,7 @@ public sealed class AdaptiveBackoffTests
     [InlineData(0)]
     public void A_quantile_outside_the_body_is_refused(double quantile)
     {
-        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Of() with { Quantile = quantile } } };
+        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Times() with { Quantile = quantile } } };
 
         Assert.Contains(Problems(policy), p => p.Contains("MeasuredBase.Quantile", StringComparison.Ordinal));
     }
@@ -305,7 +305,7 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void A_spread_of_one_or_less_is_refused()
     {
-        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Of() with { Spread = 1 } } };
+        var policy = TestPolicy.Instant with { Backoff = Backoff.Measured() with { MeasuredBase = MeasuredBase.Times() with { Spread = 1 } } };
 
         Assert.Contains(Problems(policy), p => p.Contains("MeasuredBase.Spread", StringComparison.Ordinal));
     }
@@ -318,8 +318,8 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void A_measured_base_on_a_curve_that_is_not_exponential_is_refused()
     {
-        var constant = TestPolicy.Instant with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(1)) with { MeasuredBase = MeasuredBase.Of() } };
-        var custom = TestPolicy.Instant with { Backoff = Backoff.Custom(_ => TimeSpan.Zero) with { MeasuredBase = MeasuredBase.Of() } };
+        var constant = TestPolicy.Instant with { Backoff = Backoff.Constant(TimeSpan.FromSeconds(1)) with { MeasuredBase = MeasuredBase.Times() } };
+        var custom = TestPolicy.Instant with { Backoff = Backoff.Custom(_ => TimeSpan.Zero) with { MeasuredBase = MeasuredBase.Times() } };
 
         Assert.Contains(Problems(constant), p => p.Contains("Backoff.MeasuredBase", StringComparison.Ordinal));
         Assert.Contains(Problems(custom), p => p.Contains("Backoff.MeasuredBase", StringComparison.Ordinal));
@@ -341,9 +341,9 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void Naming_a_default_equals_leaving_it_alone()
     {
-        Assert.Equal(MeasuredBase.Of(), MeasuredBase.Of() with { Quantile = 0.5 });
-        Assert.Equal(MeasuredBase.Of().GetHashCode(), (MeasuredBase.Of() with { MinimumSamples = 20 }).GetHashCode());
-        Assert.NotEqual(MeasuredBase.Of(), MeasuredBase.Of(2));
+        Assert.Equal(MeasuredBase.Times(), MeasuredBase.Times() with { Quantile = 0.5 });
+        Assert.Equal(MeasuredBase.Times().GetHashCode(), (MeasuredBase.Times() with { MinimumSamples = 20 }).GetHashCode());
+        Assert.NotEqual(MeasuredBase.Times(), MeasuredBase.Times(2));
     }
 
     /// <summary>
@@ -373,7 +373,7 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void An_unconstructed_curve_keeps_a_measured_base()
     {
-        var backoff = default(Backoff) with { MeasuredBase = MeasuredBase.Of(), Jitter = Jitter.None };
+        var backoff = default(Backoff) with { MeasuredBase = MeasuredBase.Times(), Jitter = Jitter.None };
 
         Assert.Equal(Normal, Delay(backoff, Verdict.Transient, 2, Normal));
     }
@@ -381,7 +381,7 @@ public sealed class AdaptiveBackoffTests
     [Fact]
     public void It_prints_its_effective_configuration()
     {
-        var text = MeasuredBase.Of().ToString();
+        var text = MeasuredBase.Times().ToString();
 
         Assert.Contains("1x p50", text, StringComparison.Ordinal);
         Assert.Contains("300s", text, StringComparison.Ordinal);
@@ -403,7 +403,7 @@ public sealed class AdaptiveBackoffTests
             Backoff = Backoff.Measured(1, Configured) with
             {
                 Jitter = Jitter.None,
-                MeasuredBase = MeasuredBase.Of() with { Window = Window },
+                MeasuredBase = MeasuredBase.Times() with { Window = Window },
             },
             OnEvent = recorder.Record,
         };

@@ -88,7 +88,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public void The_preset_carries_the_grpc_classifier_and_the_shipped_defaults()
     {
-        Assert.Same(GrpcResilience.Classifier, GrpcResilience.Default.Classify);
+        Assert.Same(GrpcResilience.Classifier, GrpcResilience.Default.Classifier);
         Assert.Equal(Resilience.Default.Attempts, GrpcResilience.Default.Attempts);
         Assert.Equal(Resilience.Default.Deadline, GrpcResilience.Default.Deadline);
         Assert.Equal(Resilience.Default.AttemptTimeout, GrpcResilience.Default.AttemptTimeout);
@@ -313,7 +313,7 @@ public sealed class GrpcInterceptorTests
         // The row that is invisible until a cluster is slow enough to lose the race: grpc-dotnet
         // reports DeadlineExceeded while the executor's own token is still unfired. The classifier
         // here refuses every RpcException, so only the translation can produce a retry.
-        var refusing = Policy() with { Classify = GrpcResilience.Classifier.On<RpcException>(Verdict.Permanent) };
+        var refusing = Policy() with { Classifier = GrpcResilience.Classifier.On<RpcException>(Verdict.Permanent) };
         var script = new GrpcScript().Fail(StatusCode.DeadlineExceeded).Respond("ok");
 
         using var call = Call(new ResilienceInterceptor(refusing), script);
@@ -325,7 +325,7 @@ public sealed class GrpcInterceptorTests
     [Fact]
     public async Task A_deadline_the_caller_set_stays_an_rpc_exception_for_the_classifier_to_judge()
     {
-        var refusing = Policy() with { Classify = GrpcResilience.Classifier.On<RpcException>(Verdict.Permanent) };
+        var refusing = Policy() with { Classifier = GrpcResilience.Classifier.On<RpcException>(Verdict.Permanent) };
         var script = new GrpcScript().Fail(StatusCode.DeadlineExceeded).Respond("ok");
 
         using var call = Call(

@@ -260,7 +260,7 @@ public sealed class BreakerTests
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(10),
-            MaxBreakDuration = TimeSpan.FromMinutes(2),
+            MaximumBreakDuration = TimeSpan.FromMinutes(2),
             BreakJitter = Jitter.None,
         });
 
@@ -287,7 +287,7 @@ public sealed class BreakerTests
         var breaker = Build(time, new BreakerSettings
         {
             BreakDuration = TimeSpan.FromSeconds(10),
-            MaxBreakDuration = TimeSpan.FromSeconds(20),
+            MaximumBreakDuration = TimeSpan.FromSeconds(20),
             BreakJitter = Jitter.None,
         });
 
@@ -400,7 +400,7 @@ public sealed class BreakerTests
             {
                 ConsecutiveFailures = 1,
                 BreakDuration = TimeSpan.FromSeconds(10),
-                MaxBreakDuration = TimeSpan.FromSeconds(20),
+                MaximumBreakDuration = TimeSpan.FromSeconds(20),
             });
 
             Sample(breaker, VerdictKind.Transient);
@@ -461,7 +461,7 @@ public sealed class BreakerTests
             ConsecutiveFailures = 0,
             FailureRatio = 2,
             BreakDuration = TimeSpan.FromSeconds(30),
-            MaxBreakDuration = TimeSpan.FromSeconds(10),
+            MaximumBreakDuration = TimeSpan.FromSeconds(10),
             ProbeSuccesses = 0,
         }));
 

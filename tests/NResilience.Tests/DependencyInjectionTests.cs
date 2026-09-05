@@ -141,7 +141,7 @@ public sealed class DependencyInjectionTests
         Assert.Equal(["api", "reports"], policies.Names.OrderBy(n => n, StringComparer.Ordinal));
         Assert.Equal(TimeSpan.FromSeconds(10), policies["api"].Deadline);
         Assert.Equal(5, policies["reports"].Attempts);
-        Assert.Same(Classifier.Http, policies["reports"].Classify);
+        Assert.Same(Classifier.Http, policies["reports"].Classifier);
     }
 
     /// <summary>Configuration overrides the registered policy rather than replacing it, so code sets the shape and the file sets the numbers.</summary>
@@ -173,9 +173,9 @@ public sealed class DependencyInjectionTests
         var policies = Build(s => s.AddResilience(
             "api",
             source.Configuration.GetSection("api"),
-            p => p with { Classify = custom, Attempts = p.Attempts + 1 }));
+            p => p with { Classifier = custom, Attempts = p.Attempts + 1 }));
 
-        Assert.Same(custom, policies["api"].Classify);
+        Assert.Same(custom, policies["api"].Classifier);
         Assert.Equal(8, policies["api"].Attempts);
     }
 
@@ -189,7 +189,7 @@ public sealed class DependencyInjectionTests
         }));
 
         Assert.Equal(4, policies["api"].Attempts);
-        Assert.Same(Classifier.Http, policies["api"].Classify);
+        Assert.Same(Classifier.Http, policies["api"].Classifier);
     }
 
     /// <summary>An empty or missing section still yields a working service, rather than a container that cannot resolve it.</summary>

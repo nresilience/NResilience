@@ -65,7 +65,7 @@ One thing came out cheaper than expected. Because each leg runs in its own `asyn
 
 The loop runs in rounds. A round starts a leg, waits `min(threshold, remaining deadline)`, and starts another if the gates pass and `Attempts` is not spent. The first `Ok` wins and the rest are cancelled. If every leg in a round fails, the round's last verdict drives the backoff and the next round begins - the same `Decide` makes the call.
 
-`Attempts` counts wire calls, not rounds, and that is why it stays the one number. Polly gives hedging its own `MaxHedgedAttempts` alongside retry's `MaxRetryAttempts`, and the product is the real ceiling on load. Here `Hedge.MaxConcurrent` bounds concurrency and `Attempts` bounds the total, so the number an operator reasons about is the number they already know.
+`Attempts` counts wire calls, not rounds, and that is why it stays the one number. Polly gives hedging its own `MaxHedgedAttempts` alongside retry's `MaxRetryAttempts`, and the product is the real ceiling on load. Here `Hedge.MaximumConcurrent` bounds concurrency and `Attempts` bounds the total, so the number an operator reasons about is the number they already know.
 
 The budget is charged when a hedge actually starts, not when its timer is armed - so a call that came back on its own is never charged for a hedge it did not need. Hedges and retries draw on one bucket because both are amplification, and the aggregate is what the budget exists to bound. The arithmetic is comfortable rather than tight: hedging at the p95 spends about 5% of traffic, leaving about 5% of the default budget for retries, and a policy already retrying hard stops hedging on its own.
 

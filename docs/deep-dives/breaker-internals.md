@@ -31,7 +31,7 @@ Rate-based trips (a 10% failure ratio, say) need minimum throughput to be accura
 Closing after a single successful probe is risky. If a dependency is only intermittently available, one lucky probe could close the breaker just as a fleet of accumulated retries hits the service - oscillation, and a metastable failure. Requiring multiple successes proves the dependency has actually recovered.
 
 ### Exponential break growth
-The break duration doubles with each consecutive trip, up to `MaxBreakDuration`. That is exponential backoff applied to the breaker itself, preventing the flapping of fixed-duration breaks.
+The break duration doubles with each consecutive trip, up to `MaximumBreakDuration`. That is exponential backoff applied to the breaker itself, preventing the flapping of fixed-duration breaks.
 
 ### Jitter on the break duration
 `Backoff` defaults to full jitter because a narrow band around a shared base still leaves a synchronized pulse. The breaker's own backoff has the same problem and a worse blast radius, so `BreakJitter` defaults to `Jitter.Equal` - see [the synchronized probe](#the-synchronized-probe).
@@ -135,7 +135,7 @@ Nothing clears it. `OpenCore`, `CloseCore` and `Reset` clear the trip window, be
 
 Three details make it honest:
 
-- The jitter is applied once, when the breaker opens, to the already-grown and already-capped duration. Growth is therefore computed from the nominal break, so a short first break does not shorten every break after it, and `MaxBreakDuration` still bounds the result.
+- The jitter is applied once, when the breaker opens, to the already-grown and already-capped duration. Growth is therefore computed from the nominal break, so a short first break does not shorten every break after it, and `MaximumBreakDuration` still bounds the result.
 - `RetryAfterHint` returns `_breakUntil` minus the elapsed time, so it reports the break actually being served rather than the nominal one, and `CallRejectedException.RetryAfter` is honest by construction.
 - `Jitter.None` is the escape hatch. A test that asserts "after exactly `BreakDuration`, the state is half-open" needs it, and that is the whole migration.
 

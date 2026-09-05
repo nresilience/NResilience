@@ -37,12 +37,12 @@ public sealed class Features
                 transientBase: TimeSpan.FromMilliseconds(value: 200), // the first delay after a transient failure
                 throttledBase: TimeSpan.FromSeconds(value: 2), // the first delay after being throttled
                 factor: 2, // doubling
-                max: TimeSpan.FromSeconds(value: 10)), // the cap on any single delay
+                maximumDelay: TimeSpan.FromSeconds(value: 10)), // the cap on any single delay
         };
 
         // </snippet:retry-backoff-tuning>
 
-        Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: api.Backoff.Max);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 10), actual: api.Backoff.MaximumDelay);
         Assert.Equal(expected: Jitter.Full, actual: api.Backoff.Jitter);
     }
 
@@ -54,12 +54,12 @@ public sealed class Features
         {
             // Everything else about the shipped curve is kept: the 100 ms transient base, the
             // 1 s throttled base, the factor of 2, and full jitter.
-            Backoff = Backoff.Default with { Max = TimeSpan.FromSeconds(value: 5) },
+            Backoff = Backoff.Default with { MaximumDelay = TimeSpan.FromSeconds(value: 5) },
         };
 
         // </snippet:retry-backoff-with>
 
-        Assert.Equal(expected: TimeSpan.FromSeconds(value: 5), actual: api.Backoff.Max);
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 5), actual: api.Backoff.MaximumDelay);
         Assert.Equal(expected: Backoff.Default.TransientBase, actual: api.Backoff.TransientBase);
         Assert.Equal(expected: Backoff.Default.Factor, actual: api.Backoff.Factor);
     }
@@ -345,7 +345,7 @@ public sealed class Features
         // about yours is one line, and the receiver is unchanged.
         var api = Resilience.Default with
         {
-            Classify = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
+            Classifier = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
             Backoff = Backoff.None,
         };
 
@@ -367,7 +367,7 @@ public sealed class Features
         // equivalent to Classifier.Default.
         var db = Resilience.Default with
         {
-            Classify = Classifier.Data,
+            Classifier = Classifier.Data,
             Backoff = Backoff.Constant(delay: TimeSpan.FromMilliseconds(value: 50)),
         };
 
@@ -384,16 +384,16 @@ public sealed class Features
         // For example, Azure SQL reports resource limits as 10928 and 10929. Both are
         // throttling: they use a long backoff curve and do not count as evidence against the
         // dependency's health.
-        var classify = Classifier.Data.On<SqlLikeException>(e => e.Number is 10928 or 10929
+        var classifier = Classifier.Data.On<SqlLikeException>(e => e.Number is 10928 or 10929
             ? Verdict.Throttled()
             : Classifier.Data.ClassifyException(exception: e));
 
-        var db = Resilience.Default with { Classify = classify };
+        var db = Resilience.Default with { Classifier = classifier };
 
         // </snippet:classifier-data-throttled>
 
-        Assert.Equal(expected: VerdictKind.Throttled, actual: db.Classify.ClassifyException(exception: new SqlLikeException(number: 10928)).Kind);
-        Assert.Equal(expected: VerdictKind.Transient, actual: db.Classify.ClassifyException(exception: new SqlLikeException(number: 4060)).Kind);
+        Assert.Equal(expected: VerdictKind.Throttled, actual: db.Classifier.ClassifyException(exception: new SqlLikeException(number: 10928)).Kind);
+        Assert.Equal(expected: VerdictKind.Transient, actual: db.Classifier.ClassifyException(exception: new SqlLikeException(number: 4060)).Kind);
     }
 
     [Fact]
@@ -410,7 +410,7 @@ public sealed class Features
         // read by retry, the breaker and the budget alike, because they all read one classifier.
         var api = Resilience.Default with
         {
-            Classify = Classifier.Default.OnResult<Reply>(reply => reply.Code switch
+            Classifier = Classifier.Default.OnResult<Reply>(reply => reply.Code switch
             {
                 "OK" => Verdict.Ok,
                 "BUSY" => Verdict.Throttled(retryAfter: TimeSpan.FromMilliseconds(value: 50)),

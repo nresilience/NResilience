@@ -161,7 +161,7 @@ public static class ResilienceLogging
         text.Append(policy.Attempts.ToString(CultureInfo.InvariantCulture)).Append(" attempts");
         text.Append(", deadline ").Append(Duration(policy.Deadline));
         text.Append(", attempt timeout ").Append(Duration(policy.AttemptTimeout));
-        text.Append(", backoff max ").Append(Duration(policy.Backoff.Max));
+        text.Append(", backoff max ").Append(Duration(policy.Backoff.MaximumDelay));
         text.Append(", jitter ").Append(policy.Backoff.Jitter);
 
         if (policy.Breaker is { } breaker)

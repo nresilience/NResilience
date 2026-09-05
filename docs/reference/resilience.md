@@ -28,7 +28,7 @@ The presets cover common scenarios:
 | `AttemptCeiling` | `AttemptCeiling?` | `AttemptCeiling.Above(3)` | A measured attempt ceiling. Set it to `null` to leave `AttemptTimeout` as the only per-attempt bound. The measured term can only lower the ceiling. No default is supplied when `AttemptTimeout` is `Timeout.InfiniteTimeSpan` or at or below `AttemptCeiling.Floor`, because there is no ceiling there to lower. |
 | `UseAmbientDeadline` | `bool` | `false` | Whether the deadline is clamped by the one the current call inherited from its caller. When set, the effective deadline is the minimum of `Deadline` and `ResilienceDeadline.Remaining`, resolved once per call. |
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
-| `Classify` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
+| `Classifier` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
 | `Hedge` | `Hedge?` | `null` | Hedging. A `null` value indicates no hedging. Requires `Attempts` greater than 1. |
 | `Budget` | `RetryBudget?` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` creates a budget private to the policy instance. `null` and `RetryBudget.None` disable the budget. |
@@ -172,13 +172,13 @@ The effective deadline is `min(Deadline, Remaining)`, resolved once when the cal
 
 | Member | Description |
 | :--- | :--- |
-| `PolicyScope(template, shape = null, maxKeys = 1024, comparer = null)` | Creates a scope. `template` is validated eagerly. `shape` derives a key's policy on first sight. `maxKeys` must be at least 1. `comparer` defaults to `EqualityComparer<TKey>.Default`. |
+| `PolicyScope(template, shape = null, maximumKeys = 1024, comparer = null)` | Creates a scope. `template` is validated eagerly. `shape` derives a key's policy on first sight. `maximumKeys` must be at least 1. `comparer` defaults to `EqualityComparer<TKey>.Default`. |
 | `For(key)` | The policy for one key, derived on first sight and cached. |
 | `Breakers()` | A snapshot of the breakers, by key. Empty when the template carries no breaker. |
 | `Budgets()` | A snapshot of the retry budgets, by key. |
 | `Template` | The policy every key starts from, as handed in. |
-| `MaxKeys` | How many keys the scope keeps. |
-| `Count` | How many keys it currently holds. Approximate under concurrency, and briefly above `MaxKeys` while a sweep catches up. |
+| `MaximumKeys` | How many keys the scope keeps. |
+| `Count` | How many keys it currently holds. Approximate under concurrency, and briefly above `MaximumKeys` while a sweep catches up. |
 
 A `Breaker` on the template is a **prototype**: each key gets its own breaker with those settings, and the template's instance is never executed against. A `Budget` that is `null` or `RetryBudget.Automatic` becomes one budget per key; an explicit instance, such as `RetryBudget.Shared(name)`, is left alone.
 

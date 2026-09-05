@@ -90,7 +90,7 @@ public sealed class ConsensusRefusedException(TimeSpan? retryAfter = null) : Exc
 
 var policy = Resilience.Default with
 {
-    Classify = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Refused(ex.RetryAfter)),
+    Classifier = Classifier.Default.On<ConsensusRefusedException>(ex => Verdict.Refused(ex.RetryAfter)),
 };
 
 var result = await policy.RunAsync(async ct =>
@@ -208,7 +208,7 @@ One consequence is worth stating plainly: `Classifier.ClassifyException(new Rate
 
 ## Queueing is off by default
 
-A refusal becomes a retry on the throttled curve, honoring the limiter's hint, capped by `Backoff.Max` and the deadline, and visible in telemetry as a retry.
+A refusal becomes a retry on the throttled curve, honoring the limiter's hint, capped by `Backoff.MaximumDelay` and the deadline, and visible in telemetry as a retry.
 
 Queue time is none of those. It counts against `AttemptTimeout`, where it is indistinguishable from a slow dependency, and a `SlowCallThreshold` breaker would count it against a service answering perfectly well. The library has one mechanism for waiting between attempts, already tuned; a second one hidden inside the limiter would compete with it.
 

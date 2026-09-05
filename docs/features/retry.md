@@ -40,7 +40,7 @@ var api = Resilience.Http with
         transientBase: TimeSpan.FromMilliseconds(value: 200), // the first delay after a transient failure
         throttledBase: TimeSpan.FromSeconds(value: 2), // the first delay after being throttled
         factor: 2, // doubling
-        max: TimeSpan.FromSeconds(value: 10)), // the cap on any single delay
+        maximumDelay: TimeSpan.FromSeconds(value: 10)), // the cap on any single delay
 };
 ```
 <!-- endsnippet -->
@@ -53,7 +53,7 @@ var api = Resilience.Http with
 {
     // Everything else about the shipped curve is kept: the 100 ms transient base, the
     // 1 s throttled base, the factor of 2, and full jitter.
-    Backoff = Backoff.Default with { Max = TimeSpan.FromSeconds(value: 5) },
+    Backoff = Backoff.Default with { MaximumDelay = TimeSpan.FromSeconds(value: 5) },
 };
 ```
 <!-- endsnippet -->

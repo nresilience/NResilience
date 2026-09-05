@@ -66,7 +66,7 @@ public sealed class BackoffTests
     [Fact]
     public void Server_pushback_is_still_capped()
     {
-        var backoff = Backoff.Exponential(max: TimeSpan.FromSeconds(10));
+        var backoff = Backoff.Exponential(maximumDelay: TimeSpan.FromSeconds(10));
         Assert.Equal(TimeSpan.FromSeconds(10), Delay(backoff, Verdict.Throttled(TimeSpan.FromHours(1)), 2));
     }
 
@@ -117,7 +117,7 @@ public sealed class BackoffTests
         // Math.Pow(factor, n) into the infinite range. The runtime clamps (long)infinity to
         // long.MaxValue, so this does not wrap to negative - but the guard makes the intent
         // explicit and returns TimeSpan.Zero rather than a 29000-year delay.
-        var uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
+        var uncapped = Backoff.Exponential(maximumDelay: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
 
         var delay = Delay(uncapped, Verdict.Transient, 1100);
 
@@ -129,7 +129,7 @@ public sealed class BackoffTests
     {
         // A finite-but-huge ticks value clamps to long.MaxValue ticks, which is a positive TimeSpan,
         // rather than wrapping or collapsing to zero.
-        var uncapped = Backoff.Exponential(max: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
+        var uncapped = Backoff.Exponential(maximumDelay: Timeout.InfiniteTimeSpan) with { Jitter = Jitter.None };
 
         var delay = Delay(uncapped, Verdict.Transient, 1000);
 
@@ -158,7 +158,7 @@ public sealed class BackoffTests
         Assert.Equal(TimeSpan.FromMilliseconds(100), backoff.TransientBase);
         Assert.Equal(TimeSpan.FromSeconds(1), backoff.ThrottledBase);
         Assert.Equal(2.0, backoff.Factor);
-        Assert.Equal(TimeSpan.FromSeconds(30), backoff.Max);
+        Assert.Equal(TimeSpan.FromSeconds(30), backoff.MaximumDelay);
     }
 
     [Fact]
@@ -170,7 +170,7 @@ public sealed class BackoffTests
         Assert.Equal(default(Backoff).TransientBase, shipped.TransientBase);
         Assert.Equal(default(Backoff).ThrottledBase, shipped.ThrottledBase);
         Assert.Equal(default(Backoff).Factor, shipped.Factor);
-        Assert.Equal(default(Backoff).Max, shipped.Max);
+        Assert.Equal(default(Backoff).MaximumDelay, shipped.MaximumDelay);
     }
 
     [Fact]
@@ -181,7 +181,7 @@ public sealed class BackoffTests
         Assert.Equal(BackoffKind.Constant, backoff.Kind);
         Assert.Equal(TimeSpan.Zero, backoff.TransientBase);
         Assert.Equal(TimeSpan.Zero, backoff.ThrottledBase);
-        Assert.Equal(TimeSpan.Zero, backoff.Max);
+        Assert.Equal(TimeSpan.Zero, backoff.MaximumDelay);
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public sealed class BackoffTests
         Assert.Equal(BackoffKind.Constant, backoff.Kind);
         Assert.Equal(TimeSpan.FromMilliseconds(250), backoff.TransientBase);
         Assert.Equal(TimeSpan.FromMilliseconds(250), backoff.ThrottledBase);
-        Assert.Equal(TimeSpan.FromMilliseconds(250), backoff.Max);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), backoff.MaximumDelay);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public sealed class BackoffTests
         Assert.Equal(BackoffKind.Custom, backoff.Kind);
         Assert.Equal(TimeSpan.Zero, backoff.TransientBase);
         Assert.Equal(TimeSpan.Zero, backoff.ThrottledBase);
-        Assert.Equal(Timeout.InfiniteTimeSpan, backoff.Max);
+        Assert.Equal(Timeout.InfiniteTimeSpan, backoff.MaximumDelay);
     }
 
     [Theory]
@@ -220,7 +220,7 @@ public sealed class BackoffTests
                 Jitter = Jitter.None,
             };
 
-        var rebuilt = Backoff.Exponential(original.TransientBase, original.ThrottledBase, original.Factor, original.Max)
+        var rebuilt = Backoff.Exponential(original.TransientBase, original.ThrottledBase, original.Factor, original.MaximumDelay)
             with
             {
                 Jitter = original.Jitter,
@@ -243,9 +243,9 @@ public sealed class BackoffTests
     [Fact]
     public void With_changes_one_term_and_keeps_the_rest()
     {
-        var tightened = Backoff.Exponential() with { Max = TimeSpan.FromSeconds(5) };
+        var tightened = Backoff.Exponential() with { MaximumDelay = TimeSpan.FromSeconds(5) };
 
-        Assert.Equal(TimeSpan.FromSeconds(5), tightened.Max);
+        Assert.Equal(TimeSpan.FromSeconds(5), tightened.MaximumDelay);
         Assert.Equal(Backoff.Default.TransientBase, tightened.TransientBase);
         Assert.Equal(Backoff.Default.ThrottledBase, tightened.ThrottledBase);
         Assert.Equal(Backoff.Default.Factor, tightened.Factor);
@@ -260,14 +260,14 @@ public sealed class BackoffTests
             TransientBase = TimeSpan.FromMilliseconds(250),
             ThrottledBase = TimeSpan.FromSeconds(4),
             Factor = 3.0,
-            Max = TimeSpan.FromSeconds(45),
+            MaximumDelay = TimeSpan.FromSeconds(45),
             Jitter = Jitter.None,
         };
 
         Assert.Equal(TimeSpan.FromMilliseconds(250), curve.TransientBase);
         Assert.Equal(TimeSpan.FromSeconds(4), curve.ThrottledBase);
         Assert.Equal(3.0, curve.Factor);
-        Assert.Equal(TimeSpan.FromSeconds(45), curve.Max);
+        Assert.Equal(TimeSpan.FromSeconds(45), curve.MaximumDelay);
 
         // And the curve Compute serves agrees with all five.
         Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(curve, Verdict.Transient, 2));
@@ -278,9 +278,9 @@ public sealed class BackoffTests
     [Fact]
     public void A_term_set_with_with_survives_being_set_again()
     {
-        var curve = Backoff.Default with { Max = TimeSpan.FromSeconds(5) } with { Factor = 4.0 };
+        var curve = Backoff.Default with { MaximumDelay = TimeSpan.FromSeconds(5) } with { Factor = 4.0 };
 
-        Assert.Equal(TimeSpan.FromSeconds(5), curve.Max);
+        Assert.Equal(TimeSpan.FromSeconds(5), curve.MaximumDelay);
         Assert.Equal(4.0, curve.Factor);
     }
 
@@ -298,7 +298,7 @@ public sealed class BackoffTests
 
         Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(clamped, Verdict.Throttled(), 5));
 
-        var curve = clamped with { Max = TimeSpan.FromSeconds(2) };
+        var curve = clamped with { MaximumDelay = TimeSpan.FromSeconds(2) };
 
         Assert.Equal(BackoffKind.Constant, curve.Kind);
         Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(curve, Verdict.Transient, 5));
@@ -317,7 +317,7 @@ public sealed class BackoffTests
     [Fact]
     public void A_curve_that_names_a_default_equals_one_that_left_it_alone()
     {
-        var named = Backoff.Default with { Max = TimeSpan.FromSeconds(30) };
+        var named = Backoff.Default with { MaximumDelay = TimeSpan.FromSeconds(30) };
 
         Assert.Equal(Backoff.Default, named);
         Assert.Equal(Backoff.Default.GetHashCode(), named.GetHashCode());

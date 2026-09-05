@@ -4,7 +4,7 @@ namespace NResilience;
 ///     The first retry delay, expressed relative to how long a call to this dependency normally takes
 ///     rather than as a constant somebody has to guess.
 ///     <para>
-///         <c>MeasuredBase.Of(1)</c> means "wait about as long as a normal call takes before trying
+///         <c>MeasuredBase.Times(1)</c> means "wait about as long as a normal call takes before trying
 ///         again". That number ports across dependencies, across environments and across a dependency's
 ///         own capacity changes; <c>100 ms</c> does not. Against a dependency whose median is three
 ///         seconds a 100 ms base is not backoff at all - the retry lands while the first attempt's work
@@ -54,8 +54,8 @@ namespace NResilience;
 ///         base to nothing and turn backoff into a retry storm.
 ///     </para>
 ///     <para>
-///         Every property but <see cref="Multiple" /> has a working default, so <c>MeasuredBase.Of(1)</c>
-///         is a complete configuration and <c>MeasuredBase.Of(1) with { Window = ... }</c> is the way to
+///         Every property but <see cref="Multiple" /> has a working default, so <c>MeasuredBase.Times(1)</c>
+///         is a complete configuration and <c>MeasuredBase.Times(1) with { Window = ... }</c> is the way to
 ///         change one. The defaults are supplied on read rather than by a constructor, for the reason
 ///         <see cref="Hedge" /> gives: a struct's default instance is the one thing a constructor cannot
 ///         reach.
@@ -64,7 +64,7 @@ namespace NResilience;
 public readonly record struct MeasuredBase
 {
     /// <summary>
-    ///     The multiple used when <see cref="Of" /> is called without one: one normal call. Long enough
+    ///     The multiple used when <see cref="Times" /> is called without one: one normal call. Long enough
     ///     that the first attempt's work has plausibly cleared the dependency, short enough that a
     ///     three-attempt policy still fits inside a deadline sized for one.
     /// </summary>
@@ -181,7 +181,7 @@ public readonly record struct MeasuredBase
     /// <summary>The way to configure an adaptive backoff base.</summary>
     /// <param name="multiple">How many normal calls the first retry waits. Must be greater than zero.</param>
     /// <returns>The configuration.</returns>
-    public static MeasuredBase Of(double multiple = DefaultMultiple) => new() { Multiple = multiple };
+    public static MeasuredBase Times(double multiple = DefaultMultiple) => new() { Multiple = multiple };
 
     /// <inheritdoc />
     public override int GetHashCode() => HashCode.Combine(Multiple, Quantile, Window, MinimumSamples, Spread);
@@ -203,7 +203,7 @@ public readonly record struct MeasuredBase
         {
             problems.Add(
                 $"MeasuredBase.Multiple must be greater than zero; it is {Multiple}. " +
-                "Use MeasuredBase.Of(1) for a first retry that waits about one normal call.");
+                "Use MeasuredBase.Times(1) for a first retry that waits about one normal call.");
         }
 
         if (double.IsNaN(Quantile) || Quantile <= 0 || Quantile > MaxQuantile)

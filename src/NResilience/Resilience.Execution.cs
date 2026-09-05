@@ -447,7 +447,7 @@ public sealed partial record Resilience
                     }
 
                     hasValue = true;
-                    verdict = Classify.ClassifyResult(value);
+                    verdict = Classifier.ClassifyResult(value);
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -486,7 +486,7 @@ public sealed partial record Resilience
                 }
                 catch (Exception exception)
                 {
-                    verdict = Classify.ClassifyException(exception);
+                    verdict = Classifier.ClassifyException(exception);
 
                     // An exception cannot be turned into a value, so a classifier that calls one Ok
                     // is read as "stop, do not retry".
@@ -700,7 +700,7 @@ public sealed partial record Resilience
                         }
 
                         hasValue = true;
-                        verdict = Classify.ClassifyResult(value);
+                        verdict = Classifier.ClassifyResult(value);
                     }
                     else
                         verdict = decision;
@@ -722,7 +722,7 @@ public sealed partial record Resilience
                 }
                 catch (Exception exception)
                 {
-                    verdict = Classify.ClassifyException(exception);
+                    verdict = Classifier.ClassifyException(exception);
 
                     if (verdict.Kind == VerdictKind.Ok)
                         verdict = Verdict.Permanent;

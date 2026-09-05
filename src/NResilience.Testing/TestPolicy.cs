@@ -17,7 +17,7 @@ public static class TestPolicy
     };
 
     /// <summary><see cref="Instant" /> with <see cref="Classifier.Http" />.</summary>
-    public static Resilience InstantHttp { get; } = Instant with { Classify = Classifier.Http, Name = "http" };
+    public static Resilience InstantHttp { get; } = Instant with { Classifier = Classifier.Http, Name = "http" };
 
     /// <summary>
     ///     <see cref="Instant" /> on a test clock, with any breaker the policy carries rebuilt on the

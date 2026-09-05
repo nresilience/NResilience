@@ -87,7 +87,7 @@ Assert.Equal(
 ## Reach for a ready-made policy
 
 `TestPolicy.Instant` is a `Resilience` value shaped for tests: three attempts, no backoff, and both the deadline and the attempt timeout set to infinite, so a
-test pays for neither a sleep nor a wall-clock bound it does not care about. `TestPolicy.InstantHttp` is the same shape with `Classify = Classifier.Http`.
+test pays for neither a sleep nor a wall-clock bound it does not care about. `TestPolicy.InstantHttp` is the same shape with `Classifier = Classifier.Http`.
 
 ```csharp
 var api = TestPolicy.Instant;

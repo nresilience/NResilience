@@ -99,7 +99,7 @@ public readonly record struct Recovery
     /// <summary>
     ///     The longest ramp, however long the break was. Default 30 seconds.
     ///     <para>
-    ///         The bound on what this feature can cost. <see cref="BreakerSettings.MaxBreakDuration" />
+    ///         The bound on what this feature can cost. <see cref="BreakerSettings.MaximumBreakDuration" />
     ///         is two minutes by default and grows to it after four consecutive opens, and half a minute
     ///         of partial refusal is already more warm-up than any dependency the library can see needs.
     ///     </para>

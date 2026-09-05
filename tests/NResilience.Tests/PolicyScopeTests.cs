@@ -190,11 +190,11 @@ public sealed class PolicyScopeTests
     public void The_template_and_the_cap_are_reported_as_handed_in()
     {
         var template = Resilience.Default with { Attempts = 2 };
-        var scope = new PolicyScope<string>(template, maxKeys: 8);
+        var scope = new PolicyScope<string>(template, maximumKeys: 8);
 
         Assert.Same(template, scope.Template);
-        Assert.Equal(8, scope.MaxKeys);
-        Assert.Equal(1024, new PolicyScope<string>(template).MaxKeys);
+        Assert.Equal(8, scope.MaximumKeys);
+        Assert.Equal(1024, new PolicyScope<string>(template).MaximumKeys);
     }
 
     // ---- Keys ----
@@ -222,14 +222,14 @@ public sealed class PolicyScopeTests
 
     /// <summary>
     ///     A scope sweeps only when a key is added past the cap, and a sweep clears every recency flag
-    ///     before it removes anything. Filling to <paramref name="maxKeys" /> and adding one more
+    ///     before it removes anything. Filling to <paramref name="maximumKeys" /> and adding one more
     ///     therefore leaves the scope full and cold, which is the state the eviction cases start from.
     /// </summary>
-    private static PolicyScope<string> FullAndCold(int maxKeys, out string[] keys)
+    private static PolicyScope<string> FullAndCold(int maximumKeys, out string[] keys)
     {
-        var scope = new PolicyScope<string>(Resilience.Default with { Breaker = new Breaker() }, maxKeys: maxKeys);
+        var scope = new PolicyScope<string>(Resilience.Default with { Breaker = new Breaker() }, maximumKeys: maximumKeys);
 
-        keys = Enumerable.Range(0, maxKeys + 1).Select(i => $"key{i}").ToArray();
+        keys = Enumerable.Range(0, maximumKeys + 1).Select(i => $"key{i}").ToArray();
 
         foreach (var key in keys)
         {
@@ -242,7 +242,7 @@ public sealed class PolicyScopeTests
     [Fact]
     public void Under_the_cap_nothing_is_dropped()
     {
-        var scope = new PolicyScope<string>(Resilience.Default, maxKeys: 16);
+        var scope = new PolicyScope<string>(Resilience.Default, maximumKeys: 16);
 
         for (var i = 0; i < 16; i++)
         {
@@ -277,7 +277,7 @@ public sealed class PolicyScopeTests
     [Fact]
     public void A_dropped_key_that_returns_starts_again_with_a_closed_breaker()
     {
-        var scope = new PolicyScope<string>(Resilience.Default with { Breaker = new Breaker() }, maxKeys: 8);
+        var scope = new PolicyScope<string>(Resilience.Default with { Breaker = new Breaker() }, maximumKeys: 8);
 
         var before = scope.For("first");
         before.Breaker!.Isolate();
@@ -302,7 +302,7 @@ public sealed class PolicyScopeTests
     {
         const int max = 32;
 
-        var scope = new PolicyScope<string>(Resilience.Default, maxKeys: max);
+        var scope = new PolicyScope<string>(Resilience.Default, maximumKeys: max);
 
         var workers = Enumerable.Range(0, 8).Select(worker => Task.Run(() =>
         {
@@ -324,9 +324,9 @@ public sealed class PolicyScopeTests
     [Fact]
     public void An_unbounded_scope_is_not_on_offer_because_it_is_the_leak_the_type_prevents()
     {
-        var refused = Assert.Throws<ArgumentOutOfRangeException>(() => new PolicyScope<string>(Resilience.Default, maxKeys: 0));
+        var refused = Assert.Throws<ArgumentOutOfRangeException>(() => new PolicyScope<string>(Resilience.Default, maximumKeys: 0));
 
-        Assert.Equal("maxKeys", refused.ParamName);
+        Assert.Equal("maximumKeys", refused.ParamName);
     }
 
     [Fact]

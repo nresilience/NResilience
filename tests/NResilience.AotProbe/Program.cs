@@ -140,7 +140,7 @@ internal static class Program
         // reflection, so it is exercised over two distinct result types in one process.
         var classified = instant with
         {
-            Classify = Classifier.Default.OnResult<int>(static v => v == 503 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         var failing = await classified.TryRunAsync(static ct => Task.FromResult(503)).ConfigureAwait(false);
@@ -195,7 +195,7 @@ internal static class Program
         // here rather than being merely compiled past.
         var rejecting = Resilience.Default with
         {
-            Classify = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Permanent : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static v => v < 0 ? Verdict.Permanent : Verdict.Ok),
         };
 
         var refused = false;
@@ -444,7 +444,7 @@ internal static class Program
                 ["Resilience:api:Preset"] = "Http",
                 ["Resilience:api:Attempts"] = "4",
                 ["Resilience:api:Deadline"] = "00:00:20",
-                ["Resilience:api:Backoff:Max"] = "00:00:01",
+                ["Resilience:api:Backoff:MaximumDelay"] = "00:00:01",
                 ["Resilience:api:Breaker:ConsecutiveFailures"] = "2",
                 ["Resilience:api:Logging"] = "Verbose",
             })
@@ -468,8 +468,8 @@ internal static class Program
 
         failures += Check("configuration binds under AOT (attempts)", api.Attempts == 4);
         failures += Check("configuration binds under AOT (deadline)", api.Deadline == TimeSpan.FromSeconds(20));
-        failures += Check("configuration binds under AOT (backoff cap)", api.Backoff.Max == TimeSpan.FromSeconds(1));
-        failures += Check("the preset resolves under AOT", ReferenceEquals(api.Classify, Classifier.Http));
+        failures += Check("configuration binds under AOT (backoff cap)", api.Backoff.MaximumDelay == TimeSpan.FromSeconds(1));
+        failures += Check("the preset resolves under AOT", ReferenceEquals(api.Classifier, Classifier.Http));
         failures += Check("a configured breaker is live under AOT", api.Breaker is { Settings.ConsecutiveFailures: 2 });
         failures += Check("the policy is named after its registration", api.Name == "api");
 
@@ -655,7 +655,7 @@ internal static class Program
         failures += Check("gRPC resource exhaustion is throttling under AOT",
             GrpcResilience.Classifier.ClassifyException(exhausted).Kind == VerdictKind.Throttled);
 
-        failures += Check("the gRPC preset validates under AOT", GrpcResilience.Default.Classify.Equals(GrpcResilience.Classifier));
+        failures += Check("the gRPC preset validates under AOT", GrpcResilience.Default.Classifier.Equals(GrpcResilience.Classifier));
 
         var method = new Method<string, string>(
             MethodType.Unary, "probe.Probe", "Get", Marshallers.StringMarshaller, Marshallers.StringMarshaller);

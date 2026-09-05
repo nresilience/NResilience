@@ -29,7 +29,7 @@ namespace NResilience;
 /// </example>
 /// <remarks>
 ///     Every property but <see cref="Quantile" /> has a working default, so
-///     <c>Hedge.At(0.95)</c> is a complete configuration and <c>Hedge.At(0.95) with { MaxConcurrent = 3 }</c>
+///     <c>Hedge.At(0.95)</c> is a complete configuration and <c>Hedge.At(0.95) with { MaximumConcurrent = 3 }</c>
 ///     is the way to change one. The defaults are supplied on read rather than by a constructor, because
 ///     a struct's default instance is the one thing a constructor cannot reach - so
 ///     <c>new Hedge { Quantile = 0.99 }</c> behaves the same as <c>Hedge.At(0.99)</c> instead of
@@ -47,7 +47,7 @@ public readonly record struct Hedge
     /// </summary>
     private const int DefaultMinimumSamples = 20;
 
-    /// <summary>How many attempts may be in flight at once, when <see cref="MaxConcurrent" /> was not set.</summary>
+    /// <summary>How many attempts may be in flight at once, when <see cref="MaximumConcurrent" /> was not set.</summary>
     private const int DefaultMaxConcurrent = 2;
 
     /// <summary>
@@ -83,7 +83,7 @@ public readonly record struct Hedge
     ///         at the same time.
     ///     </para>
     /// </summary>
-    public int MaxConcurrent
+    public int MaximumConcurrent
     {
         get => _maxConcurrent ?? DefaultMaxConcurrent;
         init => _maxConcurrent = value;
@@ -189,7 +189,7 @@ public readonly record struct Hedge
     /// <returns>True when both would behave identically.</returns>
     public bool Equals(Hedge other) =>
         Quantile.Equals(other.Quantile)
-        && MaxConcurrent == other.MaxConcurrent
+        && MaximumConcurrent == other.MaximumConcurrent
         && MinimumSamples == other.MinimumSamples
         && MinimumDelay == other.MinimumDelay
         && Window == other.Window
@@ -204,18 +204,18 @@ public readonly record struct Hedge
     ///     The quantile of recent latency to hedge at, between 0.5 and 1 exclusive. This is also the
     ///     extra load: hedging at 0.95 costs about 5%.
     /// </param>
-    /// <param name="maxConcurrent">How many attempts may be in flight at once, counting the first.</param>
+    /// <param name="maximumConcurrent">How many attempts may be in flight at once, counting the first.</param>
     /// <returns>The configuration.</returns>
-    public static Hedge At(double quantile = 0.95, int maxConcurrent = DefaultMaxConcurrent) =>
-        new() { Quantile = quantile, MaxConcurrent = maxConcurrent };
+    public static Hedge At(double quantile = 0.95, int maximumConcurrent = DefaultMaxConcurrent) =>
+        new() { Quantile = quantile, MaximumConcurrent = maximumConcurrent };
 
     /// <inheritdoc />
     public override int GetHashCode() =>
-        HashCode.Combine(Quantile, MaxConcurrent, MinimumSamples, MinimumDelay, Window, SuppressAt, WinRate);
+        HashCode.Combine(Quantile, MaximumConcurrent, MinimumSamples, MinimumDelay, Window, SuppressAt, WinRate);
 
     /// <inheritdoc />
     public override string ToString() =>
-        $"p{Quantile * 100:0.##} (max {MaxConcurrent} in flight, min {MinimumSamples} samples, " +
+        $"p{Quantile * 100:0.##} (max {MaximumConcurrent} in flight, min {MinimumSamples} samples, " +
         $"floor {MinimumDelay.TotalMilliseconds:0.#}ms, window {Window.TotalSeconds:0.#}s, " +
         $"suppressed at {SuppressAt:0.##} of the trip point)" +
         (WinRate is { } feedback ? $", while at least {feedback}" : "");
@@ -234,8 +234,8 @@ public readonly record struct Hedge
                 "Use Hedge.At(0.95) for the slowest 5% of calls.");
         }
 
-        if (MaxConcurrent < 2)
-            problems.Add($"Hedge.MaxConcurrent must be at least 2; it is {MaxConcurrent}. A hedge that cannot overlap anything is not a hedge.");
+        if (MaximumConcurrent < 2)
+            problems.Add($"Hedge.MaximumConcurrent must be at least 2; it is {MaximumConcurrent}. A hedge that cannot overlap anything is not a hedge.");
 
         if (MinimumSamples < 1)
             problems.Add($"Hedge.MinimumSamples must be at least 1; it is {MinimumSamples}.");

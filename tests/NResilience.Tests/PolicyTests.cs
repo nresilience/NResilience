@@ -13,7 +13,7 @@ public sealed class PolicyTests
         Assert.Equal(3, policy.Attempts);
         Assert.Equal(TimeSpan.FromSeconds(30), policy.Deadline);
         Assert.Equal(TimeSpan.FromSeconds(10), policy.AttemptTimeout);
-        Assert.Same(Classifier.Default, policy.Classify);
+        Assert.Same(Classifier.Default, policy.Classifier);
         Assert.Same(TimeProvider.System, policy.Time);
         Assert.Null(policy.BeforeAttempt);
     }
@@ -31,7 +31,7 @@ public sealed class PolicyTests
     [Fact]
     public void Http_is_the_default_with_the_http_classifier()
     {
-        Assert.Same(Classifier.Http, Resilience.Http.Classify);
+        Assert.Same(Classifier.Http, Resilience.Http.Classifier);
         Assert.Equal(Resilience.Default.Attempts, Resilience.Http.Attempts);
     }
 
@@ -42,7 +42,7 @@ public sealed class PolicyTests
 
         Assert.Equal(5, derived.Attempts);
         Assert.Equal(3, Resilience.Http.Attempts);
-        Assert.Same(Classifier.Http, derived.Classify);
+        Assert.Same(Classifier.Http, derived.Classifier);
     }
 
     [Fact]

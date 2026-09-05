@@ -133,7 +133,7 @@ ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
 var api = Resilience.Http with
 {
     Backoff = Backoff.None,
-    Classify = Classifier.Http.OnResult<HttpResponseMessage>(r =>
+    Classifier = Classifier.Http.OnResult<HttpResponseMessage>(r =>
         r.StatusCode == HttpStatusCode.Conflict ? Verdict.Transient : Classifier.Http.ClassifyResult(value: r)),
 };
 ```
@@ -212,7 +212,7 @@ Six behavioral differences to know about when migrating:
 - **Active retry budget**: By default, retries are capped at 10% of successful traffic per policy. A load test against a dead dependency returns `StopReason.BudgetExhausted`. Disable with `RetryBudget.None`; see the [Retry budget](features/retry-budget.md) guide.
 - **Refusal pause**: An open circuit breaker pauses 100 milliseconds before reporting a failure, so the breaker cannot become a load generator. See [Guarded rejection](deep-dives/guarded-rejection.md).
 - **Measured bounds you did not write**: the attempt ceiling and two of the breaker's three trip conditions are measured from the dependency's own latency and error rate, and all three are on by default. A migrated configuration therefore gets bounds Polly has no equivalent of - each of which can only tighten a bound you did write, and none of which is armed until it has a baseline. See [attempt timeouts](features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) and [trip conditions](features/circuit-breaker.md#trip-conditions).
-- **One attempt count**: Polly's hedging has its own `MaxHedgedAttempts` alongside retry's `MaxRetryAttempts`, and the product is the real ceiling on load. Here `Attempts` is the total number of calls that reach the dependency whatever shape they run in, and `Hedge.MaxConcurrent` bounds only how many overlap. Migrating `MaxRetryAttempts = 2` plus `MaxHedgedAttempts = 2` means deciding what the total should be, not multiplying. There is also no fixed-delay hedge to migrate: see [Hedging](features/hedging.md).
+- **One attempt count**: Polly's hedging has its own `MaxHedgedAttempts` alongside retry's `MaxRetryAttempts`, and the product is the real ceiling on load. Here `Attempts` is the total number of calls that reach the dependency whatever shape they run in, and `Hedge.MaximumConcurrent` bounds only how many overlap. Migrating `MaxRetryAttempts = 2` plus `MaxHedgedAttempts = 2` means deciding what the total should be, not multiplying. There is also no fixed-delay hedge to migrate: see [Hedging](features/hedging.md).
 
 ## Run NResilience and Polly together
 

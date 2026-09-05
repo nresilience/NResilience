@@ -104,7 +104,7 @@ public sealed class Migration
         var api = Resilience.Http with
         {
             Backoff = Backoff.None,
-            Classify = Classifier.Http.OnResult<HttpResponseMessage>(r =>
+            Classifier = Classifier.Http.OnResult<HttpResponseMessage>(r =>
                 r.StatusCode == HttpStatusCode.Conflict ? Verdict.Transient : Classifier.Http.ClassifyResult(value: r)),
         };
 

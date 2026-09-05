@@ -8,7 +8,7 @@ var api = Resilience.Default with
     Attempts = 4,
     Deadline = TimeSpan.FromSeconds(5),
     Backoff = Backoff.Exponential(TimeSpan.FromMilliseconds(50)),
-    Classify = Classifier.Default.On<FlakyDependencyException>(Verdict.Transient),
+    Classifier = Classifier.Default.On<FlakyDependencyException>(Verdict.Transient),
     OnEvent = e => Console.WriteLine($"  {e}"),
 };
 
@@ -28,7 +28,7 @@ Console.WriteLine($"  -> falling back to the cached value: {(result.TryGetValue(
 
 Console.WriteLine();
 Console.WriteLine("What the classifier will and will not retry:");
-Console.WriteLine(api.Classify);
+Console.WriteLine(api.Classifier);
 
 internal sealed class FakeDependency(int failuresBeforeSuccess)
 {

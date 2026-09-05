@@ -111,7 +111,7 @@ public sealed class RateLimitTests
         {
             Attempts = 4,
             Budget = budget,
-            Classify = Classifier.Default.On<InvalidOperationException>(Verdict.Throttled()),
+            Classifier = Classifier.Default.On<InvalidOperationException>(Verdict.Throttled()),
         };
 
         var result = await RunAsync(
@@ -228,7 +228,7 @@ public sealed class RateLimitTests
         var policy = TestPolicy.On(time) with
         {
             Attempts = 2,
-            Classify = Classifier.RetryEverything.On<Exception>(ex =>
+            Classifier = Classifier.RetryEverything.On<Exception>(ex =>
             {
                 seen.Add(ex.GetType());
                 return Verdict.Transient;
@@ -273,7 +273,7 @@ public sealed class RateLimitTests
         {
             Attempts = 3,
             Budget = RetryBudget.None,
-            Classify = Classifier.Default.On<InvalidOperationException>(Verdict.Throttled()),
+            Classifier = Classifier.Default.On<InvalidOperationException>(Verdict.Throttled()),
         };
 
         var result = await RunAsync(

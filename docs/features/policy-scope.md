@@ -65,16 +65,16 @@ private static readonly PolicyScope<string> Shards = new(
     },
 
     // How many keys to keep. The least-recently-seen are dropped past this.
-    maxKeys: 64);
+    maximumKeys: 64);
 ```
 <!-- endsnippet -->
 
 Unbounded keying is a memory leak - every entry includes a breaker and a budget - so there is no unbounded mode. The default is 1024, and the minimum is 1.
 
-Eviction uses the same approximation the host registry does: a key seen since the last sweep survives the next one, the scope can briefly hold more than `maxKeys` while a sweep catches up, and no lookup ever waits on a sweep.
+Eviction uses the same approximation the host registry does: a key seen since the last sweep survives the next one, the scope can briefly hold more than `maximumKeys` while a sweep catches up, and no lookup ever waits on a sweep.
 
 > [!IMPORTANT]
-> Eviction discards state. A dropped key that comes back gets a fresh breaker, which does not remember that it was open. Size `maxKeys` above the number of keys you expect to be active at once.
+> Eviction discards state. A dropped key that comes back gets a fresh breaker, which does not remember that it was open. Size `maximumKeys` above the number of keys you expect to be active at once.
 
 ## Read what it produces
 
@@ -87,7 +87,7 @@ foreach (var (tenant, breaker) in Tenants.Breakers())
 ```
 <!-- endsnippet -->
 
-`Breakers()` and `Budgets()` are snapshots over the scope's keys. `Count` is the number of current keys; `Template` and `MaxKeys` are the initial configuration.
+`Breakers()` and `Budgets()` are snapshots over the scope's keys. `Count` is the number of current keys; `Template` and `MaximumKeys` are the initial configuration.
 
 ## Go deeper
 

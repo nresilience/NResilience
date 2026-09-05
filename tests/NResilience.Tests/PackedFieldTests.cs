@@ -72,7 +72,7 @@ public sealed class PackedFieldTests
         {
             Attempts = 2,
             Backoff = Backoff.None,
-            Classify = Classifier.Default.OnResult<int>(static _ => Verdict.Limited(TimeSpan.FromSeconds(30))),
+            Classifier = Classifier.Default.OnResult<int>(static _ => Verdict.Limited(TimeSpan.FromSeconds(30))),
         };
 
         var result = await policy.TryRunAsync(static _ => Task.FromResult(0));

@@ -12,12 +12,12 @@ order: 4
 | :--- | :--- |
 | `Backoff.Default` | Uses `Exponential()` with a 100 ms transient base, 1 s throttled base, factor of 2, 30 s cap, and full jitter. |
 | `Backoff.None` | Retries immediately. Use this only when the dependency is not shared. |
-| `Backoff.Exponential(transientBase, throttledBase, factor, max)` | Uses exponential backoff with separate bases for different retryable verdicts. All parameters are optional. |
-| `Backoff.Measured(multiple, transientBase, throttledBase, factor, max)` | Uses exponential backoff whose transient base is measured from recent latency. All parameters are optional. |
+| `Backoff.Exponential(transientBase, throttledBase, factor, maximumDelay)` | Uses exponential backoff with separate bases for different retryable verdicts. All parameters are optional. |
+| `Backoff.Measured(multiple, transientBase, throttledBase, factor, maximumDelay)` | Uses exponential backoff whose transient base is measured from recent latency. All parameters are optional. |
 | `Backoff.Constant(delay)` | Uses the same delay before every retry. |
-| `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Computes the delay yourself. This mode ignores the `Max` property and jitter. |
+| `Backoff.Custom(Func<NextAttempt, TimeSpan>)` | Computes the delay yourself. This mode ignores the `MaximumDelay` property and jitter. |
 | `Jitter` | Determines the amount of randomness applied to the delay. |
-| `Max` | The maximum allowable delay for any single attempt. Defaults to 30 s. Use `Timeout.InfiniteTimeSpan` for no cap. |
+| `MaximumDelay` | The maximum allowable delay for any single attempt. Defaults to 30 s. Use `Timeout.InfiniteTimeSpan` for no cap. |
 | `TransientBase` | The base delay for a `Transient` verdict. Zero for a `Custom` curve. |
 | `ThrottledBase` | The base delay for a `Throttled` verdict. Zero for a `Custom` curve. |
 | `Factor` | The growth per attempt. |
@@ -31,9 +31,9 @@ A factory chooses the curve; `with` changes one term of it. Every property excep
 `init` accessor, so you never have to restate the terms you are not changing:
 
 ```csharp
-var slower = Backoff.Default with { Max = TimeSpan.FromMinutes(2) };
+var slower = Backoff.Default with { MaximumDelay = TimeSpan.FromMinutes(2) };
 
-slower.Max;             // 00:02:00 - the term you set
+slower.MaximumDelay;    // 00:02:00 - the term you set
 slower.TransientBase;   // 00:00:00.1000000 - everything else is the shipped default
 slower.Factor;          // 2
 slower.Jitter;          // Jitter.Full
@@ -62,7 +62,7 @@ backoff.Kind;           // BackoffKind.Exponential
 backoff.TransientBase;  // 00:00:00.1000000
 backoff.ThrottledBase;  // 00:00:01
 backoff.Factor;         // 2
-backoff.Max;            // 00:00:30
+backoff.MaximumDelay;   // 00:00:30
 ```
 
 The defaults are supplied on read rather than by a constructor, because `policy with { Backoff =
@@ -74,16 +74,16 @@ one that left it alone, and `default(Backoff)` equals `Backoff.Default`.
 For exponential backoff, the delay for attempt *n* is:
 `base × factor^(n-2)`
 
-The result is capped at `Max` and then jittered. The first retry is served the base delay.
+The result is capped at `MaximumDelay` and then jittered. The first retry is served the base delay.
 
 **Default parameters**:
 - `transientBase`: 100 ms
 - `throttledBase`: 1 s
 - `factor`: 2.0
-- `max`: 30 s
+- `maximumDelay`: 30 s
 
 ### Priority and constraints
-`Verdict.RetryAfter` wins over all backoff curves: it is honored verbatim, capped only by `Max`, with no jitter.
+`Verdict.RetryAfter` wins over all backoff curves: it is honored verbatim, capped only by `MaximumDelay`, with no jitter.
 
 The [executor](index.md) also keeps a delay from consuming the deadline's remaining time. If a delay would exceed the deadline, the call fails immediately with a deadline exception instead of sleeping.
 
@@ -95,7 +95,7 @@ dependency recently took, instead of taking it as a constant. It is opt-in, and
 
 | Member | Default | Description |
 | :--- | :--- | :--- |
-| `MeasuredBase.Of(multiple)` | `1` | Builds a configuration. `multiple` is how many normal calls the first retry waits. |
+| `MeasuredBase.Times(multiple)` | `1` | Builds a configuration. `multiple` is how many normal calls the first retry waits. |
 | `Multiple` | none - you supply it | How many normal calls the first retry waits. Must be greater than zero. |
 | `Quantile` | `0.5` | The quantile of recent successful latency that counts as normal. Must be in `(0, 0.5]`. |
 | `Window` | `5 min` | How much history the baseline covers. |

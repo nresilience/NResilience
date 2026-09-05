@@ -127,7 +127,7 @@ public static class GrpcResilience
 
         private static Resilience Build()
         {
-            var policy = Resilience.Default with { Classify = Classifier, Name = "grpc" };
+            var policy = Resilience.Default with { Classifier = ClassifierHolder.Instance, Name = "grpc" };
             policy.Validate();
             return policy;
         }

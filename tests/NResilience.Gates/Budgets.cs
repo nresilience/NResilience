@@ -179,7 +179,7 @@ public static class Budgets
     ///     does not allocate, and pretending otherwise would produce a worse design rather than a
     ///     cheaper one.
     ///     Three things moved it recently and they do not all point the same way: the array is gone from
-    ///     the two-task race that <c>MaxConcurrent</c>'s default makes the common one (-40 B), the 128-B
+    ///     the two-task race that <c>MaximumConcurrent</c>'s default makes the common one (-40 B), the 128-B
     ///     <see cref="Resilience.Hedge" /> is no longer hoisted into a local the loop's closures capture
     ///     (-128 B), and the arming delay is now given a cancellation source of the loop's own so its
     ///     timer is released when the race ends rather than when its threshold elapses (+172 B: the

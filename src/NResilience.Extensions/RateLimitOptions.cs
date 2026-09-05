@@ -52,7 +52,7 @@ public sealed class RateLimitOptions
     ///     <para>
     ///         Off by default because this library is already good at waiting: a refusal becomes a retry on
     ///         the throttled backoff curve, honoring the limiter's own hint, capped by
-    ///         <c>Backoff.Max</c> and by the time left on the deadline, and visible in telemetry as a retry.
+    ///         <c>Backoff.MaximumDelay</c> and by the time left on the deadline, and visible in telemetry as a retry.
     ///         Queue time is instead charged against <see cref="Resilience.AttemptTimeout" />, where it is
     ///         indistinguishable from a slow dependency and can trip a
     ///         <see cref="BreakerSettings.SlowCallThreshold" /> breaker against a service that is fine. Raise

@@ -50,8 +50,8 @@ The `BreakerState` enum defines the breaker's states:
 | `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default; set it to `null` to turn it off. Composes with `SlowCallThreshold`: a call is slow when it is above either. See [`SlowCalls`](#slowcalls). |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls in the window that will trip the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
-| `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set it equal to `BreakDuration` to disable growth. |
-| `BreakJitter` | `Jitter.Equal` | How much randomness is applied to the break duration, so a fleet whose breakers opened together does not probe together. `Jitter.Equal` serves half the computed duration plus a random share of the other half; `Jitter.None` serves it exactly. Jitter never lengthens a break, so `MaxBreakDuration` still bounds it. |
+| `MaximumBreakDuration` | 2 min | The maximum break duration. The break duration doubles with each consecutive trip up to this limit. Set it equal to `BreakDuration` to disable growth. |
+| `BreakJitter` | `Jitter.Equal` | How much randomness is applied to the break duration, so a fleet whose breakers opened together does not probe together. `Jitter.Equal` serves half the computed duration plus a random share of the other half; `Jitter.None` serves it exactly. Jitter never lengthens a break, so `MaximumBreakDuration` still bounds it. |
 | `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while `HalfOpen`. |
 | `ProbeSuccesses` | 2 | The number of successful probes needed to return the breaker to `Closed`. Also the number of consecutive fast calls a `Recovery` ramp needs before it raises the admitted fraction. |
 | `Recovery` | `null` | Hand the traffic back over a ramp rather than a cliff, through a `Recovering` state. Off by default, because a caller refused during the ramp would have been served by a cliffed breaker. See [`Recovery`](#recovery). |

@@ -290,7 +290,7 @@ public sealed class ChaosTests
         var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
         var handler = new ChaosHandler(chaos) { InnerHandler = transport };
 
-        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.On(time) with { Classify = Classifier.Http }));
+        using var client = new HttpClient(new ResilienceHandler(handler, TestPolicy.On(time) with { Classifier = Classifier.Http }));
         var call = client.GetAsync(new Uri("https://api.test/thing"));
 
         while (!call.IsCompleted)

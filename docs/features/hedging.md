@@ -27,7 +27,7 @@ var api = Resilience.Http with
 
 `Hedge.At` is the only way to configure it. There is deliberately no fixed-delay form: the threshold is always a **live quantile of recent latency**, which is what makes the feature safe to leave on. See [Hedging internals](../deep-dives/hedging-internals.md) for the argument.
 
-`Attempts` stays what it says: the total number of calls that reach the dependency, sequential or concurrent. `Attempts = 3` with `MaxConcurrent = 2` means at most three wire calls, at most two of them in flight at once. One number to reason about, not two multiplied together.
+`Attempts` stays what it says: the total number of calls that reach the dependency, sequential or concurrent. `Attempts = 3` with `MaximumConcurrent = 2` means at most three wire calls, at most two of them in flight at once. One number to reason about, not two multiplied together.
 
 ## Tune it
 
@@ -37,7 +37,7 @@ var api = Resilience.Http with
 // hedges 1% of calls and shortens a smaller part of the tail than 0.95 does.
 var api = Resilience.Http with
 {
-    Hedge = Hedge.At(quantile: 0.99, maxConcurrent: 3) with
+    Hedge = Hedge.At(quantile: 0.99, maximumConcurrent: 3) with
     {
         MinimumSamples = 50, // wait for 50 recent calls before hedging anything
         MinimumDelay = TimeSpan.FromMilliseconds(value: 25), // never hedge sooner than this
@@ -50,7 +50,7 @@ var api = Resilience.Http with
 | Property | Default | What it means |
 | :--- | :--- | :--- |
 | `Quantile` | - | The quantile a hedge fires at, from 0.5 to 1 exclusive. This is also the extra load: 0.95 costs about 5%. |
-| `MaxConcurrent` | `2` | How many attempts may be in flight at once, counting the first. |
+| `MaximumConcurrent` | `2` | How many attempts may be in flight at once, counting the first. |
 | `MinimumSamples` | `20` | How many recent calls the estimate needs before any hedge fires. |
 | `MinimumDelay` | `10 ms` | A floor under the delay, so a dependency with a sub-millisecond p95 does not hedge everything. |
 | `Window` | `30 s` | How much history the estimate covers. |

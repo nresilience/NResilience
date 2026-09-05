@@ -97,7 +97,7 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 | Member | Description |
 | :--- | :--- |
 | `TestPolicy.Instant` | Three attempts, no backoff, and both the deadline and the attempt timeout set to `Timeout.InfiniteTimeSpan`. Storm protection is off. |
-| `TestPolicy.InstantHttp` | `Instant` with `Classify = Classifier.Http` and `Name = "http"`. |
+| `TestPolicy.InstantHttp` | `Instant` with `Classifier = Classifier.Http` and `Name = "http"`. |
 | `TestPolicy.On(TimeProvider time)` | `Instant` on the given test clock, with any breaker the policy carries rebuilt on the same clock. |
 | `UseClock(this Resilience policy, TimeProvider time)` | Extension method. Rebases a policy on the given clock, rebuilding the breaker it carries on that clock too. The returned policy carries a new breaker with the same settings and no accumulated state. |
 

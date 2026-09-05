@@ -82,15 +82,15 @@ public sealed class GrpcDocs
         // so the shipped verdict is Permanent and this is how a store that wants it says so.
         var policy = GrpcResilience.Default with
         {
-            Classify = GrpcResilience.Classifier.On<RpcException>(
+            Classifier = GrpcResilience.Classifier.On<RpcException>(
                 static e => e.StatusCode == StatusCode.Aborted
                     ? Verdict.Transient
                     : GrpcResilience.Classifier.ClassifyException(e)),
         };
         // </snippet:grpc-classifier-override>
 
-        Assert.Equal(VerdictKind.Transient, policy.Classify.ClassifyException(new RpcException(new Status(StatusCode.Aborted, ""))).Kind);
-        Assert.Equal(VerdictKind.Permanent, policy.Classify.ClassifyException(new RpcException(new Status(StatusCode.NotFound, ""))).Kind);
+        Assert.Equal(VerdictKind.Transient, policy.Classifier.ClassifyException(new RpcException(new Status(StatusCode.Aborted, ""))).Kind);
+        Assert.Equal(VerdictKind.Permanent, policy.Classifier.ClassifyException(new RpcException(new Status(StatusCode.NotFound, ""))).Kind);
     }
 
     [Fact]

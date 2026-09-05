@@ -90,7 +90,7 @@ public sealed partial record Resilience
         StopReason reason;
 
         // The legs currently in flight. Capacity is the concurrency ceiling, so the list never grows.
-        var legs = new List<HedgeLeg<T>>(Hedge!.Value.MaxConcurrent);
+        var legs = new List<HedgeLeg<T>>(Hedge!.Value.MaximumConcurrent);
 
         // Wire calls started. Distinct from log.Count, which also counts discarded legs, and it is this
         // one that Attempts bounds - Attempts is the number of calls the dependency sees.
@@ -167,7 +167,7 @@ public sealed partial record Resilience
 
                 if (racing == 2)
                 {
-                    // MaxConcurrent defaults to 2, so a race is almost always between exactly two tasks -
+                    // MaximumConcurrent defaults to 2, so a race is almost always between exactly two tasks -
                     // one leg and its arming delay, or two legs - and WhenAny has an overload for that
                     // pair which allocates no array at all.
                     var second = legs.Count == 2 ? legs[1].Work! : armed!.Value.Delay;
@@ -428,7 +428,7 @@ public sealed partial record Resilience
             arming?.Dispose();
             arming = null;
 
-            if (hedgeRefused || legs.Count >= Hedge!.Value.MaxConcurrent || started >= Attempts)
+            if (hedgeRefused || legs.Count >= Hedge!.Value.MaximumConcurrent || started >= Attempts)
                 return null;
 
             // Half-open counts as not closed: those attempts are probes, and a probe that is raced is not
@@ -555,7 +555,7 @@ public sealed partial record Resilience
                 }
 
                 legHas = true;
-                legVerdict = Classify.ClassifyResult(legValue);
+                legVerdict = Classifier.ClassifyResult(legValue);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -586,7 +586,7 @@ public sealed partial record Resilience
             }
             catch (Exception exception)
             {
-                legVerdict = Classify.ClassifyException(exception);
+                legVerdict = Classifier.ClassifyException(exception);
 
                 if (legVerdict.Kind == VerdictKind.Ok)
                     legVerdict = Verdict.Permanent;

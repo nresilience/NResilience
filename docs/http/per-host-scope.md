@@ -14,15 +14,15 @@ The NResilience handler prevents that by keeping a separate circuit breaker and 
 
 `BreakerPerHost` and `BudgetPerHost` are on by default. The handler creates a breaker and a retry budget for each authority the first time a request goes to it.
 
-Each of those breakers measures that host's own normal latency and error rate, because [`SlowCalls` and `Failures`](../features/circuit-breaker.md#trip-conditions) are on by default - so a brownout at one host trips that host's breaker and nothing else. The estimates cost about 3.5 KB per host: at the default `MaxHosts` of 1024, a ceiling of roughly 3.5 MB for a client talking to a thousand hosts, and nothing at all for the usual client talking to three.
+Each of those breakers measures that host's own normal latency and error rate, because [`SlowCalls` and `Failures`](../features/circuit-breaker.md#trip-conditions) are on by default - so a brownout at one host trips that host's breaker and nothing else. The estimates cost about 3.5 KB per host: at the default `MaximumHosts` of 1024, a ceiling of roughly 3.5 MB for a client talking to a thousand hosts, and nothing at all for the usual client talking to three.
 
 ## Bound the host registry
  
-The registry keeps 1024 hosts by default. Use `MaxHosts` to change the cap, or set it to `null` to remove it:
+The registry keeps 1024 hosts by default. Use `MaximumHosts` to change the cap, or set it to `null` to remove it:
  
 <!-- snippet: http-max-hosts -->
 ```csharp
-var handler = new ResilienceHandler(options: new HttpResilienceOptions { MaxHosts = 64 });
+var handler = new ResilienceHandler(options: new HttpResilienceOptions { MaximumHosts = 64 });
 ```
 <!-- endsnippet -->
  
@@ -54,7 +54,7 @@ foreach (var (host, breaker) in breakers)
 ```
 <!-- endsnippet -->
 
-These methods return a snapshot of the hosts currently tracked. The dictionaries are empty until the first request to a host, and stay empty if the per-host switches are off and the policy provides no breaker or budget of its own. Hosts evicted by `MaxHosts` are removed from the snapshot.
+These methods return a snapshot of the hosts currently tracked. The dictionaries are empty until the first request to a host, and stay empty if the per-host switches are off and the policy provides no breaker or budget of its own. Hosts evicted by `MaximumHosts` are removed from the snapshot.
 
 ## Configure a different scope
 
@@ -85,4 +85,4 @@ When a request is marked non-repeatable, the handler still runs the resilience p
 Host state lives as long as the handler does, or until eviction, whichever comes first:
 - **`IHttpClientFactory`**: Rotates handler chains every two minutes by default. Per-host state is reset when the handler is rotated.
 - **`HttpResilience.CreateClient`**: Per-host state persists for the lifetime of the process if the client is maintained.
-- **Eviction**: A host dropped by a `MaxHosts` sweep resets to a closed breaker and a full budget the next time it is seen.
+- **Eviction**: A host dropped by a `MaximumHosts` sweep resets to a closed breaker and a full budget the next time it is seen.

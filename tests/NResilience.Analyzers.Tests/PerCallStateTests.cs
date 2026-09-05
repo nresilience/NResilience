@@ -368,7 +368,7 @@ public sealed class PerCallStateTests
                                                                 {
                                                                     internal static Resilience Api() => Resilience.Http with
                                                                     {
-                                                                        Backoff = Backoff.Exponential() with { MeasuredBase = MeasuredBase.Of(1) },
+                                                                        Backoff = Backoff.Exponential() with { MeasuredBase = MeasuredBase.Times(1) },
                                                                     };
                                                                 }
                                                                 """)));

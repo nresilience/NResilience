@@ -17,7 +17,7 @@ public sealed class HostRegistryTests
     /// </summary>
     private static HostRegistry FullAndCold(int max, out string[] hosts)
     {
-        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = max });
+        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaximumHosts = max });
 
         hosts = Enumerable.Range(0, max + 1).Select(i => $"host{i}.example").ToArray();
 
@@ -32,7 +32,7 @@ public sealed class HostRegistryTests
     [Fact]
     public void Under_the_cap_nothing_is_dropped_and_a_host_keeps_its_scope()
     {
-        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = 16 });
+        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaximumHosts = 16 });
 
         for (var i = 0; i < 16; i++)
         {
@@ -99,7 +99,7 @@ public sealed class HostRegistryTests
     {
         const int max = 32;
 
-        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = max });
+        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaximumHosts = max });
 
         var workers = Enumerable.Range(0, 8).Select(worker => Task.Run(() =>
         {
@@ -121,7 +121,7 @@ public sealed class HostRegistryTests
     [Fact]
     public void A_null_cap_never_sweeps()
     {
-        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaxHosts = null });
+        var registry = new HostRegistry(Resilience.Http, new HttpResilienceOptions { MaximumHosts = null });
 
         for (var i = 0; i < 2048; i++)
         {
@@ -132,5 +132,5 @@ public sealed class HostRegistryTests
     }
 
     [Fact]
-    public void The_default_cap_is_1024() => Assert.Equal(1024, new HttpResilienceOptions().MaxHosts);
+    public void The_default_cap_is_1024() => Assert.Equal(1024, new HttpResilienceOptions().MaximumHosts);
 }

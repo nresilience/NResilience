@@ -236,7 +236,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
             // Classifier.ToString builds a multi-line dump, so the guard is the point rather than a
             // micro-optimization: this is the only record that costs a string before it is written.
             if (logger.IsEnabled(LogLevel.Trace))
-                Log.PolicyClassifier(logger, LogLevel.Trace, reported, policy.Classify.ToString());
+                Log.PolicyClassifier(logger, LogLevel.Trace, reported, policy.Classifier.ToString());
         }
 
         policy.Validate();

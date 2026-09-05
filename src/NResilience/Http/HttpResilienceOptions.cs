@@ -91,7 +91,7 @@ public sealed class HttpResilienceOptions
     ///         catches up. A value of zero or less is read as unbounded.
     ///     </para>
     /// </summary>
-    public int? MaxHosts { get; set; } = 1024;
+    public int? MaximumHosts { get; set; } = 1024;
 
     /// <summary>
     ///     Whether each outbound attempt carries how long this side is going to wait for it. Off by
@@ -153,7 +153,7 @@ public sealed class HttpResilienceOptions
     /// </summary>
     /// <exception cref="ResilienceConfigurationException">The options cannot be used.</exception>
     /// <remarks>
-    ///     <see cref="MaxHosts" /> is not checked here: zero or less is documented as unbounded rather
+    ///     <see cref="MaximumHosts" /> is not checked here: zero or less is documented as unbounded rather
     ///     than as a mistake.
     /// </remarks>
     public void Validate()

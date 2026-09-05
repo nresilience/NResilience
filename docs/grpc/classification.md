@@ -51,7 +51,7 @@ Every row is one line to override. The last rule registered for an exception typ
 // so the shipped verdict is Permanent and this is how a store that wants it says so.
 var policy = GrpcResilience.Default with
 {
-    Classify = GrpcResilience.Classifier.On<RpcException>(
+    Classifier = GrpcResilience.Classifier.On<RpcException>(
         static e => e.StatusCode == StatusCode.Aborted
             ? Verdict.Transient
             : GrpcResilience.Classifier.ClassifyException(e)),

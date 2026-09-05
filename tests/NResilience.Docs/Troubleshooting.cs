@@ -19,7 +19,7 @@ public sealed class Troubleshooting
         var api = Resilience.Default with
         {
             Backoff = Backoff.None,
-            Classify = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
+            Classifier = Classifier.Default.On<MyDbException>(verdict: Verdict.Transient),
         };
 
         // </snippet:troubleshoot-not-retried>

@@ -119,7 +119,7 @@ public sealed class DeadlinePropagationTests
             Backoff = Backoff.None,
             Budget = null,
             UseAmbientDeadline = true,
-            Classify = Classifier.Http,
+            Classifier = Classifier.Http,
             Time = time,
         };
 
@@ -145,7 +145,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var attempts = 0;
 
-        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(30), Classify = Classifier.Http };
+        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(30), Classifier = Classifier.Http };
 
         using var scope = ResilienceDeadline.Begin(TimeSpan.FromMilliseconds(200), time);
 
@@ -170,7 +170,7 @@ public sealed class DeadlinePropagationTests
         {
             Deadline = TimeSpan.FromSeconds(1),
             UseAmbientDeadline = true,
-            Classify = Classifier.Http,
+            Classifier = Classifier.Http,
         };
 
         using var scope = ResilienceDeadline.Begin(TimeSpan.FromHours(1), time);
@@ -304,7 +304,7 @@ public sealed class DeadlinePropagationTests
         {
             Deadline = TimeSpan.FromSeconds(30),
             AttemptTimeout = TimeSpan.FromSeconds(3),
-            Classify = Classifier.Http,
+            Classifier = Classifier.Http,
         };
 
         using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
@@ -327,7 +327,7 @@ public sealed class DeadlinePropagationTests
         {
             Attempts = 3,
             Deadline = TimeSpan.FromSeconds(10),
-            Classify = Classifier.Http,
+            Classifier = Classifier.Http,
         };
 
         using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
@@ -346,7 +346,7 @@ public sealed class DeadlinePropagationTests
         var policy = TestPolicy.On(time) with
         {
             Deadline = TimeSpan.FromSeconds(30),
-            Classify = Classifier.Http,
+            Classifier = Classifier.Http,
             UseAmbientDeadline = true,
         };
 
@@ -366,7 +366,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
-        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classify = Classifier.Http };
+        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
         var options = new HttpResilienceOptions { PropagateDeadline = true, DeadlineHeader = "X-Budget" };
 
         using var client = new HttpClient(new ResilienceHandler(transport, policy, options));
@@ -396,7 +396,7 @@ public sealed class DeadlinePropagationTests
         var time = new FakeTimeProvider();
         var transport = new ScriptedHttpHandler().Respond(HttpStatusCode.OK);
 
-        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classify = Classifier.Http };
+        var policy = TestPolicy.On(time) with { Deadline = TimeSpan.FromSeconds(4), Classifier = Classifier.Http };
 
         using var client = new HttpClient(new ResilienceHandler(transport, policy, new HttpResilienceOptions { PropagateDeadline = true }));
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://api.test/thing"));

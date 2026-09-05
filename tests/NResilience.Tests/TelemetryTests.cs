@@ -101,7 +101,7 @@ public sealed class TelemetryTests
         {
             OnEvent = recorder.Record,
             Attempts = 2,
-            Classify = Classifier.Default.OnResult<int>(static status => status == 503 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static status => status == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         await policy.TryRunAsync(static ct => Task.FromResult(503));

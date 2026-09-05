@@ -138,7 +138,7 @@ public sealed class AdmitTests
         var policy = TestPolicy.On(time) with
         {
             Attempts = 2,
-            Classify = Classifier.RetryEverything.On<InvalidOperationException>(ex =>
+            Classifier = Classifier.RetryEverything.On<InvalidOperationException>(ex =>
             {
                 seen.Add(ex.GetType());
                 return Verdict.Transient;

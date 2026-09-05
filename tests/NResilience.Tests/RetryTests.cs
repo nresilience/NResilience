@@ -123,7 +123,7 @@ public sealed class RetryTests
 
         var policy = TestPolicy.Instant with
         {
-            Classify = Classifier.Default.OnResult<int>(static code => code == 503 ? Verdict.Transient : Verdict.Ok),
+            Classifier = Classifier.Default.OnResult<int>(static code => code == 503 ? Verdict.Transient : Verdict.Ok),
         };
 
         // An answer the policy judged a failure is still an answer: the caller gets the 503 back
@@ -142,7 +142,7 @@ public sealed class RetryTests
     public async Task A_classifier_cannot_turn_an_exception_into_a_success()
     {
         var calls = 0;
-        var policy = TestPolicy.Instant with { Classify = Classifier.Default.On<IOException>(Verdict.Ok) };
+        var policy = TestPolicy.Instant with { Classifier = Classifier.Default.On<IOException>(Verdict.Ok) };
 
         await Assert.ThrowsAsync<IOException>(async () =>
             await policy.RunAsync(ct =>

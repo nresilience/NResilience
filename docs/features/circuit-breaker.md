@@ -59,7 +59,7 @@ A breaker trips on consecutive failures, or on rates of failure and slowness. Sl
 | `SlowCalls` | `SlowCalls.Above(3)` | The same trip, expressed as a multiple of measured normal latency. On by default, and composes with `SlowCallThreshold`: a call is slow when it is above either. |
 | `SlowCallRatio` | 0.5 | The proportion of slow calls within the window that trips the breaker. |
 | `BreakDuration` | 15 s | The duration of the first break. |
-| `MaxBreakDuration` | 2 min | The maximum break duration. The break duration doubles on each consecutive open. |
+| `MaximumBreakDuration` | 2 min | The maximum break duration. The break duration doubles on each consecutive open. |
 | `BreakJitter` | `Jitter.Equal` | How much randomness the break duration carries, so a fleet that opened together does not probe together. |
 | `HalfOpenProbes` | 1 | The number of concurrent trial calls allowed while in the `HalfOpen` state. |
 | `ProbeSuccesses` | 2 | The number of successful probes required to close the breaker. |
@@ -78,7 +78,7 @@ var breaker = new Breaker(settings: new BreakerSettings
     MinimumCalls = 20, // below this, a ratio means nothing
     TripWindow = TimeSpan.FromSeconds(value: 30), // the history the ratios are measured over
     BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
-    MaxBreakDuration = TimeSpan.FromMinutes(value: 2),
+    MaximumBreakDuration = TimeSpan.FromMinutes(value: 2),
     ProbeSuccesses = 2, // two good probes to close, not one
 })
 {

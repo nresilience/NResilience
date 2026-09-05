@@ -38,7 +38,7 @@ public sealed class Guards
             MinimumCalls = 20, // below this, a ratio means nothing
             TripWindow = TimeSpan.FromSeconds(value: 30), // the history the ratios are measured over
             BreakDuration = TimeSpan.FromSeconds(value: 15), // doubles per consecutive open
-            MaxBreakDuration = TimeSpan.FromMinutes(value: 2),
+            MaximumBreakDuration = TimeSpan.FromMinutes(value: 2),
             ProbeSuccesses = 2, // two good probes to close, not one
         })
         {

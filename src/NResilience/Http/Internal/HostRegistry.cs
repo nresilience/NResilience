@@ -77,7 +77,7 @@ internal sealed class HostScope : Scoped
 ///     Host scopes, created on first sight of a host and kept until an eviction sweep drops them.
 /// </summary>
 /// <remarks>
-///     Bounded by <see cref="HttpResilienceOptions.MaxHosts" />. The bound, the sweep and the
+///     Bounded by <see cref="HttpResilienceOptions.MaximumHosts" />. The bound, the sweep and the
 ///     dictionary are <see cref="ScopeRegistry{TKey,TScope}" />'s; what is left here is the host
 ///     comparison - <see cref="StringComparer.OrdinalIgnoreCase" />, because a host is not case
 ///     sensitive and two spellings of one authority must not get two breakers.
@@ -90,7 +90,7 @@ internal sealed class HostRegistry
     {
         _scopes = new ScopeRegistry<string, HostScope>(
             host => new HostScope(policy, host, options),
-            options.MaxHosts ?? 0,
+            options.MaximumHosts ?? 0,
             StringComparer.OrdinalIgnoreCase);
     }
 

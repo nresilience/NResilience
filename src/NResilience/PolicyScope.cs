@@ -46,13 +46,13 @@ public sealed class PolicyScope<TKey>
     ///     needs a different deadline or attempt count; the per-key guards are derived from whatever it
     ///     returns, so shaping a policy does not cost the key its own breaker and budget.
     /// </param>
-    /// <param name="maxKeys">
+    /// <param name="maximumKeys">
     ///     How many keys to keep. The least-recently-seen are dropped past this, approximately - the
-    ///     same second-chance eviction <see cref="Http.HttpResilienceOptions.MaxHosts" /> uses.
+    ///     same second-chance eviction <see cref="Http.HttpResilienceOptions.MaximumHosts" /> uses.
     /// </param>
     /// <param name="comparer">How keys are compared. Defaults to <see cref="EqualityComparer{T}.Default" />.</param>
     /// <exception cref="ArgumentNullException"><paramref name="template" /> is null.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxKeys" /> is not positive.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maximumKeys" /> is not positive.</exception>
     /// <exception cref="ResilienceConfigurationException">The template cannot be executed.</exception>
     /// <remarks>
     ///     There is no unbounded mode. Unbounded keying is a memory leak with a breaker and a budget
@@ -78,12 +78,12 @@ public sealed class PolicyScope<TKey>
     ///         one.
     ///     </para>
     /// </remarks>
-    public PolicyScope(Resilience template, Func<TKey, Resilience>? shape = null, int maxKeys = 1024, IEqualityComparer<TKey>? comparer = null)
+    public PolicyScope(Resilience template, Func<TKey, Resilience>? shape = null, int maximumKeys = 1024, IEqualityComparer<TKey>? comparer = null)
     {
         ArgumentNullException.ThrowIfNull(template);
 
-        if (maxKeys < 1)
-            throw new ArgumentOutOfRangeException(nameof(maxKeys), maxKeys, "maxKeys must be at least 1; a scope is bounded by construction.");
+        if (maximumKeys < 1)
+            throw new ArgumentOutOfRangeException(nameof(maximumKeys), maximumKeys, "maximumKeys must be at least 1; a scope is bounded by construction.");
 
         // Eagerly, so a bad template throws where it is written rather than on the first call against
         // whichever key happened to arrive first. The shaped policies are validated on their own first
@@ -91,20 +91,20 @@ public sealed class PolicyScope<TKey>
         template.Validate();
 
         Template = template;
-        MaxKeys = maxKeys;
+        MaximumKeys = maximumKeys;
 
-        _scopes = new ScopeRegistry<TKey, KeyedScope>(key => new KeyedScope(shape is null ? template : shape(key), key), maxKeys, comparer);
+        _scopes = new ScopeRegistry<TKey, KeyedScope>(key => new KeyedScope(shape is null ? template : shape(key), key), maximumKeys, comparer);
     }
 
     /// <summary>The policy every key starts from, as handed in.</summary>
     public Resilience Template { get; }
 
     /// <summary>How many keys this scope keeps.</summary>
-    public int MaxKeys { get; }
+    public int MaximumKeys { get; }
 
     /// <summary>How many keys it is currently holding.</summary>
     /// <remarks>
-    ///     Approximate under concurrency, and can briefly exceed <see cref="MaxKeys" /> while a sweep
+    ///     Approximate under concurrency, and can briefly exceed <see cref="MaximumKeys" /> while a sweep
     ///     catches up: the cap bounds growth rather than pinning the count, because no lookup ever
     ///     waits on a sweep.
     /// </remarks>
@@ -117,7 +117,7 @@ public sealed class PolicyScope<TKey>
     /// <remarks>
     ///     A key that has been evicted and returns gets a fresh policy, which means a fresh breaker:
     ///     eviction discards state, and a dropped key does not remember that its breaker was open. Size
-    ///     <c>maxKeys</c> above the number of keys you expect to be active at once.
+    ///     <c>maximumKeys</c> above the number of keys you expect to be active at once.
     /// </remarks>
     public Resilience For(TKey key)
     {

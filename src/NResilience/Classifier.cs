@@ -92,7 +92,7 @@ public sealed class Classifier
     /// </summary>
     /// <example>
     ///     <code>
-    /// var db = Resilience.Default with { Classify = Classifier.Data };
+    /// var db = Resilience.Default with { Classifier = Classifier.Data };
     /// </code>
     /// </example>
     public static Classifier Data => DataHolder.Instance;
