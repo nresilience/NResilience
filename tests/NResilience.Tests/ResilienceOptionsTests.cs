@@ -27,10 +27,18 @@ public sealed class ResilienceOptionsTests
     // ---- The reason this type exists ----
 
     /// <summary>
-    ///     The correction: <c>init</c>-only scalars <i>do</i> bind now. Kept as a test rather than a
-    ///     footnote, because it is the premise the whole DTO rests on and the next binder version may
-    ///     move it again - in either direction.
+    ///     The correction: <c>init</c>-only scalars <i>do</i> bind now, on the policy and inside the
+    ///     value types it carries. Kept as a test rather than a footnote, because it is the premise the
+    ///     whole DTO rests on and the next binder version may move it again - in either direction.
     /// </summary>
+    /// <remarks>
+    ///     <c>Backoff:Max</c> is here because it used to be an exhibit in the test below: the cap was a
+    ///     computed property with no setter, so it was dropped while <c>Backoff:Jitter</c> beside it in
+    ///     the same section was honored. <see cref="NResilience.Backoff" /> now carries the same
+    ///     nullable-backed <c>init</c> properties every other value type in the library does, so the
+    ///     section binds whole. The DTO's case rests on the two failures below, which are not about
+    ///     setters at all.
+    /// </remarks>
     [Fact]
     public void The_binder_now_does_set_init_only_scalars()
     {
@@ -40,6 +48,13 @@ public sealed class ResilienceOptionsTests
 
         Assert.Equal(7, policy.Attempts);
         Assert.Equal(TimeSpan.FromSeconds(10), policy.Deadline);
+
+        var curve = new Resilience();
+
+        Config(("Backoff:Max", "00:00:05"), ("Backoff:Jitter", "None")).Bind(curve);
+
+        Assert.Equal(TimeSpan.FromSeconds(5), curve.Backoff.Max);
+        Assert.Equal(Jitter.None, curve.Backoff.Jitter);
     }
 
     /// <summary>
@@ -48,16 +63,9 @@ public sealed class ResilienceOptionsTests
     ///     <list type="number">
     ///         <item>
     ///             <description>
-    ///                 <c>Backoff:Max</c> is a computed property, so the cap is dropped - while <c>Backoff:Jitter</c>
-    ///                 beside it in the same section is honored. A section that half-applies is the worst
-    ///                 available outcome, because the half that worked is the evidence people use to conclude the
-    ///                 other half did too.
-    ///             </description>
-    ///         </item>
-    ///         <item>
-    ///             <description>
     ///                 <c>Classify</c> names a classifier and gets none, silently - so a policy configured
     ///                 <c>"Http"</c> keeps <see cref="Classifier.Default" />, which does not retry a 503.
+    ///                 A classifier is a set of predicates and no binder can conjure one from a string.
     ///             </description>
     ///         </item>
     ///         <item>
@@ -69,16 +77,17 @@ public sealed class ResilienceOptionsTests
     ///             </description>
     ///         </item>
     ///     </list>
+    ///     <para>
+    ///         Neither is a missing setter, which is why giving <see cref="NResilience.Backoff" /> its
+    ///         <c>init</c> properties fixed one exhibit and left these two exactly as they were. The
+    ///         section that half-applies is still the worst available outcome - the half that worked is
+    ///         the evidence people use to conclude the other half did too - and these two are how a
+    ///         section half-applies today.
+    ///     </para>
     /// </summary>
     [Fact]
     public void Binding_onto_the_record_is_silently_partial()
     {
-        var backoff = new Resilience();
-        Config(("Backoff:Max", "00:00:05"), ("Backoff:Jitter", "None")).Bind(backoff);
-
-        Assert.Equal(Jitter.None, backoff.Backoff.Jitter);
-        Assert.Equal(TimeSpan.FromSeconds(30), backoff.Backoff.Max);
-
         var classified = new Resilience();
         Config(("Classify", "Http")).Bind(classified);
 

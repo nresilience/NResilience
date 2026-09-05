@@ -6,18 +6,22 @@ namespace NResilience.Extensions;
 ///     <para>
 ///         This type exists because binding a configuration section directly to <see cref="Resilience" />
 ///         is <b>silently partial</b>. Measured against
-///         <c>Microsoft.Extensions.Configuration.Binder</c> 10.0.0 on both target frameworks: simple
-///         <c>init</c> scalars such as <c>Attempts</c> and <c>Deadline</c> bind, but <c>Backoff:Max</c> is
-///         dropped because the cap is a computed property, <c>Classify</c> is ignored (leaving a policy
-///         that does not retry a 503), and <c>Breaker:ConsecutiveFailures</c> constructs a live circuit
-///         breaker with default settings while ignoring the configured value.
+///         <c>Microsoft.Extensions.Configuration.Binder</c> 10.0.0 on both target frameworks: scalars and
+///         <c>init</c> properties bind - <c>Attempts</c>, <c>Deadline</c> and every term of
+///         <c>Backoff</c> among them - but <c>Classify</c> is ignored (leaving a policy that does not
+///         retry a 503), and <c>Breaker:ConsecutiveFailures</c> constructs a live circuit breaker with
+///         default settings while ignoring the configured value.
 ///     </para>
 ///     <para>
-///         Partial binding can lead to unexpected behavior; for example, if <c>Backoff:Jitter</c> is
-///         applied but <c>Backoff:Max</c> is ignored, the configuration appears to work while the
-///         resulting policy is incorrect. To eliminate this class of silent failures, the binding
-///         target is a DTO and <see cref="ToPolicy(Resilience?)" /> performs the projection manually.
-///         All three failures are gated by <c>Binding_onto_the_record_is_silently_partial</c>.
+///         Neither failure is a missing setter, and neither can be fixed by adding one: a classifier is a
+///         set of predicates that no binder can conjure from a string, and a breaker is a live, stateful
+///         guard that configuration should not be able to construct by accident. Partial binding leads to
+///         unexpected behavior - a section that sets <c>Attempts</c> and silently drops <c>Classify</c>
+///         appears to work while the resulting policy does not retry what it was told to. To eliminate
+///         this class of silent failures, the binding target is a DTO and
+///         <see cref="ToPolicy(Resilience?)" /> performs the projection manually. Both failures are gated
+///         by <c>Binding_onto_the_record_is_silently_partial</c>, and the binder's side of the line by
+///         <c>The_binder_now_does_set_init_only_scalars</c>.
 ///     </para>
 ///     <para>
 ///         All properties are nullable. A null value indicates that the property should not be overridden,
@@ -311,17 +315,17 @@ public sealed class BackoffOptions
 
         var existing = baseline.Kind == BackoffKind.Exponential ? baseline : Backoff.Default;
 
-        return Backoff.Exponential(
-                TransientBase ?? existing.TransientBase,
-                ThrottledBase ?? existing.ThrottledBase,
-                Factor ?? existing.Factor,
-                Max ?? existing.Max) with
-            {
-                Jitter = Jitter ?? baseline.Jitter,
-                MeasuredBase = MeasuredBase is { } measured
-                    ? measured.Enabled is false ? null : measured.ToMeasuredBase()
-                    : existing.MeasuredBase,
-            };
+        return existing with
+        {
+            TransientBase = TransientBase ?? existing.TransientBase,
+            ThrottledBase = ThrottledBase ?? existing.ThrottledBase,
+            Factor = Factor ?? existing.Factor,
+            Max = Max ?? existing.Max,
+            Jitter = Jitter ?? baseline.Jitter,
+            MeasuredBase = MeasuredBase is { } measured
+                ? measured.Enabled is false ? null : measured.ToMeasuredBase()
+                : existing.MeasuredBase,
+        };
     }
 }
 

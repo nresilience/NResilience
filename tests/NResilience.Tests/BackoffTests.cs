@@ -240,6 +240,116 @@ public sealed class BackoffTests
         Assert.Equal(backoff.ThrottledBase, Delay(backoff, Verdict.Throttled(), 2));
     }
 
+    [Fact]
+    public void With_changes_one_term_and_keeps_the_rest()
+    {
+        var tightened = Backoff.Exponential() with { Max = TimeSpan.FromSeconds(5) };
+
+        Assert.Equal(TimeSpan.FromSeconds(5), tightened.Max);
+        Assert.Equal(Backoff.Default.TransientBase, tightened.TransientBase);
+        Assert.Equal(Backoff.Default.ThrottledBase, tightened.ThrottledBase);
+        Assert.Equal(Backoff.Default.Factor, tightened.Factor);
+        Assert.Equal(Backoff.Default.Kind, tightened.Kind);
+    }
+
+    [Fact]
+    public void Every_term_of_the_curve_is_reachable_with_with()
+    {
+        var curve = Backoff.Default with
+        {
+            TransientBase = TimeSpan.FromMilliseconds(250),
+            ThrottledBase = TimeSpan.FromSeconds(4),
+            Factor = 3.0,
+            Max = TimeSpan.FromSeconds(45),
+            Jitter = Jitter.None,
+        };
+
+        Assert.Equal(TimeSpan.FromMilliseconds(250), curve.TransientBase);
+        Assert.Equal(TimeSpan.FromSeconds(4), curve.ThrottledBase);
+        Assert.Equal(3.0, curve.Factor);
+        Assert.Equal(TimeSpan.FromSeconds(45), curve.Max);
+
+        // And the curve Compute serves agrees with all five.
+        Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(curve, Verdict.Transient, 2));
+        Assert.Equal(TimeSpan.FromMilliseconds(750), Delay(curve, Verdict.Transient, 3));
+        Assert.Equal(TimeSpan.FromSeconds(4), Delay(curve, Verdict.Throttled(), 2));
+    }
+
+    [Fact]
+    public void A_term_set_with_with_survives_being_set_again()
+    {
+        var curve = Backoff.Default with { Max = TimeSpan.FromSeconds(5) } with { Factor = 4.0 };
+
+        Assert.Equal(TimeSpan.FromSeconds(5), curve.Max);
+        Assert.Equal(4.0, curve.Factor);
+    }
+
+    [Fact]
+    public void With_reaches_the_terms_of_a_constant_curve_too()
+    {
+        // Constant(d) sets the cap to d as well as both bases, so raising one base above it without
+        // raising the cap is clamped straight back down. That is the cap doing its job, and it is
+        // the one thing to know about `with` on a constant curve.
+        var clamped = Backoff.Constant(TimeSpan.FromMilliseconds(250)) with
+        {
+            ThrottledBase = TimeSpan.FromSeconds(2),
+            Jitter = Jitter.None,
+        };
+
+        Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(clamped, Verdict.Throttled(), 5));
+
+        var curve = clamped with { Max = TimeSpan.FromSeconds(2) };
+
+        Assert.Equal(BackoffKind.Constant, curve.Kind);
+        Assert.Equal(TimeSpan.FromMilliseconds(250), Delay(curve, Verdict.Transient, 5));
+        Assert.Equal(TimeSpan.FromSeconds(2), Delay(curve, Verdict.Throttled(), 5));
+    }
+
+    [Fact]
+    public void The_default_value_equals_the_default_preset()
+    {
+        // Equality is over the effective curve, so the instance that named nothing and the one that
+        // named every shipped default compare equal - they compute the same delays.
+        Assert.Equal(Backoff.Default, default(Backoff));
+        Assert.Equal(Backoff.Default.GetHashCode(), default(Backoff).GetHashCode());
+    }
+
+    [Fact]
+    public void A_curve_that_names_a_default_equals_one_that_left_it_alone()
+    {
+        var named = Backoff.Default with { Max = TimeSpan.FromSeconds(30) };
+
+        Assert.Equal(Backoff.Default, named);
+        Assert.Equal(Backoff.Default.GetHashCode(), named.GetHashCode());
+    }
+
+    [Fact]
+    public void Two_custom_curves_are_equal_only_when_they_share_a_delegate()
+    {
+        TimeSpan Compute(NextAttempt next) => TimeSpan.FromMilliseconds(next.Number);
+
+        Assert.Equal(Backoff.Custom(Compute), Backoff.Custom(Compute));
+        Assert.NotEqual(Backoff.Custom(Compute), Backoff.Custom(_ => TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void A_zero_factor_is_rejected_rather_than_silently_replaced()
+    {
+        // Regression: the old Normalized() identified an unconstructed value by its zero growth
+        // factor, so an explicit factor of exactly zero was rewritten as the shipped default curve
+        // and the validation message below was unreachable. Nullable-backed defaults tell the two
+        // apart, so this is reported.
+        var problems = new List<string>();
+        Backoff.Exponential(factor: 0).Validate(problems);
+
+        Assert.Contains(problems, p => p.Contains("factor must be greater than zero", StringComparison.Ordinal));
+
+        var unconstructed = new List<string>();
+        default(Backoff).Validate(unconstructed);
+
+        Assert.Empty(unconstructed);
+    }
+
     private static TimeSpan Delay(Backoff backoff, Verdict previous, int attemptNumber) =>
         backoff.Compute(new NextAttempt(attemptNumber, previous, null, Timeout.InfiniteTimeSpan, default));
 }

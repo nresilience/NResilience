@@ -21,9 +21,34 @@ order: 4
 | `TransientBase` | The base delay for a `Transient` verdict. Zero for a `Custom` curve. |
 | `ThrottledBase` | The base delay for a `Throttled` verdict. Zero for a `Custom` curve. |
 | `Factor` | The growth per attempt. |
-| `Kind` | Which curve this is: `Exponential`, `Constant`, or `Custom`. |
+| `Kind` | Which curve this is: `Exponential`, `Constant`, or `Custom`. Read-only; the factories are the only way to choose one. |
 | `MeasuredBase` | A `MeasuredBase?` that measures `TransientBase` from recent latency, or `null` to keep the configured constant. Only an `Exponential` curve may carry one. |
 | `Compute(in NextAttempt)` | Calculates the delay before the specified attempt. This value is never negative. |
+
+### Changing one term
+
+A factory chooses the curve; `with` changes one term of it. Every property except `Kind` has an
+`init` accessor, so you never have to restate the terms you are not changing:
+
+```csharp
+var slower = Backoff.Default with { Max = TimeSpan.FromMinutes(2) };
+
+slower.Max;             // 00:02:00 - the term you set
+slower.TransientBase;   // 00:00:00.1000000 - everything else is the shipped default
+slower.Factor;          // 2
+slower.Jitter;          // Jitter.Full
+```
+
+`Kind` is the exception, and deliberately: a `Custom` curve carries the delegate that computes its
+delays, and nothing but `Backoff.Custom` can supply one. A `Kind` switched away from the factory that
+built it would name a curve with nothing behind it.
+
+Two things to know when you derive from a non-exponential curve:
+
+- `Backoff.Constant(delay)` sets the cap to `delay` as well as both bases. Raising one base above the
+  cap without raising the cap is clamped straight back down.
+- `Backoff.Custom(...)` reports zero bases and no cap, and ignores every term but the delegate.
+  Setting one with `with` changes what the properties report and nothing about the delays served.
 
 ### Reading a backoff back
 
@@ -40,19 +65,10 @@ backoff.Factor;         // 2
 backoff.Max;            // 00:00:30
 ```
 
-That makes a curve round-trippable - read the properties off one `Backoff`, change one, and rebuild:
-
-```csharp
-var slower = Backoff.Exponential(
-    existing.TransientBase,
-    existing.ThrottledBase,
-    existing.Factor,
-    TimeSpan.FromMinutes(2)) with { Jitter = existing.Jitter };
-```
-
-The factories remain the only way to *construct* a `Backoff`; the properties are read-only. A
-`Backoff` built with a positive `Factor` is what `Normalized()` recognizes as constructed, so
-there is no partial-object shape to get wrong.
+The defaults are supplied on read rather than by a constructor, because `policy with { Backoff =
+default }` compiles and a struct's default instance is the one thing a constructor cannot reach. That
+is also why equality is over the *effective* curve: a value that names a default explicitly equals
+one that left it alone, and `default(Backoff)` equals `Backoff.Default`.
 
 ### Exponential backoff calculation
 For exponential backoff, the delay for attempt *n* is:
@@ -70,8 +86,6 @@ The result is capped at `Max` and then jittered. The first retry is served the b
 `Verdict.RetryAfter` wins over all backoff curves: it is honored verbatim, capped only by `Max`, with no jitter.
 
 The [executor](index.md) also keeps a delay from consuming the deadline's remaining time. If a delay would exceed the deadline, the call fails immediately with a deadline exception instead of sleeping.
-
-**Note**: `default(Backoff)` is equivalent to `Backoff.Default`.
 
 ## `MeasuredBase`
 

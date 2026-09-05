@@ -45,6 +45,19 @@ var api = Resilience.Http with
 ```
 <!-- endsnippet -->
 
+To change one term and keep the rest, use a `with` expression on a curve you already have. Every term except `Kind` is settable this way, so there is no need to restate the four knobs to move one of them:
+
+<!-- snippet: retry-backoff-with -->
+```csharp
+var api = Resilience.Http with
+{
+    // Everything else about the shipped curve is kept: the 100 ms transient base, the
+    // 1 s throttled base, the factor of 2, and full jitter.
+    Backoff = Backoff.Default with { Max = TimeSpan.FromSeconds(value: 5) },
+};
+```
+<!-- endsnippet -->
+
 Server pushback overrides the backoff curve. If a verdict carries a `RetryAfter` value - which `Classifier.Http` extracts from the `Retry-After` header on 429 or 503 responses - NResilience uses it exactly. The only limits are the `max` setting and the remaining deadline; no jitter is applied.
 
 `Backoff.Constant(delay)` and `Backoff.None` are also available. Use `Backoff.None` only if you know the dependency is not shared.

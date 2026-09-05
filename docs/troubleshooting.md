@@ -96,7 +96,7 @@ When the work eventually returns, an `OrphanedWork` event fires and names the po
 
 **Solution**: Ensure you are binding to `ResilienceOptions` via `services.AddResilience(name, section)` rather than binding directly to the `Resilience` record.
 
-**Why this happens**: Binding directly to the `Resilience` record is silently partial. `Backoff:Max` is dropped, `Classify` is ignored, and `Breaker:ConsecutiveFailures` creates a breaker with default settings while ignoring your value.
+**Why this happens**: Binding directly to the `Resilience` record is silently partial. Scalars bind, but `Classify` is ignored and `Breaker:ConsecutiveFailures` creates a breaker with default settings while ignoring your value.
 
 For more information, see [Projection via ResilienceOptions](./di/configuration.md#projection-via-resilienceoptions). Also check that the property is bindable: classifiers, `BeforeAttempt`, and `OnEvent` are lambdas and must be set in the `configure` callback.
 

@@ -139,7 +139,7 @@ The `Breaker` section mirrors [`BreakerSettings`](../reference/breaker.md) and s
 NResilience binds configuration onto `ResilienceOptions`, a flat, mutable Data Transfer Object (DTO), and the `ToPolicy` method projects that DTO into a `Resilience` policy.
 
 > [!NOTE]
-> Avoid binding a configuration section directly onto a `Resilience` instance. Direct binding is silently partial: properties like `Attempts` bind correctly, but computed properties (such as backoff caps) or complex objects (such as classifiers and circuit breakers) are ignored or incorrectly initialized. For example, `Backoff:Max` is dropped because the cap is a computed property; `Classify: "Http"` is ignored, leaving a policy that does not retry a 503; and `Breaker:ConsecutiveFailures` constructs a live circuit breaker with default settings, ignoring the value you set.
+> Avoid binding a configuration section directly onto a `Resilience` instance. Direct binding is silently partial: scalars and `init` properties bind correctly, but complex objects do not. `Classify: "Http"` is ignored, leaving a policy that does not retry a 503 - a classifier is a set of predicates and no binder can build one from a string. `Breaker:ConsecutiveFailures` is worse: it constructs a live circuit breaker with default settings, ignoring the value you set. Neither is something a setter could fix, which is why the binding target is `ResilienceOptions`.
 
 The middle case is the dangerous one, because the half that worked is the evidence people use to conclude the other half did too. The DTO ensures the final policy matches the section exactly. All three failures are gated by a test.
 

@@ -46,14 +46,18 @@ NResilience.Backoff.Backoff() -> void
 NResilience.Backoff.Compute(in NResilience.NextAttempt next) -> System.TimeSpan
 NResilience.Backoff.Equals(NResilience.Backoff other) -> bool
 NResilience.Backoff.Factor.get -> double
+NResilience.Backoff.Factor.init -> void
 NResilience.Backoff.Jitter.get -> NResilience.Jitter
 NResilience.Backoff.Jitter.init -> void
 NResilience.Backoff.Kind.get -> NResilience.BackoffKind
 NResilience.Backoff.Max.get -> System.TimeSpan
+NResilience.Backoff.Max.init -> void
 NResilience.Backoff.MeasuredBase.get -> NResilience.MeasuredBase?
 NResilience.Backoff.MeasuredBase.init -> void
 NResilience.Backoff.ThrottledBase.get -> System.TimeSpan
+NResilience.Backoff.ThrottledBase.init -> void
 NResilience.Backoff.TransientBase.get -> System.TimeSpan
+NResilience.Backoff.TransientBase.init -> void
 NResilience.BackoffKind
 NResilience.BackoffKind.Constant = 1 -> NResilience.BackoffKind
 NResilience.BackoffKind.Custom = 2 -> NResilience.BackoffKind

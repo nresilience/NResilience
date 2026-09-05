@@ -47,6 +47,24 @@ public sealed class Features
     }
 
     [Fact]
+    public void One_term_of_a_curve_can_be_changed_on_its_own()
+    {
+        // <snippet:retry-backoff-with>
+        var api = Resilience.Http with
+        {
+            // Everything else about the shipped curve is kept: the 100 ms transient base, the
+            // 1 s throttled base, the factor of 2, and full jitter.
+            Backoff = Backoff.Default with { Max = TimeSpan.FromSeconds(value: 5) },
+        };
+
+        // </snippet:retry-backoff-with>
+
+        Assert.Equal(expected: TimeSpan.FromSeconds(value: 5), actual: api.Backoff.Max);
+        Assert.Equal(expected: Backoff.Default.TransientBase, actual: api.Backoff.TransientBase);
+        Assert.Equal(expected: Backoff.Default.Factor, actual: api.Backoff.Factor);
+    }
+
+    [Fact]
     public void The_backoff_base_can_be_measured()
     {
         // <snippet:retry-backoff-adaptive>
