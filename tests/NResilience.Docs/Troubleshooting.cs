@@ -38,7 +38,7 @@ public sealed class Troubleshooting
         // invents, and on Exception.Data for an original exception it rethrew unchanged.
         var result = await api.TryRunAsync(attempt => calls.NextAsync(cancellationToken: attempt), cancellationToken: cancellationToken);
 
-        Console.WriteLine(value: result.StopReason); // AttemptsExhausted
+        Console.WriteLine(value: result.Reason); // AttemptsExhausted
         Console.WriteLine(value: result.Attempts); // 3 attempts over 0.9ms: Transient IOException (0.2ms), ...
 
         foreach (var attempt in result.Attempts)

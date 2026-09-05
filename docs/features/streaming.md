@@ -77,11 +77,11 @@ if (result.TryGetValue(out var stream))
         received.Add(item);
 }
 else
-    refused = result.StopReason;
+    refused = result.Reason;
 ```
 <!-- endsnippet -->
 
-`IsSuccess` is false for exactly the outcomes a failed `RunAsync` would have thrown from the first `MoveNextAsync`: a first element the classifier refused, a guard's rejection, a deadline, an exhausted attempt count, or whatever the source threw on its last attempt. The `StopReason`, the `Exception` and the attempt log are all on the result.
+`IsSuccess` is false for exactly the outcomes a failed `RunAsync` would have thrown from the first `MoveNextAsync`: a first element the classifier refused, a guard's rejection, a deadline, an exhausted attempt count, or whatever the source threw on its last attempt. The `Reason`, the `Exception` and the attempt log are all on the result.
 
 <!-- snippet: stream-tryrun-failure -->
 ```csharp
@@ -94,7 +94,7 @@ if (!result.IsSuccess)
 {
     // StopReason.Permanent here, carrying the CallRejectedException RunAsync would
     // have thrown, and the log of the one attempt a permanent verdict allows.
-    stopped = result.StopReason;
+    stopped = result.Reason;
     failure = result.Exception;
 }
 ```

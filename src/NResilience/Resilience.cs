@@ -207,8 +207,8 @@ public sealed partial record Resilience
     /// <summary>
     ///     First-class local admission control, checked once per attempt, inside the same classified
     ///     region the attempt itself runs in. Return <see cref="Verdict.Ok" /> to admit the attempt;
-    ///     return anything else - typically <see cref="Verdict.Refused" /> or
-    ///     <see cref="Verdict.Limited" /> - to refuse it, and the attempt is skipped and treated exactly
+    ///     return anything else - typically <see cref="Verdict.Refused" /> - to refuse it, and the
+    ///     attempt is skipped and treated exactly
     ///     as if that verdict had come back from the callback: the same log entry, the same telemetry,
     ///     the same retry-budget exemption for <see cref="Verdict.SelfImposed" />, and the same breaker
     ///     treatment.

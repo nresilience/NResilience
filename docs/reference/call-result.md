@@ -10,21 +10,21 @@ order: 2
 
 | Member | Description |
 | :--- | :--- |
-| `IsSuccess` | `true` if an attempt returned a value that the classifier identified as `Ok`. |
+| `IsSuccess` | `true` if an attempt returned a value that the classifier identified as `Ok`. This is the test a fallback branches on. |
 | `Value` | The value returned by the final attempt, or `default` if every attempt threw an exception. This is populated even on failure - for example, a final `503 Service Unavailable` response is returned so the caller can dispose of it. |
-| `HasValue` | `true` if `Value` contains a result actually returned by an attempt. |
+| `ReturnedValue` | `true` if an attempt got as far as returning something, so `Value` holds what it returned. Not the same question as `IsSuccess`: when the last attempt returned a value the classifier refused, this is `true` and `IsSuccess` is `false`. Branch on `IsSuccess` to decide whether to serve the value; branch on this one to decide whether there is something to dispose. |
 | `Exception` | The exception thrown by the last attempt, or a library-specific exception (such as a deadline timeout). |
-| `StopReason` | The reason the execution loop stopped. |
+| `Reason` | The `StopReason` the execution loop stopped for. |
 | `Attempts` | The log of all attempts made during the call. |
 | `TryGetValue(out T value)` | `true` if the call succeeded. This is the recommended method for most call sites to check for success. |
 | `ValueOrThrow()` | Returns the value if the call succeeded, otherwise rethrows the failure exception with its original stack trace intact. |
 | `ThrowIfFailed()` | Rethrows the failure exception, with its original stack trace intact, if there was one. Use it when you want the exception but not the value. |
 
-`CallResult` (the non-generic version) provides the same members without the four about a value: `Value`, `HasValue`, `TryGetValue`, and `ValueOrThrow`.
+`CallResult` (the non-generic version) provides the same members without the four about a value: `Value`, `ReturnedValue`, `TryGetValue`, and `ValueOrThrow`.
 
 **Note**: `TryRunAsync` still throws an exception if the caller's `CancellationToken` is cancelled.
 
-`CallResult<IAsyncEnumerable<T>>` - what the [streaming](../features/streaming.md#handle-the-outcome-without-exceptions) `TryRunAsync` returns - is the one shape with a rule of its own. Its `Value` is an enumeration the policy has already started, so `HasValue` is never true on a failure, and a successful value is enumerable once and implements `IAsyncDisposable`: enumerate it, or dispose it when you decide not to.
+`CallResult<IAsyncEnumerable<T>>` - what the [streaming](../features/streaming.md#handle-the-outcome-without-exceptions) `TryRunAsync` returns - is the one shape with a rule of its own. Its `Value` is an enumeration the policy has already started, so `ReturnedValue` is never true on a failure, and a successful value is enumerable once and implements `IAsyncDisposable`: enumerate it, or dispose it when you decide not to.
 
 ### Example: implement a fallback
 Use the result to serve a fallback value when a call fails:
@@ -38,7 +38,7 @@ private async Task<User> ReadUserAsync(UserCache cache, CancellationToken cancel
     if (result.TryGetValue(value: out var user))
         return user;
 
-    _logger.LogWarning(message: "Serving the cached user: {Reason} after {Attempts}", result.StopReason, result.Attempts);
+    _logger.LogWarning(message: "Serving the cached user: {Reason} after {Attempts}", result.Reason, result.Attempts);
     return cache.LastKnownGood;
 }
 ```
@@ -46,7 +46,7 @@ private async Task<User> ReadUserAsync(UserCache cache, CancellationToken cancel
 
 ## `StopReason`
 
-The `StopReason` enum says why the resilience loop stopped.
+The `StopReason` enum, carried on `Reason`, says why the resilience loop stopped.
 
 | Value | Meaning |
 | :--- | :--- |

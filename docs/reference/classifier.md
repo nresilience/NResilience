@@ -51,9 +51,9 @@ The `Retry-After` value is supported as both a delta-seconds value and an HTTP d
 | `Verdict.Transient` | A failure that may not recur. |
 | `Verdict.Permanent` | A failure that will recur. |
 | `Verdict.Throttled(TimeSpan?)` | The dependency is defending itself, potentially with a suggested retry delay. |
-| `Verdict.Limited(TimeSpan?)` | A [limiter](../features/rate-limiting.md) in this process refused the attempt. `Kind` is `Throttled` and `SelfImposed` is `true`. |
+| `Verdict.Refused(TimeSpan?)` | Local admission control - a [limiter](../features/rate-limiting.md), a distributed lock, a load shedder - refused the attempt. `Kind` is `Throttled` and `SelfImposed` is `true`. |
 
-`Verdict` implements value equality, and `SelfImposed` is part of it: `Verdict.Throttled()` and `Verdict.Limited()` are not equal. `ToString()` prints a summary such as `Throttled (retry after 2s)` or `Throttled (self-imposed, retry after 2s)`.
+`Verdict` implements value equality, and `SelfImposed` is part of it: `Verdict.Throttled()` and `Verdict.Refused()` are not equal. `ToString()` prints a summary such as `Throttled (retry after 2s)` or `Throttled (self-imposed, retry after 2s)`.
 
 ## `VerdictKind`
 
@@ -70,6 +70,6 @@ The `Retry-After` value is supported as both a delta-seconds value and an HTTP d
 Three specific verdicts are produced by the [executor](index.md) itself and cannot be overridden by a classifier:
 1. **Attempt Timeout**: Classified as `Transient`.
 2. **Caller Cancellation**: Not classified as a failure.
-3. **`RateLimitedException`**: Classified as `Verdict.Limited`, so no classifier can turn a refusal this process imposed on itself into evidence against the dependency.
+3. **`RateLimitedException`**: Classified as `Verdict.Refused`, so no classifier can turn a refusal this process imposed on itself into evidence against the dependency.
 
 **Note**: If a classifier identifies an *exception* as `Ok`, the executor treats it as `Permanent`, because an exception cannot be converted into a return value.

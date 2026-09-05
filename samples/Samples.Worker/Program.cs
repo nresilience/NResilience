@@ -58,7 +58,7 @@ var direct = await policies["api"].TryRunAsync(
     static attempt => Task.FromResult("answered"),
     CancellationToken.None);
 
-Console.WriteLine($"  -> {direct.StopReason}");
+Console.WriteLine($"  -> {direct.Reason}");
 
 Console.WriteLine();
 Console.WriteLine("A stream through the same policy, which fails to start once:");
@@ -77,7 +77,7 @@ if (stream.TryGetValue(out var updates))
     Console.WriteLine($"     the stream took {stream.Attempts.Count} attempt(s) to start, and none after it");
 }
 else
-    Console.WriteLine($"  -> {stream.StopReason}");
+    Console.WriteLine($"  -> {stream.Reason}");
 
 Console.WriteLine();
 Console.WriteLine("A call through the registered HttpClient, which sees a 503 first:");
@@ -102,7 +102,7 @@ var refused = await limited.TryRunAsync(
     },
     CancellationToken.None);
 
-Console.WriteLine($"  -> {refused.StopReason} after {refused.Attempts.Count} attempt(s)");
+Console.WriteLine($"  -> {refused.Reason} after {refused.Attempts.Count} attempt(s)");
 Console.WriteLine($"     verdict: {refused.Attempts[0].Verdict}");
 Console.WriteLine($"     retry budget spent: {budget.Utilization:P0} - a refusal that never left the process is not charged");
 

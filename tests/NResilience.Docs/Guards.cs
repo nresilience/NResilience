@@ -130,13 +130,13 @@ public sealed class Guards
         var breaker = new Breaker(settings: new BreakerSettings
         {
             Name = "search",
-            Recovery = Recovery.Over(length: 0.25), // ramp back over a quarter of the break served
+            Recovery = Recovery.Over(fraction: 0.25), // ramp back over a quarter of the break served
             BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
         });
 
         // </snippet:breaker-recovery>
 
-        Assert.Equal(expected: 0.25, actual: breaker.Settings.Recovery!.Value.Length);
+        Assert.Equal(expected: 0.25, actual: breaker.Settings.Recovery!.Value.Fraction);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class Guards
 
         // </snippet:breaker-rejection>
 
-        Assert.Equal(expected: StopReason.DependencyUnavailable, actual: result.StopReason);
+        Assert.Equal(expected: StopReason.DependencyUnavailable, actual: result.Reason);
         Assert.Equal(expected: BreakerState.Open, actual: breaker.State);
     }
 

@@ -132,8 +132,8 @@ var api = Resilience.Default with
 };
 ```
 
-`Verdict.Refused` is an alias of `Verdict.Limited` - the same verdict, named for a guard that is not
-a rate limiter. This is the general form of what the shipped rate limiter does. See [Building a custom guard](../deep-dives/admission-control.md#building-a-custom-guard) for the full recipe, including where to throw the exception.
+`Verdict.Refused` is named for what happened rather than for the mechanism, so it reads correctly for
+a guard that is not a rate limiter. This is the general form of what the shipped rate limiter does. See [Building a custom guard](../deep-dives/admission-control.md#building-a-custom-guard) for the full recipe, including where to throw the exception.
 
 ## Classify returned results
 

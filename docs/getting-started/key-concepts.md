@@ -115,7 +115,7 @@ For more information, see [Classification](../features/classification.md).
 
 ## Why a call stopped
 
-Retried calls stop when they succeed, hit a non-retryable failure, exhaust attempts, or exceed the deadline. The `StopReason` property identifies why the call stopped.
+Retried calls stop when they succeed, hit a non-retryable failure, exhaust attempts, or exceed the deadline. The `Reason` property identifies why the call stopped.
 
 `TryRunAsync` returns this reason in a `CallResult<T>` along with the value, the exception, and the attempt log. `RunAsync` rethrows the original exception so existing `catch` blocks continue to work.
 

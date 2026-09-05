@@ -208,7 +208,7 @@ public sealed class SequenceTests
         Assert.True(result.IsSuccess);
         Assert.Equal(200, result.Value);
         Assert.Equal(3, result.Attempts.Count);
-        Assert.Equal(StopReason.Succeeded, result.StopReason);
+        Assert.Equal(StopReason.Succeeded, result.Reason);
         Assert.All(result.Attempts.Take(2), a => Assert.Equal(VerdictKind.Transient, a.Verdict.Kind));
     }
 }

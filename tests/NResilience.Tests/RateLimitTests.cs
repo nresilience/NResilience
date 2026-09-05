@@ -37,28 +37,21 @@ public sealed class RateLimitTests
     // ---- The verdict ----
 
     [Fact]
-    public void Limited_is_throttling_that_knows_where_it_came_from()
+    public void Refused_is_throttling_that_knows_where_it_came_from()
     {
-        var limited = Verdict.Limited(TimeSpan.FromSeconds(2));
+        var refused = Verdict.Refused(TimeSpan.FromSeconds(2));
 
-        Assert.Equal(VerdictKind.Throttled, limited.Kind);
-        Assert.True(limited.SelfImposed);
-        Assert.Equal(TimeSpan.FromSeconds(2), limited.RetryAfter);
-    }
-
-    [Fact]
-    public void Refused_is_an_alias_of_Limited_for_a_non_rate_limiting_guard()
-    {
-        Assert.Equal(Verdict.Limited(), Verdict.Refused());
-        Assert.Equal(Verdict.Limited(TimeSpan.FromMilliseconds(200)), Verdict.Refused(TimeSpan.FromMilliseconds(200)));
+        Assert.Equal(VerdictKind.Throttled, refused.Kind);
+        Assert.True(refused.SelfImposed);
+        Assert.Equal(TimeSpan.FromSeconds(2), refused.RetryAfter);
     }
 
     [Fact]
     public void Server_throttling_and_self_throttling_are_not_the_same_verdict()
     {
-        Assert.NotEqual(Verdict.Throttled(), Verdict.Limited());
-        Assert.NotEqual(Verdict.Throttled(TimeSpan.FromSeconds(1)), Verdict.Limited(TimeSpan.FromSeconds(1)));
-        Assert.Equal(Verdict.Limited(), Verdict.Limited());
+        Assert.NotEqual(Verdict.Throttled(), Verdict.Refused());
+        Assert.NotEqual(Verdict.Throttled(TimeSpan.FromSeconds(1)), Verdict.Refused(TimeSpan.FromSeconds(1)));
+        Assert.Equal(Verdict.Refused(), Verdict.Refused());
     }
 
     [Fact]
@@ -74,8 +67,8 @@ public sealed class RateLimitTests
     [Fact]
     public void A_self_imposed_verdict_says_so_when_printed()
     {
-        Assert.Equal("Throttled (self-imposed)", Verdict.Limited().ToString());
-        Assert.Equal("Throttled (self-imposed, retry after 0.5s)", Verdict.Limited(TimeSpan.FromMilliseconds(500)).ToString());
+        Assert.Equal("Throttled (self-imposed)", Verdict.Refused().ToString());
+        Assert.Equal("Throttled (self-imposed, retry after 0.5s)", Verdict.Refused(TimeSpan.FromMilliseconds(500)).ToString());
         Assert.Equal("Throttled (retry after 0.5s)", Verdict.Throttled(TimeSpan.FromMilliseconds(500)).ToString());
     }
 
@@ -97,7 +90,7 @@ public sealed class RateLimitTests
         // called, so there was nothing to fund.
         Assert.False(result.IsSuccess);
         Assert.Equal(4, result.Attempts.Count);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.Equal(0, budget.Utilization);
     }
 
@@ -139,7 +132,7 @@ public sealed class RateLimitTests
         var result = await RunAsync(policy, _ => throw new RateLimitedException(limiter: "api"), time);
 
         Assert.Equal(3, result.Attempts.Count);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
     }
 
     // ---- The breaker ----

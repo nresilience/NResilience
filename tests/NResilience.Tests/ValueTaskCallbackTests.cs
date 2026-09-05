@@ -104,7 +104,7 @@ public sealed class ValueTaskCallbackTests
         var result = await TestPolicy.Instant.TryRunAsync(ValueTask<int> (ct) => ValueTask.FromException<int>(new TimeoutException()));
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.IsType<TimeoutException>(result.Exception);
     }
 

@@ -481,7 +481,7 @@ public sealed partial record Resilience
                     // was never contacted. The verdict is Throttled - so the long backoff curve and the
                     // limiter's own hint apply - and carries the flag that keeps the retry budget from
                     // being charged for a call that never left.
-                    verdict = Verdict.Limited(limited.RetryAfter);
+                    verdict = Verdict.Refused(limited.RetryAfter);
                     error = limited;
                 }
                 catch (Exception exception)
@@ -717,7 +717,7 @@ public sealed partial record Resilience
                 }
                 catch (RateLimitedException limited)
                 {
-                    verdict = Verdict.Limited(limited.RetryAfter);
+                    verdict = Verdict.Refused(limited.RetryAfter);
                     error = limited;
                 }
                 catch (Exception exception)

@@ -153,6 +153,7 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **`Logging`**: A string of `"Off"`, `"Default"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
+- **`Deadline`, `AttemptTimeout`**: Use `"Infinite"` for no bound (`"None"` and `"Unbounded"` are the same word, case-insensitive). The duration `Timeout.InfiniteTimeSpan` round-trips as - `"-00:00:00.0010000"` - still binds too. Any other word fails at registration rather than leaving the call quietly unbounded.
 
 ### Every section has an `Enabled`
 

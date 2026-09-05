@@ -13,7 +13,7 @@ public sealed class CallResultTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(42, result.Value);
-        Assert.Equal(StopReason.Succeeded, result.StopReason);
+        Assert.Equal(StopReason.Succeeded, result.Reason);
         Assert.Single(result.Attempts);
         Assert.Equal(VerdictKind.Ok, result.Attempts[0].Verdict.Kind);
         Assert.True(result.TryGetValue(out var value));
@@ -47,8 +47,8 @@ public sealed class CallResultTests
         var result = await (TestPolicy.Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException<int>(new IOException()));
 
         Assert.False(result.IsSuccess);
-        Assert.False(result.HasValue);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.False(result.ReturnedValue);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.IsType<IOException>(result.Exception);
         Assert.Equal(2, result.Attempts.Count);
         Assert.False(result.TryGetValue(out _));
@@ -59,7 +59,7 @@ public sealed class CallResultTests
     {
         var result = await TestPolicy.Instant.TryRunAsync(ct => Task.FromException<int>(new InvalidOperationException()));
 
-        Assert.Equal(StopReason.Permanent, result.StopReason);
+        Assert.Equal(StopReason.Permanent, result.Reason);
         Assert.Single(result.Attempts);
     }
 
@@ -75,10 +75,10 @@ public sealed class CallResultTests
         var result = await policy.TryRunAsync(ct => Task.FromResult(503));
 
         Assert.False(result.IsSuccess);
-        Assert.True(result.HasValue);
+        Assert.True(result.ReturnedValue);
         Assert.Equal(503, result.Value);
         Assert.Null(result.Exception);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public sealed class CallResultTests
         var result = await (TestPolicy.Instant with { Attempts = 2 }).TryRunAsync(ct => Task.FromException(new IOException()));
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.Equal(2, result.Attempts.Count);
         Assert.Throws<IOException>(result.ThrowIfFailed);
     }
@@ -195,7 +195,7 @@ public sealed class CallResultTests
         });
 
         Assert.False(result.IsSuccess);
-        Assert.False(result.HasValue);
+        Assert.False(result.ReturnedValue);
         Assert.Equal(503, result.Value);
     }
 
@@ -218,7 +218,7 @@ public sealed class CallResultTests
         });
 
         Assert.False(result.IsSuccess);
-        Assert.False(result.HasValue);
+        Assert.False(result.ReturnedValue);
         Assert.Equal(503, result.Value);
     }
 

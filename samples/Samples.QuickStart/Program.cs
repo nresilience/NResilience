@@ -22,7 +22,7 @@ Console.WriteLine("A call that never succeeds, reported rather than thrown:");
 var broken = new FakeDependency(int.MaxValue);
 var result = await api.TryRunAsync(attempt => broken.ReadAsync(attempt), CancellationToken.None);
 
-Console.WriteLine($"  -> {result.StopReason}");
+Console.WriteLine($"  -> {result.Reason}");
 Console.WriteLine($"  -> {result.Attempts}");
 Console.WriteLine($"  -> falling back to the cached value: {(result.TryGetValue(out var v) ? v : "(cached)")}");
 

@@ -197,13 +197,13 @@ Two successful probes indicate the dependency can serve some traffic. Closing th
 var breaker = new Breaker(settings: new BreakerSettings
 {
     Name = "search",
-    Recovery = Recovery.Over(length: 0.25), // ramp back over a quarter of the break served
+    Recovery = Recovery.Over(fraction: 0.25), // ramp back over a quarter of the break served
     BreakDuration = TimeSpan.FromSeconds(value: 15), // so this one ramps over about 4 s
 });
 ```
 <!-- endsnippet -->
 
-The ramp's length is derived from the break duration just served, clamped between `MinimumLength` and `MaximumLength`. Its pace depends on the performance of admitted calls: a slow call halves the admitted fraction, and `ProbeSuccesses` consecutive fast calls increase it, with the clock providing an upper bound. A single failure during the ramp re-opens the breaker with an increased break duration.
+The ramp's length is derived from the break duration just served, clamped between `MinimumDuration` and `MaximumDuration`. Its pace depends on the performance of admitted calls: a slow call halves the admitted fraction, and `ProbeSuccesses` consecutive fast calls increase it, with the clock providing an upper bound. A single failure during the ramp re-opens the breaker with an increased break duration.
 
 **The failure mode.** A ramp against a dependency that answers but remains slow will not complete: it stays at `InitialFraction`, and `State` reports `Recovering` indefinitely. This is reported as degraded to the [health check](../di/health-checks.md). This is deliberate; it indicates the dependency is up but not ready, and re-opening would deny the trickle of traffic it needs to warm. Alert on a breaker recovering for longer than its break. See [Breaker internals](../deep-dives/breaker-internals.md#the-recovery-cliff).
 

@@ -137,7 +137,7 @@ public sealed class EventRecorderTests
         var result = await pending;
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
+        Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
         Assert.True(events.Contains(CallEventKind.DeadlineExceeded));
         Assert.False(events.Contains(CallEventKind.Retrying));
     }

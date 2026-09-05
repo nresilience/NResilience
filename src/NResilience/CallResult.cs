@@ -10,17 +10,26 @@ namespace NResilience;
 /// <typeparam name="T">What the callback returns.</typeparam>
 public readonly struct CallResult<T>
 {
-    internal CallResult(bool isSuccess, T? value, bool hasValue, Exception? exception, StopReason stopReason, AttemptLog attempts)
+    internal CallResult(bool isSuccess, T? value, bool returnedValue, Exception? exception, StopReason reason, AttemptLog attempts)
     {
         IsSuccess = isSuccess;
         Value = value;
-        HasValue = hasValue;
+        ReturnedValue = returnedValue;
         Exception = exception;
-        StopReason = stopReason;
+        Reason = reason;
         Attempts = attempts;
     }
 
-    /// <summary>True when an attempt returned a value the classifier called <see cref="VerdictKind.Ok" />.</summary>
+    /// <summary>
+    ///     True when the call succeeded: an attempt returned a value the classifier called
+    ///     <see cref="VerdictKind.Ok" />. This is the test a fallback branches on.
+    ///     <para>
+    ///         Not the same question as <see cref="ReturnedValue" />, and the difference is the whole
+    ///         reason <c>TryRunAsync</c> exists. The two disagree in exactly one case: the last attempt
+    ///         returned a value the classifier refused - a final <c>503</c>, say. There
+    ///         <see cref="ReturnedValue" /> is true and this is false.
+    ///     </para>
+    /// </summary>
     public bool IsSuccess { get; }
 
     /// <summary>
@@ -28,20 +37,30 @@ public readonly struct CallResult<T>
     ///     <para>
     ///         This is populated even when <see cref="IsSuccess" /> is false, because an answer the policy
     ///         judged a failure is still an answer - a final <c>503 HttpResponseMessage</c> is a value the
-    ///         caller needs, not least so it can be disposed. <see cref="HasValue" /> says whether it is
-    ///         real.
+    ///         caller needs, not least so it can be disposed. <see cref="ReturnedValue" /> says whether it
+    ///         is real.
     ///     </para>
     /// </summary>
     public T? Value { get; }
 
-    /// <summary>True when <see cref="Value" /> holds a value an attempt actually returned.</summary>
-    public bool HasValue { get; }
+    /// <summary>
+    ///     True when an attempt got as far as returning something, so <see cref="Value" /> holds what it
+    ///     returned rather than <c>default</c>.
+    ///     <para>
+    ///         Not <c>Nullable&lt;T&gt;.HasValue</c>, and not <see cref="IsSuccess" />. It says an answer
+    ///         arrived, not that the answer was good: when the last attempt returned a value the
+    ///         classifier refused, this is true and <see cref="IsSuccess" /> is false. Branch on
+    ///         <see cref="IsSuccess" /> to decide whether to serve the value; branch on this one to
+    ///         decide whether there is something to dispose.
+    ///     </para>
+    /// </summary>
+    public bool ReturnedValue { get; }
 
     /// <summary>What the last attempt threw, or the deadline exception the library invented.</summary>
     public Exception? Exception { get; }
 
     /// <summary>Why the call stopped.</summary>
-    public StopReason StopReason { get; }
+    public StopReason Reason { get; }
 
     /// <summary>Everything that happened. Always populated on this type.</summary>
     public AttemptLog Attempts { get; }
@@ -63,7 +82,7 @@ public readonly struct CallResult<T>
     public void ThrowIfFailed()
     {
         if (!IsSuccess)
-            CallFailure.Rethrow(Exception, StopReason, Attempts);
+            CallFailure.Rethrow(Exception, Reason, Attempts);
     }
 
     /// <summary>The value, or the failure - rethrown with its original stack intact.</summary>
@@ -73,7 +92,7 @@ public readonly struct CallResult<T>
         if (IsSuccess)
             return Value!;
 
-        CallFailure.Rethrow(Exception, StopReason, Attempts);
+        CallFailure.Rethrow(Exception, Reason, Attempts);
 
         // Unreachable: Rethrow is [DoesNotReturn], which the compiler's definite-return analysis
         // does not consult.
@@ -83,16 +102,16 @@ public readonly struct CallResult<T>
 
 /// <summary>
 ///     The void form of <see cref="CallResult{T}" />. The same members, minus the four about a value:
-///     <see cref="CallResult{T}.Value" />, <see cref="CallResult{T}.HasValue" />,
+///     <see cref="CallResult{T}.Value" />, <see cref="CallResult{T}.ReturnedValue" />,
 ///     <see cref="CallResult{T}.TryGetValue" /> and <see cref="CallResult{T}.ValueOrThrow" />.
 /// </summary>
 public readonly struct CallResult
 {
-    internal CallResult(bool isSuccess, Exception? exception, StopReason stopReason, AttemptLog attempts)
+    internal CallResult(bool isSuccess, Exception? exception, StopReason reason, AttemptLog attempts)
     {
         IsSuccess = isSuccess;
         Exception = exception;
-        StopReason = stopReason;
+        Reason = reason;
         Attempts = attempts;
     }
 
@@ -103,7 +122,7 @@ public readonly struct CallResult
     public Exception? Exception { get; }
 
     /// <summary>Why the call stopped.</summary>
-    public StopReason StopReason { get; }
+    public StopReason Reason { get; }
 
     /// <summary>Everything that happened. Always populated on this type.</summary>
     public AttemptLog Attempts { get; }
@@ -112,7 +131,7 @@ public readonly struct CallResult
     public void ThrowIfFailed()
     {
         if (!IsSuccess)
-            CallFailure.Rethrow(Exception, StopReason, Attempts);
+            CallFailure.Rethrow(Exception, Reason, Attempts);
     }
 }
 
@@ -124,11 +143,11 @@ public readonly struct CallResult
 internal static class CallFailure
 {
     [DoesNotReturn]
-    internal static void Rethrow(Exception? exception, StopReason stopReason, AttemptLog attempts)
+    internal static void Rethrow(Exception? exception, StopReason reason, AttemptLog attempts)
     {
         if (exception is not null)
             ExceptionDispatchInfo.Capture(exception).Throw();
 
-        throw new CallRejectedException(stopReason, attempts);
+        throw new CallRejectedException(reason, attempts);
     }
 }

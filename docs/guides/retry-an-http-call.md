@@ -28,7 +28,7 @@ private static async Task<Order?> ReadOrderAsync(HttpClient client, string id, C
         return order;
 
     // The failure, and everything that led to it, without an exception.
-    Console.WriteLine(value: $"{result.StopReason}: {result.Attempts}");
+    Console.WriteLine(value: $"{result.Reason}: {result.Attempts}");
     return null;
 }
 ```
@@ -68,7 +68,7 @@ In an application with a DI container, call [`AddResilience()`](../di/index.md) 
 
 ## Handle the outcome
 
-Use `result.TryGetValue(out var order)` to check whether the call succeeded. If it failed, `result.StopReason` says why:
+Use `result.TryGetValue(out var order)` to check whether the call succeeded. If it failed, `result.Reason` says why:
 
 - `AttemptsExhausted`: All retry attempts were used.
 - `DeadlineExceeded`: The overall time limit was reached.

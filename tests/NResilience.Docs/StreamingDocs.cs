@@ -125,7 +125,7 @@ public sealed class StreamingDocs
                 received.Add(item);
         }
         else
-            refused = result.StopReason;
+            refused = result.Reason;
         // </snippet:stream-tryrun>
 
         Assert.Equal(expected: [1, 2, 3], actual: received);
@@ -156,7 +156,7 @@ public sealed class StreamingDocs
         {
             // StopReason.Permanent here, carrying the CallRejectedException RunAsync would
             // have thrown, and the log of the one attempt a permanent verdict allows.
-            stopped = result.StopReason;
+            stopped = result.Reason;
             failure = result.Exception;
         }
         // </snippet:stream-tryrun-failure>

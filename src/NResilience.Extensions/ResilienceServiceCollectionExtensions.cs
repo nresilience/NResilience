@@ -109,7 +109,11 @@ public static class ResilienceServiceCollectionExtensions
         // renamed key would bind nothing and leave the policy quietly on its defaults, which reads
         // identical to a policy that was never configured. See ResiliencePolicies.Build for where the
         // binder's complaint is turned into one of ours.
-        services.Configure<ResilienceOptions>(name, section, binder => binder.ErrorOnUnknownConfiguration = true);
+        // TimeBoundAliases so "Deadline": "Infinite" binds; see it for why the word exists.
+        services.Configure<ResilienceOptions>(
+            name,
+            TimeBoundAliases.Around(section),
+            binder => binder.ErrorOnUnknownConfiguration = true);
 
         if (configure is not null)
             services.Configure<ResiliencePolicyRegistration>(name, r => r.Configure = configure);

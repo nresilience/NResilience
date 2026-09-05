@@ -581,7 +581,7 @@ public sealed partial record Resilience
             }
             catch (RateLimitedException limited)
             {
-                legVerdict = Verdict.Limited(limited.RetryAfter);
+                legVerdict = Verdict.Refused(limited.RetryAfter);
                 legError = limited;
             }
             catch (Exception exception)

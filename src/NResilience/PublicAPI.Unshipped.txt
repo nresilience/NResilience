@@ -165,15 +165,15 @@ NResilience.CallResult.Attempts.get -> NResilience.AttemptLog!
 NResilience.CallResult.CallResult() -> void
 NResilience.CallResult.Exception.get -> System.Exception?
 NResilience.CallResult.IsSuccess.get -> bool
-NResilience.CallResult.StopReason.get -> NResilience.StopReason
+NResilience.CallResult.Reason.get -> NResilience.StopReason
 NResilience.CallResult.ThrowIfFailed() -> void
 NResilience.CallResult<T>
 NResilience.CallResult<T>.Attempts.get -> NResilience.AttemptLog!
 NResilience.CallResult<T>.CallResult() -> void
 NResilience.CallResult<T>.Exception.get -> System.Exception?
-NResilience.CallResult<T>.HasValue.get -> bool
 NResilience.CallResult<T>.IsSuccess.get -> bool
-NResilience.CallResult<T>.StopReason.get -> NResilience.StopReason
+NResilience.CallResult<T>.Reason.get -> NResilience.StopReason
+NResilience.CallResult<T>.ReturnedValue.get -> bool
 NResilience.CallResult<T>.ThrowIfFailed() -> void
 NResilience.CallResult<T>.TryGetValue(out T value) -> bool
 NResilience.CallResult<T>.Value.get -> T?
@@ -293,14 +293,14 @@ NResilience.RateLimitedException.RateLimitedException(string! message, System.Ex
 NResilience.RateLimitedException.RetryAfter.get -> System.TimeSpan?
 NResilience.Recovery
 NResilience.Recovery.Equals(NResilience.Recovery other) -> bool
+NResilience.Recovery.Fraction.get -> double
+NResilience.Recovery.Fraction.init -> void
 NResilience.Recovery.InitialFraction.get -> double
 NResilience.Recovery.InitialFraction.init -> void
-NResilience.Recovery.Length.get -> double
-NResilience.Recovery.Length.init -> void
-NResilience.Recovery.MaximumLength.get -> System.TimeSpan
-NResilience.Recovery.MaximumLength.init -> void
-NResilience.Recovery.MinimumLength.get -> System.TimeSpan
-NResilience.Recovery.MinimumLength.init -> void
+NResilience.Recovery.MaximumDuration.get -> System.TimeSpan
+NResilience.Recovery.MaximumDuration.init -> void
+NResilience.Recovery.MinimumDuration.get -> System.TimeSpan
+NResilience.Recovery.MinimumDuration.init -> void
 NResilience.Recovery.Recovery() -> void
 NResilience.Resilience
 NResilience.Resilience.<Clone>$() -> NResilience.Resilience!
@@ -491,7 +491,7 @@ static NResilience.MeasuredBase.operator !=(NResilience.MeasuredBase left, NResi
 static NResilience.MeasuredBase.operator ==(NResilience.MeasuredBase left, NResilience.MeasuredBase right) -> bool
 static NResilience.MeasuredValues.operator !=(NResilience.MeasuredValues left, NResilience.MeasuredValues right) -> bool
 static NResilience.MeasuredValues.operator ==(NResilience.MeasuredValues left, NResilience.MeasuredValues right) -> bool
-static NResilience.Recovery.Over(double length = 0.25) -> NResilience.Recovery
+static NResilience.Recovery.Over(double fraction = 0.25) -> NResilience.Recovery
 static NResilience.Recovery.operator !=(NResilience.Recovery left, NResilience.Recovery right) -> bool
 static NResilience.Recovery.operator ==(NResilience.Recovery left, NResilience.Recovery right) -> bool
 static NResilience.Resilience.Default.get -> NResilience.Resilience!
@@ -523,7 +523,6 @@ static NResilience.RetryBudget.Shared(string! name, double fraction = 0.1, int m
 static NResilience.SlowCalls.Above(double multiple = 3) -> NResilience.SlowCalls
 static NResilience.SlowCalls.operator !=(NResilience.SlowCalls left, NResilience.SlowCalls right) -> bool
 static NResilience.SlowCalls.operator ==(NResilience.SlowCalls left, NResilience.SlowCalls right) -> bool
-static NResilience.Verdict.Limited(System.TimeSpan? retryAfter = null) -> NResilience.Verdict
 static NResilience.Verdict.Ok.get -> NResilience.Verdict
 static NResilience.Verdict.OkTask.get -> System.Threading.Tasks.Task<NResilience.Verdict>!
 static NResilience.Verdict.Permanent.get -> NResilience.Verdict

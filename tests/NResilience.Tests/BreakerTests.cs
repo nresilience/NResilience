@@ -564,7 +564,7 @@ public sealed class BreakerTests
 
         Assert.False(ran);
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, result.Reason);
         Assert.IsType<CallRejectedException>(result.Exception);
         Assert.Empty(result.Attempts);
     }
@@ -588,7 +588,7 @@ public sealed class BreakerTests
         Assert.False(call.IsCompleted);
 
         time.Advance(TimeSpan.FromMilliseconds(1));
-        Assert.Equal(StopReason.DependencyUnavailable, (await call).StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, (await call).Reason);
     }
 
     [Fact]
@@ -604,7 +604,7 @@ public sealed class BreakerTests
         // A refusal must never make a call overrun the budget its caller set.
         time.Advance(TimeSpan.FromMilliseconds(40));
 
-        Assert.Equal(StopReason.DependencyUnavailable, (await call).StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, (await call).Reason);
     }
 
     [Fact]
@@ -651,7 +651,7 @@ public sealed class BreakerTests
 
         // The first attempt tripped the breaker, so the second was refused. Reporting the
         // IOException would describe a call that was never made.
-        Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, result.Reason);
         Assert.Single(result.Attempts);
 
         var rejected = Assert.IsType<CallRejectedException>(result.Exception);

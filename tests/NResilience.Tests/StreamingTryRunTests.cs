@@ -23,8 +23,8 @@ public sealed class StreamingTryRunTests
         var result = await policy.TryRunAsync(streams.Next);
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.HasValue);
-        Assert.Equal(StopReason.Succeeded, result.StopReason);
+        Assert.True(result.ReturnedValue);
+        Assert.Equal(StopReason.Succeeded, result.Reason);
         Assert.Null(result.Exception);
 
         // The first element is already in hand when the await returns, and it is the first element
@@ -100,9 +100,9 @@ public sealed class StreamingTryRunTests
         var result = await policy.TryRunAsync(streams.Next);
 
         Assert.False(result.IsSuccess);
-        Assert.False(result.HasValue);
+        Assert.False(result.ReturnedValue);
         Assert.Null(result.Value);
-        Assert.Equal(StopReason.Permanent, result.StopReason);
+        Assert.Equal(StopReason.Permanent, result.Reason);
         Assert.IsType<CallRejectedException>(result.Exception);
         Assert.Single(result.Attempts);
 
@@ -127,7 +127,7 @@ public sealed class StreamingTryRunTests
 
         Assert.False(result.IsSuccess);
         Assert.Same(fault, result.Exception);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.Equal(3, result.Attempts.Count);
 
         // The same log the throwing form attaches to the exception it throws.
@@ -155,7 +155,7 @@ public sealed class StreamingTryRunTests
         var result = await pending;
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
+        Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
         Assert.IsType<DeadlineExceededException>(result.Exception);
     }
 
@@ -172,7 +172,7 @@ public sealed class StreamingTryRunTests
         var result = await policy.TryRunAsync(streams.Next);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, result.Reason);
         Assert.IsType<CallRejectedException>(result.Exception);
         Assert.Equal(0, streams.CallCount);
     }

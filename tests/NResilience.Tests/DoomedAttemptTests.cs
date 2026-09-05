@@ -49,7 +49,7 @@ public sealed class DoomedAttemptTests
         var result = await FailAsync(policy, time, TimeSpan.FromMilliseconds(450));
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
+        Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
         Assert.Single(result.Attempts);
     }
 
@@ -74,7 +74,7 @@ public sealed class DoomedAttemptTests
 
         // The same stop reason. What differs is that a second request reached a dependency nobody was
         // going to wait for.
-        Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
+        Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
         Assert.Equal(2, result.Attempts.Count);
     }
 
@@ -180,7 +180,7 @@ public sealed class DoomedAttemptTests
         var call = FailAsync(policy, time, TimeSpan.FromMilliseconds(600), TimeSpan.FromMilliseconds(1500));
         var result = await call.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
+        Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
         Assert.Single(result.Attempts);
     }
 

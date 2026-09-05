@@ -392,7 +392,7 @@ internal static class Program
 
         failures += Check(
             "library: a refusal reports DependencyUnavailable",
-            refused.StopReason == StopReason.DependencyUnavailable && refused.Exception is CallRejectedException);
+            refused.Reason == StopReason.DependencyUnavailable && refused.Exception is CallRejectedException);
 
         breaker.Reset();
         failures += Check("library: Reset closes the breaker", breaker.State == BreakerState.Closed);
@@ -409,7 +409,7 @@ internal static class Program
 
         failures += Check(
             "library: an exhausted budget refuses the retry",
-            throttled.StopReason == StopReason.BudgetExhausted && throttled.Attempts.Count == 1);
+            throttled.Reason == StopReason.BudgetExhausted && throttled.Attempts.Count == 1);
 
         return failures;
     }
@@ -443,6 +443,7 @@ internal static class Program
                 ["Resilience:api:Preset"] = "Http",
                 ["Resilience:api:Attempts"] = "4",
                 ["Resilience:api:Deadline"] = "00:00:20",
+                ["Resilience:api:AttemptTimeout"] = "Infinite",
                 ["Resilience:api:Backoff:MaximumDelay"] = "00:00:01",
                 ["Resilience:api:Breaker:ConsecutiveFailures"] = "2",
                 ["Resilience:api:Logging"] = "Verbose",
@@ -468,6 +469,7 @@ internal static class Program
         failures += Check("configuration binds under AOT (attempts)", api.Attempts == 4);
         failures += Check("configuration binds under AOT (deadline)", api.Deadline == TimeSpan.FromSeconds(20));
         failures += Check("configuration binds under AOT (backoff cap)", api.Backoff.MaximumDelay == TimeSpan.FromSeconds(1));
+        failures += Check("\"Infinite\" binds under AOT", api.AttemptTimeout == Timeout.InfiniteTimeSpan);
         failures += Check("the preset resolves under AOT", ReferenceEquals(api.Classifier, Classifier.Http));
         failures += Check("a configured breaker is live under AOT", api.Breaker is { Settings.ConsecutiveFailures: 2 });
         failures += Check("the policy is named after its registration", api.Name == "api");

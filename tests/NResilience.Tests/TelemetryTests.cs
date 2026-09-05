@@ -427,7 +427,7 @@ public sealed class TelemetryTests
 
         var result = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time);
 
-        Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
+        Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
         Assert.Equal(1, recorder.CountOf(CallEventKind.DeadlineExceeded));
 
         // The backoff would outlast the deadline, so the call stops rather than sleeping through
@@ -459,13 +459,13 @@ public sealed class TelemetryTests
 
         // Two failing attempts trip it; the operation still reports its own failure.
         var first = await RunAsync(policy, static ct => Task.FromException<int>(new IOException("down")), time);
-        Assert.Equal(StopReason.AttemptsExhausted, first.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, first.Reason);
         Assert.Equal(1, recorder.CountOf(CallEventKind.BreakerOpened));
         Assert.Equal(BreakerState.Open, breaker.State);
 
         var second = await RunAsync(policy, static ct => Task.FromResult(1), time);
 
-        Assert.Equal(StopReason.DependencyUnavailable, second.StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, second.Reason);
 
         var rejected = recorder.Single(CallEventKind.RejectedByBreaker);
         Assert.Equal(1, rejected.AttemptNumber);
@@ -572,7 +572,7 @@ public sealed class TelemetryTests
 
         var result = await RunAsync(policy, static ct => Task.FromResult(1), time);
 
-        Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, result.Reason);
         Assert.Equal([CallEventKind.RejectedByBreaker], recorder.Kinds);
     }
 
@@ -597,7 +597,7 @@ public sealed class TelemetryTests
 
         for (var i = 0; i < 40 && last != StopReason.BudgetExhausted; i++)
         {
-            last = (await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time)).StopReason;
+            last = (await RunAsync(policy, static ct => Task.FromException<int>(new IOException("flaky")), time)).Reason;
         }
 
         Assert.Equal(StopReason.BudgetExhausted, last);

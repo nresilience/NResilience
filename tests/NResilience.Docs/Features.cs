@@ -164,7 +164,7 @@ public sealed class Features
         var result = await pending;
 
         Assert.IsType<AttemptTimeoutException>(@object: result.Exception);
-        Assert.Equal(expected: StopReason.AttemptsExhausted, actual: result.StopReason);
+        Assert.Equal(expected: StopReason.AttemptsExhausted, actual: result.Reason);
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public sealed class Features
 
         // </snippet:deadline-handle-exception>
 
-        Assert.Equal(expected: StopReason.DeadlineExceeded, actual: result.StopReason);
+        Assert.Equal(expected: StopReason.DeadlineExceeded, actual: result.Reason);
     }
 
     [Fact]
@@ -295,7 +295,7 @@ public sealed class Features
 
         // Stopped by the caller's 200 ms rather than by the policy's own 30 s, and reported against the
         // deadline that actually applied.
-        Assert.Equal(expected: StopReason.DeadlineExceeded, actual: result.StopReason);
+        Assert.Equal(expected: StopReason.DeadlineExceeded, actual: result.Reason);
 
         // At most the 200 ms the caller sent - the inbound deadline is measured against the system clock
         // here, because that is the clock the snippet's Begin defaults to.

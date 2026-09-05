@@ -78,7 +78,7 @@ Each concern in the original pipeline maps to one place in the flat model. None 
 
 ### Why the cache check is not in `Admit`
 
-`Admit` is `Func<NextAttempt, Task<Verdict>>?`. It returns a verdict: `Ok` to admit the attempt, or `Refused`/`Limited` to refuse it. A cache hit is a value, not a verdict, so it does not fit `Admit`'s contract. Checking the cache at the top of the callback serves the hit without calling the dependency, and a miss falls through to the real call. See [the callback is the seam](../deep-dives/admission-control.md#the-callback-is-the-seam) for the full reasoning.
+`Admit` is `Func<NextAttempt, Task<Verdict>>?`. It returns a verdict: `Ok` to admit the attempt, or `Refused` to refuse it. A cache hit is a value, not a verdict, so it does not fit `Admit`'s contract. Checking the cache at the top of the callback serves the hit without calling the dependency, and a miss falls through to the real call. See [the callback is the seam](../deep-dives/admission-control.md#the-callback-is-the-seam) for the full reasoning.
 
 ### Why the auth refresh is not in the callback
 
@@ -92,7 +92,7 @@ Each concern in the original pipeline maps to one place in the flat model. None 
 return result.TryGetValue(out var user) ? user : cache.LastKnownGood;
 ```
 
-If the call succeeded, `TryGetValue` returns the value. If it failed, `result.StopReason` tells you why - `Permanent`, `AttemptsExhausted`, `DeadlineExceeded`, `BudgetExhausted`, or `DependencyUnavailable` - and you serve the fallback. The full list is in [`CallResult<T>`](../reference/call-result.md).
+If the call succeeded, `TryGetValue` returns the value. If it failed, `result.Reason` tells you why - `Permanent`, `AttemptsExhausted`, `DeadlineExceeded`, `BudgetExhausted`, or `DependencyUnavailable` - and you serve the fallback. The full list is in [`CallResult<T>`](../reference/call-result.md).
 
 ## When to go deeper
 

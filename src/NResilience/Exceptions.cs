@@ -261,7 +261,7 @@ public sealed class AttemptTimeoutException : TimeoutException, IResilienceFailu
 ///     anything else in this process that said no before the call left it. Nothing reached the
 ///     dependency.
 ///     <para>
-///         Classified <see cref="Verdict.Limited" /> by the executor itself, never by a user predicate, for
+///         Classified <see cref="Verdict.Refused" /> by the executor itself, never by a user predicate, for
 ///         the same reason <see cref="AttemptTimeoutException" /> is: a classifier that turned this into
 ///         <see cref="VerdictKind.Transient" /> would feed the breaker evidence about a dependency that was
 ///         never called, and open a circuit against a healthy service because this process throttled
@@ -275,7 +275,7 @@ public sealed class AttemptTimeoutException : TimeoutException, IResilienceFailu
 ///     </para>
 ///     <para>
 ///         This type is not required to get that treatment. Any exception a classifier maps to
-///         <see cref="Verdict.Limited" /> reaches the executor's general exception-classification path
+///         <see cref="Verdict.Refused" /> reaches the executor's general exception-classification path
 ///         and is handled identically - see "Building a custom guard" in the admission control deep
 ///         dive. Throwing this type directly is simply the shortest path when a name like "rate
 ///         limiter" already fits.

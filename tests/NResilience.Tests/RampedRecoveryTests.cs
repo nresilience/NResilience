@@ -149,7 +149,7 @@ public sealed class RampedRecoveryTests
     [Fact]
     public void The_ramp_length_is_clamped_at_both_ends()
     {
-        var recovery = Recovery.Over() with { MinimumLength = TimeSpan.FromSeconds(2), MaximumLength = TimeSpan.FromSeconds(20) };
+        var recovery = Recovery.Over() with { MinimumDuration = TimeSpan.FromSeconds(2), MaximumDuration = TimeSpan.FromSeconds(20) };
 
         // A one-second break would be a 250 ms ramp, which is a cliff with extra state.
         Assert.Equal(TimeSpan.FromSeconds(2), recovery.RampFor(TimeSpan.FromSeconds(1)));
@@ -308,14 +308,14 @@ public sealed class RampedRecoveryTests
             Time = time,
             Recovery = Recovery.Over(0) with
             {
-                MinimumLength = TimeSpan.FromSeconds(10),
-                MaximumLength = TimeSpan.FromSeconds(5),
+                MinimumDuration = TimeSpan.FromSeconds(10),
+                MaximumDuration = TimeSpan.FromSeconds(5),
                 InitialFraction = 1,
             },
         }));
 
-        Assert.Contains("Recovery.Length", caught.Message, StringComparison.Ordinal);
-        Assert.Contains("Recovery.MaximumLength", caught.Message, StringComparison.Ordinal);
+        Assert.Contains("Recovery.Fraction", caught.Message, StringComparison.Ordinal);
+        Assert.Contains("Recovery.MaximumDuration", caught.Message, StringComparison.Ordinal);
         Assert.Contains("Recovery.InitialFraction", caught.Message, StringComparison.Ordinal);
     }
 
@@ -324,8 +324,8 @@ public sealed class RampedRecoveryTests
     {
         var spelled = Recovery.Over() with
         {
-            MinimumLength = TimeSpan.FromSeconds(1),
-            MaximumLength = TimeSpan.FromSeconds(30),
+            MinimumDuration = TimeSpan.FromSeconds(1),
+            MaximumDuration = TimeSpan.FromSeconds(30),
             InitialFraction = 0.05,
         };
 
@@ -356,7 +356,7 @@ public sealed class RampedRecoveryTests
         time.Advance(TimeSpan.FromMilliseconds(100));
         var result = await call;
 
-        Assert.Equal(StopReason.DependencyUnavailable, result.StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, result.Reason);
 
         var rejected = Assert.IsType<CallRejectedException>(result.Exception);
 

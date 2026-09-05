@@ -132,7 +132,7 @@ public readonly struct Attempt
         // The one place the origin flag matters on the way out: a reader of the log can tell a limiter
         // this process runs from a 429 the dependency sent.
         VerdictKind.Throttled => (_packed & Verdict.SelfImposedFlag) != 0
-            ? Verdict.Limited()
+            ? Verdict.Refused()
             : Verdict.Throttled(),
         _ => Verdict.Permanent,
     };

@@ -156,7 +156,7 @@ public sealed class DeadlinePropagationTests
         });
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.Equal(3, attempts);
     }
 

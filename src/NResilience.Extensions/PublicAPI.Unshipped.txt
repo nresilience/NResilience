@@ -174,14 +174,14 @@ NResilience.Extensions.RateLimiterExtensions
 NResilience.Extensions.RecoveryOptions
 NResilience.Extensions.RecoveryOptions.Enabled.get -> bool?
 NResilience.Extensions.RecoveryOptions.Enabled.set -> void
+NResilience.Extensions.RecoveryOptions.Fraction.get -> double?
+NResilience.Extensions.RecoveryOptions.Fraction.set -> void
 NResilience.Extensions.RecoveryOptions.InitialFraction.get -> double?
 NResilience.Extensions.RecoveryOptions.InitialFraction.set -> void
-NResilience.Extensions.RecoveryOptions.Length.get -> double?
-NResilience.Extensions.RecoveryOptions.Length.set -> void
-NResilience.Extensions.RecoveryOptions.MaximumLength.get -> System.TimeSpan?
-NResilience.Extensions.RecoveryOptions.MaximumLength.set -> void
-NResilience.Extensions.RecoveryOptions.MinimumLength.get -> System.TimeSpan?
-NResilience.Extensions.RecoveryOptions.MinimumLength.set -> void
+NResilience.Extensions.RecoveryOptions.MaximumDuration.get -> System.TimeSpan?
+NResilience.Extensions.RecoveryOptions.MaximumDuration.set -> void
+NResilience.Extensions.RecoveryOptions.MinimumDuration.get -> System.TimeSpan?
+NResilience.Extensions.RecoveryOptions.MinimumDuration.set -> void
 NResilience.Extensions.RecoveryOptions.RecoveryOptions() -> void
 NResilience.Extensions.ResilienceHealthOptions
 NResilience.Extensions.ResilienceHealthOptions.BreakerOpenStatus.get -> Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus

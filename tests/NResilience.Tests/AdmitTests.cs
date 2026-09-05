@@ -207,7 +207,7 @@ public sealed class AdmitTests
         var result = await RunAsync(policy, _ => Task.FromResult(1), time);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
     }
 
     [Fact]

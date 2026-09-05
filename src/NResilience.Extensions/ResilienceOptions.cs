@@ -84,10 +84,22 @@ public sealed class ResilienceOptions
     /// </summary>
     public int? Attempts { get; set; }
 
-    /// <summary><see cref="Resilience.Deadline" />. Use <c>"-00:00:00.0010000"</c> - <see cref="Timeout.InfiniteTimeSpan" /> - for no bound.</summary>
+    /// <summary>
+    ///     <see cref="Resilience.Deadline" /> - the wall-clock budget for the entire call. Use
+    ///     <c>"Infinite"</c> for no bound.
+    /// </summary>
+    /// <remarks>
+    ///     <c>"None"</c> and <c>"Unbounded"</c> are accepted as the same word, case-insensitively, and so
+    ///     is the duration <see cref="Timeout.InfiniteTimeSpan" /> round-trips as
+    ///     (<c>"-00:00:00.0010000"</c>).
+    /// </remarks>
     public TimeSpan? Deadline { get; set; }
 
-    /// <summary><see cref="Resilience.AttemptTimeout" />.</summary>
+    /// <summary>
+    ///     <see cref="Resilience.AttemptTimeout" /> - the ceiling on one attempt. Use <c>"Infinite"</c>
+    ///     to leave <see cref="Deadline" /> as the only bound.
+    /// </summary>
+    /// <remarks>Takes the same words as <see cref="Deadline" />.</remarks>
     public TimeSpan? AttemptTimeout { get; set; }
 
     /// <summary>
@@ -745,7 +757,7 @@ public sealed class BreakerOptions
     /// <summary>
     ///     <see cref="BreakerSettings.Recovery" /> - hand the traffic back over a ramp rather than a
     ///     cliff. A section of its own, so <c>"Recovery": {}</c> turns it on at its defaults,
-    ///     <c>"Recovery": { "Length": 0.5 }</c> changes the one number, and
+    ///     <c>"Recovery": { "Fraction": 0.5 }</c> changes the one number, and
     ///     <c>"Recovery": { "Enabled": false }</c> turns it back off.
     /// </summary>
     public RecoveryOptions? Recovery { get; set; }
@@ -923,41 +935,41 @@ public sealed class RecoveryOptions
     public bool? Enabled { get; set; }
 
     /// <summary>
-    ///     <see cref="NResilience.Recovery.Length" /> - how long the ramp lasts, as a fraction of the
+    ///     <see cref="NResilience.Recovery.Fraction" /> - how long the ramp lasts, as a fraction of the
     ///     break just served. Defaults to 0.25, and must be above zero - <c>"Enabled": false</c> is how
     ///     a section turns the ramp off.
     /// </summary>
-    public double? Length { get; set; }
+    public double? Fraction { get; set; }
 
-    /// <summary><see cref="NResilience.Recovery.MinimumLength" />.</summary>
-    public TimeSpan? MinimumLength { get; set; }
+    /// <summary><see cref="NResilience.Recovery.MinimumDuration" />.</summary>
+    public TimeSpan? MinimumDuration { get; set; }
 
-    /// <summary><see cref="NResilience.Recovery.MaximumLength" />.</summary>
-    public TimeSpan? MaximumLength { get; set; }
+    /// <summary><see cref="NResilience.Recovery.MaximumDuration" />.</summary>
+    public TimeSpan? MaximumDuration { get; set; }
 
     /// <summary><see cref="NResilience.Recovery.InitialFraction" /> - the fraction of calls the ramp starts by admitting.</summary>
     public double? InitialFraction { get; set; }
 
     /// <summary>Projects onto the value the breaker carries. Every unset property keeps its own default.</summary>
     /// <returns>The configuration.</returns>
-    /// <exception cref="ResilienceConfigurationException"><see cref="Length" /> is zero, which used to be the off switch.</exception>
+    /// <exception cref="ResilienceConfigurationException"><see cref="Fraction" /> is zero, which used to be the off switch.</exception>
     internal Recovery ToRecovery()
     {
-        if (Length is 0)
+        if (Fraction is 0)
         {
             throw RetiredOffSwitch.For(
                 "Recovery",
-                nameof(Length),
+                nameof(Fraction),
                 "A ramp lasting none of the break is not a ramp anyone could mean.");
         }
 
-        var recovery = Recovery.Over(Length ?? 0.25);
+        var recovery = Recovery.Over(Fraction ?? 0.25);
 
-        if (MinimumLength is { } minimum)
-            recovery = recovery with { MinimumLength = minimum };
+        if (MinimumDuration is { } minimum)
+            recovery = recovery with { MinimumDuration = minimum };
 
-        if (MaximumLength is { } maximum)
-            recovery = recovery with { MaximumLength = maximum };
+        if (MaximumDuration is { } maximum)
+            recovery = recovery with { MaximumDuration = maximum };
 
         if (InitialFraction is { } initial)
             recovery = recovery with { InitialFraction = initial };

@@ -326,13 +326,13 @@ public sealed class BudgetTests
         // The one token in the bucket funds one retry, so the first operation makes two attempts.
         var first = await RunAsync(policy, Failing, time);
         Assert.Equal(2, calls);
-        Assert.Equal(StopReason.BudgetExhausted, first.StopReason);
+        Assert.Equal(StopReason.BudgetExhausted, first.Reason);
 
         // The next operation still gets its first attempt - a budget throttles retries, never the
         // call the caller actually asked for.
         var second = await RunAsync(policy, Failing, time);
         Assert.Equal(3, calls);
-        Assert.Equal(StopReason.BudgetExhausted, second.StopReason);
+        Assert.Equal(StopReason.BudgetExhausted, second.Reason);
         Assert.Single(second.Attempts);
     }
 
@@ -355,7 +355,7 @@ public sealed class BudgetTests
 
         var result = await RunAsync(policy, _ => Task.FromException<int>(new IOException("down")), time);
 
-        Assert.Equal(StopReason.BudgetExhausted, result.StopReason);
+        Assert.Equal(StopReason.BudgetExhausted, result.Reason);
 
         var rejected = Assert.IsType<CallRejectedException>(result.Exception);
         Assert.IsType<IOException>(rejected.InnerException);

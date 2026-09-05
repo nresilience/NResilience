@@ -267,7 +267,7 @@ public sealed class AdaptiveAttemptTimeoutTests
         var result = await HangAsync(policy, time, TimeSpan.FromMilliseconds(200));
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.DeadlineExceeded, result.StopReason);
+        Assert.Equal(StopReason.DeadlineExceeded, result.Reason);
         Assert.Single(result.Attempts);
     }
 

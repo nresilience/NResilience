@@ -111,7 +111,7 @@ public sealed class HedgeTests
 
         Assert.False(events.Contains(CallEventKind.HedgeStarted));
         Assert.False(race.Result.IsSuccess);
-        Assert.Equal(StopReason.DependencyUnavailable, race.Result.StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, race.Result.Reason);
     }
 
     /// <summary>
@@ -316,7 +316,7 @@ public sealed class HedgeTests
         Assert.Equal(BreakerState.HalfOpen, breaker.State);
 
         // The slot is taken, so nothing else gets through.
-        Assert.Equal(StopReason.DependencyUnavailable, (await RunAsync(single, _ => Task.FromResult(1), time)).StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, (await RunAsync(single, _ => Task.FromResult(1), time)).Reason);
 
         // Now let the stranded leg finish. Its clean-up runs, disposes what it produced, and - before
         // the fix - handed back a probe slot it never held.
@@ -331,7 +331,7 @@ public sealed class HedgeTests
         await Task.Delay(20);
 
         // The probe is still the only call in flight, so the breaker still refuses everything else.
-        Assert.Equal(StopReason.DependencyUnavailable, (await RunAsync(single, _ => Task.FromResult(1), time)).StopReason);
+        Assert.Equal(StopReason.DependencyUnavailable, (await RunAsync(single, _ => Task.FromResult(1), time)).Reason);
 
         probing.TrySetResult();
         await probe;
@@ -437,7 +437,7 @@ public sealed class HedgeTests
 
         // The accumulated value is still what the caller is handed: a failed answer is an answer.
         Assert.False(result.IsSuccess);
-        Assert.True(result.HasValue);
+        Assert.True(result.ReturnedValue);
         Assert.Equal(0, result.Value);
     }
 
@@ -548,7 +548,7 @@ public sealed class HedgeTests
 
         // Two attempts, both in flight at once, and no third: the hedge used the retry.
         Assert.Equal(2, calls);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.Single(events.OfKind(CallEventKind.HedgeStarted));
     }
 

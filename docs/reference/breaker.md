@@ -95,11 +95,11 @@ The `BreakerState` enum defines the breaker's states:
 
 | Property | Default | Description |
 | :--- | :--- | :--- |
-| `Length` | N/A | How long the ramp lasts, as a fraction of the break just served. Must be greater than 0. |
-| `MinimumLength` | 1 s | The shortest ramp, however brief the break was. |
-| `MaximumLength` | 30 s | The longest ramp, however long the break was. The bound on what the feature can cost. |
+| `Fraction` | N/A | How long the ramp lasts, as a fraction of the break just served. Must be greater than 0. |
+| `MinimumDuration` | 1 s | The shortest ramp, however brief the break was. |
+| `MaximumDuration` | 30 s | The longest ramp, however long the break was. The bound on what the feature can cost. |
 | `InitialFraction` | 0.05 | The fraction of *calls* the ramp admits when it starts, and the floor it never drops below. Must be in (0, 1). |
-| `Over(double length = 0.25)` | N/A | The static factory. |
+| `Over(double fraction = 0.25)` | N/A | The static factory. |
 
 ### Implementation details
 

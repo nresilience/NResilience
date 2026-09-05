@@ -32,8 +32,8 @@ public sealed class PackedFieldTests
         var after = TimeSpan.FromMilliseconds(1234.5678);
 
         Assert.Equal(after, Verdict.Throttled(after).RetryAfter);
-        Assert.Equal(after, Verdict.Limited(after).RetryAfter);
-        Assert.True(Verdict.Limited(after).SelfImposed);
+        Assert.Equal(after, Verdict.Refused(after).RetryAfter);
+        Assert.True(Verdict.Refused(after).SelfImposed);
         Assert.False(Verdict.Throttled(after).SelfImposed);
     }
 
@@ -46,7 +46,7 @@ public sealed class PackedFieldTests
     public void A_negative_pushback_reads_back_as_zero()
     {
         Assert.Equal(TimeSpan.Zero, Verdict.Throttled(TimeSpan.FromSeconds(-5)).RetryAfter);
-        Assert.Equal(TimeSpan.Zero, Verdict.Limited(TimeSpan.FromSeconds(-5)).RetryAfter);
+        Assert.Equal(TimeSpan.Zero, Verdict.Refused(TimeSpan.FromSeconds(-5)).RetryAfter);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public sealed class PackedFieldTests
         {
             Attempts = 2,
             Backoff = Backoff.None,
-            Classifier = Classifier.Default.OnResult<int>(static _ => Verdict.Limited(TimeSpan.FromSeconds(30))),
+            Classifier = Classifier.Default.OnResult<int>(static _ => Verdict.Refused(TimeSpan.FromSeconds(30))),
         };
 
         var result = await policy.TryRunAsync(static _ => Task.FromResult(0));

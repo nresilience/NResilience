@@ -76,7 +76,7 @@ var result = await api.TryRunAsync(attempt => FetchAsync(cancellationToken: atte
 if (!result.TryGetValue(value: out var user))
 {
     // Why it stopped, and everything that happened on the way.
-    Console.WriteLine(value: result.StopReason); // AttemptsExhausted
+    Console.WriteLine(value: result.Reason); // AttemptsExhausted
     Console.WriteLine(value: result.Attempts); // 2 attempts over 1.2ms: Transient IOException (0.6ms), ...
 }
 ```

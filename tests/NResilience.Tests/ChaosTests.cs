@@ -85,7 +85,7 @@ public sealed class ChaosTests
         var result = await (TestPolicy.InstantHttp with { Attempts = 2 }).TryRunAsync(work);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal(StopReason.AttemptsExhausted, result.StopReason);
+        Assert.Equal(StopReason.AttemptsExhausted, result.Reason);
         Assert.Null(result.Exception);
 
         // Classified from the status code, by Classifier.Http's own result rule.

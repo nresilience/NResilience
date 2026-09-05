@@ -23,7 +23,7 @@ So the kind stays `Throttled` - the honest reading anyway: something is defendin
 ```csharp
 public bool SelfImposed { get; }
 
-public static Verdict Limited(TimeSpan? retryAfter = null);
+public static Verdict Refused(TimeSpan? retryAfter = null);
 ```
 
 Everything that already handles throttling therefore handles a refusal, unchanged. The long backoff curve applies. `RetryAfter` is honored verbatim. `Breaker.RecordCore` returns early for anything that is not `Transient`, so a refusal cannot open a circuit against a dependency that was never called.
@@ -102,9 +102,9 @@ var result = await policy.RunAsync(async ct =>
 }, cancellationToken);
 ```
 
-This works because `Verdict.Refused` (an alias of `Verdict.Limited`, named for a guard that is not a
-rate limiter) is not specific to rate limiting - its summary says it is for "a rate limiter, a
-concurrency limit, or anything else in this process that said no before the call left it" - and
+This works because `Verdict.Refused` is not specific to rate limiting - its summary says it is for "a
+rate limiter, a concurrency limit, a distributed lock, a consensus check, a load shedder - anything in
+this process that said no before the call left it" - and
 because the budget and the breaker key off `SelfImposed`, not the exception type.
 `RateLimitedException` gets special-cased in the executor only because the shipped limiters throw it
 directly; a classifier rule reaches the identical code path through the ordinary
@@ -120,7 +120,7 @@ That is why a guard belongs in the callback, not as a matter of taste.
 
 `Resilience.Admit` is `Func<NextAttempt, Task<Verdict>>?`, checked once per attempt, in the same
 classified region the attempt itself runs in. Return `Verdict.Ok` to admit the attempt; return
-anything else - typically `Verdict.Refused` or `Verdict.Limited` - to refuse it. The attempt is
+anything else - typically `Verdict.Refused` - to refuse it. The attempt is
 skipped and processed exactly as if the callback had produced that verdict: the same log entry, the
 same telemetry, the same retry-budget exemption for `SelfImposed`, and the same breaker treatment.
 
@@ -156,12 +156,12 @@ var policy = Resilience.Default with
 {
     Admit = _ => gate.Wait(0)
         ? Verdict.OkTask
-        : Task.FromResult(Verdict.Limited(TimeSpan.FromMilliseconds(50))),
+        : Task.FromResult(Verdict.Refused(TimeSpan.FromMilliseconds(50))),
 };
 ```
 
 `Verdict.TransientTask` and `Verdict.PermanentTask` are the same thing for the other two constant
-verdicts. There is no cached task for `Throttled`, `Limited` or `Refused`: each takes a pushback, so
+verdicts. There is no cached task for `Throttled` or `Refused`: each takes a pushback, so
 there is no single value to cache - and a guard that refuses is on the slow path anyway, where the
 retry it causes costs far more than the task wrapping its answer.
 

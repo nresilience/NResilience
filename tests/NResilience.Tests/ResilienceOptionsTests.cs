@@ -405,7 +405,7 @@ public sealed class ResilienceOptionsTests
     [InlineData("Budget:Fraction", "Budget")]
     [InlineData("Breaker:SlowCalls:Multiple", "SlowCalls")]
     [InlineData("Breaker:Failures:Multiple", "Failures")]
-    [InlineData("Breaker:Recovery:Length", "Recovery")]
+    [InlineData("Breaker:Recovery:Fraction", "Recovery")]
     [InlineData("Hedge:WinRate:Minimum", "Hedge.WinRate")]
     public void A_retired_off_switch_names_the_one_that_replaced_it(string key, string section)
     {
@@ -488,7 +488,7 @@ public sealed class ResilienceOptionsTests
     [InlineData("MaxDelay", "MaxDelay")]
     [InlineData("BudgetFraction", "BudgetFraction")]
     [InlineData("Breaker:Window", "Window")]
-    [InlineData("Breaker:Recovery:Fraction", "Fraction")]
+    [InlineData("Breaker:Recovery:Ratio", "Ratio")]
     [InlineData("Adaptivee", "Adaptivee")]
     public void A_key_the_dto_does_not_have_fails_at_resolution(string key, string named)
     {
@@ -519,7 +519,7 @@ public sealed class ResilienceOptionsTests
                 ("Budget:Fraction", "0.25"),
                 ("AttemptCeiling:Multiple", "5"),
                 ("Breaker:TripWindow", "00:00:30"),
-                ("Breaker:Recovery:Length", "0.5"),
+                ("Breaker:Recovery:Fraction", "0.5"),
                 ("Breaker:SlowCalls:Enabled", "false")));
 
         using var provider = services.BuildServiceProvider();
@@ -528,8 +528,80 @@ public sealed class ResilienceOptionsTests
         Assert.Equal(TimeSpan.FromSeconds(4), policy.Backoff.MaximumDelay);
         Assert.Equal(5, policy.AttemptCeiling!.Value.Multiple);
         Assert.Equal(TimeSpan.FromSeconds(30), policy.Breaker!.Settings.TripWindow);
-        Assert.Equal(0.5, policy.Breaker.Settings.Recovery!.Value.Length);
+        Assert.Equal(0.5, policy.Breaker.Settings.Recovery!.Value.Fraction);
         Assert.Null(policy.Breaker.Settings.SlowCalls);
+    }
+
+    // ---- "No bound" is a word ----
+
+    /// <summary>
+    ///     Timeout.InfiniteTimeSpan is minus one millisecond, so the binder round-trips it as
+    ///     "-00:00:00.0010000". Nobody edits that into appsettings.Production.json during an incident,
+    ///     so the two time bounds take the word instead - three spellings of it, case-insensitively.
+    /// </summary>
+    /// <param name="word">What the section says.</param>
+    [Theory]
+    [InlineData("Infinite")]
+    [InlineData("None")]
+    [InlineData("Unbounded")]
+    [InlineData("infinite")]
+    [InlineData("  Infinite  ")]
+    public void No_bound_is_a_word_on_both_time_bounds(string word)
+    {
+        var services = new ServiceCollection();
+        services.AddResilience("api", Config(("Deadline", word), ("AttemptTimeout", word)));
+
+        using var provider = services.BuildServiceProvider();
+        var policy = provider.GetRequiredService<IResiliencePolicies>()["api"];
+
+        Assert.Equal(Timeout.InfiniteTimeSpan, policy.Deadline);
+        Assert.Equal(Timeout.InfiniteTimeSpan, policy.AttemptTimeout);
+    }
+
+    /// <summary>The duration the word replaces still binds, and so does every ordinary bound.</summary>
+    [Fact]
+    public void The_duration_form_of_no_bound_still_binds()
+    {
+        var services = new ServiceCollection();
+
+        services.AddResilience(
+            "api",
+            Config(("Deadline", Timeout.InfiniteTimeSpan.ToString()), ("AttemptTimeout", "00:00:03")));
+
+        using var provider = services.BuildServiceProvider();
+        var policy = provider.GetRequiredService<IResiliencePolicies>()["api"];
+
+        Assert.Equal(Timeout.InfiniteTimeSpan, policy.Deadline);
+        Assert.Equal(TimeSpan.FromSeconds(3), policy.AttemptTimeout);
+    }
+
+    /// <summary>
+    ///     A word that is not one of the three is still the binder's problem, so a misspelling fails at
+    ///     resolution rather than quietly leaving the call unbounded.
+    /// </summary>
+    [Fact]
+    public void A_word_that_is_not_one_of_the_three_still_fails()
+    {
+        var services = new ServiceCollection();
+        services.AddResilience("api", Config(("Deadline", "Forever")));
+
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
+
+        Assert.Throws<ResilienceConfigurationException>(() => _ = policies["api"]);
+    }
+
+    /// <summary>The words are the two time bounds' own, so a duration elsewhere is untouched by them.</summary>
+    [Fact]
+    public void The_words_belong_to_the_two_time_bounds_only()
+    {
+        var services = new ServiceCollection();
+        services.AddResilience("api", Config(("Backoff:MaximumDelay", "None")));
+
+        using var provider = services.BuildServiceProvider();
+        var policies = provider.GetRequiredService<IResiliencePolicies>();
+
+        Assert.Throws<ResilienceConfigurationException>(() => _ = policies["api"]);
     }
 
     /// <summary>A named budget is the shared one, which is the opt-in the design insists is an opt-in.</summary>
@@ -751,16 +823,16 @@ public sealed class ResilienceOptionsTests
         var options = new ResilienceOptions();
 
         Config(
-            ("Breaker:Recovery:Length", "0.5"),
-            ("Breaker:Recovery:MinimumLength", "00:00:02"),
-            ("Breaker:Recovery:MaximumLength", "00:01:00"),
+            ("Breaker:Recovery:Fraction", "0.5"),
+            ("Breaker:Recovery:MinimumDuration", "00:00:02"),
+            ("Breaker:Recovery:MaximumDuration", "00:01:00"),
             ("Breaker:Recovery:InitialFraction", "0.1")).Bind(options);
 
         var recovery = options.ToPolicy().Breaker!.Settings.Recovery!.Value;
 
-        Assert.Equal(0.5, recovery.Length);
-        Assert.Equal(TimeSpan.FromSeconds(2), recovery.MinimumLength);
-        Assert.Equal(TimeSpan.FromMinutes(1), recovery.MaximumLength);
+        Assert.Equal(0.5, recovery.Fraction);
+        Assert.Equal(TimeSpan.FromSeconds(2), recovery.MinimumDuration);
+        Assert.Equal(TimeSpan.FromMinutes(1), recovery.MaximumDuration);
         Assert.Equal(0.1, recovery.InitialFraction);
     }
 

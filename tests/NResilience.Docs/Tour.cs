@@ -69,7 +69,7 @@ public sealed class Tour
         if (result.TryGetValue(value: out var user))
             return user;
 
-        _logger.LogWarning(message: "Serving the cached user: {Reason} after {Attempts}", result.StopReason, result.Attempts);
+        _logger.LogWarning(message: "Serving the cached user: {Reason} after {Attempts}", result.Reason, result.Attempts);
         return cache.LastKnownGood;
     }
 

@@ -43,7 +43,7 @@ public sealed class Guides
             return order;
 
         // The failure, and everything that led to it, without an exception.
-        Console.WriteLine(value: $"{result.StopReason}: {result.Attempts}");
+        Console.WriteLine(value: $"{result.Reason}: {result.Attempts}");
         return null;
     }
 

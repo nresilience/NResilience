@@ -144,7 +144,7 @@ public readonly struct Verdict : IEquatable<Verdict>
     /// </summary>
     /// <example>
     ///     <code>
-    /// Admit = _ => Gate.Wait(0) ? Verdict.OkTask : Task.FromResult(Verdict.Limited()),
+    /// Admit = _ => Gate.Wait(0) ? Verdict.OkTask : Task.FromResult(Verdict.Refused()),
     /// </code>
     /// </example>
     /// <remarks>
@@ -161,7 +161,7 @@ public readonly struct Verdict : IEquatable<Verdict>
     ///     </para>
     ///     <para>
     ///         One for each verdict this type exposes as a constant. The factory methods -
-    ///         <see cref="Throttled" />, <see cref="Limited" /> and <see cref="Refused" /> - take a
+    ///         <see cref="Throttled" /> and <see cref="Refused" /> - take a
     ///         pushback and so have no single value to cache; a guard that refuses is on the slow path
     ///         anyway, where the retry it causes costs far more than the task wrapping its answer.
     ///     </para>
@@ -180,28 +180,24 @@ public readonly struct Verdict : IEquatable<Verdict>
     public static Verdict Throttled(TimeSpan? retryAfter = null) => new(VerdictKind.Throttled, retryAfter);
 
     /// <summary>
-    ///     Local admission control refused the attempt: a rate limiter, a concurrency limit, or anything
-    ///     else in this process that said no before the call left it.
+    ///     Local admission control refused the attempt: a rate limiter, a concurrency limit, a
+    ///     distributed lock, a consensus check, a load shedder - anything in this process that said no
+    ///     before the call left it.
     ///     <para>
     ///         Throttling, because that is what it is - retried on the long backoff curve, honoring
-    ///         <paramref name="retryAfter" /> verbatim when the limiter supplied one. It is never counted as
+    ///         <paramref name="retryAfter" /> verbatim when the guard supplied one. It is never counted as
     ///         evidence against the dependency, and never charged to the retry budget; see
     ///         <see cref="SelfImposed" />.
     ///     </para>
-    /// </summary>
-    /// <param name="retryAfter">When the limiter said a permit would be available, if it said.</param>
-    /// <returns>A self-imposed throttled verdict.</returns>
-    public static Verdict Limited(TimeSpan? retryAfter = null) => new(VerdictKind.Throttled, retryAfter, true);
-
-    /// <summary>
-    ///     An alias for <see cref="Limited" />, for a classifier rule that is not a rate limiter. Both
-    ///     produce the identical verdict; this name is for a hand-rolled admission-control guard - a
-    ///     distributed lock, a consensus check, a load shedder - where "limited" would misdescribe what
-    ///     refused the attempt. See the admission control deep dive for the full pattern.
+    ///     <para>
+    ///         Named for what happened rather than for the mechanism, so a hand-rolled guard that is not
+    ///         a rate limiter reads correctly too. See the admission control deep dive for the full
+    ///         pattern.
+    ///     </para>
     /// </summary>
     /// <param name="retryAfter">When the guard said it would allow another attempt, if it said.</param>
     /// <returns>A self-imposed throttled verdict.</returns>
-    public static Verdict Refused(TimeSpan? retryAfter = null) => Limited(retryAfter);
+    public static Verdict Refused(TimeSpan? retryAfter = null) => new(VerdictKind.Throttled, retryAfter, true);
 
     /// <inheritdoc />
     public bool Equals(Verdict other) => _packed == other._packed && _retryAfterPlusOne == other._retryAfterPlusOne;
