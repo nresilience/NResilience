@@ -253,7 +253,9 @@ public sealed class AdaptiveBackoffTests
         // now be a microsecond and the base would be pinned to the bottom of the band.
         for (var i = 0; i < 60; i++)
         {
-            await policy.TryRunAsync<int>(_ =>
+            // The explicit return type is what tells a never-returning lambda apart from a
+            // streaming source: TryRunAsync has both a Task<T> and an IAsyncEnumerable<T> overload.
+            await policy.TryRunAsync(Task<int> (_) =>
             {
                 time.Advance(TimeSpan.FromMicroseconds(1));
                 throw new IOException();

@@ -25,6 +25,13 @@ namespace NResilience;
 public sealed partial record Resilience
 {
     /// <summary>
+    ///     Why a hedged policy cannot start a stream, in one place because all four streaming entry
+    ///     points refuse for the same reason.
+    /// </summary>
+    private const string HedgedStreamRefusal =
+        "A policy with Hedge cannot run a streaming call: a hedge is a concurrent second copy of a value-returning attempt, and two interleaved enumerables is a buffering problem, not a hedge. Use a policy without Hedge for the IAsyncEnumerable<T> overloads of RunAsync and TryRunAsync; the same policy still runs calls.";
+
+    /// <summary>
     ///     Runs a cold source, retrying until its first element is yielded, then handing the rest of
     ///     the enumeration to the caller untouched.
     ///     <para>
@@ -62,8 +69,7 @@ public sealed partial record Resilience
         // returning an iterator rather than an iterator itself.
         if (Hedge is not null)
         {
-            throw new ResilienceConfigurationException(
-                "A policy with Hedge cannot run a streaming call: a hedge is a concurrent second copy of a value-returning attempt, and two interleaved enumerables is a buffering problem, not a hedge. Use a policy without Hedge for RunAsync over IAsyncEnumerable<T>; the same policy still runs calls.");
+            throw new ResilienceConfigurationException(HedgedStreamRefusal);
         }
 
         // A policy that imposes nothing hands back the source's own enumerable. Whether that is
@@ -75,7 +81,7 @@ public sealed partial record Resilience
             return source(cancellationToken);
 
         return ExecuteStreamAsync<VoidResult, T, StatelessStreamStarter<VoidResult, T>>(
-            new StatelessStreamStarter<VoidResult, T>(source), default, cancellationToken);
+            new StatelessStreamStarter<VoidResult, T>(source), default, null, cancellationToken);
     }
 
     /// <summary>
@@ -98,15 +104,151 @@ public sealed partial record Resilience
 
         if (Hedge is not null)
         {
-            throw new ResilienceConfigurationException(
-                "A policy with Hedge cannot run a streaming call: a hedge is a concurrent second copy of a value-returning attempt, and two interleaved enumerables is a buffering problem, not a hedge. Use a policy without Hedge for RunAsync over IAsyncEnumerable<T>; the same policy still runs calls.");
+            throw new ResilienceConfigurationException(HedgedStreamRefusal);
         }
 
         if (IsPassthrough)
             return source(state, cancellationToken);
 
         return ExecuteStreamAsync<TState, T, StatefulStreamStarter<TState, T>>(
+            new StatefulStreamStarter<TState, T>(source), state, null, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Starts a cold source and reports the outcome instead of throwing. The streaming form of
+    ///     <see cref="TryRunAsync{T}(Func{CancellationToken, Task{T}}, CancellationToken)" />, and what
+    ///     replaces a fallback for a stream - a fallback is an <c>if</c>.
+    ///     <para>
+    ///         <b>The await ends at the first element</b>, which is the same success point the
+    ///         throwing form uses: the returned <see cref="ValueTask{TResult}" /> completes once the
+    ///         policy has started the stream, pulled one element and classified it - or given up. So
+    ///         <see cref="CallResult{T}.IsSuccess" /> answers the question a stream can actually be
+    ///         asked before it is consumed, and the retries, the backoff and the guards have all
+    ///         already happened by the time you read it.
+    ///     </para>
+    ///     <para>
+    ///         <b>Everything after the first element is still the consumer's.</b> A fault at element
+    ///         nine throws from <c>MoveNextAsync</c> exactly as it does under <c>RunAsync</c>; it is
+    ///         not folded into the result, because the result was decided before that element existed.
+    ///         Only the outcomes a failed <c>RunAsync</c> would have thrown at the first
+    ///         <c>MoveNextAsync</c> - a guard's refusal, a deadline, an exhausted attempt count, a
+    ///         first element the classifier refused - arrive here as
+    ///         <see cref="CallResult{T}.IsSuccess" /> being false.
+    ///     </para>
+    ///     <para>
+    ///         <b>A successful result owns a live enumerator</b>, so enumerate it or dispose it: the
+    ///         value is enumerable once, and it implements <see cref="IAsyncDisposable" /> for the
+    ///         caller who reads <see cref="CallResult{T}.IsSuccess" /> and then decides not to
+    ///         consume the stream. A failed result carries nothing to dispose.
+    ///     </para>
+    /// </summary>
+    /// <typeparam name="T">The element type of the source. Inferred; there is nothing to declare.</typeparam>
+    /// <param name="source">The cold source. See <see cref="RunAsync{T}(Func{CancellationToken, IAsyncEnumerable{T}}, CancellationToken)" /> for what its token bounds.</param>
+    /// <param name="cancellationToken">The caller's token. Its cancellation is the one thing this method still throws.</param>
+    /// <returns>The outcome, carrying the started stream when the policy started one.</returns>
+    /// <exception cref="ResilienceConfigurationException">This policy has a <see cref="Hedge" /> configured.</exception>
+    public ValueTask<CallResult<IAsyncEnumerable<T>>> TryRunAsync<T>(Func<CancellationToken, IAsyncEnumerable<T>> source,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ExecutionState.EnsureValidated(this);
+
+        // Refused at the call rather than at the first pull, and synchronously rather than on the
+        // returned task, for the reason the throwing form refuses here: a configuration error
+        // belongs at the call site. That is why this method is not itself async.
+        if (Hedge is not null)
+        {
+            throw new ResilienceConfigurationException(HedgedStreamRefusal);
+        }
+
+        // No passthrough shortcut, for the same reason the buffered TryRunAsync has none: the
+        // caller asked for a result object, and a result object needs an outcome and a log that
+        // handing back the source's own enumerable cannot produce.
+        return TryStartAsync<VoidResult, T, StatelessStreamStarter<VoidResult, T>>(
+            new StatelessStreamStarter<VoidResult, T>(source), default, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Starts a cold source with caller state and reports the outcome instead of throwing, so the
+    ///     lambda can be <c>static</c> and allocate no closure. Same semantics as the stateless form.
+    /// </summary>
+    /// <typeparam name="TState">The state's type.</typeparam>
+    /// <typeparam name="T">The element type of the source.</typeparam>
+    /// <param name="source">The cold source. See the stateless form for what its token bounds.</param>
+    /// <param name="state">Handed to the source on every attempt.</param>
+    /// <param name="cancellationToken">The caller's token. Its cancellation is the one thing this method still throws.</param>
+    /// <returns>The outcome, carrying the started stream when the policy started one.</returns>
+    /// <exception cref="ResilienceConfigurationException">This policy has a <see cref="Hedge" /> configured.</exception>
+    public ValueTask<CallResult<IAsyncEnumerable<T>>> TryRunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>> source,
+        TState state, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ExecutionState.EnsureValidated(this);
+
+        if (Hedge is not null)
+        {
+            throw new ResilienceConfigurationException(HedgedStreamRefusal);
+        }
+
+        return TryStartAsync<TState, T, StatefulStreamStarter<TState, T>>(
             new StatefulStreamStarter<TState, T>(source), state, cancellationToken);
+    }
+
+    /// <summary>
+    ///     Drives the streaming loop as far as its first element and shapes what it reports into a
+    ///     <see cref="CallResult{T}" />.
+    ///     <para>
+    ///         The whole non-throwing path is this method: the loop is the same iterator the
+    ///         throwing form returns, driven one <c>MoveNextAsync</c> by this method rather than by
+    ///         the consumer's <c>await foreach</c>. That first pull runs every attempt, every
+    ///         backoff and every guard, because the iterator's first yield is the handover. There is
+    ///         no second copy of the loop, and no shaper interface either - a stream has one shape
+    ///         of outcome, not the two the buffered paths have to keep apart.
+    ///     </para>
+    /// </summary>
+    private async ValueTask<CallResult<IAsyncEnumerable<T>>> TryStartAsync<TState, T, TStarter>(
+        TStarter starter,
+        TState state,
+        CancellationToken cancellationToken)
+        where TStarter : struct, IStreamStarter<TState, T>
+    {
+        var outcome = new StreamOutcome();
+
+        var enumerator = ExecuteStreamAsync<TState, T, TStarter>(starter, state, outcome, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        bool started;
+
+        try
+        {
+            // The loop reports its failures through outcome and yield-breaks, so what escapes here
+            // is what escapes the throwing form for the same reasons: the caller's cancellation,
+            // and whatever a BeforeAttempt hook threw. Neither is an outcome of the call.
+            started = await enumerator.MoveNextAsync().ConfigureAwait(false);
+        }
+        catch
+        {
+            await enumerator.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+
+        if (outcome.Error is not null)
+        {
+            // The loop stopped without handing anything over: nothing is live, and the iterator has
+            // already run its own teardown. Disposed anyway, because a completed iterator's
+            // DisposeAsync is the cheap no-op and "the failure path leaks" is not a thing to have
+            // to reason about.
+            await enumerator.DisposeAsync().ConfigureAwait(false);
+
+            return new CallResult<IAsyncEnumerable<T>>(false, null, false, outcome.Error, outcome.Reason, outcome.Attempts);
+        }
+
+        // Success, with or without an element: a source that completed empty is a success with
+        // nothing to hand over, and StartedStream re-yields nothing for it - the consumer's
+        // enumeration simply completes. Either way the value is the live enumeration, and the
+        // caller now owns it.
+        return new CallResult<IAsyncEnumerable<T>>(
+            true, new StartedStream<T>(enumerator, started), true, null, StopReason.Succeeded, outcome.Attempts);
     }
 
     /// <summary>
@@ -140,6 +282,7 @@ public sealed partial record Resilience
     private async IAsyncEnumerable<T> ExecuteStreamAsync<TState, T, TStarter>(
         TStarter starter,
         TState state,
+        StreamOutcome? outcome,
         [EnumeratorCancellation] CancellationToken cancellationToken)
         where TStarter : struct, IStreamStarter<TState, T>
     {
@@ -427,6 +570,15 @@ public sealed partial record Resilience
             }
         }
 
+        if (succeeded && outcome is not null)
+        {
+            // The one thing a non-throwing caller needs that the handover does not already carry.
+            // Materialized here, before either success exit, because TryRunAsync's contract is the
+            // buffered one - a caller who asked for a result object gets the history on success
+            // too, and "it succeeded on the third attempt" has to be assertable.
+            outcome.Attempts = log.Materialize(Time.GetElapsedTime(start), deadline);
+        }
+
         if (succeeded && !hasValue)
         {
             // The empty source: a success with nothing to hand over. The attempt was torn down in
@@ -498,6 +650,20 @@ public sealed partial record Resilience
             _ => null,
         };
 
-        throw FailureException.Build(reason, error, deadline, attempts, retryAfter);
+        var failure = FailureException.Build(reason, error, deadline, attempts, retryAfter);
+
+        if (outcome is not null)
+        {
+            // The non-throwing caller's exit. The failure is built rather than described, so both
+            // forms report the same exception object with the same log attached - one of them
+            // through CallResult<T>.Exception, and the other by being thrown.
+            outcome.Reason = reason;
+            outcome.Attempts = attempts;
+            outcome.Error = failure;
+
+            yield break;
+        }
+
+        throw failure;
     }
 }

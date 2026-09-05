@@ -24,6 +24,8 @@ order: 2
 
 **Note**: `TryRunAsync` still throws an exception if the caller's `CancellationToken` is cancelled.
 
+`CallResult<IAsyncEnumerable<T>>` - what the [streaming](../features/streaming.md#handle-the-outcome-without-exceptions) `TryRunAsync` returns - is the one shape with a rule of its own. Its `Value` is an enumeration the policy has already started, so `HasValue` is never true on a failure, and a successful value is enumerable once and implements `IAsyncDisposable`: enumerate it, or dispose it when you decide not to.
+
 ### Example: implement a fallback
 Use the result to serve a fallback value when a call fails:
 

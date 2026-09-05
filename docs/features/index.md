@@ -20,7 +20,7 @@ The table below summarizes each feature and its default setting.
 | Rate limiting | Disabled (opt-in, and queueing off when enabled) | [Rate limiting](rate-limiting.md) |
 | Hedging | Disabled (opt-in, and never against a fixed delay) | [Hedging](hedging.md) |
 | Keyed policy scope | Disabled (opt-in; on by default per host for HTTP and per service for gRPC) | [Keyed policy scope](policy-scope.md) |
-| Streaming calls | Opt-in, through the `RunAsync` overloads taking a source | [Streaming](streaming.md) |
+| Streaming calls | Opt-in, through the `RunAsync` and `TryRunAsync` overloads taking a source | [Streaming](streaming.md) |
 | Deadline propagation | Disabled (opt-in on both halves) | [Deadlines](deadlines.md#propagate-the-deadline-across-a-hop) |
 | Telemetry | Enabled for registered policies; disabled for hand-built policies | [Telemetry](telemetry.md) |
 | Logging | Enabled for registered policies; opt-in for hand-built policies | [Logging](logging.md) |

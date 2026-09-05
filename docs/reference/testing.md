@@ -41,7 +41,7 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 
 ## `ScriptedStream`
 
-`ScriptedStream` is a factory for creating scripted cold streams, used with the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source.
+`ScriptedStream` is a factory for creating scripted cold streams, used with the `RunAsync` and `TryRunAsync` overloads that take an `IAsyncEnumerable<T>` source.
 
 | Member | Description |
 | :--- | :--- |
@@ -59,7 +59,7 @@ Pass the same `TimeProvider` to the `Sequence` that you gave the resilience poli
 | `Throws(Exception)` | Appends a step that throws the exception from its first pull, after any pending delay. |
 | `FaultsAfter(Exception, params ReadOnlySpan<T> elements)` | Appends a step that yields the elements and then throws the exception mid-stream, from the pull after the last element - the fault a source produces after the streaming path has stopped watching. |
 | `Delays(TimeSpan)` | Makes the next step wait the delay before its outcome. Multiple calls accumulate. |
-| `Next(CancellationToken)` | Serves the next step as a cold source. This is the method typically bound to the streaming `RunAsync` overloads, as a method group or a static lambda. |
+| `Next(CancellationToken)` | Serves the next step as a cold source. This is the method typically bound to the streaming `RunAsync` and `TryRunAsync` overloads, as a method group or a static lambda. |
 | `CallCount` | How many attempts have started, whether or not their source was ever pulled from. |
 | `LiveEnumerators` | How many served enumerators are still undisposed - one while the caller is still enumerating, zero once done. |
 | `DisposedEnumerators` | How many served enumerators have been disposed - abandoned by the policy, or finished by the consumer. A retried stream that leaks its losing attempts reads here. |

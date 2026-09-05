@@ -72,6 +72,8 @@ The `Resilience` record provides the execution methods.
 | `TryRunAsync<TState>(…)` | `ValueTask<CallResult>` |
 | `RunAsync<T>(Func<CancellationToken, IAsyncEnumerable<T>>, CancellationToken)` | `IAsyncEnumerable<T>` |
 | `RunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `IAsyncEnumerable<T>` |
+| `TryRunAsync<T>(Func<CancellationToken, IAsyncEnumerable<T>>, CancellationToken)` | `ValueTask<CallResult<IAsyncEnumerable<T>>>` |
+| `TryRunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `ValueTask<CallResult<IAsyncEnumerable<T>>>` |
 | `Validate()` | `void` |
 | `Validated()` | `Resilience` |
 | `WithListener(Action<CallEvent>)` | `Resilience` |
@@ -107,11 +109,16 @@ var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationTo
 
 To use the `ValueTask` path with an `async` lambda, provide an explicit return type: `async ValueTask<int> (ct) => …`. This is rarely necessary, because an `async` lambda allocates its own state machine regardless of return type. See [where the allocations are](../deep-dives/allocations.md) for what the overloads save and why they are shaped this way.
 
-The two streaming overloads take a **cold source** - a callback returning `IAsyncEnumerable<T>` - rather than a task, so a lambda binds to them by return type alone. Each attempt re-invokes the source, retrying until the first element is yielded, then hands the rest of the enumeration to the caller untouched. A policy with `Hedge` configured is refused by these overloads at the call. See [streaming](../features/streaming.md) for the semantics.
+The four streaming overloads take a **cold source** - a callback returning `IAsyncEnumerable<T>` - rather than a task, so a lambda binds to them by return type alone. Each attempt re-invokes the source, retrying until the first element is yielded, then hands the rest of the enumeration to the caller untouched. A policy with `Hedge` configured is refused by these overloads at the call. See [streaming](../features/streaming.md) for the semantics.
+
+The streaming `TryRunAsync` awaits to the **first element** and reports what a failed `RunAsync` would have thrown from the first `MoveNextAsync`. The value of a successful `CallResult<IAsyncEnumerable<T>>` is the started enumeration: it is enumerable once, and it implements `IAsyncDisposable` for a caller who reads `IsSuccess` and then decides not to consume it. A fault after the first element is not part of the result - it throws from `MoveNextAsync`, because the result was decided before that element existed.
+
+> [!NOTE]
+> A lambda that only throws needs an explicit return type here - `TryRunAsync(Task<int> (ct) => throw new IOException())` - because a lambda with no return statement is ambiguous between the `Task<T>` and `IAsyncEnumerable<T>` overloads.
 
 ### Execution behavior
 
-`RunAsync` methods throw the original exception with its stack trace intact, or one of the [exceptions defined by the library](exceptions.md). `TryRunAsync` methods return a `CallResult` and always materialize the attempt log.
+`RunAsync` methods throw the original exception with its stack trace intact, or one of the [exceptions defined by the library](exceptions.md). `TryRunAsync` methods return a `CallResult` and always materialize the attempt log - including the streaming form, whose log covers the attempts up to the first element.
 
 #### Cancellation tokens
 Every method signature includes two different `CancellationToken` parameters:

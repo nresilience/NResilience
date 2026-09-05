@@ -6,7 +6,7 @@ order: 11
 
 # Streaming
 
-Streaming calls are **opt-in** - they use the same policy as everything else, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry, deadlines, attempt ceilings, the classifier, the breaker, and the retry budget all compose; the only thing that changes is what an attempt is.
+Streaming calls are **opt-in** - they use the same policy as everything else, through the `RunAsync` and `TryRunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry, deadlines, attempt ceilings, the classifier, the breaker, and the retry budget all compose; the only thing that changes is what an attempt is.
 
 An attempt over a stream ends at the **first element**. Before the first element, a stream is indistinguishable from a call: a connection reset, a throttling reply, or a deadline all arrive before anything is yielded, and that window is exactly what the existing machinery classifies. After the first element the call has succeeded - a retry would duplicate or drop work the consumer has already acted on - so the rest of the enumeration passes to the caller untouched.
 
@@ -53,14 +53,70 @@ await foreach (var item in api.RunAsync(ct => streams.Next(ct)))
 
 Elements after the first pass through unclassified, because the call already succeeded and re-judging mid-stream data would be a second policy nobody configured.
 
-Elements after the first pass through unclassified, because the call already succeeded and re-judging mid-stream data would be a second policy nobody configured.
-
 A stream the policy could not start successfully **throws from the first `MoveNextAsync`**. If the attempts run out on an element the classifier kept refusing, the classifier calls a verdict `Permanent`, or a guard refuses the retry, the consumer receives nothing: an element does not self-describe its failure the way a response with a status code does, so a one-element stream completing normally would be indistinguishable from success. The verdict, the stop reason, and the attempt log travel on the exception instead - `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, or whatever the source threw - exactly the exceptions a failed call throws.
 
 Two outcomes are successes without a verdict point:
 
 - **An empty source that completes** is a success - no element, nothing to judge. The consumer's enumeration yields nothing.
 - **A caller who stops pulling** is the consumer's business, as with any enumerable.
+
+## Handle the outcome without exceptions
+
+`TryRunAsync` is the streaming form of the non-throwing entry point, and it awaits to the **first element**: by the time it returns, every attempt, every backoff and every guard has already run. That is the only point at which a stream can be asked whether it worked - before it, nothing has been tried; after it, the policy is no longer in the loop.
+
+<!-- snippet: stream-tryrun -->
+```csharp
+// TryRunAsync awaits to the first element: by the time it returns, every attempt,
+// every backoff and every guard has already run. IsSuccess answers the only question
+// a stream can be asked before it is consumed - did the policy get it started?
+var result = await api.TryRunAsync(ct => streams.Next(ct));
+
+if (result.TryGetValue(out var stream))
+{
+    await foreach (var item in stream)
+        received.Add(item);
+}
+else
+    refused = result.StopReason;
+```
+<!-- endsnippet -->
+
+`IsSuccess` is false for exactly the outcomes a failed `RunAsync` would have thrown from the first `MoveNextAsync`: a first element the classifier refused, a guard's rejection, a deadline, an exhausted attempt count, or whatever the source threw on its last attempt. The `StopReason`, the `Exception` and the attempt log are all on the result.
+
+<!-- snippet: stream-tryrun-failure -->
+```csharp
+// The outcomes a failed RunAsync would have thrown from the first MoveNextAsync arrive
+// here instead: a refused first element, a guard's rejection, a deadline, an exhausted
+// attempt count. There is no value to read and nothing to dispose.
+var result = await api.TryRunAsync(ct => streams.Next(ct));
+
+if (!result.IsSuccess)
+{
+    // StopReason.Permanent here, carrying the CallRejectedException RunAsync would
+    // have thrown, and the log of the one attempt a permanent verdict allows.
+    stopped = result.StopReason;
+    failure = result.Exception;
+}
+```
+<!-- endsnippet -->
+
+A **successful result owns a live enumerator**, because its first element has already been pulled. Enumerate it once, or dispose it:
+
+<!-- snippet: stream-tryrun-dispose -->
+```csharp
+// A successful result owns a live enumerator, because the first element has already
+// been pulled. Enumerate it once, or dispose it if you decide not to.
+var result = await api.TryRunAsync(ct => streams.Next(ct));
+
+if (result.IsSuccess && !stillWanted)
+    await ((IAsyncDisposable)result.Value!).DisposeAsync();
+```
+<!-- endsnippet -->
+
+This is the one value in the library a caller has to remember to release. It is also the reason the value is enumerable once - the elements behind it are a started enumeration, not a source that can be re-run. To run the policy a second time, call `TryRunAsync` again.
+
+> [!NOTE]
+> A fault after the first element is not part of the result. It throws from `MoveNextAsync` under `TryRunAsync` exactly as it does under `RunAsync`, because the result was decided before that element existed - see below.
 
 ## What belongs to the consumer
 

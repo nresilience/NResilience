@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using System.Net;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -60,6 +61,25 @@ var direct = await policies["api"].TryRunAsync(
 Console.WriteLine($"  -> {direct.StopReason}");
 
 Console.WriteLine();
+Console.WriteLine("A stream through the same policy, which fails to start once:");
+
+// TryRunAsync over a cold source awaits to the first element: by the time it returns, the retry has
+// already happened. A successful result carries the started enumeration, so enumerate it once.
+var feed = new FlakyFeed();
+
+var stream = await policies["api"].TryRunAsync(static (source, ct) => source.Read(ct), feed, CancellationToken.None);
+
+if (stream.TryGetValue(out var updates))
+{
+    await foreach (var update in updates)
+        Console.WriteLine($"  -> {update}");
+
+    Console.WriteLine($"     the stream took {stream.Attempts.Count} attempt(s) to start, and none after it");
+}
+else
+    Console.WriteLine($"  -> {stream.StopReason}");
+
+Console.WriteLine();
 Console.WriteLine("A call through the registered HttpClient, which sees a 503 first:");
 var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient("orders");
 using var response = await client.GetAsync(new Uri("https://orders.example/1"), CancellationToken.None);
@@ -89,6 +109,29 @@ Console.WriteLine($"     retry budget spent: {budget.Utilization:P0} - a refusal
 Console.WriteLine();
 Console.WriteLine("nresilience.attempts / nresilience.calls is the retry fraction - the number to alert on.");
 Console.WriteLine("The dbug: lines above are the log records. Every event ID is tabled in docs/reference/events.md.");
+
+/// <summary>
+///     A cold source that fails before its first element once, which is the window a stream is
+///     retried in, and then serves the feed.
+/// </summary>
+internal sealed class FlakyFeed
+{
+    private int _starts;
+
+    public async IAsyncEnumerable<string> Read([EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        if (++_starts == 1)
+            throw new HttpRequestException("the feed is not ready");
+
+        foreach (var update in new[] { "order 1 shipped", "order 2 shipped" })
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+
+            yield return update;
+        }
+    }
+}
 
 internal sealed class FakeTransport : HttpMessageHandler
 {

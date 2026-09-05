@@ -234,7 +234,7 @@ public sealed class DoomedAttemptTests
     {
         var bounded = policy with { Deadline = deadline ?? policy.Deadline };
 
-        return await bounded.TryRunAsync<int>(_ =>
+        return await bounded.TryRunAsync(Task<int> (_) =>
         {
             time.Advance(spend);
 

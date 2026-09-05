@@ -30,7 +30,12 @@ It is a separate package and a separate registration, not an overload of `AddRes
 Unary and server-streaming calls are covered: a stream is retried until its first message and never after it. Client-streaming and duplex calls are passed through untouched and always will be, for the same reason a partially consumed stream cannot be retried. See [gRPC streaming](grpc/streaming.md).
 
 ### Can I retry a stream?
-Yes, through the `RunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry stops at the first element: once the caller has received one, a retry would duplicate or drop work they have already acted on. Everything after the first element goes to the caller untouched. See [Streaming](features/streaming.md) for the core primitive and [gRPC streaming](grpc/streaming.md) for the server-streaming calls the interceptor wraps on the same semantic.
+Yes, through the `RunAsync` and `TryRunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry stops at the first element: once the caller has received one, a retry would duplicate or drop work they have already acted on. Everything after the first element goes to the caller untouched. `TryRunAsync` awaits to that first element and reports the outcome instead of throwing, so a stream has the same non-throwing form a call does. See [Streaming](features/streaming.md) for the core primitive and [gRPC streaming](grpc/streaming.md) for the server-streaming calls the interceptor wraps on the same semantic.
+
+### Why does a streaming `TryRunAsync` result have to be enumerated or disposed?
+Because its first element has already been pulled. `TryRunAsync` over an `IAsyncEnumerable<T>` awaits to the first element - the only point where a stream can be asked whether it worked - so a successful `CallResult<IAsyncEnumerable<T>>` carries a started enumeration, not a source that can be re-run. Enumerate it once, or dispose it when you decide not to.
+
+The alternative shapes are worse. Reporting success before the first element would report it exactly when a streaming call fails, and buffering the element so the result could be dropped safely would pay for teardown on every stream to spare the rare caller who abandons one. See [Streaming](features/streaming.md#handle-the-outcome-without-exceptions).
 
 ### Where is hedging?
 It is here, and it is opt-in: set `Hedge = Hedge.At(0.95)`. See [Hedging](features/hedging.md).
