@@ -3,6 +3,7 @@ using System.Diagnostics.Metrics;
 using System.Globalization;
 using Microsoft.Extensions.Time.Testing;
 using NResilience.Extensions;
+using NResilience.Internal;
 using NResilience.Testing;
 
 namespace NResilience.Tests;
@@ -165,6 +166,51 @@ public sealed class MetricsTests
 
         // Seconds, matching the instrument's unit: three times a p95 of 100 ms.
         Assert.InRange(single.Value, 0.3, 0.34);
+    }
+
+    /// <summary>
+    ///     The thread pool's queue delay reaches the meter, once per local episode. This is the only
+    ///     instrument in the set that describes the process rather than a dependency, and the only one
+    ///     whose silence is good news.
+    /// </summary>
+    [Fact]
+    public async Task The_pool_queue_delay_is_recorded_when_the_process_saturates()
+    {
+        using var recording = new Recording();
+        var time = new FakeTimeProvider();
+
+        var policy = (TestPolicy.WithClock(time) with
+        {
+            Name = "t-pool",
+            Attempts = 1,
+            AttemptTimeout = TimeSpan.FromSeconds(30),
+            AttemptCeiling = AttemptCeiling.Above() with { Window = TimeSpan.FromHours(1) },
+            Saturation = Saturation.Above(),
+        }).WithTelemetry();
+
+        ExecutionState.OverrideProbe(policy, new PoolProbe.Reading(TimeSpan.FromMilliseconds(400), TimeSpan.FromMilliseconds(1)));
+
+        for (var i = 0; i < 20; i++)
+        {
+            await policy.RunAsync(_ =>
+            {
+                time.Advance(TimeSpan.FromMilliseconds(100));
+                return Task.FromResult(1);
+            });
+        }
+
+        var recorded = recording.Measurements
+            .Where(m => m.Instrument == "nresilience.pool.delay" && Equals(m.Tags["nresilience.policy"], "t-pool"))
+            .ToList();
+
+        // Once, at the onset - not twenty times, once per attempt.
+        var single = Assert.Single(recorded);
+
+        // Seconds, matching the instrument's unit: the 400 ms that was measured.
+        Assert.Equal(0.4, single.Value, precision: 3);
+
+        // And the ceiling learned nothing while it was saturated, so it recorded nothing either.
+        Assert.DoesNotContain(recording.Measurements, m => m.Instrument == "nresilience.attempt.ceiling");
     }
 
     // ---- Tagging ----

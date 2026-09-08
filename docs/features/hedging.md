@@ -230,8 +230,11 @@ All six conditions must hold. If any fails, the call waits exactly as it would w
 5. The estimate has at least `MinimumSamples` samples. A cold process does not guess a threshold.
 6. The [retry budget](retry-budget.md) funds it. Hedges and retries draw on one bucket, so a policy already retrying at its limit stops hedging - a retry is evidence that something failed, a hedge only a guess that something is slow.
 
+The threshold is measured from wall clock, so a local thread pool deep enough to add 400 ms to every call raises it, and hedges stop firing during exactly the incident where a second copy of the work is the wrong answer. [`Saturation`](saturation.md) is the opt-in switch that stops the estimate learning that.
+
 ## Go deeper
 
 - [Hedging internals](../deep-dives/hedging-internals.md) - why an adaptive threshold is safe and a constant one is not, and how the quantile is estimated.
+- [Local saturation](saturation.md) - not measuring while this process is the bottleneck.
 - [Retry budget](retry-budget.md) - the bucket hedges and retries share.
 - [Idempotency](../http/idempotency.md) - what makes a request repeatable.

@@ -156,6 +156,19 @@ public static class ShippingScenarios
         Budget = RetryBudget.None,
     };
 
+    /// <summary>
+    ///     <see cref="Lib.Resilience.Default" /> watching this process's thread pool. Paired with
+    ///     <see cref="DefaultSuspending" /> and <see cref="DefaultSyncState" /> in the same sweep, this
+    ///     is what <see cref="Lib.Resilience.Saturation" /> costs a call: the probe is process-wide and
+    ///     off the call path, so the per-attempt cost is one lookup and two volatile loads and the
+    ///     answer has to be the same number of bytes.
+    /// </summary>
+    public static readonly Resilience DefaultWithSaturation = Resilience.Default with
+    {
+        Name = "saturation",
+        Saturation = Lib.Saturation.Above(),
+    };
+
     // ---- Suspending path: the path every real I/O call takes. ----
 
     public static ValueTask<int> NoneSuspending() => Resilience.None.RunAsync(SuspendCallback);
@@ -190,6 +203,9 @@ public static class ShippingScenarios
 
     /// <summary>What <see cref="Lib.Resilience.AttemptCeiling" /> being on by default costs, per call.</summary>
     public static ValueTask<int> DefaultNoCeilingSuspending() => DefaultWithoutCeiling.RunAsync(SuspendCallback);
+
+    /// <summary>The same call with saturation awareness on. See <see cref="DefaultWithSaturation" />.</summary>
+    public static ValueTask<int> DefaultSaturationSuspending() => DefaultWithSaturation.RunAsync(SuspendCallback);
 
     /// <summary>What <see cref="Lib.RetryBudget.Automatic" /> being on by default costs, per call.</summary>
     public static ValueTask<int> DefaultNoBudgetSuspending() => DefaultWithoutBudget.RunAsync(SuspendCallback);
@@ -227,6 +243,18 @@ public static class ShippingScenarios
     /// </summary>
     public static ValueTask<int> ExplainedSyncState() =>
         Explained.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
+
+    /// <summary>
+    ///     The same call again with saturation awareness on.
+    ///     <para>
+    ///         The claim this arm keeps honest is that the thread-pool probe is off the call path.
+    ///         It is process-wide and paced by the read, so nothing per call may allocate for it - and
+    ///         if the reading ever started costing a closure, a boxed nullable or a captured lambda,
+    ///         this arm would separate from <see cref="DefaultSyncState" />.
+    ///     </para>
+    /// </summary>
+    public static ValueTask<int> DefaultSaturationSyncState() =>
+        DefaultWithSaturation.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
 
     // ---- ValueTask-returning callbacks. ----
 

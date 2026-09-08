@@ -156,6 +156,13 @@ internal static partial class Log
     internal static partial void BackoffBaseAdapted(ILogger logger, LogLevel level, string policy, long baseMs);
 
     [LoggerMessage(
+        EventId = Codes.SaturationDetected,
+        EventName = nameof(Ids.SaturationDetected),
+        Message =
+            "{Policy} stopped measuring: this process's thread pool is queueing for {QueueDelayMs} ms, so a latency measured now would describe the pool rather than the dependency")]
+    internal static partial void SaturationDetected(ILogger logger, LogLevel level, string policy, long queueDelayMs);
+
+    [LoggerMessage(
         EventId = Codes.Stalled,
         EventName = nameof(Ids.Stalled),
         Message =
@@ -198,6 +205,7 @@ internal static partial class Log
         internal const int BackoffBaseAdapted = 1026;
         internal const int HedgeSuppressed = 1027;
         internal const int Stalled = 1028;
+        internal const int SaturationDetected = 1029;
     }
 
     /// <summary>
@@ -235,5 +243,6 @@ internal static partial class Log
         internal static readonly EventId BackoffBaseAdapted = new(Codes.BackoffBaseAdapted, nameof(BackoffBaseAdapted));
         internal static readonly EventId HedgeSuppressed = new(Codes.HedgeSuppressed, nameof(HedgeSuppressed));
         internal static readonly EventId Stalled = new(Codes.Stalled, nameof(Stalled));
+        internal static readonly EventId SaturationDetected = new(Codes.SaturationDetected, nameof(SaturationDetected));
     }
 }

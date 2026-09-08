@@ -48,12 +48,12 @@ namespace NResilience.Extensions;
 /// <remarks>
 ///     <para>
 ///         <b>Every feature is a section, and every section has an <c>Enabled</c>.</b>
-///         <see cref="Backoff" />, <see cref="Budget" />, <see cref="AttemptCeiling" />, <see cref="Breaker" />
-///         and <see cref="Hedge" /> are objects whose keys are the property names of the type each one
-///         configures. Writing <c>"Enabled": false</c> in any of them turns that feature off, whatever
-///         else the section says - which is the only way an <c>appsettings.Production.json</c> can
-///         remove a feature a base file turned on, because configuration providers merge and never
-///         delete a key.
+///         <see cref="Backoff" />, <see cref="Budget" />, <see cref="AttemptCeiling" />,
+///         <see cref="Breaker" />, <see cref="Hedge" /> and <see cref="Saturation" /> are objects whose
+///         keys are the property names of the type each one configures. Writing <c>"Enabled": false</c>
+///         in any of them turns that feature off, whatever else the section says - which is the only way
+///         an <c>appsettings.Production.json</c> can remove a feature a base file turned on, because
+///         configuration providers merge and never delete a key.
 ///     </para>
 ///     <para>
 ///         <see cref="Resilience.Classifier" />, <see cref="Resilience.BeforeAttempt" /> and
@@ -171,6 +171,13 @@ public sealed class ResilienceOptions
     public HedgeOptions? Hedge { get; set; }
 
     /// <summary>
+    ///     Saturation awareness, or null - the default - for none. Off in every preset, so this section
+    ///     is the only way a registered policy stops measuring while the local thread pool is queueing;
+    ///     <c>"Saturation": { "Enabled": false }</c> takes it back off again.
+    /// </summary>
+    public SaturationOptions? Saturation { get; set; }
+
+    /// <summary>
     ///     Whether the registered policy records to <see cref="ResilienceTelemetry" />. On by default,
     ///     which is the one place this library is not pay-for-play - see
     ///     <see cref="ResilienceTelemetry" /> for why registering a policy in a container is taken as
@@ -244,6 +251,9 @@ public sealed class ResilienceOptions
 
         if (AttemptCeiling is { } ceiling)
             policy = policy with { AttemptCeiling = ceiling.Enabled is false ? null : ceiling.ToAttemptCeiling() };
+
+        if (Saturation is { } saturation)
+            policy = policy with { Saturation = saturation.Enabled is false ? null : saturation.ToSaturation() };
 
         return policy;
     }
@@ -697,6 +707,58 @@ public sealed class AttemptCeilingOptions
             ceiling = ceiling with { Floor = floor };
 
         return ceiling;
+    }
+}
+
+/// <summary>
+///     The bindable shape of a <see cref="NResilience.Saturation" />.
+/// </summary>
+/// <remarks>
+///     Opt-in, unlike <see cref="AttemptCeilingOptions" />: saturation awareness changes what every
+///     other measured term in the policy learns, so it is turned on deliberately rather than inherited
+///     from a preset.
+/// </remarks>
+public sealed class SaturationOptions
+{
+    /// <summary>
+    ///     Whether the policy stops measuring while the local thread pool is queueing. Off unless the
+    ///     section is present, and <c>"Saturation": { "Enabled": false }</c> is how a later
+    ///     configuration layer removes what an earlier layer asked for.
+    /// </summary>
+    public bool? Enabled { get; set; }
+
+    /// <summary>
+    ///     The multiple of this process's normal queue delay. Defaults to 5, and must be greater than 1 -
+    ///     <c>"Enabled": false</c> is how a section turns saturation awareness off.
+    /// </summary>
+    public double? Multiple { get; set; }
+
+    /// <summary><see cref="NResilience.Saturation.Floor" />.</summary>
+    public TimeSpan? Floor { get; set; }
+
+    /// <summary><see cref="NResilience.Saturation.MinimumSamples" />.</summary>
+    public int? MinimumSamples { get; set; }
+
+    /// <summary>Converts the options to a <see cref="NResilience.Saturation" /> value, using defaults for any unset properties.</summary>
+    /// <returns>The configuration.</returns>
+    /// <remarks>
+    ///     No <c>RetiredOffSwitch</c> guard on <see cref="Multiple" />, unlike every section beside this
+    ///     one. Those guards exist to catch a configuration file written against a spelling that has
+    ///     since been retired, and this section never had one - <c>"Enabled": false</c> is the only way
+    ///     it has ever been turned off. A zero multiple is refused by
+    ///     <see cref="Resilience.Validate" /> at registration like any other losing value.
+    /// </remarks>
+    internal Saturation ToSaturation()
+    {
+        var saturation = Saturation.Above(Multiple ?? 5.0);
+
+        if (Floor is { } floor)
+            saturation = saturation with { Floor = floor };
+
+        if (MinimumSamples is { } samples)
+            saturation = saturation with { MinimumSamples = samples };
+
+        return saturation;
     }
 }
 

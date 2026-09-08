@@ -291,6 +291,75 @@ public sealed class ResilienceOptionsTests
         Assert.Null(new ResilienceOptions().ToPolicy().Backoff.MeasuredBase);
     }
 
+    // ---- Saturation ----
+
+    /// <summary>Off unless the section is present, for the same reason the measured base is.</summary>
+    [Fact]
+    public void Saturation_is_off_unless_the_section_asks_for_it() =>
+        Assert.Null(new ResilienceOptions().ToPolicy().Saturation);
+
+    /// <summary>
+    ///     A zero multiple is refused by ordinary validation rather than by a retired-off-switch guard.
+    ///     This section never had a magic number for "off", so there is no migration to name - and
+    ///     claiming one would be a message about a history that did not happen.
+    /// </summary>
+    [Fact]
+    public void A_zero_saturation_multiple_is_refused_as_a_losing_value()
+    {
+        var options = new ResilienceOptions();
+
+        Config(("Saturation:Multiple", "0")).Bind(options);
+
+        var problems = Assert.Throws<ResilienceConfigurationException>(options.ToPolicy().Validate).Problems;
+
+        Assert.Contains(problems, problem => problem.Contains("Saturation.Multiple must be greater than 1", StringComparison.Ordinal));
+        Assert.DoesNotContain(problems, problem => problem.Contains("no longer how", StringComparison.Ordinal));
+    }
+
+    /// <summary>An empty section is the feature at its defaults, and the policy it produces is valid.</summary>
+    [Fact]
+    public void An_empty_saturation_section_turns_it_on_at_the_defaults()
+    {
+        var policy = new ResilienceOptions { Saturation = new SaturationOptions() }.ToPolicy();
+
+        Assert.Equal(Saturation.Above(), policy.Saturation);
+
+        policy.Validate();
+    }
+
+    /// <summary>Every property binds, and the ones left out keep their defaults.</summary>
+    [Fact]
+    public void A_saturation_section_binds_every_property()
+    {
+        var options = new ResilienceOptions();
+
+        Config(
+            ("Saturation:Multiple", "8"),
+            ("Saturation:Floor", "00:00:00.050"),
+            ("Saturation:MinimumSamples", "40")).Bind(options);
+
+        var settings = options.ToPolicy().Saturation;
+
+        Assert.NotNull(settings);
+        Assert.Equal(8, settings.Value.Multiple);
+        Assert.Equal(TimeSpan.FromMilliseconds(50), settings.Value.Floor);
+        Assert.Equal(40, settings.Value.MinimumSamples);
+    }
+
+    /// <summary><c>"Enabled": false</c> drops what a base policy carried, in the one direction a merged configuration cannot.</summary>
+    [Fact]
+    public void A_disabled_saturation_section_drops_the_base_policys_awareness()
+    {
+        var baseline = Resilience.Default with { Saturation = Saturation.Above() };
+
+        var policy = new ResilienceOptions
+        {
+            Saturation = new SaturationOptions { Enabled = false },
+        }.ToPolicy(baseline);
+
+        Assert.Null(policy.Saturation);
+    }
+
     /// <summary><c>"Enabled": false</c> drops a measured base the base policy carried.</summary>
     [Fact]
     public void A_disabled_measured_section_drops_the_base_policys_measurement()

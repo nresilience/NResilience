@@ -110,6 +110,7 @@ var api = (Resilience.Http with { Name = "payments" }).WithTelemetry();
 | `nresilience.hedge.threshold` | s | The latency quantile a hedge fired at, recorded when it fired |
 | `nresilience.attempt.ceiling` | s | The measured per-attempt [ceiling](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it), recorded when it changes - which, since the ceiling is measured by default, is on every policy with an `AttemptTimeout` |
 | `nresilience.backoff.base` | s | The measured [backoff base](retry.md#measure-the-backoff-base-instead-of-guessing-it), recorded when it changes. Reported only by a policy that configures `Backoff.MeasuredBase` |
+| `nresilience.pool.delay` | s | How long a work item waited for a thread, recorded at the onset of each [local saturation](saturation.md) episode, so a count of samples is a count of local incidents. The only instrument here that describes this process rather than a dependency, and the only one whose silence is good news |
 | `nresilience.limiter.leases` | `{lease}` | Permits a [limiter](rate-limiting.md) was asked for, tagged `acquired` or `denied` |
 | `nresilience.limiter.wait.duration` | s | How long a caller waited on a limiter. Zero unless queueing is enabled |
 | `nresilience.limiter.limit` | `{permit}` | The concurrency limit an [adaptive limiter](rate-limiting.md) has settled on, recorded when it changes |

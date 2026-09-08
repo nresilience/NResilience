@@ -50,6 +50,7 @@ The `CallEventKind` enum defines the event types raised during a call.
 | `AttemptCeilingAdapted` | No | Yes (the measured ceiling) | No |
 | `BackoffBaseAdapted` | No | Yes (the measured base) | No |
 | `Stalled` | No | Yes (the stall bound) | No |
+| `SaturationDetected` | No | Yes (the queue delay) | No |
 
 ### Event invariants and behavior
 
@@ -63,6 +64,7 @@ The `CallEventKind` enum defines the event types raised during a call.
 - **Stalls**: `Stalled` fires when a transfer is cut off for lack of progress, and carries the bound that fired on `Delay` and the `AttemptStalledException` on `Exception`. For a response body the caller is reading itself, it arrives after the call has already raised `Succeeded` - the retry loop was over before the stall existed - which makes it the only event that follows a terminal one. For a stream between two elements, and for a body read under `BufferResponses`, the stall is inside the attempt and is followed by `Retrying` or by a terminal event of its own. See [progress bounds](../features/deadlines.md#the-third-thing-the-attempt-timeout-bounds).
 - **Measured backoff bases**: `BackoffBaseAdapted` carries the new base on `Delay`, after the `Spread` clamp - which is what the curve actually uses. It is raised on the retry decision, and only when the number differs from the last one raised for that policy instance. A policy whose previous attempt was throttled rather than transient raises nothing, because a throttled retry does not use the measured base. See [Retry](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it).
 - **Measured attempt ceilings**: `AttemptCeilingAdapted` carries the new ceiling on `Delay`. It is raised only when the measured term is what bounds the attempt, and only when the number differs from the last one raised for that policy instance - so the rate follows how much the estimate moves rather than how much traffic there is. A policy whose ceiling has been clamped back to `AttemptTimeout` raises nothing. See [Deadlines](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it).
+- **Local saturation**: `SaturationDetected` carries the thread-pool queue delay that was measured on `Delay`. It is raised at the *onset* of an episode - once when the process crosses `Multiple` times its own normal queue delay, and nothing more until the queue has drained and filled again - so a count of these is a count of local incidents. The episode is tracked per policy instance, because each policy independently stops feeding its own estimates: a listener attached to five policies sees five events per episode, one per policy that stopped measuring. Nothing is refused and no bound moves, so it is neither a failure nor terminal. See [Local saturation](../features/saturation.md).
 - **Breaker transitions**: Breaker state transitions are raised on the call that triggered the transition, outside the breaker's internal lock.
 
 ## Listener contract
@@ -111,6 +113,7 @@ Every record is written every time unless you opt into [sampling](../features/lo
 | 1026 | `BackoffBaseAdapted` | `Debug` | `Information` | `{Policy} measured a new backoff base of {BaseMs} ms from recent latency` |
 | 1027 | `HedgeSuppressed` | `Debug` | `Information` | `{Policy} held back hedge attempt {Attempt} after {ThresholdMs} ms` |
 | 1028 | `Stalled` | `Warning` | `Warning` | `{Policy} cut off a transfer after {TransferredCount} byte(s) or element(s): nothing arrived for {StallMs} ms` |
+| 1029 | `SaturationDetected` | `Debug` | `Information` | `{Policy} stopped measuring: this process's thread pool is queueing for {QueueDelayMs} ms` |
 
 Field names are shared with the metric tag vocabulary wherever both exist (`Policy`, `Verdict`, `Reason`), so a structured record and a metric describe the same call with the same words.
 

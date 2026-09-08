@@ -67,6 +67,16 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSyncOverhead(Baseline.LibExplainedSyncState, Budgets.FullPolicyWithTimeoutSyncOverhead);
 
     /// <summary>
+    ///     <see cref="Resilience.Saturation" /> costs a call nothing, which is the whole basis for
+    ///     measuring the thread pool at all. The probe is process-wide and paced by the read, so the
+    ///     per-attempt cost is a lookup and two volatile loads - and this arm is what keeps the reading
+    ///     from quietly acquiring a closure, a boxed nullable, or a captured lambda.
+    /// </summary>
+    [Fact]
+    public void Watching_the_thread_pool_does_not_make_a_call_cost_more()
+        => AssertSyncOverhead(Baseline.LibSaturationSyncState, Budgets.FullPolicyWithTimeoutSyncOverhead);
+
+    /// <summary>
     ///     Verifies that callbacks returning <see cref="ValueTask" /> also allocate nothing.
     ///     This is measured against a raw <see cref="ValueTask" /> baseline to ensure the
     ///     result reflects the executor's overhead rather than the callback's savings.
@@ -316,6 +326,29 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
     [Fact]
     public void The_hedged_path_stays_within_its_own_budget()
         => AssertSuspendingOverhead(Baseline.LibDefaultHedge, Budgets.HedgeConfiguredOverhead);
+
+    /// <summary>
+    ///     The same claim on the suspending path, and against <see cref="Baseline.LibDefault" /> in the
+    ///     same sweep rather than against a budget of its own: the two policies differ only by
+    ///     <see cref="Resilience.Saturation" />, so the honest assertion is that they are
+    ///     indistinguishable rather than that one fits a number.
+    /// </summary>
+    [Fact]
+    public void Watching_the_thread_pool_does_not_move_the_suspending_baseline()
+    {
+        var ignoring = baseline.SuspendingBytes(Baseline.LibDefault);
+        var watching = baseline.SuspendingBytes(Baseline.LibDefaultSaturation);
+
+        output.WriteLine(string.Create(
+            CultureInfo.InvariantCulture,
+            $"no saturation {ignoring:0.0} B/op vs saturation configured {watching:0.0} B/op, delta {watching - ignoring:0.0} B"));
+
+        Assert.True(
+            watching - ignoring <= Budgets.SuspendingNoiseFloor,
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"A policy with Saturation configured measured {watching:0.0} B/op against {ignoring:0.0} B/op without it. The thread-pool probe is process-wide and off the call path, so reading it must not allocate per call."));
+    }
 
     /// <summary>
     ///     The streaming path's own budget, measured over a full enumeration and compared against the

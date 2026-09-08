@@ -19,6 +19,7 @@ The table below summarizes each feature and its default setting.
 | Breaker trip conditions | Five consecutive failures, five times the measured error rate, and half a window at three times the measured normal latency | [Circuit breaker](circuit-breaker.md#trip-conditions) |
 | Rate limiting | Disabled (opt-in, and queueing off when enabled) | [Rate limiting](rate-limiting.md) |
 | Hedging | Disabled (opt-in, and never against a fixed delay) | [Hedging](hedging.md) |
+| Local saturation | Disabled (opt-in; it changes what every other measured term learns) | [Local saturation](saturation.md) |
 | Keyed policy scope | Disabled (opt-in; on by default per host for HTTP and per service for gRPC) | [Keyed policy scope](policy-scope.md) |
 | Streaming calls | Opt-in, through the `RunAsync` and `TryRunAsync` overloads taking a source | [Streaming](streaming.md) |
 | Deadline propagation | Disabled (opt-in on both halves) | [Deadlines](deadlines.md#propagate-the-deadline-across-a-hop) |

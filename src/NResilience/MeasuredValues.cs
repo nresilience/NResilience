@@ -5,16 +5,17 @@ namespace NResilience;
 ///     <see cref="Resilience.Measured" /> is the one place a dashboard looks.
 ///     <para>
 ///         Every property is a <i>reading</i>, not configuration - the configuration that produces it is
-///         <see cref="Resilience.AttemptCeiling" />, <see cref="NResilience.Backoff.MeasuredBase" /> and
-///         <see cref="Resilience.Hedge" /> respectively. Each returns <c>null</c> when its feature is not
-///         configured, or when the estimate is still cold, and reading one validates the policy exactly
-///         as executing it does.
+///         <see cref="Resilience.AttemptCeiling" />, <see cref="NResilience.Backoff.MeasuredBase" />,
+///         <see cref="Resilience.Hedge" /> and <see cref="Resilience.Saturation" /> respectively. Each
+///         returns <c>null</c> when its feature is not configured, or when the estimate is still cold,
+///         and reading one validates the policy exactly as executing it does.
 ///     </para>
 /// </summary>
 /// <remarks>
 ///     The estimates are private to the policy instance. The HTTP handler derives one policy per host,
 ///     so each host is measured independently and <c>HttpResilienceHandler.PoliciesByHost()</c> is where
-///     per-host readings come from.
+///     per-host readings come from. <see cref="QueueDelay" /> is the exception: there is one thread
+///     pool, so every policy in the process reports the same number for it.
 ///     <para>
 ///         The struct holds the policy and computes on read, so a value kept in a local keeps reporting
 ///         current numbers rather than a snapshot.
@@ -102,6 +103,37 @@ public readonly struct MeasuredValues : IEquatable<MeasuredValues>
     ///     A hedge is configured and the policy cannot be executed.
     /// </exception>
     public TimeSpan? HedgeThreshold => _policy?.ReadHedgeThreshold();
+
+    /// <summary>
+    ///     How long a work item currently waits for a thread in this process's pool. <c>null</c> when
+    ///     <see cref="Resilience.Saturation" /> is not configured, or when the process-wide baseline is
+    ///     still cold.
+    ///     <para>
+    ///         The only reading here that is a fact about this process rather than about the dependency,
+    ///         and the only one that is process-wide: one thread pool, one queue, one number, whichever
+    ///         policy is asked for it. Compare it against the same policy's <see cref="BackoffBase" /> -
+    ///         when the two move together, the dependency did not get slower and this host did.
+    ///     </para>
+    ///     <para>
+    ///         Watching this rise is watching the cause of an incident that every other number on the
+    ///         dashboard will report as the dependency's fault.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     Validation is a side effect of looking the estimate up, so it happens only on the path that
+    ///     looks one up: with <see cref="Resilience.Saturation" /> unset this returns <c>null</c>
+    ///     without validating anything.
+    ///     <para>
+    ///         A non-null reading is not the same as "saturated". Saturation compares this against the
+    ///         process's own recent median, so the number that matters is how far it has moved rather
+    ///         than what it is; <see cref="CallEventKind.SaturationDetected" /> is what says the
+    ///         comparison fired.
+    ///     </para>
+    /// </remarks>
+    /// <exception cref="ResilienceConfigurationException">
+    ///     Saturation is configured and the policy cannot be executed.
+    /// </exception>
+    public TimeSpan? QueueDelay => _policy?.ReadQueueDelay();
 
     /// <summary>Whether two readings came from the same policy.</summary>
     /// <param name="other">The other reading.</param>

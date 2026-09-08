@@ -132,6 +132,29 @@ public sealed class DependencyInjectionDocs
         Assert.Equal(expected: 5, actual: api.Breaker.Settings.ConsecutiveFailures);
     }
 
+    /// <summary>
+    ///     Saturation awareness from a section. Off unless the section is present, because it changes
+    ///     what every other measured term in the policy learns.
+    /// </summary>
+    [Fact]
+    public void A_saturation_section_makes_a_configured_policy_watch_its_own_thread_pool()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddJsonFile(path: "appsettings.resilience.saturation.json")
+            .Build();
+
+        var services = new ServiceCollection();
+        services.AddResilience(section: configuration.GetSection(key: "Resilience"));
+
+        using var provider = services.BuildServiceProvider();
+        var api = provider.GetRequiredService<IResiliencePolicies>()[name: "api"];
+
+        Assert.NotNull(api.Saturation);
+        Assert.Equal(expected: 5, actual: api.Saturation.Value.Multiple);
+        Assert.Equal(expected: TimeSpan.FromMilliseconds(value: 20), actual: api.Saturation.Value.Floor);
+        Assert.Equal(expected: 20, actual: api.Saturation.Value.MinimumSamples);
+    }
+
     [Fact]
     public void The_configure_callback_holds_what_json_cannot()
     {

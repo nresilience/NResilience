@@ -940,18 +940,24 @@ public sealed partial record Resilience
         // accumulate again. Sampling the failures instead would let a wave of timeouts raise the ceiling
         // that produced them.
         //
-        // Unguarded by an AttemptCeiling null-check, unlike the MeasuredBase line below: that one is a
-        // plain field read off a struct, while this one would recompute the property's default per
-        // attempt to save a thread-static reference comparison. AttemptCeilingFor already returns null
-        // exactly when there is nothing measuring.
-        if (verdict.Kind == VerdictKind.Ok)
+        // Contaminated is the second reason a success is not recorded, and it is about this process
+        // rather than about the dependency: a duration measured while the thread pool is queueing is
+        // mostly a measure of the queue. Asked once for both windows, because the answer is a fact
+        // about the instant rather than about either estimate.
+        if (verdict.Kind == VerdictKind.Ok && !Contaminated(log.Count))
+        {
+            // Unguarded by an AttemptCeiling null-check, unlike the MeasuredBase line below: that one is
+            // a plain field read off a struct, while this one would recompute the property's default per
+            // attempt to save a thread-static reference comparison. AttemptCeilingFor already returns
+            // null exactly when there is nothing measuring.
             ExecutionState.AttemptCeilingFor(this)?.Record(duration);
 
-        // Successes only again, and here it is what keeps backoff from collapsing: a dependency failing
-        // fast has a very short latency distribution, and a base measured from it would turn the retry
-        // curve into a tight loop at the moment the dependency could least afford one.
-        if (verdict.Kind == VerdictKind.Ok && Backoff.MeasuredBase is not null)
-            ExecutionState.BackoffBaseFor(this)?.Record(duration);
+            // Here it is what keeps backoff from collapsing: a dependency failing fast has a very short
+            // latency distribution, and a base measured from it would turn the retry curve into a tight
+            // loop at the moment the dependency could least afford one.
+            if (Backoff.MeasuredBase is not null)
+                ExecutionState.BackoffBaseFor(this)?.Record(duration);
+        }
 
         if (OnEvent is not null)
         {
@@ -1441,6 +1447,56 @@ public sealed partial record Resilience
             return null;
 
         return threshold < hedge.MinimumDelay ? hedge.MinimumDelay : threshold;
+    }
+
+    /// <summary>
+    ///     How long a work item currently waits for a thread. Null when <see cref="Saturation" /> is not
+    ///     configured, or while the process-wide baseline is still cold.
+    /// </summary>
+    /// <returns>The queue delay, or null.</returns>
+    internal TimeSpan? ReadQueueDelay()
+    {
+        if (Saturation is not { } settings)
+            return null;
+
+        var reading = ExecutionState.ProbeFor(this, settings.MinimumSamples);
+
+        return reading.Normal is null ? null : reading.Delay;
+    }
+
+    /// <summary>
+    ///     Whether a duration measured right now would describe this process's thread-pool queue rather
+    ///     than the dependency - in which case nothing learns from it.
+    /// </summary>
+    /// <param name="attemptNumber">
+    ///     The attempt to name on <see cref="CallEventKind.SaturationDetected" />, or zero to raise
+    ///     nothing. Zero is for a second caller inside the same attempt, so one episode is reported once.
+    /// </param>
+    /// <returns>True when the estimates should not be fed.</returns>
+    /// <remarks>
+    ///     One branch on a nullable struct for a policy that never configured this, which is what keeps
+    ///     the feature free for the callers who did not ask for it. A policy that did pays the
+    ///     thread-static reference comparison <c>ExecutionState</c> primes plus the probe's two volatile
+    ///     loads, and no allocation either way.
+    /// </remarks>
+    private bool Contaminated(int attemptNumber)
+    {
+        if (Saturation is not { } settings)
+            return false;
+
+        if (!ExecutionState.Saturated(this, settings, out var delay))
+            return false;
+
+        // The onset only, not every attempt of the episode: a listener wants to count incidents, and the
+        // continuous view is MeasuredValues.QueueDelay and the nresilience.pool.delay instrument. The
+        // absence of a second event is what says the episode is still running.
+        //
+        // The episode is claimed here rather than inside the answer above, so that a caller passing zero
+        // cannot consume an onset it is not going to report.
+        if (attemptNumber > 0 && OnEvent is not null && ExecutionState.SaturationOnset(this))
+            Notify(CallEventKind.SaturationDetected, attemptNumber, Verdict.Ok, TimeSpan.Zero, delay, null, null);
+
+        return true;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

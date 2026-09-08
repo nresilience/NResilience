@@ -84,6 +84,7 @@ Four behaviors are worth knowing:
 - **It only tightens a ceiling you set.** A policy whose `AttemptTimeout` is `Timeout.InfiniteTimeSpan` gets no default measured ceiling: you said the deadline was the only per-attempt bound, and there is nothing there to tighten. Writing `AttemptCeiling` yourself there is a different instruction - "bound me by the dependency's latency and nothing else" - and it is honored.
 - **Only successful attempts are sampled.** A ceiling tight enough to cancel calls that would have succeeded starves its own estimator, so the policy reverts to `AttemptTimeout` rather than tightening further.
 - **The estimate is per policy instance.** The HTTP handler derives one policy per host, so each host's ceiling is measured from that host's own latency.
+- **It measures wall clock, and attributes all of it to the dependency.** A local incident - a thread pool deep enough that a work item waits 400 ms for a thread - reads as a dependency that got 400 ms slower, and raises the ceiling accordingly. [`Saturation`](saturation.md) is the opt-in switch that tells the two apart.
 
 Read the current value from `policy.Measured.AttemptCeiling`, or watch the `nresilience.attempt.ceiling` histogram, which is recorded when the number moves. Both report the measured ceiling before `AttemptTimeout` clamps it, so a value above your `AttemptTimeout` is the reading that says the clamp is now what bounds the attempt.
 

@@ -165,6 +165,7 @@ NResilience.CallEventKind.OrphanedWork = 7 -> NResilience.CallEventKind
 NResilience.CallEventKind.RejectedByBreaker = 4 -> NResilience.CallEventKind
 NResilience.CallEventKind.RejectedByBudget = 5 -> NResilience.CallEventKind
 NResilience.CallEventKind.Retrying = 1 -> NResilience.CallEventKind
+NResilience.CallEventKind.SaturationDetected = 20 -> NResilience.CallEventKind
 NResilience.CallEventKind.Stalled = 19 -> NResilience.CallEventKind
 NResilience.CallEventKind.Succeeded = 2 -> NResilience.CallEventKind
 NResilience.CallRejectedException
@@ -295,6 +296,7 @@ NResilience.MeasuredValues.BackoffBase.get -> System.TimeSpan?
 NResilience.MeasuredValues.Equals(NResilience.MeasuredValues other) -> bool
 NResilience.MeasuredValues.HedgeThreshold.get -> System.TimeSpan?
 NResilience.MeasuredValues.MeasuredValues() -> void
+NResilience.MeasuredValues.QueueDelay.get -> System.TimeSpan?
 NResilience.NestedRetry
 NResilience.NestedRetry.Scope
 NResilience.NestedRetry.Scope.Dispose() -> void
@@ -375,6 +377,8 @@ NResilience.Resilience.RunAsync<T>(System.Func<System.Threading.CancellationToke
 NResilience.Resilience.RunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T>!
 NResilience.Resilience.RunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
 NResilience.Resilience.RunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+NResilience.Resilience.Saturation.get -> NResilience.Saturation?
+NResilience.Resilience.Saturation.init -> void
 NResilience.Resilience.Time.get -> System.TimeProvider!
 NResilience.Resilience.Time.init -> void
 NResilience.Resilience.TryRunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
@@ -397,6 +401,15 @@ NResilience.ResilienceConfigurationException.ResilienceConfigurationException(st
 NResilience.RetryBudget
 NResilience.RetryBudget.Name.get -> string?
 NResilience.RetryBudget.Utilization.get -> double
+NResilience.Saturation
+NResilience.Saturation.Equals(NResilience.Saturation other) -> bool
+NResilience.Saturation.Floor.get -> System.TimeSpan
+NResilience.Saturation.Floor.init -> void
+NResilience.Saturation.MinimumSamples.get -> int
+NResilience.Saturation.MinimumSamples.init -> void
+NResilience.Saturation.Multiple.get -> double
+NResilience.Saturation.Multiple.init -> void
+NResilience.Saturation.Saturation() -> void
 NResilience.SlowCalls
 NResilience.SlowCalls.Equals(NResilience.SlowCalls other) -> bool
 NResilience.SlowCalls.MinimumSamples.get -> int
@@ -465,6 +478,8 @@ override NResilience.Recovery.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
 override NResilience.Resilience.GetHashCode() -> int
 override NResilience.Resilience.ToString() -> string!
+override NResilience.Saturation.GetHashCode() -> int
+override NResilience.Saturation.ToString() -> string!
 override NResilience.SlowCalls.GetHashCode() -> int
 override NResilience.SlowCalls.ToString() -> string!
 override NResilience.Verdict.Equals(object? obj) -> bool
@@ -527,6 +542,9 @@ static NResilience.RetryBudget.Automatic.get -> NResilience.RetryBudget!
 static NResilience.RetryBudget.None.get -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Of(double fraction = 0.1, int minimumPerSecond = 3, System.TimeProvider? time = null) -> NResilience.RetryBudget!
 static NResilience.RetryBudget.Shared(string! name, double fraction = 0.1, int minimumPerSecond = 3) -> NResilience.RetryBudget!
+static NResilience.Saturation.Above(double multiple = 5) -> NResilience.Saturation
+static NResilience.Saturation.operator !=(NResilience.Saturation left, NResilience.Saturation right) -> bool
+static NResilience.Saturation.operator ==(NResilience.Saturation left, NResilience.Saturation right) -> bool
 static NResilience.SlowCalls.Above(double multiple = 3) -> NResilience.SlowCalls
 static NResilience.SlowCalls.operator !=(NResilience.SlowCalls left, NResilience.SlowCalls right) -> bool
 static NResilience.SlowCalls.operator ==(NResilience.SlowCalls left, NResilience.SlowCalls right) -> bool
@@ -558,5 +576,6 @@ static NResilience.WinRate.operator ==(NResilience.WinRate left, NResilience.Win
 ~override NResilience.Hedge.Equals(object obj) -> bool
 ~override NResilience.MeasuredBase.Equals(object obj) -> bool
 ~override NResilience.Recovery.Equals(object obj) -> bool
+~override NResilience.Saturation.Equals(object obj) -> bool
 ~override NResilience.SlowCalls.Equals(object obj) -> bool
 ~override NResilience.WinRate.Equals(object obj) -> bool

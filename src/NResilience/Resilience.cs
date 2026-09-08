@@ -273,6 +273,39 @@ public sealed partial record Resilience
     public Hedge? Hedge { get; init; }
 
     /// <summary>
+    ///     Null - the default, and the default in every preset - means this policy attributes every
+    ///     millisecond it measures to the dependency. Set it, and the policy stops feeding its measured
+    ///     terms while the local thread pool is queueing, because a measurement taken then describes
+    ///     this process rather than the dependency.
+    ///     <para>
+    ///         <c>Saturation.Above(5)</c> means "five times this process's own normal queue delay". A
+    ///         queue delay of 400 ms is indistinguishable, from inside the executor, from a dependency
+    ///         that got 400 ms slower - and the library's response to the second is to relax every
+    ///         bound it has, which is exactly wrong for the first. See
+    ///         <see cref="NResilience.Saturation" /> for the argument.
+    ///     </para>
+    ///     <para>
+    ///         What pauses is what this policy measures: <see cref="AttemptCeiling" />,
+    ///         <see cref="NResilience.Backoff.MeasuredBase" /> and the <see cref="Hedge" /> threshold.
+    ///         Each holds what it last learned and resumes when the queue drains. Nothing is refused,
+    ///         no bound moves, and no delay is added, so the worst this can do is leave the policy
+    ///         behaving exactly as it does without it. It does not reach the <see cref="Breaker" /> -
+    ///         see <see cref="NResilience.Saturation" /> for why.
+    ///     </para>
+    ///     <para>
+    ///         The measurement is one process-wide probe, queued four times a second at most and read
+    ///         as two volatile loads. A process that never configures this never queues one, and
+    ///         configuring it does not increase the allocation of any call.
+    ///     </para>
+    /// </summary>
+    /// <remarks>
+    ///     Opt-in rather than defaulted on, unlike <see cref="AttemptCeiling" />, and not because it
+    ///     could do harm: it changes what every other measured term in the policy learns, and a change
+    ///     of that shape earns its own deliberate diff and its own release note.
+    /// </remarks>
+    public Saturation? Saturation { get; init; }
+
+    /// <summary>
     ///     Whether this policy's deadline is clamped by the inherited deadline of the current call.
     ///     Off by default.
     ///     <para>
@@ -355,7 +388,9 @@ public sealed partial record Resilience
     ///         off every measured term the library would otherwise supply, leaving only the constants
     ///         written here. Today that is <see cref="AttemptCeiling" />; anything added later that
     ///         measures rather than asks joins it, and <see cref="NResilience.Backoff.MeasuredBase" />
-    ///         already has.
+    ///         already has. <see cref="Saturation" /> is not one of them - it decides when to stop
+    ///         measuring rather than what to measure - so a policy that says <c>false</c> and sets it
+    ///         has contradicted itself in the same way, and <see cref="Validate" /> says so.
     ///     </para>
     ///     <para>
     ///         It suppresses defaults rather than overriding what you wrote. A policy that says
@@ -384,12 +419,14 @@ public sealed partial record Resilience
     public TimeProvider Time { get; init; } = TimeProvider.System;
 
     /// <summary>
-    ///     What this policy is currently measuring: the attempt ceiling, the backoff base and the hedge
-    ///     threshold, each <c>null</c> until its feature is configured and its estimate is warm.
+    ///     What this policy is currently measuring: the attempt ceiling, the backoff base, the hedge
+    ///     threshold and the thread pool's queue delay, each <c>null</c> until its feature is configured
+    ///     and its estimate is warm.
     ///     <para>
     ///         Readings, not configuration. The configuration that produces them is
-    ///         <see cref="AttemptCeiling" />, <see cref="NResilience.Backoff.MeasuredBase" /> and
-    ///         <see cref="Hedge" />. Reading one validates the policy, exactly as executing it does.
+    ///         <see cref="AttemptCeiling" />, <see cref="NResilience.Backoff.MeasuredBase" />,
+    ///         <see cref="Hedge" /> and <see cref="Saturation" />. Reading one validates the policy,
+    ///         exactly as executing it does.
     ///     </para>
     /// </summary>
     /// <remarks>
@@ -530,6 +567,14 @@ public sealed partial record Resilience
                     "Adaptive is false, so this policy measures nothing, but Hedge is set. " +
                     "Hedging has no constant form - its threshold is always a measured quantile - so remove one of the two.");
             }
+
+            if (Saturation is not null)
+            {
+                problems.Add(
+                    "Adaptive is false, so this policy measures nothing, but Saturation is set. " +
+                    "Saturation only decides when to stop measuring, so it has nothing to do here - remove it, " +
+                    "or drop Adaptive = false to keep the measured terms it guards.");
+            }
         }
 
         if (Hedge is { } hedge)
@@ -541,6 +586,23 @@ public sealed partial record Resilience
             // up believing a dependency's tail is being managed when it is not.
             if (Attempts <= 1)
                 problems.Add($"Hedge needs more than one attempt to work with; Attempts is {Attempts}.");
+        }
+
+        if (Saturation is { } saturation)
+        {
+            saturation.Validate(problems);
+
+            // Saturation does nothing but decline to feed a measured term, so a policy with no measured
+            // term has asked for a guard over nothing. Rejected rather than ignored, for the reason the
+            // two checks above are: silently doing nothing is how a caller ends up believing their
+            // estimates are protected from a local incident when they are not.
+            if (AttemptCeiling is null && Backoff.MeasuredBase is null && Hedge is null)
+            {
+                problems.Add(
+                    "Saturation is set, but this policy measures nothing for it to protect: AttemptCeiling, " +
+                    "Backoff.MeasuredBase and Hedge are all unconfigured. Remove Saturation, or configure a " +
+                    "measured term for it to guard.");
+            }
         }
 
         return problems;

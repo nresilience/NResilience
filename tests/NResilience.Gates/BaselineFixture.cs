@@ -77,6 +77,9 @@ public static class Baseline
     /// <summary>The third execution path, in its steady state: hedging configured, no hedge firing.</summary>
     public const string LibDefaultHedge = "lib: Default + hedging";
 
+    /// <summary>The suspending path with saturation awareness on. See <c>ShippingScenarios.DefaultWithSaturation</c>.</summary>
+    public const string LibDefaultSaturation = "lib: Default + saturation";
+
     public const string LibDefaultValue = "lib: Default, ValueTask callback";
 
     public const string LibRetry = "lib: retry x2 -> success";
@@ -119,6 +122,9 @@ public static class Baseline
     public const string LibDefaultSyncState = "lib: Default, static+state";
 
     public const string LibExplainedSyncState = "lib: explained, static+state";
+
+    /// <summary>The same, with <c>Saturation</c> configured. See <c>ShippingScenarios.DefaultWithSaturation</c>.</summary>
+    public const string LibSaturationSyncState = "lib: saturation, static+state";
 
     /// <summary>A <c>ValueTask</c>-returning callback that already has its answer.</summary>
     public const string LibTrivialValueSyncState = "lib: trivial, ValueTask+state";

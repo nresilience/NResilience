@@ -187,8 +187,8 @@ public sealed partial record Resilience
         var problems = Problems();
 
         return problems.Count > 0
-            ? new Readings(problems, null, null, null, null)
-            : new Readings([], ReadCeiling(), ReadBackoffBase(), ReadHedgeThreshold(), ExecutionState.BudgetFor(this));
+            ? new Readings(problems, null, null, null, null, null)
+            : new Readings([], ReadCeiling(), ReadBackoffBase(), ReadHedgeThreshold(), ReadQueueDelay(), ExecutionState.BudgetFor(this));
     }
 
     /// <summary>
@@ -571,24 +571,50 @@ public sealed partial record Resilience
             return;
         }
 
-        Rows(
-            writer,
-            "Measured now:",
-            [
-                Reading(
-                    "attempt ceiling",
-                    readings.Ceiling,
-                    AttemptCeiling is { } ceiling ? Quantile(ceiling.Multiple, ceiling.Quantile, ceiling.Window, ceiling.MinimumSamples) : null),
-                Reading(
-                    "backoff base",
-                    readings.BackoffBase,
-                    Backoff.MeasuredBase is { } measured ? Quantile(measured.Multiple, measured.Quantile, measured.Window, measured.MinimumSamples) : null),
-                Reading(
-                    "hedge threshold",
-                    readings.HedgeThreshold,
-                    Hedge is { } hedge ? Quantile(multiple: 1, hedge.Quantile, hedge.Window, hedge.MinimumSamples) : null),
-            ]);
+        List<(string, string, string)> rows =
+        [
+            Reading(
+                "attempt ceiling",
+                readings.Ceiling,
+                AttemptCeiling is { } ceiling ? Quantile(ceiling.Multiple, ceiling.Quantile, ceiling.Window, ceiling.MinimumSamples) : null),
+            Reading(
+                "backoff base",
+                readings.BackoffBase,
+                Backoff.MeasuredBase is { } measured ? Quantile(measured.Multiple, measured.Quantile, measured.Window, measured.MinimumSamples) : null),
+            Reading(
+                "hedge threshold",
+                readings.HedgeThreshold,
+                Hedge is { } hedge ? Quantile(multiple: 1, hedge.Quantile, hedge.Window, hedge.MinimumSamples) : null),
+            Reading("pool queue delay", readings.QueueDelay, Saturation is { } local ? Local(local) : null),
+        ];
+
+        // The three rows above are what this policy measures; this one is the condition under which it
+        // stops. Said as a note rather than folded into the rows, because it is the only line here that
+        // changes what the others mean.
+        if (Saturation is { } settings)
+        {
+            rows.Add((
+                "(measurement pauses above " + Compact(settings.Floor) + " and "
+                + settings.Multiple.ToString("0.##", CultureInfo.InvariantCulture)
+                + "x normal, so the three rows above hold whatever they last learned)",
+                string.Empty,
+                string.Empty));
+        }
+
+        Rows(writer, "Measured now:", rows);
     }
+
+    /// <summary>
+    ///     <see cref="NResilience.Saturation" />'s configuration, short enough for a column. Not
+    ///     <see cref="Quantile" />, because the multiple here is against this process's own median
+    ///     rather than against the dependency's latency, and the floor is load-bearing rather than a
+    ///     guardrail.
+    /// </summary>
+    private static string Local(Saturation settings) =>
+        settings.Multiple.ToString("0.##", CultureInfo.InvariantCulture) + "x p"
+        + (PoolProbe.Quantile * 100).ToString("0.##", CultureInfo.InvariantCulture)
+        + " of queue delay over " + Compact(PoolProbe.Window) + ", "
+        + Count(settings.MinimumSamples, "sample") + " minimum";
 
     /// <summary>One reading: its value when warm, and the configuration behind it either way.</summary>
     private static (string, string, string) Reading(string name, TimeSpan? value, string? configured) =>
@@ -856,6 +882,7 @@ public sealed partial record Resilience
         TimeSpan? Ceiling,
         TimeSpan? BackoffBase,
         TimeSpan? HedgeThreshold,
+        TimeSpan? QueueDelay,
         RetryBudget? Budget);
 
     /// <summary>The worst-case walk: its rows, and the facts the bound sentence is built from.</summary>

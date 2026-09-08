@@ -98,6 +98,7 @@ Four behaviors are worth knowing:
 - **Throttling keeps its constant.** A rate limiter that answers in two milliseconds is telling you about its token bucket, not about how long to wait. Where the server does know, it says so, and `Retry-After` already wins over every curve.
 - **Only successful attempts are sampled.** A dependency failing fast has a very short latency distribution, and a base measured from it would turn the retry curve into a tight loop at the moment the dependency could least afford one.
 - **The estimate is per policy instance.** The [HTTP handler](../http/index.md) derives one policy per host, so each host's base is measured from that host's own latency. A policy rebuilt per call never warms its estimate - [`NRES008`](../reference/analyzers.md#nres008) reports that shape.
+- **It measures wall clock, and attributes all of it to the dependency.** A local thread pool deep enough to add 400 ms to every call lengthens the backoff, so the retry that would have worked waits. [`Saturation`](saturation.md) is the opt-in switch that stops the baseline learning that.
 
 Read the current value from `policy.Measured.BackoffBase`, or watch the `nresilience.backoff.base` histogram, which is recorded when the number moves. Both report the base after the clamp, so the gap between it and your `transientBase` is how wrong the constant was.
 

@@ -21,6 +21,7 @@ NResilience replaces complex fluent builders, confusing policy ordering, and man
 - **Sensible defaults.** Get a working, retried HTTP call with one line of code.
 - **One method for everything.** Use `RunAsync` for HTTP calls, database queries, or queue reads.
 - **Measured, not guessed.** Attempt ceilings, circuit breaker trips, and even the concurrency limit are measured from what the dependency actually does, so you never guess a millisecond figure per dependency.
+- **It knows when the problem is local.** `Saturation.Above(5)` stops those measurements learning from a duration that is mostly this process's own thread-pool queue - the one incident where every measured bound would otherwise loosen at once, and the breaker would sit quiet because the dependency really is fine.
 - **Retry budget.** A cap on retries as a fraction of traffic, on by default, so a fleet of clients cannot overwhelm a struggling dependency.
 - **Hedging.** When a call is slow, a duplicate request races it. Hedges pause while the dependency degrades, so they never pile onto a struggling service.
 - **Deadline propagation.** Deadlines travel across services: the gRPC interceptor sends `grpc-timeout`, and the ASP.NET middleware reads what a caller sent so outbound calls inherit it.

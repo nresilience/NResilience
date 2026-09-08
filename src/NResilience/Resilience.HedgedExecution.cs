@@ -248,8 +248,12 @@ public sealed partial record Resilience
 
                 // A refusal this process imposed on itself never reached the dependency, so it is not a
                 // sample of how long the dependency takes and must not move the threshold that decides
-                // when to hedge it.
-                if (!outcome.Verdict.SelfImposed)
+                // when to hedge it. Neither is a duration measured while this process's own thread pool
+                // is queueing - and a hedge threshold that learned the queue delay would arm later
+                // during exactly the incident where a second copy of the work is the wrong answer.
+                //
+                // Zero, so the episode is reported by the RecordAttempt below rather than twice per leg.
+                if (!outcome.Verdict.SelfImposed && !Contaminated(attemptNumber: 0))
                     latency.Record(outcome.Duration);
 
                 verdict = outcome.Verdict;

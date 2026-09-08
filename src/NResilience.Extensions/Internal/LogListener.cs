@@ -188,6 +188,14 @@ internal sealed class LogListener
 
                 break;
 
+            // The onset of an episode, so this is already one line per local incident. No flood control
+            // for the same reason the two above need none.
+            case CallEventKind.SaturationDetected:
+                if (Level(Log.Ids.SaturationDetected, e) is { } saturated)
+                    Log.SaturationDetected(_logger, saturated, policy, Ms(e.Delay));
+
+                break;
+
             case CallEventKind.Stalled:
                 if (Level(Log.Ids.Stalled, e) is { } stalled)
                 {

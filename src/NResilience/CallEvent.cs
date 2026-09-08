@@ -192,6 +192,26 @@ public enum CallEventKind : byte
     ///     </para>
     /// </summary>
     Stalled,
+
+    /// <summary>
+    ///     This process's own thread pool started queueing, so the policy stopped feeding its measured
+    ///     terms. <see cref="CallEvent.Delay" /> carries the queue delay that was measured.
+    ///     <para>
+    ///         The onset of an episode, not every call in it: one event when the process crosses
+    ///         <see cref="NResilience.Saturation.Multiple" /> times its own normal queue delay, and
+    ///         nothing more until the queue has drained and filled again. So a listener counting these
+    ///         is counting local incidents, which is the number worth counting - the continuous view is
+    ///         <see cref="MeasuredValues.QueueDelay" /> and the <c>nresilience.pool.delay</c>
+    ///         instrument.
+    ///     </para>
+    ///     <para>
+    ///         Not a failure, and not terminal. Nothing is refused and no bound moves; the attempt
+    ///         ceiling, the measured backoff base and the hedge threshold simply hold what they last
+    ///         learned. Raised only by a policy that configures
+    ///         <see cref="Resilience.Saturation" />, which is off by default.
+    ///     </para>
+    /// </summary>
+    SaturationDetected,
 }
 
 /// <summary>

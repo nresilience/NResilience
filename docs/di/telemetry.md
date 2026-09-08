@@ -50,6 +50,7 @@ The library uses `StartActivity`, which returns `null` when the tracing system i
 | `nresilience.hedge_discarded` | A hedged leg lost the race and was cancelled. |
 | `nresilience.attempt_ceiling_adapted` | The measured attempt ceiling moved. |
 | `nresilience.backoff_base_adapted` | The measured backoff base moved. |
+| `nresilience.saturation_detected` | This process's thread pool started queueing, so the policy stopped measuring. |
 | `nresilience.breaker_opened`, `nresilience.breaker_closed`, `nresilience.breaker_half_opened` | The breaker changed state. |
 | `nresilience.orphaned_work` | An attempt kept running after the call returned. |
 | `nresilience.nested_retry` | The call is already inside a retrying client. |

@@ -11,9 +11,10 @@ Policy "api" - 3 attempts, 5s deadline, 10s attempt timeout
                    private to this policy, holds the sustained rate to 1.1x - 10% of successful
                    attempts, with a 3/s floor - and it is 0% spent.
 
-  Measured now:    attempt ceiling  -  cold - 3x p95 over 5m, 20 samples minimum
-                   backoff base     -  not configured
-                   hedge threshold  -  not configured
+  Measured now:    attempt ceiling   -  cold - 3x p95 over 5m, 20 samples minimum
+                   backoff base      -  not configured
+                   hedge threshold   -  not configured
+                   pool queue delay  -  not configured
 
   Breaker:         not configured, so nothing stops a call reaching a dependency that is already
                    down.

@@ -156,6 +156,22 @@ public static class ResilienceTelemetry
         "s",
         "The measured backoff base, recorded when it changes. Reported only by a policy that configures Backoff.MeasuredBase.");
 
+    /// <summary>
+    ///     How long a work item waits for a thread in this process's pool, recorded when a policy that
+    ///     configures <see cref="Resilience.Saturation" /> finds the pool saturated.
+    ///     <para>
+    ///         The only instrument here that describes this process rather than a dependency, and the
+    ///         one to put beside <c>nresilience.attempt.ceiling</c> and <c>nresilience.backoff.base</c>:
+    ///         when all three rise together, the dependency did not get slower and this host did. It is
+    ///         also the only instrument whose silence is good news - nothing is recorded while the pool
+    ///         is healthy.
+    ///     </para>
+    /// </summary>
+    private static readonly Histogram<double> PoolDelay = Meter.CreateHistogram<double>(
+        "nresilience.pool.delay",
+        "s",
+        "How long a work item waited for a thread, recorded when the local pool is saturated. Recorded at the onset of an episode, so a count of samples is a count of local incidents.");
+
     private static readonly Histogram<double> LeaseWait = Meter.CreateHistogram<double>(
         "nresilience.limiter.wait.duration",
         unit: "s",
@@ -280,6 +296,13 @@ public static class ResilienceTelemetry
                     MeasuredBase.Record(measured.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
 
                 Annotate(e, "nresilience.backoff_base_adapted");
+                break;
+
+            case CallEventKind.SaturationDetected:
+                if (e.Delay is { } queued)
+                    PoolDelay.Record(queued.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
+
+                Annotate(e, "nresilience.saturation_detected");
                 break;
 
             case CallEventKind.Stalled:

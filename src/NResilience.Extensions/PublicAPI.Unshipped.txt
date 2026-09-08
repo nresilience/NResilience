@@ -241,12 +241,24 @@ NResilience.Extensions.ResilienceOptions.Name.set -> void
 NResilience.Extensions.ResilienceOptions.Preset.get -> string?
 NResilience.Extensions.ResilienceOptions.Preset.set -> void
 NResilience.Extensions.ResilienceOptions.ResilienceOptions() -> void
+NResilience.Extensions.ResilienceOptions.Saturation.get -> NResilience.Extensions.SaturationOptions?
+NResilience.Extensions.ResilienceOptions.Saturation.set -> void
 NResilience.Extensions.ResilienceOptions.Telemetry.get -> bool?
 NResilience.Extensions.ResilienceOptions.Telemetry.set -> void
 NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseline = null) -> NResilience.Resilience!
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.get -> bool?
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.set -> void
 NResilience.Extensions.ResilienceTelemetry
+NResilience.Extensions.SaturationOptions
+NResilience.Extensions.SaturationOptions.Enabled.get -> bool?
+NResilience.Extensions.SaturationOptions.Enabled.set -> void
+NResilience.Extensions.SaturationOptions.Floor.get -> System.TimeSpan?
+NResilience.Extensions.SaturationOptions.Floor.set -> void
+NResilience.Extensions.SaturationOptions.MinimumSamples.get -> int?
+NResilience.Extensions.SaturationOptions.MinimumSamples.set -> void
+NResilience.Extensions.SaturationOptions.Multiple.get -> double?
+NResilience.Extensions.SaturationOptions.Multiple.set -> void
+NResilience.Extensions.SaturationOptions.SaturationOptions() -> void
 NResilience.Extensions.SlowCallsOptions
 NResilience.Extensions.SlowCallsOptions.Enabled.get -> bool?
 NResilience.Extensions.SlowCallsOptions.Enabled.set -> void

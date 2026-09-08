@@ -65,6 +65,22 @@ internal sealed class ExecutionState
     /// </summary>
     private long _lastCeilingTicks;
 
+    /// <summary>
+    ///     The reading <see cref="ProbeFor" /> hands back instead of the process-wide probe's, or null -
+    ///     which it always is outside this library's own tests.
+    ///     <para>
+    ///         The seam is per policy instance rather than a static, because the probe is process-wide
+    ///         and a test that moved it would move it for every test running beside it.
+    ///     </para>
+    /// </summary>
+    private PoolProbe.Reading? _probe;
+
+    /// <summary>
+    ///     Whether this policy instance last found the process saturated. <c>1</c> for yes, so the
+    ///     onset can be reported once per episode rather than once per attempt.
+    /// </summary>
+    private int _saturated;
+
     private ExecutionState(Resilience policy)
     {
         // A policy that cannot retry has nothing to spend and nobody to fund, so it gets no budget
@@ -244,6 +260,79 @@ internal sealed class ExecutionState
 
         return Interlocked.Exchange(ref StateFor(policy)._lastBackoffBaseTicks, ticks) != ticks;
     }
+
+    /// <summary>
+    ///     What the thread pool currently looks like, as this policy instance sees it.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <param name="minimumSamples">How many probes the baseline needs before it reports one.</param>
+    /// <returns>The reading.</returns>
+    /// <remarks>
+    ///     The probe itself is process-wide - one thread pool, one queue - and this exists only to let
+    ///     a test substitute a reading for one policy without moving the number every other test in the
+    ///     process is reading. In production it is the thread-static reference comparison
+    ///     <see cref="StateFor" /> primes, a null check, and the probe's two volatile loads.
+    /// </remarks>
+    public static PoolProbe.Reading ProbeFor(Resilience policy, int minimumSamples)
+    {
+        var state = StateFor(policy);
+
+        return state._probe ?? PoolProbe.Read(minimumSamples);
+    }
+
+    /// <summary>
+    ///     Whether the process reads as saturated under this policy's settings, so a duration measured
+    ///     now would describe the local queue rather than the dependency.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <param name="settings">The policy's saturation settings.</param>
+    /// <param name="delay">What the pool's queue delay currently is, whatever the answer.</param>
+    /// <returns>True when the estimates should not be fed.</returns>
+    /// <remarks>
+    ///     Answering "no" ends the episode, so the next onset can be reported. Answering "yes" does not
+    ///     start one - see <see cref="SaturationOnset" /> for why the two are separate calls.
+    /// </remarks>
+    public static bool Saturated(Resilience policy, in Saturation settings, out TimeSpan delay)
+    {
+        var state = StateFor(policy);
+        var reading = state._probe ?? PoolProbe.Read(settings.MinimumSamples);
+        delay = reading.Delay;
+
+        if (settings.IsSaturated(reading))
+            return true;
+
+        Volatile.Write(ref state._saturated, 0);
+        return false;
+    }
+
+    /// <summary>
+    ///     Claims the current saturation episode for reporting: true for the first caller in it, false
+    ///     for every caller after.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <returns>True when this is the attempt that noticed.</returns>
+    /// <remarks>
+    ///     Separate from <see cref="Saturated" /> because the hedged loop asks the question twice per
+    ///     leg - once before it feeds the latency estimate, once from <c>RecordAttempt</c> - and only
+    ///     the second of those reports. A single call that claimed the episode as a side effect of
+    ///     answering would let the first ask consume the onset and the second raise nothing, so the
+    ///     hedged path would be silent for the whole incident.
+    ///     <para>
+    ///         The flag is what keeps <see cref="CallEventKind.SaturationDetected" /> proportional to
+    ///         incidents rather than to traffic - the same argument <see cref="CeilingChanged" /> makes,
+    ///         and it matters more here: this is reached on every recorded attempt, so without it a
+    ///         listener would see an event per call for the duration of the incident.
+    ///     </para>
+    /// </remarks>
+    public static bool SaturationOnset(Resilience policy) => Interlocked.Exchange(ref StateFor(policy)._saturated, 1) == 0;
+
+    /// <summary>
+    ///     Test seam: makes this policy instance read <paramref name="reading" /> instead of the
+    ///     process-wide probe, or null to put it back.
+    /// </summary>
+    /// <param name="policy">The policy.</param>
+    /// <param name="reading">The reading to substitute.</param>
+    internal static void OverrideProbe(Resilience policy, PoolProbe.Reading? reading) => StateFor(policy)._probe = reading;
 
     /// <summary>
     ///     The state for a policy: the per-thread cache when this thread just used the same policy,

@@ -33,6 +33,7 @@ Registration methods live in the `NResilience.Extensions` package as extension m
 | `RecoveryOptions` | Its recovery ramp - keys mirror [`Recovery`](breaker.md#recovery) | `Breaker:Recovery` |
 | [`HedgeOptions`](#hedgeoptions) | Hedging | `Hedge` |
 | [`WinRateOptions`](#winrateoptions) | Holding hedges back when they stop winning | `Hedge:WinRate` |
+| [`SaturationOptions`](#saturationoptions) | Not measuring while the local thread pool queues | `Saturation` |
 
 **Limiting, health and observability**
 
@@ -149,7 +150,7 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 `ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone". An unrecognized key is an error, not a no-op - see [An unrecognized key is an error](../di/configuration.md#an-unrecognized-key-is-an-error).
 
-**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `BoundProgress`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`. `Backoff` carries a `MeasuredBase` subsection of its own.
+**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `BoundProgress`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`, `Saturation`. `Backoff` carries a `MeasuredBase` subsection of its own.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **`Logging`**: A string of `"Off"`, `"Normal"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.
@@ -158,8 +159,8 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 ### Every section has an `Enabled`
 
-`Budget`, `AttemptCeiling`, `Breaker`, `Hedge`, and the `Failures`, `SlowCalls` and `Recovery` subsections
-of `Breaker` each take a nullable `bool Enabled`:
+`Budget`, `AttemptCeiling`, `Breaker`, `Hedge`, `Saturation`, and the `Failures`, `SlowCalls` and
+`Recovery` subsections of `Breaker` each take a nullable `bool Enabled`:
 
 | Value | Meaning |
 | :--- | :--- |
@@ -248,6 +249,19 @@ Opt-in, unlike the rest of `HedgeOptions`: it is a control loop over a control l
 | `Floor` | `50 ms` | A floor under the measured ceiling. |
 
 There is deliberately no way to make the measured ceiling longer than `AttemptTimeout`. The clamp is what makes the feature safe to leave on, and a key that lifted it would be the one key nobody should have.
+
+## `SaturationOptions`
+
+`SaturationOptions` provides the bindable shape of [`Saturation`](../features/saturation.md), which stops the policy feeding its measured terms while this process's thread pool queues. It is off unless the section is present, because it changes what every other measured term learns.
+
+| Property | Default | Description |
+| :--- | :--- | :--- |
+| `Enabled` | `null` | `false` drops the awareness a base policy carried. |
+| `Multiple` | `5` | How many times this process's normal queue delay counts as saturated. Must be greater than 1. |
+| `Floor` | `20 ms` | A floor under the delay that counts as saturated, whatever the multiple says. |
+| `MinimumSamples` | `20` | How many probes the baseline needs before it is used at all. |
+
+The section is refused on a policy that measures nothing - `AttemptCeiling`, `Backoff:MeasuredBase` and `Hedge` all off - because there would be nothing for it to guard.
 
 ## `MeasuredBaseOptions`
 

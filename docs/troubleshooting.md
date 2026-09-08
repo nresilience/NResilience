@@ -166,6 +166,17 @@ See [Error responses](./http/error-responses.md) for the full mapping.
 
 In a test hammering a dead dependency, set `Budget = RetryBudget.None`. In production, this symptom means the retry fraction has left the range where retrying helps.
 
+### Symptom: Every measured bound loosened at once during an incident, and the dependency was fine.
+
+> [!CAUTION] Quick fix
+> Turn on saturation awareness: `Saturation = Saturation.Above(multiple: 5)`, alongside whatever measured terms the policy already has.
+
+**Why this happens**: The library times the callback with a wall clock and attributes all of it to the dependency. When the local thread pool is the bottleneck, a work item waiting 400 ms for a thread is indistinguishable - from inside the executor - from a dependency that got 400 ms slower. So the attempt ceiling rises, the measured backoff base lengthens, and the hedge threshold climbs out of reach, all at the moment the process could least afford it. Neither the breaker nor the retry budget can see it, because the dependency really is fine.
+
+With `Saturation` set, the policy stops feeding those estimates while the pool queues, and `Measured.QueueDelay` plus the `nresilience.pool.delay` histogram name the cause. It only declines to record - nothing is refused and no bound moves - so it does not fix the pool. It stops the pool's problem being recorded as the dependency's.
+
+See [Local saturation](./features/saturation.md) for the whole mechanism.
+
 ### Symptom: A test is slow or flaky.
 
 **Solution**:
