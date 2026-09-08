@@ -173,9 +173,7 @@ In a test hammering a dead dependency, set `Budget = RetryBudget.None`. In produ
 
 **Why this happens**: The dependency publishes its rate limit in response headers, and the handler is honoring it. Once the remaining allowance is inside the reserve - a tenth of the published quota by default - the next attempt is refused locally rather than sent. The `RejectedByQuota` event and log record 1030 carry the time until the published window resets.
 
-The usual cause of an unwanted refusal is a quota published per account while several instances of your service share it: each one reads the whole allowance as its own, and each holds back a tenth of it. `Quota.Reserving(0)` refuses only once the dependency says nothing is left; `null` stops reading the headers at all.
-
-See [the published quota](./http/index.md#honor-the-allowance-the-dependency-publishes).
+The usual cause of an unwanted refusal is a quota published per account while several instances of your service share it: each one reads the whole allowance as its own, and each holds back a tenth of it. See [the published quota](./http/index.md#honor-the-allowance-the-dependency-publishes).
 
 ### Symptom: Every measured bound loosened at once during an incident, and the dependency was fine.
 
@@ -225,9 +223,7 @@ For exceptions the library rethrew, read the log from `Exception.Data` with `Att
 > [!CAUTION] Quick fix
 > `Console.WriteLine(api.Explain());`
 
-`Explain()` names the bound that binds first, lays out the worst case attempt by attempt, and reports which adaptive terms are warm. It answers the two questions a policy's properties cannot: how long can this call take, and which of these numbers is in effect right now.
-
-It is also safe on a policy that will not validate - the timeline is usually what makes the problem obvious. See [`Explain()`](reference/resilience.md#explaining-a-policy).
+`Explain()` names the bound that binds first, lays out the worst case attempt by attempt, and reports which measured terms are warm. It answers the two questions a policy's properties cannot: how long can this call take, and which of these numbers is in effect right now. It is also safe on a policy that will not validate - the timeline is usually what makes the problem obvious. See [`Explain()`](reference/resilience.md#explaining-a-policy).
 
 ### Symptom: A call is not being retried and you cannot see why.
 

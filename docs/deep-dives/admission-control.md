@@ -214,11 +214,8 @@ awaiter field to every caller that configures it - and the quota is on by defaul
 whose dependencies publish nothing. The send is already the seam: it runs per attempt, on the
 attempt's own token, inside the executor's `try`. The three properties
 [the callback is the seam](#the-callback-is-the-seam) asks for are true of it without adding
-anything.
-
-That is the general rule this section is here to record. **A guard that runs where the work runs
-should throw; a guard that runs instead of the work should be `Admit`.** The quota is the first kind:
-it is a question the handler can answer without leaving the method the send already occupies.
+anything. The rule the quota records: **a guard that runs where the work runs should throw; a guard
+that runs instead of the work should be `Admit`.**
 
 ## The exception belongs to the core
 

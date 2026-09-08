@@ -98,7 +98,7 @@ A `RateLimitedException` is thrown when local admission control refuses to start
 
 The [executor](index.md) always classifies it as `Verdict.Refused`, regardless of the configured classifier - so it is retried on the throttled curve, is never counted against the breaker, and is never charged to the [retry budget](../features/retry-budget.md). Because the executor handles it directly, a `Classifier` never sees it; calling `ClassifyException` with one returns `Permanent`.
 
-Throw it yourself from any limiter you bring, and it composes the same way. See [Rate limiting](../features/rate-limiting.md). The HTTP handler throws it for a spent [published quota](../http/index.md#honor-the-allowance-the-dependency-publishes), which is the one guard the library ships.
+Throw it yourself from any limiter you bring, and it composes the same way. See [Rate limiting](../features/rate-limiting.md). The HTTP handler throws it for a spent [published quota](../http/index.md#honor-the-allowance-the-dependency-publishes), the one guard the library ships.
 
 ## `ResilienceConfigurationException`
 
@@ -108,7 +108,7 @@ A `ResilienceConfigurationException` is thrown when a policy, breaker setting, o
 | :--- | :--- |
 | `Problems` | A collection of all configuration problems found. |
 
-When the policy is what was invalid, `Message` carries the list of problems and then the policy's own worst-case timeline, because for the mistake this exception is most often about - two time bounds in the wrong order - the timeline is what makes it obvious. `Problems` is unchanged by it: the timeline is context, not a problem of its own. It is the same text [`Explain()`](resilience.md#explaining-a-policy) prints.
+When the policy is what was invalid, `Message` carries the list of problems and then the policy's own worst-case timeline, because for the mistake this exception is most often about - two time bounds in the wrong order - the timeline is what makes it obvious. `Problems` is unchanged: the timeline is context, not a problem of its own. It is the same text [`Explain()`](resilience.md#explaining-a-policy) prints.
 
 This exception comes from `Resilience.Validate()`, `BreakerSettings.Validate()`, `HttpResilienceOptions.Validate()`, `GrpcResilienceOptions.Validate()`, and the `RetryBudget` factories. Each has a `Validated()` companion that runs the check and returns the receiver, so a `static readonly` field fails where it is written. It can also be thrown during DI registration or lazily on a policy instance's first execution.
 

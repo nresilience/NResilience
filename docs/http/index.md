@@ -145,7 +145,7 @@ A host that publishes neither has no quota, and the feature is invisible. So is 
 Set `LegacyHeaders` for a dependency that spells the triple differently - `X-Rate-Limit-*` is the common variant - naming exactly three headers, in the order limit, remaining, reset.
 
 > [!IMPORTANT]
-> A server publishing a per-account quota while you are one of fifty pods will make every pod believe it owns the whole allowance. The reserve does not fix that; only the 429 does, and the 429 still works exactly as it always has. The honest use is a single-instance client, or a generous reserve. Set `Quota = null` to read no headers at all.
+> A server publishing a per-account quota while you are one of fifty pods will make every pod believe it owns the whole allowance. The reserve does not fix that; only the 429 does. The honest use is a single-instance client, or a generous reserve. Set `Quota = null` to read no headers at all.
 
 ## Verify retry behavior
 

@@ -60,7 +60,7 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 
 The handler reads two shapes off every response and keeps the numbers per host. The standard fields - `RateLimit-Policy` carrying the quota `q` and window `w`, and `RateLimit` carrying the remaining allowance `r` and the seconds until reset `t` - win where both shapes are present, and the most constraining member of `RateLimit` is the one that binds. The legacy triple's reset is whole seconds, read as a Unix timestamp when it is too large to be a count from now.
 
-A refusal is `Verdict.Refused`, carrying the time until the window resets as the pushback: retried on the long backoff curve, never charged to the retry budget, never evidence against the host's breaker, and reported as the [`RejectedByQuota`](events.md#calleventkind) event and `RateLimitedException`. A host that publishes nothing, a window that has already reset, and a malformed field all leave the guard with no opinion.
+A refusal is `Verdict.Refused`, carrying the time until the window resets as the pushback: retried on the long backoff curve, never charged to the retry budget, never evidence against the host's breaker, and reported as the [`RejectedByQuota`](events.md#calleventkind) event and `RateLimitedException`. A host that publishes nothing, a remaining count with no quota to take a fraction of, a window that has already reset, and a malformed field all leave the guard with no opinion.
 
 ## `HttpResilience`
 

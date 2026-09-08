@@ -31,7 +31,7 @@ The presets cover common scenarios:
 | `Classifier` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
 | `Hedge` | `Hedge?` | `null` | Hedging. A `null` value indicates no hedging. Requires `Attempts` greater than 1. |
-| `Saturation` | `Saturation?` | `null` | Local saturation awareness. When set, the policy stops feeding `AttemptCeiling`, `Backoff.MeasuredBase` and the `Hedge` threshold while this process's thread pool queues more than `Multiple` times its own normal delay. It only declines to record: nothing is refused and no bound moves. Requires at least one of those three to be configured. See [Local saturation](../features/saturation.md). |
+| `Saturation` | `Saturation?` | `null` | Local saturation awareness. When set, the policy stops feeding `AttemptCeiling`, `Backoff.MeasuredBase` and the `Hedge` threshold while this process's thread pool queues more than `Multiple` times its own normal delay. It only declines to record: nothing is refused and no bound moves. Requires at least one of those three features to be configured. See [Local saturation](../features/saturation.md). |
 | `Budget` | `RetryBudget` | `RetryBudget.Automatic` | The retry budget. `RetryBudget.Automatic` creates a budget private to the policy instance, or to each key when the policy is scoped. `RetryBudget.None` is no budget. Any other instance is shared wherever the instance is shared. |
 | `BeforeAttempt` | `Func<NextAttempt, Task>?` | `null` | A function that runs before every attempt, including the first. |
 | `OnEvent` | `Action<CallEvent>?` | `null` | The telemetry listener. If `null`, no events are raised and no performance cost is incurred. |
@@ -60,7 +60,7 @@ The estimates are private to the policy instance. The HTTP handler derives one p
 
 ## Explaining a policy
 
-`Explain()` returns what the policy will do, as text: which bound binds first, the worst-case timeline attempt by attempt, the load a call can add, what each adaptive term currently measures, and what the breaker and the classifier will do about a failure.
+`Explain()` returns what the policy will do, as text: which bound binds first, the worst-case timeline attempt by attempt, the load a call can add, what each measured term currently reads, and what the breaker and the classifier will do about a failure.
 
 The worst-case wall clock of a call is a function of `Attempts`, `Deadline`, `AttemptTimeout`, `AttemptCeiling`, `Backoff`, the breaker's state and the budget's fill. `Explain()` computes it.
 
@@ -115,7 +115,7 @@ Policy "api" - 3 attempts, 5s deadline, 10s attempt timeout
 Two lines carry most of the value:
 
 - **`Bound first by`** names the bound that ends the worst case, and what it costs. An open breaker or a spent retry budget comes before any arithmetic, because a call refused by either never reaches the timeline below it.
-- **`Measured now`** distinguishes *configured* from *in effect*. Ten adaptive terms are invisible until they have samples, and a live reading is the only way to tell a cold estimate from a warm one.
+- **`Measured now`** distinguishes *configured* from *in effect*. A measured term is invisible until it has samples, and a live reading is the only way to tell a cold estimate from a warm one.
 
 <!-- snippet: explain-configured-versus-measured -->
 ```csharp
@@ -138,7 +138,7 @@ The same text reaches three other places:
 | The [health check](../di/health-checks.md) payload | One line per registered policy, under the key `policy:<name>`. |
 | [`NRES004`](analyzers.md#nres004-attempt-timeout-exceeds-deadline) | The same durations and the same clamp clause, computed at build time. |
 
-A call that does not ask for an explanation pays nothing for the method: no field on the record, no branch in the [executor](index.md), and no allocation. Reading the measured terms validates the policy and materializes its estimates, exactly as `Measured` does.
+A call that does not ask for an explanation pays nothing for the method: no field on the record, no branch in the [executor](index.md), and no allocation. Reading the measured terms validates the policy, exactly as `Measured` does.
 
 ## Methods
 

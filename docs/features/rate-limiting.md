@@ -11,7 +11,7 @@ A **limiter** bounds what leaves this process: the absolute rate of outbound cal
 It is a different guard from the two the library turns on for you. The [circuit breaker](circuit-breaker.md) reacts to evidence that a dependency is unhealthy. The [retry budget](retry-budget.md) bounds retries as a *fraction* of traffic. Neither bounds an absolute number, so neither stops you from exceeding a published quota or opening 500 concurrent connections to one host.
 
 > [!TIP]
-> If the dependency publishes its rate limit in response headers, you may not need a limiter at all. The HTTP handler reads those headers by default and refuses an attempt once the remaining allowance is inside the reserve - no rate to supply, because the dependency supplies it. See [the published quota](../http/index.md#honor-the-allowance-the-dependency-publishes). A limiter is the answer when the dependency publishes nothing, or when you need a concurrency bound rather than a rate.
+> If the dependency publishes its rate limit in response headers, you may not need a limiter at all. The HTTP handler reads those headers by default and refuses an attempt once the remaining allowance is inside the reserve - no rate to supply, because the dependency supplies it. A limiter is the answer when the dependency publishes nothing, or when you need a concurrency bound rather than a rate. See [the published quota](../http/index.md#honor-the-allowance-the-dependency-publishes).
 
 ## Turn it on for an HTTP client
 
