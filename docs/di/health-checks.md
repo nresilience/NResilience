@@ -35,11 +35,14 @@ Each guard is one entry in the check's `Data` dictionary:
 
 | Key | Value |
 | :--- | :--- |
+| `policy:<name>` | What the policy is configured to do and which bound binds first, on one line. The same sentence [`Explain()`](../reference/resilience.md#explaining-a-policy) prints, trimmed to fit a payload that is read on every probe. Registered policies only. |
 | `breaker:<name>` | `Closed`, `HalfOpen`, or `Open since <timestamp>` / `Recovering since <timestamp>` / `Isolated since <timestamp>`. |
 | `breaker:<name>:normal` | The measured normal latency in milliseconds, for a breaker whose `SlowCalls` trip is in effect - which is the default. Absent until the baseline has enough samples. |
 | `budget:<name>` | Utilization, from 0 to 1. |
 
 For a registered policy, `<name>` is the registration name. For an HTTP client it is `<client>:<host:port>`, so a client talking to three hosts reports three breakers, and you can tell which one is in trouble.
+
+`policy:<name>` reads, for example, `Policy "api" - 3 attempts, 5s deadline, 10s attempt timeout; bound first by the deadline (attempt 1 is clamped to 5.00s, 50% of the 10s attempt timeout, and attempts 2-3 never start)`. For the whole picture rather than one line, call [`Explain()`](../reference/resilience.md#explaining-a-policy) on the policy.
 
 The `Description` summarizes: either `"4 breaker(s) closed, 2 retry budget(s) funding retries."` or, when something is wrong, `"1 of 4 breaker(s) open, recovering or isolated."`
 

@@ -28,6 +28,32 @@ public sealed class HealthCheckTests
     }
 
     /// <summary>
+    ///     Every registered policy reports what it is configured to do and which bound binds first -
+    ///     the sentence an operator would otherwise have to derive from a configuration file, and the
+    ///     one every support question about a registered policy turns on.
+    ///     <para>
+    ///         One line rather than the whole <c>Resilience.Explain()</c>, because this payload is read
+    ///         on every probe.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task A_registered_policy_reports_which_bound_binds_first()
+    {
+        using var provider = Provider(services => services
+            .AddResilience("api", Resilience.Http with { Deadline = TimeSpan.FromSeconds(5) })
+            .AddHealthChecks().AddResilienceHealthCheck());
+
+        var summary = (string)(await Check(provider)).Data["policy:api"];
+
+        Assert.Contains("3 attempts, 5s deadline, 10s attempt timeout", summary, StringComparison.Ordinal);
+        Assert.Contains("bound first by the deadline", summary, StringComparison.Ordinal);
+        Assert.Contains("attempt 1 is clamped to 5.00s", summary, StringComparison.Ordinal);
+
+        // One line, so a probe that reads the payload on every request is not reading a page of ASCII.
+        Assert.DoesNotContain('\n', summary);
+    }
+
+    /// <summary>
     ///     An adaptive breaker knows what this dependency normally costs, and that is the number a
     ///     dashboard wants next to the state. It appears only once the baseline can answer, which is the
     ///     same condition under which the slow-call trip is armed.

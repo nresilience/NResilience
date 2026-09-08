@@ -59,8 +59,13 @@ public sealed class PolicyConfigurationTests
                                                                 """)));
 
         Assert.Equal("NRES004", reported.Id);
-        Assert.Contains("0:00:10", reported.GetMessage(), StringComparison.Ordinal);
-        Assert.Contains("0:00:05", reported.GetMessage(), StringComparison.Ordinal);
+
+        // The compact durations and the clamp clause are the same format Resilience.Explain() prints,
+        // which is the point of duplicating the renderer in the analyzer.
+        Assert.Equal(
+            "AttemptTimeout (10s) is longer than Deadline (5s); attempt 1 is clamped to 5s, 50% of the "
+            + "attempt timeout, so this setting can never be reached",
+            reported.GetMessage());
     }
 
     [Fact]

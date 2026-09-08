@@ -25,6 +25,7 @@ NResilience replaces complex fluent builders, confusing policy ordering, and man
 - **Hedging.** When a call is slow, a duplicate request races it. Hedges pause while the dependency degrades, so they never pile onto a struggling service.
 - **Deadline propagation.** Deadlines travel across services: the gRPC interceptor sends `grpc-timeout`, and the ASP.NET middleware reads what a caller sent so outbound calls inherit it.
 - **Testable.** Scripted callbacks, a recording listener, and fault injection make policies deterministic in tests.
+- **It explains itself.** `policy.Explain()` prints the worst case attempt by attempt, names the bound that binds first, and reports which measured terms are warm - so "how long can this call take?" has an answer you can read.
 - **Telemetry.** Every call raises one event carrying its verdict, retries, and delays; meters and an activity source expose them.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.
 - **Native AOT compatible.** Zero external dependencies and no reflection.

@@ -59,7 +59,7 @@ internal static class Diagnostics
     internal static readonly DiagnosticDescriptor AttemptTimeoutExceedsDeadline = Rule(
         AttemptTimeoutExceedsDeadlineId,
         "AttemptTimeout is longer than Deadline",
-        "AttemptTimeout ({0}) is longer than Deadline ({1}); an attempt is capped by whatever is left of the deadline, so this setting can never be reached",
+        "AttemptTimeout ({0}) is longer than Deadline ({1}); attempt 1 is clamped to {1}, {2} of the attempt timeout, so this setting can never be reached",
         Usage,
         DiagnosticSeverity.Warning,
         "The two bounds are different things and the deadline wins: it covers the whole call, retries and " +

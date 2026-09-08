@@ -180,4 +180,37 @@ internal static class TimeSpanValue
 
     /// <summary>The shortest honest rendering of a duration for a diagnostic message.</summary>
     internal static string Describe(this TimeSpan value) => value.ToString("g", CultureInfo.InvariantCulture);
+
+    /// <summary>
+    ///     The compact rendering <c>Resilience.Explain()</c> uses, duplicated here on purpose: an
+    ///     analyzer targets <c>netstandard2.0</c> and loads into the compiler's own process, so it
+    ///     cannot reference the runtime. What it can share is the format, so the sentence a developer
+    ///     reads in the IDE and the one <c>Explain()</c> prints at runtime are the same sentence.
+    /// </summary>
+    internal static string Compact(this TimeSpan value)
+    {
+        if (value.IsUnbounded())
+            return "no bound";
+
+        var magnitude = value == TimeSpan.MinValue ? TimeSpan.MaxValue : value < TimeSpan.Zero ? value.Negate() : value;
+
+        if (magnitude < TimeSpan.FromSeconds(1))
+            return Number(value.TotalMilliseconds) + "ms";
+
+        if (magnitude < TimeSpan.FromMinutes(1))
+            return Number(value.TotalSeconds) + "s";
+
+        return magnitude < TimeSpan.FromHours(1) ? Number(value.TotalMinutes) + "m" : Number(value.TotalHours) + "h";
+    }
+
+    /// <summary>
+    ///     How much of a bound something got, as a percentage of it. The same clause
+    ///     <c>Resilience.Explain()</c> writes for a deadline-clamped attempt.
+    /// </summary>
+    internal static string Share(this TimeSpan part, TimeSpan whole) =>
+        whole <= TimeSpan.Zero || whole.IsUnbounded()
+            ? "an unknown share"
+            : Number(part.Ticks / (double)whole.Ticks * 100) + "%";
+
+    private static string Number(double amount) => amount.ToString("0.##", CultureInfo.InvariantCulture);
 }

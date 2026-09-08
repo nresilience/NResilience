@@ -359,6 +359,8 @@ NResilience.Resilience.Classifier.init -> void
 NResilience.Resilience.Deadline.get -> System.TimeSpan
 NResilience.Resilience.Deadline.init -> void
 NResilience.Resilience.Equals(NResilience.Resilience? other) -> bool
+NResilience.Resilience.Explain() -> string!
+NResilience.Resilience.Explain(System.IO.TextWriter! writer) -> void
 NResilience.Resilience.Hedge.get -> NResilience.Hedge?
 NResilience.Resilience.Hedge.init -> void
 NResilience.Resilience.Measured.get -> NResilience.MeasuredValues

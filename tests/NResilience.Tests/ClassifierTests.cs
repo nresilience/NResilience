@@ -182,6 +182,12 @@ public sealed class ClassifierTests
     {
         var dump = Classifier.Http.ToString();
 
+        // A shipped preset names itself. "Default+" is true about how it was assembled and useless to
+        // whoever is reading the dump to find out what the policy will retry.
+        Assert.StartsWith("Classifier Http:", dump, StringComparison.Ordinal);
+        Assert.StartsWith("Classifier Data:", Classifier.Data.ToString(), StringComparison.Ordinal);
+        Assert.StartsWith("Classifier Default+:", Classifier.Default.On<InvalidOperationException>(Verdict.Transient).ToString(), StringComparison.Ordinal);
+
         Assert.Contains("HttpRequestException", dump, StringComparison.Ordinal);
         Assert.Contains("HttpResponseMessage", dump, StringComparison.Ordinal);
         Assert.Contains("any other exception -> Permanent", dump, StringComparison.Ordinal);

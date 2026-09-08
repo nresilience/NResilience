@@ -198,6 +198,15 @@ foreach (var attempt in result.Attempts)
 
 For exceptions the library rethrew, read the log from `Exception.Data` with `AttemptLog.Of(exception)`.
 
+### Symptom: You cannot tell what a policy will actually do.
+
+> [!CAUTION] Quick fix
+> `Console.WriteLine(api.Explain());`
+
+`Explain()` names the bound that binds first, lays out the worst case attempt by attempt, and reports which adaptive terms are warm. It answers the two questions a policy's properties cannot: how long can this call take, and which of these numbers is in effect right now.
+
+It is also safe on a policy that will not validate - the timeline is usually what makes the problem obvious. See [`Explain()`](reference/resilience.md#explaining-a-policy).
+
 ### Symptom: A call is not being retried and you cannot see why.
 
 > [!CAUTION] Quick fix

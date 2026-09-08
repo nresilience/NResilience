@@ -1,6 +1,5 @@
 using System.Data.Common;
 using System.Net.Sockets;
-using System.Text;
 
 namespace NResilience;
 
@@ -206,22 +205,55 @@ public sealed class Classifier
     /// <returns>A multi-line dump of the ruleset.</returns>
     public override string ToString()
     {
-        var text = new StringBuilder();
-        text.Append("Classifier ").Append(_name).Append(':').Append('\n');
+        var text = new StringWriter();
+        text.Write("Classifier ");
+        text.Write(_name);
+        text.Write(":\n");
+        Describe(text, indent: "  ");
+        return text.ToString();
+    }
 
+    /// <summary>The name this classifier was derived under: one of the presets, with a <c>+</c> per derivation.</summary>
+    internal string Name => _name;
+
+    /// <summary>
+    ///     Every rule in evaluation order, one per line, each prefixed by <paramref name="indent" /> and
+    ///     with no trailing newline.
+    /// </summary>
+    /// <param name="writer">Where to write.</param>
+    /// <param name="indent">What to put in front of each line.</param>
+    /// <remarks>
+    ///     Split out of <see cref="ToString" /> so <see cref="Resilience.Explain()" /> lists the same
+    ///     rules in the same order under its own indent. Two renderers would be two answers to "what
+    ///     will this retry?".
+    /// </remarks>
+    internal void Describe(TextWriter writer, string indent)
+    {
         foreach (var rule in _exceptionRules)
         {
-            text.Append("  exception ").Append(rule.Description).Append(" -> ").Append(rule.Constant?.ToString() ?? "(predicate)").Append('\n');
+            writer.Write(indent);
+            writer.Write("exception ");
+            writer.Write(rule.Description);
+            writer.Write(" -> ");
+            writer.Write(rule.Constant?.ToString() ?? "(predicate)");
+            writer.Write('\n');
         }
 
         foreach (var rule in _resultRules)
         {
-            text.Append("  result ").Append(rule.Description).Append(" -> (predicate)").Append('\n');
+            writer.Write(indent);
+            writer.Write("result ");
+            writer.Write(rule.Description);
+            writer.Write(" -> (predicate)");
+            writer.Write('\n');
         }
 
-        text.Append("  any other exception -> ").Append(_unrecognized.Kind);
-        text.Append('\n').Append("  any other result -> Ok");
-        return text.ToString();
+        writer.Write(indent);
+        writer.Write("any other exception -> ");
+        writer.Write(_unrecognized.Kind.ToString());
+        writer.Write('\n');
+        writer.Write(indent);
+        writer.Write("any other result -> Ok");
     }
 
     private Verdict ClassifyResultSlow<T>(T value)
@@ -249,6 +281,17 @@ public sealed class Classifier
     }
 
     private string DerivedName() => _name.EndsWith('+') ? _name : _name + "+";
+
+    /// <summary>
+    ///     This ruleset under a name of its own, for a shipped preset assembled by derivation.
+    ///     <para>
+    ///         Without it <see cref="Http" /> and <see cref="Data" /> report themselves as
+    ///         <c>Default+</c> - true about how they were built and useless to whoever is reading
+    ///         <see cref="Resilience.Explain()" /> or <see cref="ToString" /> to find out what a policy
+    ///         will retry. A preset is a thing with a name; only a caller's own derivation is anonymous.
+    ///     </para>
+    /// </summary>
+    private Classifier Named(string name) => new(_exceptionRules, _resultRules, _unrecognized, name);
 
     private static T[] Prepend<T>(T[] existing, T item)
     {
@@ -312,7 +355,7 @@ public sealed class Classifier
     private static class DataHolder
     {
         internal static readonly Classifier Instance =
-            Default.On<DbException>(static e => e.IsTransient ? Verdict.Transient : Verdict.Permanent);
+            Default.On<DbException>(static e => e.IsTransient ? Verdict.Transient : Verdict.Permanent).Named("Data");
     }
 
     private static class HttpHolder
@@ -332,7 +375,8 @@ public sealed class Classifier
                     // retry snippet in .NET, and shipping the correct thing in the box is the
                     // only defense against that.
                     _ => Verdict.Ok,
-                });
+                })
+                .Named("Http");
 
         private static TimeSpan? RetryAfterOf(HttpResponseMessage response)
         {

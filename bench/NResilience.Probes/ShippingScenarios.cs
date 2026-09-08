@@ -77,6 +77,13 @@ public static class ShippingScenarios
     };
 
     /// <summary>
+    ///     A <see cref="Lib.Resilience.Default" />-shaped policy that has already been explained once.
+    ///     A distinct instance rather than the preset, because explaining it materializes its execution
+    ///     state and the preset is measured by other arms that must not inherit that.
+    /// </summary>
+    public static readonly Resilience Explained = Explain(Resilience.Default with { Name = "explained" });
+
+    /// <summary>
     ///     This arm uses the shipping log listener chained behind the empty listener, with a
     ///     logger where all levels are disabled.
     ///     <para>
@@ -208,6 +215,19 @@ public static class ShippingScenarios
     public static ValueTask<int> DefaultSyncState() =>
         Resilience.Default.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
 
+    /// <summary>
+    ///     The same call again, on a policy that has already explained itself once.
+    ///     <para>
+    ///         <c>Resilience.Explain()</c> adds no field to the record and no branch to the executor, and
+    ///         this arm is what keeps that true. It also covers the one way the claim could quietly
+    ///         become false: explaining a policy reads its measured terms, which materializes the
+    ///         per-instance execution state - and if that state ever grew something the call path had to
+    ///         consult, this arm would separate from <see cref="DefaultSyncState" />.
+    ///     </para>
+    /// </summary>
+    public static ValueTask<int> ExplainedSyncState() =>
+        Explained.RunAsync(static (_, ct) => Gate.CompleteAsync(ct), 0);
+
     // ---- ValueTask-returning callbacks. ----
 
     /// <summary>
@@ -297,6 +317,16 @@ public static class ShippingScenarios
         public void Reset() => _counter.Reset();
 
         public ValueTask<int> RunAsync() => _policy.RunAsync(_callback, _counter);
+    }
+
+    /// <summary>
+    ///     Explains a policy and hands it back, so an arm can be built from an already-explained
+    ///     instance in a static initializer.
+    /// </summary>
+    private static Resilience Explain(Resilience policy)
+    {
+        _ = policy.Explain();
+        return policy;
     }
 
     public sealed class RetryArm

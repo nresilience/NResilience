@@ -25,6 +25,12 @@ internal sealed class ResilienceHealthCheck(
         {
             foreach (var guard in registered.Guards())
             {
+                // What the policy is configured to do and which bound binds first - the sentence every
+                // support question about a registered policy turns on, and one an operator otherwise has
+                // to derive from a configuration file. One line rather than the whole
+                // Resilience.Explain(), because a health payload is read on every probe.
+                data[$"policy:{guard.Name}"] = guard.Policy.Summarize();
+
                 Inspect(guard.Name, guard.Breaker, guard.Budget, data, ref tally);
             }
         }

@@ -112,6 +112,7 @@ public static class Arms
         Arm.Of("lib: trivial, static+state", ShippingScenarios.TrivialSyncState, AllocationCounter.ThreadLocal),
         Arm.Of("lib: trivial, callback", ShippingScenarios.TrivialSyncCallback, AllocationCounter.ThreadLocal),
         Arm.Of("lib: Default, static+state", ShippingScenarios.DefaultSyncState, AllocationCounter.ThreadLocal),
+        Arm.Of("lib: explained, static+state", ShippingScenarios.ExplainedSyncState, AllocationCounter.ThreadLocal),
         Arm.Of("lib: trivial, ValueTask+state", ShippingScenarios.TrivialValueSyncState, AllocationCounter.ThreadLocal),
         Arm.Of("lib: trivial, ValueTask via AsTask", ShippingScenarios.TrivialValueAsTaskSyncState, AllocationCounter.ThreadLocal),
         Arm.Of("lib: Default, ValueTask+state", ShippingScenarios.DefaultValueSyncState, AllocationCounter.ThreadLocal),

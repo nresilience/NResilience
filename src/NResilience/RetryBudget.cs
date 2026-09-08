@@ -39,6 +39,16 @@ public sealed class RetryBudget
     /// </summary>
     private const double BurstSeconds = 10.0;
 
+    /// <summary>
+    ///     The fraction <see cref="Automatic" /> resolves to, and the one <see cref="Of" /> and
+    ///     <see cref="Shared(string, double, int)" /> default to. Internal because it is a number the
+    ///     library may re-tune, and a public constant would be inlined into the caller's assembly.
+    /// </summary>
+    internal const double DefaultFraction = 0.1;
+
+    /// <summary>The per-second floor <see cref="Automatic" /> resolves to. Internal for the reason <see cref="DefaultFraction" /> is.</summary>
+    internal const int DefaultMinimumPerSecond = 3;
+
     private static readonly ConcurrentDictionary<string, RetryBudget> SharedBudgets = new(StringComparer.Ordinal);
     private readonly double _capacity;
     private readonly double _fraction;
@@ -161,8 +171,18 @@ public sealed class RetryBudget
             (Fraction: fraction, MinimumPerSecond: minimumPerSecond));
     }
 
+    /// <summary>
+    ///     Retries funded per successful attempt, so 0.1 is one retry per ten successes. Zero for
+    ///     <see cref="None" /> and for the <see cref="Automatic" /> marker, neither of which is a bucket.
+    /// </summary>
+    internal double Fraction => _fraction;
+
+    /// <summary>The absolute per-second floor. Zero for the two markers, for the reason <see cref="Fraction" /> is.</summary>
+    internal double MinimumPerSecond => _refillPerSecond;
+
     /// <summary>The bucket <see cref="Automatic" /> resolves to. Same defaults as <see cref="Of" />.</summary>
-    internal static RetryBudget CreateAutomatic(TimeProvider time) => new(null, 0.1, 3, time);
+    internal static RetryBudget CreateAutomatic(TimeProvider time) =>
+        new(null, DefaultFraction, DefaultMinimumPerSecond, time);
 
     /// <summary>Charges one retry. False means the retry is refused.</summary>
     internal bool TrySpend()

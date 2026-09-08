@@ -1,6 +1,10 @@
 namespace NResilience.DocSnippets;
 
 /// <summary>A single snippet extracted from a source file.</summary>
+/// <param name="Name">How a page names it in its <c>&lt;!-- snippet: … --&gt;</c> marker.</param>
+/// <param name="Language">The fence language: <c>csharp</c> for a marked region, <c>json</c> or <c>text</c> for a whole file.</param>
+/// <param name="Text">The snippet body, with no trailing newline.</param>
+/// <param name="Source">The file it came from.</param>
 public sealed record Snippet(string Name, string Language, string Text, string Source);
 
 /// <summary>A markdown file where snippet blocks do not match the sources.</summary>
@@ -28,6 +32,15 @@ public static class SnippetEngine
             if (extension is ".json")
             {
                 Add(snippets, new Snippet(Path.GetFileName(file), "json", File.ReadAllText(file).TrimEnd(), file));
+                continue;
+            }
+
+            // A .txt file is program output rather than program text: what a method prints, asserted
+            // against by a test in the same project. The page shows the real thing, and the test is
+            // what keeps it real.
+            if (extension is ".txt")
+            {
+                Add(snippets, new Snippet(Path.GetFileName(file), "text", File.ReadAllText(file).TrimEnd(), file));
                 continue;
             }
 
@@ -159,7 +172,7 @@ public static class SnippetEngine
 
     private static IEnumerable<string> SourceFiles(string root) =>
         Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories)
-            .Where(static file => Path.GetExtension(file) is ".cs" or ".json")
+            .Where(static file => Path.GetExtension(file) is ".cs" or ".json" or ".txt")
             .Where(static file => !file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .Where(static file => !file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
             .OrderBy(static file => file, StringComparer.Ordinal);

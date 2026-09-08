@@ -454,6 +454,24 @@ public sealed partial record Resilience
     /// <exception cref="ResilienceConfigurationException">The policy cannot be executed.</exception>
     public void Validate()
     {
+        var problems = Problems();
+
+        if (problems.Count > 0)
+            throw new ResilienceConfigurationException(problems, Timeline());
+    }
+
+    /// <summary>
+    ///     Everything wrong with this policy, in the order it is reported. Empty when the policy can be
+    ///     executed.
+    /// </summary>
+    /// <returns>The problems.</returns>
+    /// <remarks>
+    ///     Split from <see cref="Validate" /> so <see cref="Explain()" /> can ask whether the policy is
+    ///     valid without throwing - it is called on invalid policies by design, because the message
+    ///     <see cref="ResilienceConfigurationException" /> carries is one of its consumers.
+    /// </remarks>
+    internal List<string> Problems()
+    {
         var problems = new List<string>();
 
         if (Attempts < 1)
@@ -525,8 +543,7 @@ public sealed partial record Resilience
                 problems.Add($"Hedge needs more than one attempt to work with; Attempts is {Attempts}.");
         }
 
-        if (problems.Count > 0)
-            throw new ResilienceConfigurationException(problems);
+        return problems;
     }
 
     /// <summary>

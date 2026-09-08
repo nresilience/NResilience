@@ -127,11 +127,15 @@ public sealed class PolicyConfigurationAnalyzer : DiagnosticAnalyzer
             || attempt <= whole)
             return;
 
+        // The clamp is the sentence Resilience.Explain() prints for the same policy at runtime, computed
+        // here from the two literals: attempt 1 gets the whole deadline and nothing more, so the share
+        // of the attempt timeout it reaches is the ratio of the two.
         context.ReportDiagnostic(Diagnostic.Create(
             Diagnostics.AttemptTimeoutExceedsDeadline,
             attemptTimeout.Syntax.GetLocation(),
-            attempt.Describe(),
-            whole.Describe()));
+            attempt.Compact(),
+            whole.Compact(),
+            whole.Share(attempt)));
     }
 
     private static void Report(

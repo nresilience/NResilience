@@ -118,6 +118,8 @@ public static class Baseline
     public const string LibTrivialSyncCallback = "lib: trivial, callback";
     public const string LibDefaultSyncState = "lib: Default, static+state";
 
+    public const string LibExplainedSyncState = "lib: explained, static+state";
+
     /// <summary>A <c>ValueTask</c>-returning callback that already has its answer.</summary>
     public const string LibTrivialValueSyncState = "lib: trivial, ValueTask+state";
 

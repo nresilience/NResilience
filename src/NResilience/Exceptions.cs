@@ -462,6 +462,26 @@ public sealed class ResilienceConfigurationException : Exception
         Problems = [message];
     }
 
+    /// <summary>
+    ///     Creates the exception with the policy's own worst-case timeline appended to the message.
+    /// </summary>
+    /// <param name="problems">Every problem found.</param>
+    /// <param name="timeline">
+    ///     What <see cref="Resilience.Explain()" /> prints for the header and the worst case, or null
+    ///     when the policy has no bound worth laying out.
+    /// </param>
+    /// <remarks>
+    ///     Internal, and deliberately not a public overload: the timeline is the library's own answer to
+    ///     "why is this wrong", and a caller assembling one by hand would be assembling a message that
+    ///     claims to be the executor's. <see cref="Problems" /> is unchanged by it - the timeline is
+    ///     context, not a problem of its own.
+    /// </remarks>
+    internal ResilienceConfigurationException(IReadOnlyList<string> problems, string? timeline)
+        : base(Describe(problems) + (timeline is null ? string.Empty : Environment.NewLine + Environment.NewLine + timeline))
+    {
+        Problems = problems;
+    }
+
     /// <summary>Every problem found, not just the first.</summary>
     public IReadOnlyList<string> Problems { get; }
 

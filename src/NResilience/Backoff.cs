@@ -301,24 +301,7 @@ public readonly record struct Backoff
             return capped > TimeSpan.Zero ? capped : TimeSpan.Zero;
         }
 
-        var throttled = next.PreviousVerdict.Kind == VerdictKind.Throttled;
-        var transient = TransientBase;
-        var @base = throttled ? ThrottledBase : transient;
-
-        // Throttling is deliberately excluded: a rate limiter's refill interval is not visible in how
-        // fast it said no, and the one case where the server does know is the pushback above.
-        if (!throttled && normal is { } measured && MeasuredBase is { } adaptive)
-            @base = adaptive.BaseFor(transient, measured);
-
-        if (@base <= TimeSpan.Zero)
-            return TimeSpan.Zero;
-
-        var ticks = Kind == BackoffKind.Constant
-            ? @base.Ticks
-            : @base.Ticks * Math.Pow(Factor, Math.Max(0, next.Number - 2));
-
-        if (max != Timeout.InfiniteTimeSpan)
-            ticks = Math.Min(ticks, max.Ticks);
+        var ticks = CurveTicks(next.Number, next.PreviousVerdict.Kind == VerdictKind.Throttled, normal);
 
         ticks = Jitter switch
         {
@@ -336,6 +319,76 @@ public readonly record struct Backoff
 
         var clamped = ticks > long.MaxValue ? long.MaxValue : (long)ticks;
         return TimeSpan.FromTicks(clamped);
+    }
+
+    /// <summary>
+    ///     The narrowest and widest delay this curve can produce before <paramref name="attemptNumber" />,
+    ///     for <see cref="Resilience.Explain()" />. The widest is the pre-jitter curve value, so the
+    ///     worst-case wall clock a timeline reports is the one the executor can actually reach.
+    /// </summary>
+    /// <param name="attemptNumber">The attempt the delay precedes, one-based.</param>
+    /// <param name="normal">The measured baseline, or null when nothing is measuring.</param>
+    /// <param name="minimum">The shortest delay jitter can produce.</param>
+    /// <param name="maximum">The longest, which is the curve value itself.</param>
+    /// <returns>False for a <see cref="BackoffKind.Custom" /> curve, whose delays are not knowable in advance.</returns>
+    /// <remarks>
+    ///     A custom curve is reported as unknown rather than probed: the delegate is the caller's, and
+    ///     calling it to render an explanation would run their code at a point they never asked for.
+    /// </remarks>
+    internal bool TryRange(int attemptNumber, TimeSpan? normal, out TimeSpan minimum, out TimeSpan maximum)
+    {
+        minimum = TimeSpan.Zero;
+        maximum = TimeSpan.Zero;
+
+        if (Kind == BackoffKind.Custom)
+            return false;
+
+        var ticks = CurveTicks(attemptNumber, throttled: false, normal);
+
+        if (!double.IsFinite(ticks) || ticks <= 0)
+            return true;
+
+        maximum = TimeSpan.FromTicks(ticks > long.MaxValue ? long.MaxValue : (long)ticks);
+
+        minimum = Jitter switch
+        {
+            Jitter.Full => TimeSpan.Zero,
+            Jitter.Equal => maximum / 2,
+            _ => maximum,
+        };
+
+        return true;
+    }
+
+    /// <summary>
+    ///     The curve value before jitter, in ticks. Kept in <c>double</c> rather than converted to a
+    ///     <see cref="TimeSpan" /> because an uncapped exponential overflows here and the clamp belongs
+    ///     after the jitter multiplication, not before it - see <see cref="Compute(in NextAttempt, System.TimeSpan?)" />.
+    /// </summary>
+    /// <param name="attemptNumber">The attempt the delay precedes, one-based.</param>
+    /// <param name="throttled">Whether the previous verdict was <see cref="VerdictKind.Throttled" />.</param>
+    /// <param name="normal">The measured baseline, or null when nothing is measuring.</param>
+    /// <returns>The delay in ticks, which may be zero, negative or non-finite.</returns>
+    private double CurveTicks(int attemptNumber, bool throttled, TimeSpan? normal)
+    {
+        var transient = TransientBase;
+        var @base = throttled ? ThrottledBase : transient;
+
+        // Throttling is deliberately excluded: a rate limiter's refill interval is not visible in how
+        // fast it said no, and the one case where the server does know is the pushback Compute applies
+        // before it reaches here.
+        if (!throttled && normal is { } measured && MeasuredBase is { } adaptive)
+            @base = adaptive.BaseFor(transient, measured);
+
+        if (@base <= TimeSpan.Zero)
+            return 0;
+
+        var ticks = Kind == BackoffKind.Constant
+            ? @base.Ticks
+            : @base.Ticks * Math.Pow(Factor, Math.Max(0, attemptNumber - 2));
+
+        var max = MaximumDelay;
+        return max != Timeout.InfiniteTimeSpan ? Math.Min(ticks, max.Ticks) : ticks;
     }
 
     internal void Validate(List<string> problems)

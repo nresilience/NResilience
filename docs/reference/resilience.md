@@ -56,6 +56,87 @@ One property is computed rather than configured:
 
 The estimates are private to the policy instance. The HTTP handler derives one policy per host, so each host is measured independently.
 
+## Explaining a policy
+
+`Explain()` returns what the policy will do, as text: which bound binds first, the worst-case timeline attempt by attempt, the load a call can add, what each adaptive term currently measures, and what the breaker and the classifier will do about a failure.
+
+The worst-case wall clock of a call is a function of `Attempts`, `Deadline`, `AttemptTimeout`, `AttemptCeiling`, `Backoff`, the breaker's state and the budget's fill. `Explain()` computes it.
+
+<!-- snippet: explain-call -->
+```csharp
+var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 5), Name = "api" };
+
+// At a REPL, or once at startup. Nothing here contacts a dependency or runs your callback.
+Console.WriteLine(value: api.Explain());
+
+// The allocation-free form, for a log that wants it on a stream rather than on the heap.
+api.Explain(writer: Console.Out);
+```
+<!-- endsnippet -->
+
+For `Resilience.Http with { Deadline = TimeSpan.FromSeconds(5), Name = "api" }`:
+
+<!-- snippet: explain-api.txt -->
+```text
+Policy "api" - 3 attempts, 5s deadline, 10s attempt timeout
+
+  Bound first by:  the deadline. Attempt 1 is clamped to 5.00s, 50% of the 10s attempt timeout,
+                   and attempts 2-3 never start.
+
+  Worst case:      attempt 1  0.00s -> 5.00s  min(10s attempt timeout, 5.00s left)
+                   deadline   5.00s           DeadlineExceededException
+                   (a throttled attempt uses the 1s throttled base; Retry-After wins over both)
+
+  Load:            up to 3.0x per call from retries. The automatic retry budget, which is
+                   private to this policy, holds the sustained rate to 1.1x - 10% of successful
+                   attempts, with a 3/s floor - and it is 0% spent.
+
+  Measured now:    attempt ceiling  -  cold - 3x p95 over 5m, 20 samples minimum
+                   backoff base     -  not configured
+                   hedge threshold  -  not configured
+
+  Breaker:         not configured, so nothing stops a call reaching a dependency that is already
+                   down.
+
+  Classifier:      Http
+                     exception HttpRequestException -> Transient
+                     exception TimeoutException -> Transient
+                     exception IOException -> Transient
+                     exception SocketException -> Transient
+                     result HttpResponseMessage -> (predicate)
+                     any other exception -> Permanent
+                     any other result -> Ok
+```
+<!-- endsnippet -->
+
+Two lines carry most of the value:
+
+- **`Bound first by`** names the bound that ends the worst case, and what it costs. An open breaker or a spent retry budget comes before any arithmetic, because a call refused by either never reaches the timeline below it.
+- **`Measured now`** distinguishes *configured* from *in effect*. Ten adaptive terms are invisible until they have samples, and a live reading is the only way to tell a cold estimate from a warm one.
+
+<!-- snippet: explain-configured-versus-measured -->
+```csharp
+var api = Resilience.Http with { AttemptTimeout = TimeSpan.FromSeconds(value: 30) };
+
+// Configured: 30s. In effect: nothing yet - the ceiling is cold until it has samples, and
+// until then the attempt gets the 30 seconds. The "Measured now" block reports both.
+var configured = api.AttemptTimeout;
+var inEffect = api.Measured.AttemptCeiling;
+```
+<!-- endsnippet -->
+
+`Explain()` is safe to call on a policy that cannot be executed: an invalid policy is reported as such and the timeline is still laid out, because the timeline is usually what makes the problem obvious. Nothing in it runs the callback, contacts a dependency, or changes the policy.
+
+The same text reaches three other places:
+
+| Where | What it shows |
+| :--- | :--- |
+| `ResilienceConfigurationException.Message` | The header and the worst-case timeline, after the list of problems. |
+| The [health check](../di/health-checks.md) payload | One line per registered policy, under the key `policy:<name>`. |
+| [`NRES004`](analyzers.md#nres004-attempt-timeout-exceeds-deadline) | The same durations and the same clamp clause, computed at build time. |
+
+A call that does not ask for an explanation pays nothing for the method: no field on the record, no branch in the [executor](index.md), and no allocation. Reading the measured terms validates the policy and materializes its estimates, exactly as `Measured` does.
+
 ## Methods
 
 The `Resilience` record provides the execution methods.
@@ -74,6 +155,8 @@ The `Resilience` record provides the execution methods.
 | `RunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `IAsyncEnumerable<T>` |
 | `TryRunAsync<T>(Func<CancellationToken, IAsyncEnumerable<T>>, CancellationToken)` | `ValueTask<CallResult<IAsyncEnumerable<T>>>` |
 | `TryRunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `ValueTask<CallResult<IAsyncEnumerable<T>>>` |
+| `Explain()` | `string` |
+| `Explain(TextWriter)` | `void` |
 | `Validate()` | `void` |
 | `Validated()` | `Resilience` |
 | `WithListener(Action<CallEvent>)` | `Resilience` |

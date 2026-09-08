@@ -56,6 +56,17 @@ public sealed class AllocationGateTests(BaselineFixture baseline, ITestOutputHel
         => AssertSyncOverhead(Baseline.LibDefaultSyncState, Budgets.FullPolicyWithTimeoutSyncOverhead);
 
     /// <summary>
+    ///     <c>Resilience.Explain()</c> costs nothing on a call that does not ask for it. Free to state
+    ///     and worth stating: the method adds no field to the record and no branch to the executor, and
+    ///     explaining a policy materializes the same per-instance execution state a first execution
+    ///     would - so if that state ever grew something the call path had to consult, this arm would
+    ///     separate from the one above.
+    /// </summary>
+    [Fact]
+    public void Explaining_a_policy_does_not_make_its_calls_cost_more()
+        => AssertSyncOverhead(Baseline.LibExplainedSyncState, Budgets.FullPolicyWithTimeoutSyncOverhead);
+
+    /// <summary>
     ///     Verifies that callbacks returning <see cref="ValueTask" /> also allocate nothing.
     ///     This is measured against a raw <see cref="ValueTask" /> baseline to ensure the
     ///     result reflects the executor's overhead rather than the callback's savings.

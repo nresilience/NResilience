@@ -71,6 +71,8 @@ Reported when `AttemptTimeout` is longer than `Deadline`. Legal, and it passes v
 var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(5), AttemptTimeout = TimeSpan.FromSeconds(10) };
 ```
 
+The message reads `AttemptTimeout (10s) is longer than Deadline (5s); attempt 1 is clamped to 5s, 50% of the attempt timeout, so this setting can never be reached` - the same clamp clause [`Explain()`](resilience.md#explaining-a-policy) prints at runtime, in the same duration format. An analyzer cannot reference the runtime, because it targets `netstandard2.0` and loads into the compiler's own process, so what the two share is the format.
+
 This is only reported when both properties are set within the same expression.
 
 ## NRES005: Guard created per call
