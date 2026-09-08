@@ -187,6 +187,19 @@ internal sealed class LogListener
                     Log.BackoffBaseAdapted(_logger, backoffBase, policy, Ms(e.Delay));
 
                 break;
+
+            case CallEventKind.Stalled:
+                if (Level(Log.Ids.Stalled, e) is { } stalled)
+                {
+                    Log.Stalled(
+                        _logger,
+                        stalled,
+                        policy,
+                        e.Exception is AttemptStalledException { Transferred: var moved } ? moved : 0,
+                        Ms(e.Delay));
+                }
+
+                break;
         }
     }
 
@@ -410,6 +423,9 @@ internal sealed class LogListener
         // turned on has stopped being worth its load, and the operator reading Default should see it.
         Log.Codes.HedgeSuppressed => LogLevel.Debug,
         Log.Codes.PolicyClassifier => LogLevel.Trace,
+        // Warning, beside the other records a caller actually felt. A stall is a failed transfer
+        // that no other record covers - the call it belongs to logged CallSucceeded, because it did.
+        Log.Codes.Stalled => LogLevel.Warning,
         Log.Codes.NotRetriedFirstSighting => LogLevel.Warning,
         Log.Codes.RejectedDependencyUnavailable => LogLevel.Warning,
         Log.Codes.RejectedBudgetExhausted => LogLevel.Warning,

@@ -224,6 +224,8 @@ NResilience.Extensions.ResilienceOptions.Attempts.get -> int?
 NResilience.Extensions.ResilienceOptions.Attempts.set -> void
 NResilience.Extensions.ResilienceOptions.Backoff.get -> NResilience.Extensions.BackoffOptions?
 NResilience.Extensions.ResilienceOptions.Backoff.set -> void
+NResilience.Extensions.ResilienceOptions.BoundProgress.get -> bool?
+NResilience.Extensions.ResilienceOptions.BoundProgress.set -> void
 NResilience.Extensions.ResilienceOptions.Breaker.get -> NResilience.Extensions.BreakerOptions?
 NResilience.Extensions.ResilienceOptions.Breaker.set -> void
 NResilience.Extensions.ResilienceOptions.Budget.get -> NResilience.Extensions.BudgetOptions?

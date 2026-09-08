@@ -63,8 +63,8 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `Deadline`, `AttemptTimeout` | Time bounds for the call. Use `"Infinite"` for no bound. |
 | `Backoff` | A `BackoffOptions` section: `TransientBase`, `ThrottledBase`, `MaximumDelay`, `Factor`, `Jitter`. |
 | `Budget` | A `BudgetOptions` section: `Enabled`, `Fraction`, `MinimumPerSecond`, `Shared`. |
-| `AttemptCeiling` | An `AttemptCeilingOptions` section. On by default; `"AttemptCeiling": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |
-| `Backoff:MeasuredBase` | A `MeasuredBaseOptions` subsection. Off by default; `"Backoff": { "MeasuredBase": { "Multiple": 1 } }` measures the transient base from recent latency. |
+| `AttemptCeiling` | An `AttemptCeilingOptions` section. Enabled by default; `"AttemptCeiling": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |
+| `Backoff:MeasuredBase` | A `MeasuredBaseOptions` subsection. Disabled by default; `"Backoff": { "MeasuredBase": { "Multiple": 1 } }` measures the transient base from recent latency. |
 | `Breaker` | A `BreakerOptions` section. Omit it, or write `"Enabled": false`, for no circuit breaker. |
 | `Hedge` | A `HedgeOptions` section. Omit it, or write `"Enabled": false`, for no hedging. |
 | `Adaptive` | Set to `false` to turn off every measured term in the policy **and its breaker**. See [Turning measurement off](#turning-measurement-off). |

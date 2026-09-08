@@ -109,6 +109,17 @@ public sealed class ResilienceOptions
     public bool? UseAmbientDeadline { get; set; }
 
     /// <summary>
+    ///     <see cref="Resilience.BoundProgress" /> - whether a transfer that has stopped making
+    ///     progress counts as a failed attempt. Enabled by default, and the bound is
+    ///     <see cref="AttemptTimeout" /> rather than a number of its own.
+    ///     <para>
+    ///         <c>"BoundProgress": false</c> disables the bound for response bodies or streams
+    ///         that stop arriving. This is rarely needed.
+    ///     </para>
+    /// </summary>
+    public bool? BoundProgress { get; set; }
+
+    /// <summary>
     ///     <see cref="Resilience.Adaptive" /> - whether this policy measures the dependency and bounds
     ///     itself by what it measures. On by default; <c>"Adaptive": false</c> is the one key that turns
     ///     every measured term off and leaves only the constants this section wrote.
@@ -209,6 +220,9 @@ public sealed class ResilienceOptions
 
         if (UseAmbientDeadline is { } ambient)
             policy = policy with { UseAmbientDeadline = ambient };
+
+        if (BoundProgress is { } progress)
+            policy = policy with { BoundProgress = progress };
 
         if (Adaptive is { } adaptive)
             policy = policy with { Adaptive = adaptive };

@@ -45,6 +45,34 @@ public sealed class HttpResilienceOptions
     public bool OwnTransportTimeout { get; set; } = true;
 
     /// <summary>
+    ///     Whether the response body is read inside the attempt, so that a body that fails or stalls is
+    ///     retried like any other transient failure. Disabled by default.
+    ///     <para>
+    ///         The body is not part of the attempt. The transport returns as soon as the response headers
+    ///         arrive, so by the time the executor has a status code to classify, the body has not been
+    ///         read - and a body that stalls or breaks half-way through arrives at the caller's own read,
+    ///         after the call has already succeeded. <see cref="Resilience.BoundProgress" /> makes that
+    ///         failure finite; this makes it retryable, which is the stronger guarantee and the more
+    ///         expensive one.
+    ///     </para>
+    ///     <para>
+    ///         The cost is memory: the whole body is held before the call returns, so a client that
+    ///         downloads large files must leave this off. The benefit is that
+    ///         <see cref="Resilience.Deadline" /> and <see cref="Resilience.AttemptTimeout" /> cover the
+    ///         body, the breaker's slow-call detection sees the real duration of the call, and a broken
+    ///         body is one more transient failure rather than an exception the retry loop never hears
+    ///         about.
+    ///     </para>
+    ///     <para>
+    ///         Disabled by default because the memory cost is unbounded and the caller is the only one who
+    ///         knows how large their bodies are. Turning it on for a client whose responses are small -
+    ///         which is most JSON APIs - is close to free, because a caller reading a small body was
+    ///         going to buffer it a moment later anyway.
+    ///     </para>
+    /// </summary>
+    public bool BufferResponses { get; set; }
+
+    /// <summary>
     ///     Whether each host gets its own circuit breaker. On by default.
     ///     <para>
     ///         One breaker across every host means a dead host trips calls to the healthy ones, which is

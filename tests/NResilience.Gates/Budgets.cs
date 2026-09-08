@@ -226,11 +226,27 @@ public static class Budgets
     ///     caller supplies both a call-time and an enumeration-time token, which this arm does not -
     ///     the arm binds the caller's token at <c>RunAsync</c>, so the count here is the one-token
     ///     shape.
-    ///     Measured: 848 B/op on .NET 10 and 849 B/op on .NET 8, against the raw enumeration's
-    ///     1,216 B/op total - roughly twice the call path's Default overhead, which is the honest
-    ///     reading: a stream pays for everything a call pays (the box, the linked source, the pooled
-    ///     timer) plus the enumerator itself and the surviving sources a call tears down at attempt
-    ///     end. Budgeted with roughly 15% headroom over the measured figure, as the call budgets are.
+    ///     Measured: 856 B/op on .NET 10, against the raw enumeration's 1,225 B/op total - roughly
+    ///     twice the call path's Default overhead, which is the honest reading: a stream pays for
+    ///     everything a call pays (the box, the linked source, the pooled timer) plus the enumerator
+    ///     itself and the surviving sources a call tears down at attempt end. Budgeted with roughly
+    ///     15% headroom over the measured figure, as the call budgets are.
+    ///     <para>
+    ///         <b>Moved once, by 8 B/op.</b> It was 848 B/op on .NET 10 and 849 on .NET 8 before
+    ///         <see cref="Resilience.BoundProgress" /> bounded the gap between two elements. The
+    ///         8 bytes are the count of elements handed over, hoisted onto the iterator's box because
+    ///         it is live across every yield and <see cref="AttemptStalledException.Transferred" />
+    ///         reports it. Two cheaper arrangements were measured and neither moved the figure:
+    ///         reading <c>AttemptTimeout</c> per element rather than hoisting the bound, and skipping
+    ///         the arming entirely for a pull that completed synchronously - the second is kept
+    ///         anyway, because it is what stops a stream of ready elements touching a timer at all.
+    ///         The arrangement that did matter was structural: awaiting the pull inside the iterator's
+    ///         own <c>try</c>, with the <c>yield</c> outside it, rather than in an
+    ///         <c>async ValueTask&lt;bool&gt;</c> helper. The helper was the obvious shape and cost
+    ///         312 B/op on this three-element arm - one boxed state machine per suspending element -
+    ///         which is the whole reason the loop in <c>ExecuteStreamAsync</c> is written the way it
+    ///         is.
+    ///     </para>
     /// </summary>
     public const double DefaultStreamingOverhead = 1000;
 

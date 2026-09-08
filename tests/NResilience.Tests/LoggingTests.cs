@@ -49,6 +49,7 @@ public sealed class LoggingTests
         (1025, "AttemptCeilingAdapted"),
         (1026, "BackoffBaseAdapted"),
         (1027, "HedgeSuppressed"),
+        (1028, "Stalled"),
     ];
 
     // ---- The verbosity promise ----
@@ -116,6 +117,7 @@ public sealed class LoggingTests
             (Log.Ids.AttemptCeilingAdapted.Id, Log.Ids.AttemptCeilingAdapted.Name!),
             (Log.Ids.BackoffBaseAdapted.Id, Log.Ids.BackoffBaseAdapted.Name!),
             (Log.Ids.HedgeSuppressed.Id, Log.Ids.HedgeSuppressed.Name!),
+            (Log.Ids.Stalled.Id, Log.Ids.Stalled.Name!),
         ];
 
         Assert.Equal(Vocabulary.Select(row => (row.Id, row.Name)), actual);

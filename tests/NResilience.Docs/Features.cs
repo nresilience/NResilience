@@ -468,6 +468,29 @@ public sealed class Features
         public override bool IsTransient => true;
     }
 
+    [Fact]
+    public void A_body_that_stops_arriving_is_bounded_by_the_attempt_timeout()
+    {
+        // <snippet:deadline-progress>
+        var api = Resilience.Http with
+        {
+            // The attempt, and the gap between two reads of the body that attempt returned.
+            AttemptTimeout = TimeSpan.FromSeconds(value: 10),
+        };
+
+        // Nothing else to configure. A body that stops arriving for longer than AttemptTimeout fails
+        // the read with AttemptStalledException rather than hanging, and a body that keeps arriving is
+        // never cut off however long it takes - the bound is on the gap, not on the total.
+        //
+        // Two ways to change that. BoundProgress = false removes the bound entirely. BufferResponses
+        // reads the body inside the attempt, so a stall becomes one more transient failure and is
+        // retried - at the cost of holding the whole body in memory.
+        using var client = HttpResilience.CreateClient(api, new HttpResilienceOptions { BufferResponses = true });
+        // </snippet:deadline-progress>
+
+        Assert.True(condition: api.BoundProgress);
+    }
+
     /// <summary>Stands in for SqlException, whose Number is what tells a resource limit from a fault.</summary>
     internal sealed class SqlLikeException(int number) : DbException(message: $"error {number}")
     {

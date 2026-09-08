@@ -81,6 +81,22 @@ public static class ResilienceTelemetry
         "Hedged attempts, tagged started, won or discarded. Started against nresilience.calls is the extra load hedging is costing; won is what that load bought.");
 
     /// <summary>
+    ///     Transfers cut off for lack of progress, tagged by shape.
+    ///     <para>
+    ///         A counter rather than a span event, unlike the other things that "happened at a moment":
+    ///         a stall is a failure a caller saw, and the useful question is what fraction of bodies
+    ///         stall - which needs a denominator, and <c>nresilience.calls</c> is it. A rising
+    ///         <c>body</c> count against a flat <c>nresilience.rejections</c> is the signature of a
+    ///         dependency that answers and then stops writing, which is invisible in every other
+    ///         instrument here.
+    ///     </para>
+    /// </summary>
+    private static readonly Counter<long> StallCounter = Meter.CreateCounter<long>(
+        "nresilience.stalls",
+        "{stall}",
+        "Transfers cut off because nothing arrived within the attempt timeout, tagged body or stream. Against nresilience.calls, the fraction of answers that stopped part-way.");
+
+    /// <summary>
     ///     The adaptive threshold, sampled at the moments it actually decided something.
     ///     <para>
     ///         A histogram rather than the observable gauge this obviously wants to be, and the reason is
@@ -264,6 +280,19 @@ public static class ResilienceTelemetry
                     MeasuredBase.Record(measured.TotalSeconds, new KeyValuePair<string, object?>("nresilience.policy", policy));
 
                 Annotate(e, "nresilience.backoff_base_adapted");
+                break;
+
+            case CallEventKind.Stalled:
+                // AttemptNumber is 1 for a body - ProgressStream has no attempt to name, because the
+                // attempt was over before it existed - and the delivered element count for a stream.
+                // That is the tag: a body stall and a stream stall are different failures with
+                // different fixes, and the two never share a call.
+                StallCounter.Add(
+                    1,
+                    new KeyValuePair<string, object?>("nresilience.policy", policy),
+                    new KeyValuePair<string, object?>("nresilience.stall", e.Exception is AttemptStalledException { Transferred: var moved } && moved > 0 ? "partial" : "empty"));
+
+                Annotate(e, "nresilience.stalled");
                 break;
 
             case CallEventKind.HedgeSuppressed:

@@ -56,6 +56,12 @@ public sealed partial record Resilience
         // Redundant against Attempts = 1, and stated anyway: passthrough means *every* bound is
         // off, and a reader should not have to derive "so no budget either" from the attempt count.
         Budget = RetryBudget.None,
+
+        // A stall bound is a bound, and this preset has none. It is also the only bound whose
+        // absence a caller can observe as a hang rather than as a slow success, which is why
+        // Resilience.None says so here rather than leaving it to be inferred from AttemptTimeout
+        // being infinite - the two are separate switches, and only one of them is about the body.
+        BoundProgress = false,
     };
 
     /// <summary>
@@ -284,6 +290,44 @@ public sealed partial record Resilience
     ///     </para>
     /// </summary>
     public bool UseAmbientDeadline { get; init; }
+
+    /// <summary>
+    ///     Whether a transfer that has stopped making progress counts as a failed attempt. Enabled by
+    ///     default.
+    ///     <para>
+    ///         This adds no number. The bound is <see cref="AttemptTimeout" /> - the same number, applied
+    ///         to the part of a call that used to escape it. An HTTP response body and an
+    ///         <see cref="IAsyncEnumerable{T}" /> both continue after the executor has judged the attempt,
+    ///         and without this the gap between two reads, or between two elements, is bounded by nothing
+    ///         at all: not the deadline, not the attempt timeout, and not the breaker's slow-call
+    ///         detection. A dependency that sends headers and then stops writing produces a call that
+    ///         never completes.
+    ///     </para>
+    ///     <para>
+    ///         What it bounds is the <i>gap</i>, not the total. A large download that keeps arriving is
+    ///         never cut off however long it takes, because the deadline is a budget for reaching an
+    ///         answer and the body is what the answer was. The total is bounded too when the read is
+    ///         inside the attempt - a stream between elements, or a body read under
+    ///         <see cref="HttpResilienceOptions.BufferResponses" /> - because there the deadline still
+    ///         applies and always did.
+    ///     </para>
+    ///     <para>
+    ///         Where the stall surfaces decides whether it can be retried.
+    ///         <see cref="AttemptStalledException" /> from inside the attempt is classified
+    ///         <see cref="VerdictKind.Transient" /> and retried like any other transient failure; one
+    ///         from a body the caller is reading itself arrives at their read, after the call has already
+    ///         succeeded, and ends the read rather than the call. See
+    ///         <see cref="HttpResilienceOptions.BufferResponses" /> for the trade.
+    ///     </para>
+    ///     <para>
+    ///         Costs nothing when there is nothing to bound: a bodiless response, an
+    ///         <see cref="AttemptTimeout" /> of <see cref="Timeout.InfiniteTimeSpan" />, and every
+    ///         non-streaming call pay one branch. A response with a body costs one wrapper and one timer,
+    ///         created after the executor has returned, so nothing is added to the state-machine box of
+    ///         any call.
+    ///     </para>
+    /// </summary>
+    public bool BoundProgress { get; init; } = true;
 
     /// <summary>
     ///     Told about everything that happens during a call. Null - the default - means the executor

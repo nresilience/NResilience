@@ -149,17 +149,21 @@ public sealed class HttpResilienceHandler : DelegatingHandler
 
         // A hedged policy runs the callback concurrently and disposes every response it discards, so the
         // call must not also dispose "the previous one" - there is no such thing when attempts overlap.
-        var call = new HttpCall(request, _send, retrying, policy.Hedge is not null, StampFor(policy));
+        var call = new HttpCall(request, _send, retrying, policy.Hedge is not null, StampFor(policy), Options.BufferResponses);
 
         if (retrying)
             await call.BufferAsync(cancellationToken).ConfigureAwait(false);
 
         try
         {
-            return await policy.RunAsync(
+            var response = await policy.RunAsync(
                 static (c, ct) => c.SendAsync(ct),
                 call,
                 cancellationToken).ConfigureAwait(false);
+
+            // A buffered body is already read, so there is nothing left to stall on and nothing to
+            // wrap - the attempt covered it, which is the whole point of the option.
+            return Options.BufferResponses ? response : Bound(response, policy);
         }
         catch
         {
@@ -188,6 +192,39 @@ public sealed class HttpResilienceHandler : DelegatingHandler
     protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken) =>
         throw new NotSupportedException(
             "NResilience is async-only: a retry loop that blocks holds a thread through every backoff delay. Use SendAsync.");
+
+    /// <summary>
+    ///     Substitutes a body whose reads are bounded, when the policy asks for it and there is a body
+    ///     to bound.
+    /// </summary>
+    /// <remarks>
+    ///     This is the one place the bound can be applied. The transport returns at the response
+    ///     headers, so the body is not part of the attempt and the executor has already judged, logged
+    ///     and returned by the time there is a body to wrap - which is also why nothing here is live
+    ///     across the attempt <c>await</c> and the state-machine box of every call is unmoved.
+    ///     <para>
+    ///         Skipped for a declared empty body, which is what a 204 and a HEAD response carry: the
+    ///         transport supplies an empty content rather than a null one, and wrapping it would pay a
+    ///         timer and a stream for a body that cannot stall.
+    ///     </para>
+    /// </remarks>
+    /// <param name="response">The response the executor returned.</param>
+    /// <param name="policy">The host-scoped policy that produced it.</param>
+    /// <returns>The same response, with its content wrapped where that applies.</returns>
+    private static HttpResponseMessage Bound(HttpResponseMessage response, Resilience policy)
+    {
+        // An infinite attempt timeout is the absence of the bound this feature applies, so there is
+        // nothing to apply. Said here rather than in ProgressStream so the timer is never created.
+        if (!policy.BoundProgress || policy.AttemptTimeout == Timeout.InfiniteTimeSpan)
+            return response;
+
+        if (response.Content is not { } body || body.Headers.ContentLength == 0 || body is ProgressContent)
+            return response;
+
+        response.Content = new ProgressContent(body, policy.AttemptTimeout, policy.Time, policy.Name, policy.OnEvent);
+
+        return response;
+    }
 
     /// <summary>
     ///     One host-scoped guard per host that has one, as a snapshot. Both public views are the same

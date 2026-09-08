@@ -37,6 +37,7 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `BudgetPerHost` | `true` | Enables per-host retry budgets. An explicit `Budget` (including `RetryBudget.None`) takes precedence. `RetryBudget.Automatic` does not specify a scope, so per-host scoping applies. |
 | `MaximumHosts` | `1024` | The number of hosts the per-host registry keeps. At least 1; the least-recently-seen hosts are dropped past the cap. There is no unbounded mode - `int.MaxValue` is as close as it gets. |
 | `DetectNestedRetries` | `true` | Whether the nested-retry header is added to requests and whether nesting is reported. |
+| `BufferResponses` | `false` | Whether the response body is read inside the attempt, so a stalled or broken body is retried. Costs the body in memory. |
 | `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. The gRPC switch of the same name defaults to `true`, because `grpc-timeout` is a protocol field rather than a convention. |
 | `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `AmbientDeadline.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
 

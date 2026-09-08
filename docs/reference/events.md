@@ -49,16 +49,18 @@ The `CallEventKind` enum defines the event types raised during a call.
 | `HedgeSuppressed` | No | Yes (the latency threshold) | No |
 | `AttemptCeilingAdapted` | No | Yes (the measured ceiling) | No |
 | `BackoffBaseAdapted` | No | Yes (the measured base) | No |
+| `Stalled` | No | Yes (the stall bound) | No |
 
 ### Event invariants and behavior
 
-- **Terminal events**: Every call ends with exactly one terminal event, which is what makes logical operations countable. The `IsTerminal` property identifies them.
+- **Terminal events**: Every call ends with exactly one terminal event, which is what makes logical operations countable. The `IsTerminal` property identifies them. `Stalled` is the one event that can arrive *after* the terminal event of the call it belongs to, and it is not itself terminal, so the count still holds - see below.
 - **Rejections**: A refusal names the guard that made it: `RejectedByBreaker` indicates that the dependency is unavailable; `RejectedByBudget` indicates that the client is retrying too hard. `IsRejection` covers both.
 - **Attempt events**: Exactly one `Attempt` event fires per attempt.
 - **Retrying events**: `Retrying` fires **before** the backoff delay is served, so listeners can report the expected idle time.
 - **Orphaned work**: `OrphanedWork` fires when an attempt exceeds its ceiling by more than one second, raised retrospectively the moment the work finally returns.
 - **Nested retries**: `NestedRetry` events are raised only by the HTTP handler.
 - **Hedging**: `HedgeStarted` carries the live latency quantile that triggered it on `Delay`. `HedgeDiscarded` fires when a leg is cancelled because a sibling answered first; its `Duration` is how long that leg ran. A discarded leg raises no `Attempt` event, because nothing classified it. `HedgeSuppressed` fires when a call got slow enough to hedge and the hedge was held back - by `SuppressAt` or by `WinRate` - and carries the same threshold on `Delay` that `HedgeStarted` does, so the two count against each other. A hedge the retry budget refused, and one that was never armed at all, raise nothing. See [Hedging](../features/hedging.md).
+- **Stalls**: `Stalled` fires when a transfer is cut off for lack of progress, and carries the bound that fired on `Delay` and the `AttemptStalledException` on `Exception`. For a response body the caller is reading itself, it arrives after the call has already raised `Succeeded` - the retry loop was over before the stall existed - which makes it the only event that follows a terminal one. For a stream between two elements, and for a body read under `BufferResponses`, the stall is inside the attempt and is followed by `Retrying` or by a terminal event of its own. See [progress bounds](../features/deadlines.md#the-third-thing-the-attempt-timeout-bounds).
 - **Measured backoff bases**: `BackoffBaseAdapted` carries the new base on `Delay`, after the `Spread` clamp - which is what the curve actually uses. It is raised on the retry decision, and only when the number differs from the last one raised for that policy instance. A policy whose previous attempt was throttled rather than transient raises nothing, because a throttled retry does not use the measured base. See [Retry](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it).
 - **Measured attempt ceilings**: `AttemptCeilingAdapted` carries the new ceiling on `Delay`. It is raised only when the measured term is what bounds the attempt, and only when the number differs from the last one raised for that policy instance - so the rate follows how much the estimate moves rather than how much traffic there is. A policy whose ceiling has been clamped back to `AttemptTimeout` raises nothing. See [Deadlines](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it).
 - **Breaker transitions**: Breaker state transitions are raised on the call that triggered the transition, outside the breaker's internal lock.
@@ -108,6 +110,7 @@ Every record is written every time unless you opt into [sampling](../features/lo
 | 1025 | `AttemptCeilingAdapted` | `Debug` | `Information` | `{Policy} measured a new per-attempt ceiling of {CeilingMs} ms from recent latency` |
 | 1026 | `BackoffBaseAdapted` | `Debug` | `Information` | `{Policy} measured a new backoff base of {BaseMs} ms from recent latency` |
 | 1027 | `HedgeSuppressed` | `Debug` | `Information` | `{Policy} held back hedge attempt {Attempt} after {ThresholdMs} ms` |
+| 1028 | `Stalled` | `Warning` | `Warning` | `{Policy} cut off a transfer after {TransferredCount} byte(s) or element(s): nothing arrived for {StallMs} ms` |
 
 Field names are shared with the metric tag vocabulary wherever both exist (`Policy`, `Verdict`, `Reason`), so a structured record and a metric describe the same call with the same words.
 

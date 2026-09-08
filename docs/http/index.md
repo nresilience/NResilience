@@ -75,10 +75,11 @@ using var client = HttpResilience.CreateClient(
 | `BudgetPerHost` | `true` | Scopes the retry budget to the target host. | [Per-host scope](per-host-scope.md) |
 | `MaximumHosts` | `1024` | Bounds the per-host registry. At least 1; `int.MaxValue` is effectively unbounded. | [Per-host scope](per-host-scope.md) |
 | `DetectNestedRetries` | `true` | Detects nested retry loops. | [Nested retries](nested-retries.md) |
+| `BufferResponses` | `false` | Reads the response body inside the attempt, so a stalled or broken body is retried. | below |
 
 Three things the handler does without being asked, because `Resilience.Http` and the per-host `BreakerSettings` carry them: each attempt is bounded by three times that host's measured p95, each host's breaker trips on an error rate five times that host's own, and each host's breaker trips on half a window of calls three times slower than that host's own normal. All three are measured per host, none is armed until it has a baseline, and each can be turned off - see [attempt timeouts](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) and [trip conditions](../features/circuit-breaker.md#trip-conditions).
 
-The one adaptive guard that is *not* on by default is the concurrency limit, because a limiter holds live permits and queues callers - not something a default should start doing. It is one option when you want it: `.AddRateLimit(o => o.Adaptive = new())` gives every host a concurrency limit discovered from its own latency. See [rate limiting](../features/rate-limiting.md#from-configuration).
+The one adaptive guard that is *not* enabled by default is the concurrency limit, because a limiter holds live permits and queues callers - not something a default should start doing. It is one option when you want it: `.AddRateLimit(o => o.Adaptive = new())` gives every host a concurrency limit discovered from its own latency. See [rate limiting](../features/rate-limiting.md#from-configuration).
 
 ## Manage the transport timeout
 
@@ -97,6 +98,19 @@ using var client = new HttpClient(handler: new HttpResilienceHandler(innerHandle
 };
 ```
 <!-- endsnippet -->
+
+## Buffered responses
+
+The attempt ends when the response *headers* arrive. The body is a live stream over the connection, read after the executor has classified the attempt and returned - so a body that breaks or stops arriving half-way through is not something the retry loop can see, let alone retry.
+
+By default [`BoundProgress`](../features/deadlines.md#the-third-thing-the-attempt-timeout-bounds) makes that failure finite: a body that stops arriving for longer than `AttemptTimeout` fails your read with `AttemptStalledException` instead of hanging. `BufferResponses = true` makes it retryable instead, by reading the body to completion inside the attempt:
+
+```csharp
+services.AddHttpClient(name: "api")
+    .AddResilience(configureOptions: o => o.BufferResponses = true);
+```
+
+Inside the attempt, the deadline and the attempt timeout cover the body, the breaker's slow-call detection sees the real duration of the call, and a broken body is one more transient failure. The cost is memory: the whole body is held before the call returns, so leave it off for a client that downloads large files. For a JSON API whose caller was going to buffer the body a moment later anyway, it is close to free.
 
 ## Verify retry behavior
 

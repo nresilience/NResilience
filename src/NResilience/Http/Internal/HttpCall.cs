@@ -31,12 +31,19 @@ namespace NResilience.Internal;
 ///     <see cref="HttpResilienceOptions.PropagateDeadline" /> is off. Written per attempt, as each
 ///     attempt has less of the deadline remaining.
 /// </param>
+/// <param name="buffer">
+///     Whether the response body is read before the attempt is judged; see
+///     <see cref="HttpResilienceOptions.BufferResponses" />. It is what moves a broken or stalled body
+///     inside the classified region, where it becomes one more transient failure instead of an
+///     exception the retry loop never hears about.
+/// </param>
 internal sealed class HttpCall(
     HttpRequestMessage request,
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
     bool clone,
     bool concurrent = false,
-    DeadlineStamp? deadline = null)
+    DeadlineStamp? deadline = null,
+    bool buffer = false)
 {
     /// <summary>
     ///     Guards <see cref="Clone" /> on a hedged call. Reading an <c>HttpHeaders</c> collection parses
@@ -108,6 +115,22 @@ internal sealed class HttpCall(
         {
             var response = await send(attempt, cancellationToken).ConfigureAwait(false);
 
+            if (buffer && response.Content is { } body && body.Headers.ContentLength != 0)
+            {
+                try
+                {
+                    await BufferResponseAsync(response, body, cancellationToken).ConfigureAwait(false);
+                }
+                catch
+                {
+                    // This response is never reaching the caller and it owns a socket. Disposed here
+                    // rather than left to the next attempt's sweep, because on the last attempt there
+                    // is no next attempt - and on a hedged call the sweep does not run at all.
+                    response.Dispose();
+                    throw;
+                }
+            }
+
             if (!concurrent)
                 _previous = response;
 
@@ -118,6 +141,44 @@ internal sealed class HttpCall(
             if (clone)
                 attempt.Dispose();
         }
+    }
+
+    /// <summary>
+    ///     Reads the body and puts it back as a re-readable one, so the attempt covers it.
+    /// </summary>
+    /// <remarks>
+    ///     A <see cref="MemoryStream" /> behind a <see cref="StreamContent" /> rather than
+    ///     <see cref="HttpContent.LoadIntoBufferAsync()" />, which has no
+    ///     <see cref="CancellationToken" /> overload on <c>net8.0</c> - and an unbounded read is the
+    ///     failure this whole feature exists to remove, so buffering with the token dropped would be a
+    ///     joke at its own expense. The stream is pre-sized from <c>Content-Length</c> when the server
+    ///     declared one, which most do.
+    /// </remarks>
+    /// <param name="response">The response whose content is being replaced.</param>
+    /// <param name="body">The transport's content.</param>
+    /// <param name="cancellationToken">The attempt's token, which is what bounds the read.</param>
+    private static async Task BufferResponseAsync(HttpResponseMessage response, HttpContent body, CancellationToken cancellationToken)
+    {
+        var declared = body.Headers.ContentLength;
+        var capacity = declared is > 0 and <= int.MaxValue ? (int)declared.Value : 0;
+
+        var source = await body.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+        var buffered = new MemoryStream(capacity);
+
+        await source.CopyToAsync(buffered, cancellationToken).ConfigureAwait(false);
+        buffered.Position = 0;
+
+        var content = new StreamContent(buffered);
+
+        // Content-Type above all, for the same reason Clone() copies the request's: a substituted
+        // content that lost them would break every caller that deserializes by media type.
+        foreach (var header in body.Headers)
+        {
+            content.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        }
+
+        response.Content = content;
+        body.Dispose();
     }
 
     /// <summary>A fresh request carrying everything the original did.</summary>

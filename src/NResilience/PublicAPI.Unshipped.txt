@@ -37,6 +37,16 @@ NResilience.AttemptLog.Enumerator.Enumerator() -> void
 NResilience.AttemptLog.Enumerator.MoveNext() -> bool
 NResilience.AttemptLog.GetEnumerator() -> NResilience.AttemptLog.Enumerator
 NResilience.AttemptLog.this[int index].get -> NResilience.Attempt
+NResilience.AttemptStalledException
+NResilience.AttemptStalledException.AttemptStalledException() -> void
+NResilience.AttemptStalledException.AttemptStalledException(System.TimeSpan stall, long transferred) -> void
+NResilience.AttemptStalledException.AttemptStalledException(System.TimeSpan stall, long transferred, System.Exception? innerException) -> void
+NResilience.AttemptStalledException.AttemptStalledException(string! message) -> void
+NResilience.AttemptStalledException.AttemptStalledException(string! message, System.Exception! innerException) -> void
+NResilience.AttemptStalledException.Attempts.get -> NResilience.AttemptLog!
+NResilience.AttemptStalledException.Reason.get -> NResilience.StopReason
+NResilience.AttemptStalledException.Stall.get -> System.TimeSpan
+NResilience.AttemptStalledException.Transferred.get -> long
 NResilience.AttemptTimeoutException
 NResilience.AttemptTimeoutException.AttemptTimeoutException() -> void
 NResilience.AttemptTimeoutException.AttemptTimeoutException(System.TimeSpan timeout) -> void
@@ -155,6 +165,7 @@ NResilience.CallEventKind.OrphanedWork = 7 -> NResilience.CallEventKind
 NResilience.CallEventKind.RejectedByBreaker = 4 -> NResilience.CallEventKind
 NResilience.CallEventKind.RejectedByBudget = 5 -> NResilience.CallEventKind
 NResilience.CallEventKind.Retrying = 1 -> NResilience.CallEventKind
+NResilience.CallEventKind.Stalled = 19 -> NResilience.CallEventKind
 NResilience.CallEventKind.Succeeded = 2 -> NResilience.CallEventKind
 NResilience.CallRejectedException
 NResilience.CallRejectedException.Attempts.get -> NResilience.AttemptLog!
@@ -241,6 +252,8 @@ NResilience.HttpResilienceOptions.BreakerSettings.get -> NResilience.BreakerSett
 NResilience.HttpResilienceOptions.BreakerSettings.set -> void
 NResilience.HttpResilienceOptions.BudgetPerHost.get -> bool
 NResilience.HttpResilienceOptions.BudgetPerHost.set -> void
+NResilience.HttpResilienceOptions.BufferResponses.get -> bool
+NResilience.HttpResilienceOptions.BufferResponses.set -> void
 NResilience.HttpResilienceOptions.DeadlineHeader.get -> string!
 NResilience.HttpResilienceOptions.DeadlineHeader.set -> void
 NResilience.HttpResilienceOptions.DetectNestedRetries.get -> bool
@@ -335,6 +348,8 @@ NResilience.Resilience.Backoff.get -> NResilience.Backoff
 NResilience.Resilience.Backoff.init -> void
 NResilience.Resilience.BeforeAttempt.get -> System.Func<NResilience.NextAttempt, System.Threading.Tasks.Task!>?
 NResilience.Resilience.BeforeAttempt.init -> void
+NResilience.Resilience.BoundProgress.get -> bool
+NResilience.Resilience.BoundProgress.init -> void
 NResilience.Resilience.Breaker.get -> NResilience.Breaker?
 NResilience.Resilience.Breaker.init -> void
 NResilience.Resilience.Budget.get -> NResilience.RetryBudget!
@@ -361,11 +376,11 @@ NResilience.Resilience.RunAsync<TState>(System.Func<TState, System.Threading.Can
 NResilience.Resilience.Time.get -> System.TimeProvider!
 NResilience.Resilience.Time.init -> void
 NResilience.Resilience.TryRunAsync(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
+NResilience.Resilience.TryRunAsync<T>(System.Func<System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<System.Collections.Generic.IAsyncEnumerable<T>!>>
 NResilience.Resilience.TryRunAsync<T>(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
+NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<System.Collections.Generic.IAsyncEnumerable<T>!>>
 NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
 NResilience.Resilience.TryRunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
-NResilience.Resilience.TryRunAsync<T>(System.Func<System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<System.Collections.Generic.IAsyncEnumerable<T>!>>
-NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<System.Collections.Generic.IAsyncEnumerable<T>!>>
 NResilience.Resilience.UseAmbientDeadline.get -> bool
 NResilience.Resilience.UseAmbientDeadline.init -> void
 NResilience.Resilience.Validate() -> void

@@ -4,12 +4,12 @@ namespace NResilience;
 ///     What the library throws to end a call: the attempt log and why it stopped, under one name so a
 ///     caller does not need a three-arm type switch to reach either.
 ///     <para>
-///         Implemented by <see cref="CallRejectedException" />, <see cref="DeadlineExceededException" />
-///         and <see cref="AttemptTimeoutException" /> - the three exceptions that mean "this operation
-///         is over". <see cref="RateLimitedException" /> is not one of them: it is thrown by <i>your</i>
-///         code, inside an attempt, and is classified and retried like any other failure.
-///         <see cref="ResilienceConfigurationException" /> is not one either - it reports a policy that
-///         cannot run, which is a startup failure with no call behind it.
+///         Implemented by <see cref="CallRejectedException" />, <see cref="DeadlineExceededException" />,
+///         <see cref="AttemptTimeoutException" /> and <see cref="AttemptStalledException" /> - the four
+///         exceptions that mean "this operation is over". <see cref="RateLimitedException" /> is not one
+///         of them: it is thrown by <i>your</i> code, inside an attempt, and is classified and retried
+///         like any other failure. <see cref="ResilienceConfigurationException" /> is not one either - it
+///         reports a policy that cannot run, which is a startup failure with no call behind it.
 ///     </para>
 ///     <para>
 ///         An interface rather than a base class, because
@@ -253,6 +253,94 @@ public sealed class AttemptTimeoutException : TimeoutException, IResilienceFailu
     ///     exhausted the whole deadline is a <see cref="DeadlineExceededException" /> instead, so
     ///     <see cref="StopReason.DeadlineExceeded" /> never appears here.
     /// </remarks>
+    public StopReason Reason { get; internal set; } = StopReason.AttemptsExhausted;
+}
+
+/// <summary>
+///     A response body or a stream stopped making progress: no bytes were read, and no element was
+///     yielded, for longer than <see cref="Resilience.AttemptTimeout" />. The far side is still
+///     holding the connection open, which is what makes this different from a broken one.
+///     <para>
+///         Classified <see cref="VerdictKind.Transient" /> by the executor itself, never by a user
+///         predicate, for the reason <see cref="AttemptTimeoutException" /> is: this is the library's
+///         own bound running out, and a stall is exactly the failure that may not recur.
+///     </para>
+///     <para>
+///         Where it is raised depends on who is reading. A stall inside the attempt - a stream between
+///         elements, or an HTTP body being read under
+///         <see cref="HttpResilienceOptions.BufferResponses" /> - is classified, retried and reported
+///         like any other transient failure. A stall in a response body the caller is reading itself
+///         arrives at their <see cref="System.IO.Stream.ReadAsync(Memory{byte}, CancellationToken)" />
+///         after the call has already succeeded, so it cannot be retried and
+///         <see cref="Attempts" /> is empty: the retry loop was over before the stall existed. That is
+///         the trade the default makes, and <see cref="HttpResilienceOptions.BufferResponses" /> is how
+///         to take the other side of it.
+///     </para>
+/// </summary>
+public sealed class AttemptStalledException : TimeoutException, IResilienceFailure
+{
+    /// <summary>Creates the exception.</summary>
+    /// <param name="stall">How long nothing arrived.</param>
+    /// <param name="transferred">How much had arrived before it stopped.</param>
+    /// <param name="innerException">The cancellation the stall produced, when there was one.</param>
+    public AttemptStalledException(TimeSpan stall, long transferred, Exception? innerException)
+        : base($"The transfer stalled: nothing arrived for {stall.TotalSeconds:0.###}s after {transferred} byte(s) or element(s).", innerException)
+    {
+        Stall = stall;
+        Transferred = transferred;
+    }
+
+    /// <summary>Creates the exception.</summary>
+    /// <param name="stall">How long nothing arrived.</param>
+    /// <param name="transferred">How much had arrived before it stopped.</param>
+    public AttemptStalledException(TimeSpan stall, long transferred)
+        : this(stall, transferred, null)
+    {
+    }
+
+    /// <summary>Creates the exception.</summary>
+    public AttemptStalledException()
+        : this(TimeSpan.Zero, 0, null)
+    {
+    }
+
+    /// <summary>Creates the exception with a message.</summary>
+    /// <param name="message">The message.</param>
+    public AttemptStalledException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Creates the exception with a message and a cause.</summary>
+    /// <param name="message">The message.</param>
+    /// <param name="innerException">The cause.</param>
+    public AttemptStalledException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+
+    /// <summary>How long nothing arrived: the bound that was exceeded.</summary>
+    public TimeSpan Stall { get; }
+
+    /// <summary>
+    ///     How much had arrived before it stopped - bytes for a response body, elements for a stream.
+    ///     Zero means the far side sent headers and then nothing at all, which is the case worth
+    ///     recognizing in a log.
+    /// </summary>
+    public long Transferred { get; }
+
+    /// <summary>
+    ///     Everything that happened, when the stall was inside the attempt and this is the exception the
+    ///     call ended on. Empty for a stall in a body the caller was reading itself; see the remarks on
+    ///     the type.
+    /// </summary>
+    public AttemptLog Attempts { get; internal set; } = AttemptLog.Empty;
+
+    /// <summary>
+    ///     Why the call stopped on this stall, set beside <see cref="Attempts" /> and read the same way:
+    ///     <see cref="StopReason.AttemptsExhausted" /> normally, and left at the default for a stall the
+    ///     executor went on to retry or never saw.
+    /// </summary>
     public StopReason Reason { get; internal set; } = StopReason.AttemptsExhausted;
 }
 

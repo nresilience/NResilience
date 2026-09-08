@@ -63,6 +63,21 @@ Set this only for requests that are safe to repeat, such as those carrying an id
 
 ## Timeouts and deadlines
 
+### Symptom: Reading the response body never returns, and the deadline does nothing.
+
+**Solution**: Leave `BoundProgress` enabled, which is the default. If you disabled it, enable it again.
+
+**Why this happens**: The attempt ends when the response *headers* arrive. The body is a live stream read after the policy has classified the attempt and returned, so the deadline, the attempt timeout and the retry all stop covering it - and because the handler sets `HttpClient.Timeout` to infinite, nothing else covers it either. A dependency that sends headers and then stops writing produced a call that never completed.
+
+With `BoundProgress` on, a body that stops arriving for longer than `AttemptTimeout` fails your read with `AttemptStalledException`. To have the stall *retried* rather than merely bounded, read the body inside the attempt:
+
+```csharp
+services.AddHttpClient(name: "api")
+    .AddResilience(configureOptions: o => o.BufferResponses = true);
+```
+
+See [progress bounds](./features/deadlines.md#the-third-thing-the-attempt-timeout-bounds) for the mechanism and [buffered responses](./http/index.md#buffered-responses) for the trade.
+
 ### Symptom: The call times out after approximately 100 seconds instead of at the configured deadline.
 
 **Solution**: Set the `HttpClient.Timeout` to infinite.

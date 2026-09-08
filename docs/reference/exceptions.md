@@ -12,7 +12,7 @@ The library only introduces new exception types for failures it generates, such 
 
 ### `IResilienceFailure`
 
-The three exceptions that mean "this operation is over" - `CallRejectedException`, `DeadlineExceededException`, and `AttemptTimeoutException` - implement `IResilienceFailure`, so one catch reaches the attempt log and the reason without a type switch:
+The four exceptions that mean "this operation is over" - `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, and `AttemptStalledException` - implement `IResilienceFailure`, so one catch reaches the attempt log and the reason without a type switch:
 
 ```csharp
 catch (Exception e) when (e is IResilienceFailure failure)
@@ -71,6 +71,21 @@ An `AttemptTimeoutException` is thrown when a single attempt exceeds its ceiling
 | `Reason` | Why the call stopped, when this was the exception it stopped on. Normally `AttemptsExhausted`: the last attempt the policy allowed ran out of time. A timeout that spent the whole deadline is a `DeadlineExceededException` instead, so `DeadlineExceeded` never appears here. |
 
 The [executor](index.md) always classifies `AttemptTimeoutException` as `Transient`, regardless of the configured classifier.
+
+## `AttemptStalledException`
+
+An `AttemptStalledException` is thrown when a response body or a stream stops making progress: nothing arrived for longer than `AttemptTimeout`. It derives from `TimeoutException`.
+
+| Property | Meaning |
+| :--- | :--- |
+| `Stall` | The bound that was exceeded - the policy's `AttemptTimeout`. |
+| `Transferred` | How much had arrived before it stopped: bytes for a body, elements for a stream. Zero means the far side sent headers and then nothing. |
+| `Attempts` | The attempt log, when the stall was inside the attempt. **Empty** for a body the caller was reading itself. |
+| `Reason` | `AttemptsExhausted` when this is the exception the call ended on. |
+
+The [executor](index.md) always classifies it `Transient`, for the reason it classifies `AttemptTimeoutException`: this is the library's own bound running out, and a stall is exactly the failure that may not recur.
+
+`Attempts` is empty for the most common case, and that is not an oversight. A response body is read after the call has already succeeded, so the retry loop was over before the stall existed and there is no attempt to report. [`BufferResponses`](../http/index.md#buffered-responses) reads the body inside the attempt instead, where a stall surfaces as `AttemptTimeoutException` and is retried. See [progress bounds](../features/deadlines.md#the-third-thing-the-attempt-timeout-bounds).
 
 ## `RateLimitedException`
 

@@ -10,7 +10,7 @@ A retried call needs two different time bounds - mixing them up causes common ti
 
 The **deadline** is the ceiling for the entire operation, including every attempt and backoff delay. The **attempt timeout** is the ceiling for a single attempt.
 
-Both are on by default:
+Both are enabled by default:
 - **Deadline**: 30 seconds for the whole call.
 - **Attempt timeout**: 10 seconds for any single attempt, and usually far less: the ceiling is measured from the dependency's own latency, and 10 seconds is where the lowering stops.
 
@@ -87,6 +87,48 @@ Read the current value from `policy.Measured.AttemptCeiling`, or watch the `nres
 
 > [!NOTE]
 > When [hedging](hedging.md) is configured too, the ceiling is measured from at least the hedge's own quantile. A ceiling below the hedge threshold would cancel the first leg at the moment the second was due to start, and you would have bought a feature that never fires.
+
+## The third thing the attempt timeout bounds
+
+**Enabled by default.** `AttemptTimeout` also bounds the gap between two reads of a response body, and the gap between two elements of a stream. Set `BoundProgress = false` to remove that bound.
+
+This is not a new number - it is the same one, applied to the part of a call that used to escape it. An attempt ends when the response *headers* arrive: the body is a live stream over the connection, read after the executor has classified the attempt and returned. Before this bound existed, nothing covered it. Not the deadline, not the attempt timeout, not the breaker's slow-call detection, and not the retry - and because the handler [takes ownership of `HttpClient.Timeout`](../http/index.md#manage-the-transport-timeout), not that either. A dependency that sends headers and then stops writing produces a call that never completes.
+
+<!-- snippet: deadline-progress -->
+```csharp
+var api = Resilience.Http with
+{
+    // The attempt, and the gap between two reads of the body that attempt returned.
+    AttemptTimeout = TimeSpan.FromSeconds(value: 10),
+};
+
+// Nothing else to configure. A body that stops arriving for longer than AttemptTimeout fails
+// the read with AttemptStalledException rather than hanging, and a body that keeps arriving is
+// never cut off however long it takes - the bound is on the gap, not on the total.
+//
+// Two ways to change that. BoundProgress = false removes the bound entirely. BufferResponses
+// reads the body inside the attempt, so a stall becomes one more transient failure and is
+// retried - at the cost of holding the whole body in memory.
+using var client = HttpResilience.CreateClient(api, new HttpResilienceOptions { BufferResponses = true });
+```
+<!-- endsnippet -->
+
+**The bound is on the gap, not on the total.** A 4 GB download that keeps arriving is never cut off, however long it takes: a deadline is a budget for reaching an answer, and the body is what the answer was. Only a read that has been outstanding longer than `AttemptTimeout` is a stall - and a read that is outstanding is, by definition, waiting on the far side. A consumer that spends a minute processing each buffer is never blamed for it.
+
+### Where the stall surfaces decides whether it can be retried
+
+| Where the read happens | What a stall raises | Retried? |
+| :--- | :--- | :--- |
+| A response body you read yourself | `AttemptStalledException`, at your read | No - the call already succeeded |
+| A stream, between two elements | `AttemptStalledException`, at your `MoveNextAsync` | No - the handover is over |
+| A body read under [`BufferResponses`](../http/index.md#buffered-responses) | `AttemptTimeoutException`, inside the attempt | Yes, like any transient failure |
+
+The first two are the honest floor: the retry loop was over before the stall existed, so the hang becomes finite rather than retryable, and `AttemptStalledException.Attempts` is empty because there is no attempt to report. `BufferResponses` is how to take the other side of that trade - it reads the body inside the attempt, where the deadline and the attempt timeout both already apply, at the cost of holding the whole body in memory.
+
+A stall raises [`CallEventKind.Stalled`](../reference/events.md), which is the one event that can arrive *after* a terminal event. It is not itself terminal, so a listener counting terminal events per call still counts exactly one.
+
+> [!NOTE]
+> A policy whose `AttemptTimeout` is `Timeout.InfiniteTimeSpan` gets no progress bound, because the number this feature applies is the one that is not there. That is the same step-aside rule `AttemptCeiling` follows, and it is why `Resilience.None` states `BoundProgress = false` rather than leaving it to be inferred.
 
 ### If you have an exact SLA
 

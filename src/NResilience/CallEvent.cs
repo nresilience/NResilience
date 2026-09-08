@@ -171,6 +171,27 @@ public enum CallEventKind : byte
     ///     </para>
     /// </summary>
     HedgeSuppressed,
+
+    /// <summary>
+    ///     A transfer stopped making progress and was cut off.
+    ///     <see cref="CallEvent.Delay" /> carries the stall bound that fired, and
+    ///     <see cref="CallEvent.Exception" /> is the <see cref="AttemptStalledException" /> raised.
+    ///     <para>
+    ///         This is the one event that can arrive <i>after</i> a terminal event, and only in one
+    ///         case: an HTTP response body that the caller is reading itself, which stalls after the
+    ///         call has already reported <see cref="Succeeded" />. Everywhere else - a stream between
+    ///         elements, or a body read under
+    ///         <see cref="HttpResilienceOptions.BufferResponses" /> - the stall is inside the attempt
+    ///         and is followed by <see cref="Retrying" /> or by a terminal event of its own, like any
+    ///         other transient failure.
+    ///     </para>
+    ///     <para>
+    ///         A listener that counts terminal events per call therefore has to ignore this one. That
+    ///         is the cost of bounding a read the retry loop has already handed over, and the
+    ///         alternative was leaving it unbounded.
+    ///     </para>
+    /// </summary>
+    Stalled,
 }
 
 /// <summary>

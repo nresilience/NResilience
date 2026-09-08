@@ -155,6 +155,13 @@ internal static partial class Log
         Message = "{Policy} measured a new backoff base of {BaseMs} ms from recent latency")]
     internal static partial void BackoffBaseAdapted(ILogger logger, LogLevel level, string policy, long baseMs);
 
+    [LoggerMessage(
+        EventId = Codes.Stalled,
+        EventName = nameof(Ids.Stalled),
+        Message =
+            "{Policy} cut off a transfer after {TransferredCount} byte(s) or element(s): nothing arrived for {StallMs} ms, which is the attempt timeout")]
+    internal static partial void Stalled(ILogger logger, LogLevel level, string policy, long transferredCount, long stallMs);
+
     /// <summary>
     ///     The IDs as constants, so the <c>[LoggerMessage]</c> attributes and the level switches in
     ///     <c>LogListener</c> - both of which need a compile-time constant - name them rather than
@@ -190,6 +197,7 @@ internal static partial class Log
         internal const int AttemptCeilingAdapted = 1025;
         internal const int BackoffBaseAdapted = 1026;
         internal const int HedgeSuppressed = 1027;
+        internal const int Stalled = 1028;
     }
 
     /// <summary>
@@ -226,5 +234,6 @@ internal static partial class Log
         internal static readonly EventId AttemptCeilingAdapted = new(Codes.AttemptCeilingAdapted, nameof(AttemptCeilingAdapted));
         internal static readonly EventId BackoffBaseAdapted = new(Codes.BackoffBaseAdapted, nameof(BackoffBaseAdapted));
         internal static readonly EventId HedgeSuppressed = new(Codes.HedgeSuppressed, nameof(HedgeSuppressed));
+        internal static readonly EventId Stalled = new(Codes.Stalled, nameof(Stalled));
     }
 }

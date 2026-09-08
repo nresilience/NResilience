@@ -438,7 +438,7 @@ public sealed partial record Resilience
 
                             if (timer is not null)
                             {
-                                timer.CancelAfter(Timeout.InfiniteTimeSpan);
+                                timer!.CancelAfter(Timeout.InfiniteTimeSpan);
                                 raced = timer.IsCancellationRequested;
                             }
 
@@ -599,8 +599,79 @@ public sealed partial record Resilience
             {
                 yield return value;
 
-                while (await enumerator!.MoveNextAsync().ConfigureAwait(false))
+                // The bound on the gap between two elements: AttemptTimeout, the same number the
+                // attempt ran under, applied to the part of a stream that outlives the attempt.
+                // Infinite - which is what the policy's own infinite attempt timeout means - when
+                // there is nothing to apply: the policy turned it off, or there is no ceiling source
+                // to cancel the enumeration through.
+                var stall = BoundProgress && timer is not null
+                    ? AttemptTimeout
+                    : Timeout.InfiniteTimeSpan;
+
+                // The elements handed over, for the exception's Transferred. Live across every yield
+                // below, so it is a field on the iterator's box: the 8 B/op this feature costs the
+                // streaming path, recorded in Budgets.DefaultStreamingOverhead. Tried and rejected -
+                // reading AttemptTimeout per element instead of hoisting `stall` moved nothing, so
+                // the counter is the whole cost and the readable shape is free.
+                var delivered = 1L;
+
+                while (true)
                 {
+                    var pending = enumerator!.MoveNextAsync();
+                    bool moved;
+
+                    // Two cheap exits before anything is armed. An element already in hand cannot be
+                    // stalling and most are - a buffered source, a decoder with a frame left, a
+                    // channel with a queued item - and an unbounded policy has nothing to arm at all.
+                    if (pending.IsCompletedSuccessfully)
+                    {
+                        moved = pending.Result;
+                    }
+                    else if (stall == Timeout.InfiniteTimeSpan)
+                    {
+                        moved = await pending.ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // Awaited here rather than in a helper, and the yield below sits outside this
+                        // try, which is what the compiler's "no yield inside a try with a catch" rule
+                        // permits. A helper would be the obvious shape and it costs an async state
+                        // machine box per suspending element - measured at 312 B per enumeration on
+                        // the streaming gate's three-element arm, which is what this arrangement buys
+                        // back. The awaiter field is the one the loop already hoists.
+                        try
+                        {
+                            timer!.CancelAfter(stall);
+                            moved = await pending.ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException e) when (!cancellationToken.IsCancellationRequested && timer!.IsCancellationRequested)
+                        {
+                            // The caller's token is tested first and wins, so a consumer who cancels
+                            // at the same moment the bound fires gets their own exception. Same
+                            // precedence the attempt ceiling applies, and for the same reason: a
+                            // caller must never be told their own cancellation was somebody's fault.
+                            throw Stalled(stall, delivered, e);
+                        }
+                        finally
+                        {
+                            // Disarmed on every exit. Harmless once the source is cancelled, and
+                            // necessary otherwise: a bound left armed would fire into the next pull.
+                            timer!.CancelAfter(Timeout.InfiniteTimeSpan);
+                        }
+
+                        // Disarmed and then tested, in that order and for the reason the first
+                        // element's ceiling check gives: the timer can fire in the window between the
+                        // pull completing and the disarm landing, and an element from an enumeration
+                        // whose token has just been cancelled is one the consumer would act on.
+                        if (timer!.IsCancellationRequested)
+                            throw Stalled(stall, delivered, null);
+                    }
+
+                    if (!moved)
+                        break;
+
+                    delivered++;
+
                     yield return enumerator.Current;
                 }
             }
@@ -665,5 +736,34 @@ public sealed partial record Resilience
         }
 
         throw failure;
+    }
+
+    /// <summary>Builds the stall and tells the listener, once, from the thread that found it.</summary>
+    /// <param name="stall">The bound that was exceeded.</param>
+    /// <param name="delivered">How many elements had arrived.</param>
+    /// <param name="inner">The cancellation the bound produced, when there was one.</param>
+    /// <returns>The exception to throw.</returns>
+    private AttemptStalledException Stalled(TimeSpan stall, long delivered, OperationCanceledException? inner)
+    {
+        var stalled = new AttemptStalledException(stall, delivered, inner);
+
+        if (OnEvent is { } listener)
+        {
+            try
+            {
+                listener(CallEvent.Create(
+                    CallEventKind.Stalled,
+                    Name,
+                    verdict: Verdict.Transient,
+                    delay: stall,
+                    exception: stalled));
+            }
+            catch
+            {
+                // Telemetry that can fail the operation it is observing is worse than no telemetry.
+            }
+        }
+
+        return stalled;
     }
 }
