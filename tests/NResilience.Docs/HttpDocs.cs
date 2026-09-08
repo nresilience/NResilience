@@ -6,6 +6,8 @@ namespace NResilience.Docs;
 /// <summary>The HTTP handler: the five things a policy on its own cannot do.</summary>
 public sealed class HttpDocs
 {
+    private static readonly Uri Orders = new(uriString: "https://api.example.com/orders/1");
+
     [Fact]
     public async Task A_client_with_the_handler_in_front_of_it()
     {
@@ -55,6 +57,7 @@ public sealed class HttpDocs
                 BudgetPerHost = true,
                 MaximumHosts = 1024, // the per-host registry is bounded; int.MaxValue is as close to unbounded as it gets
                 DetectNestedRetries = true,
+                Quota = Quota.Reserving(reserve: 0.1), // hold a tenth of the allowance the dependency publishes
             });
 
         // </snippet:http-options>
@@ -173,5 +176,42 @@ public sealed class HttpDocs
         // With the flag published, this service's own outbound call reports the nesting it is part of.
         Assert.Equal(expected: HttpStatusCode.OK, actual: response.StatusCode);
         Assert.Contains(collection: events.Events, filter: e => e.Kind == CallEventKind.NestedRetry);
+    }
+
+    [Fact]
+    public async Task The_published_allowance_refuses_an_attempt_before_the_dependency_has_to()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        var transport = new ScriptedHttpHandler().Responds(
+            response: () =>
+            {
+                var spent = new HttpResponseMessage(statusCode: HttpStatusCode.OK);
+                spent.Headers.TryAddWithoutValidation(name: "RateLimit-Policy", value: "\"default\";q=100;w=60");
+                spent.Headers.TryAddWithoutValidation(name: "RateLimit", value: "\"default\";r=4;t=30");
+
+                return spent;
+            },
+            times: 4);
+
+        // <snippet:http-quota>
+        // The dependency publishes how much allowance is left. Hold a fifth of it back, and refuse
+        // locally rather than waiting for the 429. Nothing is sent, so nothing is charged to the
+        // retry budget and nothing counts against the host's breaker.
+        using var client = HttpResilience.CreateClient(
+            policy: Resilience.Http with { Attempts = 1 },
+            options: new HttpResilienceOptions { Quota = Quota.Reserving(reserve: 0.2) },
+            innerHandler: transport);
+
+        // </snippet:http-quota>
+
+        using var _ = await client.GetAsync(requestUri: Orders, cancellationToken: cancellationToken);
+
+        var refused = await Assert.ThrowsAsync<RateLimitedException>(
+            () => client.GetAsync(requestUri: Orders, cancellationToken: cancellationToken));
+
+        // Four of a hundred are left and the reserve is twenty, so the next attempt never leaves.
+        Assert.InRange(actual: refused.RetryAfter!.Value, low: TimeSpan.FromSeconds(value: 29), high: TimeSpan.FromSeconds(value: 30));
+        Assert.Equal(expected: 1, actual: transport.CallCount);
     }
 }

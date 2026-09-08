@@ -20,6 +20,7 @@ The `HttpResilienceHandler` runs a [policy](../reference/resilience.md) around t
 - **Request regeneration**: Builds a fresh `HttpRequestMessage` for every attempt.
 - **Idempotency protection**: Prevents the retry of `POST` or `PATCH` methods unless explicitly configured to do so.
 - **Per-host scoping**: Scopes the circuit breaker and retry budget to the target host.
+- **Published quota**: Reads the rate-limit headers the dependency publishes and refuses an attempt locally once the remaining allowance is inside the reserve.
 - **Nested retry detection**: Reports when retries are occurring in nested layers. Its inbound half - the middleware that reads the marker a retrying caller sent - is [`UseResilienceNestedRetry`](nested-retries.md).
 - **Response management**: Disposes of responses that are superseded by a retry.
 - **Transport timeout management**: Manages `HttpClient.Timeout` to ensure the policy deadline is honored.
@@ -63,6 +64,7 @@ using var client = HttpResilience.CreateClient(
         BudgetPerHost = true,
         MaximumHosts = 1024, // the per-host registry is bounded; int.MaxValue is as close to unbounded as it gets
         DetectNestedRetries = true,
+        Quota = Quota.Reserving(reserve: 0.1), // hold a tenth of the allowance the dependency publishes
     });
 ```
 <!-- endsnippet -->
@@ -76,6 +78,7 @@ using var client = HttpResilience.CreateClient(
 | `MaximumHosts` | `1024` | Bounds the per-host registry. At least 1; `int.MaxValue` is effectively unbounded. | [Per-host scope](per-host-scope.md) |
 | `DetectNestedRetries` | `true` | Detects nested retry loops. | [Nested retries](nested-retries.md) |
 | `BufferResponses` | `false` | Reads the response body inside the attempt, so a stalled or broken body is retried. | below |
+| `Quota` | `Quota.Reserving(0.1)` | Holds a tenth of the allowance the dependency publishes unspent. `null` reads no rate-limit headers. | below |
 
 Three things the handler does without being asked, because `Resilience.Http` and the per-host `BreakerSettings` carry them: each attempt is bounded by three times that host's measured p95, each host's breaker trips on an error rate five times that host's own, and each host's breaker trips on half a window of calls three times slower than that host's own normal. All three are measured per host, none is armed until it has a baseline, and each can be turned off - see [attempt timeouts](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) and [trip conditions](../features/circuit-breaker.md#trip-conditions).
 
@@ -111,6 +114,38 @@ services.AddHttpClient(name: "api")
 ```
 
 Inside the attempt, the deadline and the attempt timeout cover the body, the breaker's slow-call detection sees the real duration of the call, and a broken body is one more transient failure. The cost is memory: the whole body is held before the call returns, so leave it off for a client that downloads large files. For a JSON API whose caller was going to buffer the body a moment later anyway, it is close to free.
+
+## Honor the allowance the dependency publishes
+
+Most large APIs tell you how much quota you have, how much is left, and when the window resets - on every response, not just the 429. The handler reads those numbers, keeps them per host, and refuses an attempt locally once the remaining allowance is inside the reserve. It is on by default, holding a tenth back.
+
+<!-- snippet: http-quota -->
+```csharp
+// The dependency publishes how much allowance is left. Hold a fifth of it back, and refuse
+// locally rather than waiting for the 429. Nothing is sent, so nothing is charged to the
+// retry budget and nothing counts against the host's breaker.
+using var client = HttpResilience.CreateClient(
+    policy: Resilience.Http with { Attempts = 1 },
+    options: new HttpResilienceOptions { Quota = Quota.Reserving(reserve: 0.2) },
+    innerHandler: transport);
+```
+<!-- endsnippet -->
+
+The refusal never leaves the process, so it gets the treatment every local refusal gets: the long backoff curve, the reset time honored as the pushback, no evidence against the host's [circuit breaker](../features/circuit-breaker.md), and no charge against the [retry budget](../features/retry-budget.md). A `RejectedByQuota` [event](../reference/events.md) carries the time until the window resets, and the exception the caller sees is `RateLimitedException`.
+
+Two header shapes are read, and the standard one wins where both are present:
+
+| Shape | Headers | Read as |
+| :--- | :--- | :--- |
+| Standard | `RateLimit-Policy: "burst";q=100;w=60`, `RateLimit: "burst";r=50;t=30` | `q` the quota, `w` the window, `r` what is left, `t` the seconds until reset |
+| Legacy | `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` | The reset is whole seconds, either a Unix timestamp or a count from now |
+
+A host that publishes neither has no quota, and the feature is invisible. So is a host that publishes a remaining count with no quota to take a fraction of - there is no denominator for the reserve, so it is refused only once the count reaches zero. A malformed field is ignored rather than thrown.
+
+Set `LegacyHeaders` for a dependency that spells the triple differently - `X-Rate-Limit-*` is the common variant - naming exactly three headers, in the order limit, remaining, reset.
+
+> [!IMPORTANT]
+> A server publishing a per-account quota while you are one of fifty pods will make every pod believe it owns the whole allowance. The reserve does not fix that; only the 429 does, and the 429 still works exactly as it always has. The honest use is a single-instance client, or a generous reserve. Set `Quota = null` to read no headers at all.
 
 ## Verify retry behavior
 

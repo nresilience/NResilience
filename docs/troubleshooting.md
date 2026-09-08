@@ -166,6 +166,17 @@ See [Error responses](./http/error-responses.md) for the full mapping.
 
 In a test hammering a dead dependency, set `Budget = RetryBudget.None`. In production, this symptom means the retry fraction has left the range where retrying helps.
 
+### Symptom: `RateLimitedException` is thrown and nothing was sent, while the dependency looks healthy.
+
+> [!CAUTION] Quick fix
+> Lower the reserve, or turn the guard off for that client: `configureOptions: o => o.Quota = Quota.Reserving(reserve: 0)`, or `o.Quota = null`.
+
+**Why this happens**: The dependency publishes its rate limit in response headers, and the handler is honoring it. Once the remaining allowance is inside the reserve - a tenth of the published quota by default - the next attempt is refused locally rather than sent. The `RejectedByQuota` event and log record 1030 carry the time until the published window resets.
+
+The usual cause of an unwanted refusal is a quota published per account while several instances of your service share it: each one reads the whole allowance as its own, and each holds back a tenth of it. `Quota.Reserving(0)` refuses only once the dependency says nothing is left; `null` stops reading the headers at all.
+
+See [the published quota](./http/index.md#honor-the-allowance-the-dependency-publishes).
+
 ### Symptom: Every measured bound loosened at once during an incident, and the dependency was fine.
 
 > [!CAUTION] Quick fix

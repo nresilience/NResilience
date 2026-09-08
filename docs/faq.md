@@ -49,6 +49,8 @@ The three gates a hedge passes are a budget, an adaptive latency threshold, and 
 
 What the library adds is the composition the platform cannot decide for you: the permit is taken once per attempt rather than once per operation, the wait is bounded by the time left on the deadline, and a refusal is classified as self-imposed throttling - so it takes the long backoff curve, never counts as evidence against the dependency, and is never charged to the [retry budget](features/retry-budget.md). For the reasoning, see [Admission control](deep-dives/admission-control.md).
 
+Over HTTP, check first whether you need to name a rate at all. If the dependency publishes its limit in response headers, the handler reads it by default and refuses an attempt once the remaining allowance is inside the reserve - the rate comes from the dependency rather than from a constant you have to keep in sync. See [the published quota](http/index.md#honor-the-allowance-the-dependency-publishes).
+
 ### Where is bulkhead isolation?
 `Limit.Concurrency` is the bulkhead: it bounds how many calls run against one dependency at once, per host by default. See [Resource isolation with bulkheads](guides/resource-isolation.md) for a complete guide.
 

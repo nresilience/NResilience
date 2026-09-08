@@ -196,6 +196,13 @@ internal sealed class LogListener
 
                 break;
 
+            // An incident that ends, like the two rejections above: the allowance is spent until the
+            // window resets, so every call in between would write the same line. One warning plus a
+            // count of what it stood for.
+            case CallEventKind.RejectedByQuota:
+                Quota(e, policy);
+                break;
+
             case CallEventKind.Stalled:
                 if (Level(Log.Ids.Stalled, e) is { } stalled)
                 {
@@ -296,6 +303,22 @@ internal sealed class LogListener
     }
 
     /// <summary>
+    ///     A spent quota refuses every attempt until the window resets, so the useful record is one
+    ///     line saying so plus a count - the same treatment, and the same window, an open breaker gets.
+    /// </summary>
+    private void Quota(CallEvent e, string policy)
+    {
+        if (Level(Log.Ids.RejectedByQuota, e) is { } level && ShouldWarn($"{policy}|{Log.Codes.RejectedByQuota}", out var suppressed))
+        {
+            Log.RejectedByQuota(_logger, level, policy, Ms(e.Delay), suppressed);
+            return;
+        }
+
+        if (Level(Log.Ids.RejectedRepeat, e) is { } repeat)
+            Log.RejectedRepeat(_logger, repeat, policy, "the allowance the dependency publishes is spent");
+    }
+
+    /// <summary>
     ///     A configuration mistake rather than an event: loud the first time it is seen for a policy,
     ///     quiet after, because the second one carries no information the first did not.
     /// </summary>
@@ -378,8 +401,9 @@ internal sealed class LogListener
     }
 
     /// <summary>
-    ///     What opens the incident window: the breaker opening, and either rejection reason. Three IDs
-    ///     rather than "everything at <c>Warning</c>", because the other three warnings do not end.
+    ///     What opens the incident window: the breaker opening, either rejection reason, and a spent
+    ///     published quota. Four IDs rather than "everything at <c>Warning</c>", because the other
+    ///     three warnings do not end.
     ///     <see cref="Log.Codes.OrphanedWork" /> and <see cref="Log.Codes.NestedRetry" /> are
     ///     configuration errors that recur on every call, and
     ///     <see cref="Log.Codes.NotRetriedFirstSighting" /> is raised for a dependency answering "no"
@@ -389,7 +413,8 @@ internal sealed class LogListener
     private static bool IsIncident(int id) =>
         id is Log.Codes.BreakerOpened
             or Log.Codes.RejectedDependencyUnavailable
-            or Log.Codes.RejectedBudgetExhausted;
+            or Log.Codes.RejectedBudgetExhausted
+            or Log.Codes.RejectedByQuota;
 
     /// <summary>
     ///     The records whose volume is proportional to traffic, and so the only ones sampling touches.
@@ -437,6 +462,7 @@ internal sealed class LogListener
         Log.Codes.NotRetriedFirstSighting => LogLevel.Warning,
         Log.Codes.RejectedDependencyUnavailable => LogLevel.Warning,
         Log.Codes.RejectedBudgetExhausted => LogLevel.Warning,
+        Log.Codes.RejectedByQuota => LogLevel.Warning,
         Log.Codes.BreakerOpened => LogLevel.Warning,
         Log.Codes.OrphanedWork => LogLevel.Warning,
         Log.Codes.NestedRetry => LogLevel.Warning,

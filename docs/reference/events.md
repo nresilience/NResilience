@@ -19,7 +19,7 @@ order: 7
 | `Exception` | The exception thrown by the most recent attempt, or `null` if none was thrown. |
 | `Result` | The value returned by the most recent attempt, as an `object`. This is `null` if the attempt threw an exception or returned nothing. |
 | `Reason` | The `StopReason` indicating why the call stopped. This is populated only for terminal event kinds. |
-| `IsRejection` | `true` for `RejectedByBreaker` and `RejectedByBudget`, for a listener that treats the two refusals alike. |
+| `IsRejection` | `true` for `RejectedByBreaker` and `RejectedByBudget`, for a listener that treats the two refusals alike. `false` for `RejectedByQuota`, which refuses one attempt rather than the call. |
 | `IsTerminal` | `true` for the kinds that end a call. Exactly one of these is raised per call. |
 | `ToString()` | Returns a formatted summary of the event, omitting absent segments. |
 | `Create(kind, ...)` | Static. Builds a `CallEvent` for [testing a listener](../testing/index.md#test-a-custom-listener) without the executor. Every parameter but `kind` is defaulted. |
@@ -51,6 +51,7 @@ The `CallEventKind` enum defines the event types raised during a call.
 | `BackoffBaseAdapted` | No | Yes (the measured base) | No |
 | `Stalled` | No | Yes (the stall bound) | No |
 | `SaturationDetected` | No | Yes (the queue delay) | No |
+| `RejectedByQuota` | No | Yes (the time until the window resets) | No |
 
 ### Event invariants and behavior
 
@@ -65,6 +66,7 @@ The `CallEventKind` enum defines the event types raised during a call.
 - **Measured backoff bases**: `BackoffBaseAdapted` carries the new base on `Delay`, after the `Spread` clamp - which is what the curve actually uses. It is raised on the retry decision, and only when the number differs from the last one raised for that policy instance. A policy whose previous attempt was throttled rather than transient raises nothing, because a throttled retry does not use the measured base. See [Retry](../features/retry.md#measure-the-backoff-base-instead-of-guessing-it).
 - **Measured attempt ceilings**: `AttemptCeilingAdapted` carries the new ceiling on `Delay`. It is raised only when the measured term is what bounds the attempt, and only when the number differs from the last one raised for that policy instance - so the rate follows how much the estimate moves rather than how much traffic there is. A policy whose ceiling has been clamped back to `AttemptTimeout` raises nothing. See [Deadlines](../features/deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it).
 - **Local saturation**: `SaturationDetected` carries the thread-pool queue delay that was measured on `Delay`. It is raised at the *onset* of an episode - once when the process crosses `Multiple` times its own normal queue delay, and nothing more until the queue has drained and filled again - so a count of these is a count of local incidents. The episode is tracked per policy instance, because each policy independently stops feeding its own estimates: a listener attached to five policies sees five events per episode, one per policy that stopped measuring. Nothing is refused and no bound moves, so it is neither a failure nor terminal. See [Local saturation](../features/saturation.md).
+- **Published quota**: `RejectedByQuota` fires when the allowance the dependency publishes is spent and the HTTP handler refused an attempt without sending it, and carries the time until the published window resets on `Delay` - which is also the pushback the retry honors. It refuses one attempt rather than the call, so it is neither terminal nor an `IsRejection`, and the call still ends with `Succeeded`, `Exhausted` or `DeadlineExceeded`. `Duration` is zero, because the handler does not hold the call's start. Raised only by the HTTP handler. See [the published quota](../http/index.md#honor-the-allowance-the-dependency-publishes).
 - **Breaker transitions**: Breaker state transitions are raised on the call that triggered the transition, outside the breaker's internal lock.
 
 ## Listener contract
@@ -114,7 +116,8 @@ Every record is written every time unless you opt into [sampling](../features/lo
 | 1027 | `HedgeSuppressed` | `Debug` | `Information` | `{Policy} held back hedge attempt {Attempt} after {ThresholdMs} ms` |
 | 1028 | `Stalled` | `Warning` | `Warning` | `{Policy} cut off a transfer after {TransferredCount} byte(s) or element(s): nothing arrived for {StallMs} ms` |
 | 1029 | `SaturationDetected` | `Debug` | `Information` | `{Policy} stopped measuring: this process's thread pool is queueing for {QueueDelayMs} ms` |
+| 1030 | `RejectedByQuota` | `Warning` | `Warning` | `{Policy} refused an attempt because the allowance the dependency publishes is spent, and it resets in {ResetMs} ms.` |
 
 Field names are shared with the metric tag vocabulary wherever both exist (`Policy`, `Verdict`, `Reason`), so a structured record and a metric describe the same call with the same words.
 
-Events 1010, 1011, 1016 and 1018 are rate-limited per policy - see [flood control](../features/logging.md#flood-control). Events 1007, 1012, 1017 and 1019 are the quiet forms the suppressed occurrences take.
+Events 1010, 1011, 1016, 1018 and 1030 are rate-limited per policy - see [flood control](../features/logging.md#flood-control). Events 1007, 1012, 1017 and 1019 are the quiet forms the suppressed occurrences take.

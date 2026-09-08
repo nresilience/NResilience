@@ -305,6 +305,14 @@ public static class ResilienceTelemetry
                 Annotate(e, "nresilience.saturation_detected");
                 break;
 
+            // No instrument. The refusal is one attempt this process declined to spend, which
+            // nresilience.attempts already counts with a throttled verdict; what only this event can
+            // say is that the published allowance rather than the dependency is what stopped it, and
+            // that belongs on the span beside the transitions.
+            case CallEventKind.RejectedByQuota:
+                Annotate(e, "nresilience.rejected_by_quota");
+                break;
+
             case CallEventKind.Stalled:
                 // AttemptNumber is 1 for a body - ProgressStream has no attempt to name, because the
                 // attempt was over before it existed - and the delivered element count for a stream.

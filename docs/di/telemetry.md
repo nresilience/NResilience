@@ -54,6 +54,7 @@ The library uses `StartActivity`, which returns `null` when the tracing system i
 | `nresilience.breaker_opened`, `nresilience.breaker_closed`, `nresilience.breaker_half_opened` | The breaker changed state. |
 | `nresilience.orphaned_work` | An attempt kept running after the call returned. |
 | `nresilience.nested_retry` | The call is already inside a retrying client. |
+| `nresilience.rejected_by_quota` | The dependency's published allowance is spent, so the attempt was refused without being sent. |
 
 ## Tag reference
 

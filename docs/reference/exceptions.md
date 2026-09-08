@@ -29,7 +29,7 @@ catch (Exception e) when (e is IResilienceFailure failure)
 
 It is an interface rather than a base class because two of the three derive from `TimeoutException` on purpose, and a caller that catches `TimeoutException` should keep catching them.
 
-`RateLimitedException` is deliberately not one: it is thrown by *your* code, inside an attempt, and is classified and retried like any other failure. `ResilienceConfigurationException` is not one either - it reports a policy that cannot run, which is a startup failure with no call behind it.
+`RateLimitedException` is deliberately not one: it is thrown by a limiter - yours, or the HTTP handler's [published quota](../http/index.md#honor-the-allowance-the-dependency-publishes) - inside an attempt, and is classified and retried like any other failure. `ResilienceConfigurationException` is not one either - it reports a policy that cannot run, which is a startup failure with no call behind it.
 
 ### Accessing the attempt log
 For any exception thrown by the library - including the one your callback threw, which the executor rethrows unchanged - the attempt log is stored in `Exception.Data` under the `AttemptLog.DataKey`. Retrieve it with `AttemptLog.Of(exception)`. That is the general mechanism; `IResilienceFailure` is the typed one for the three exceptions the library invents to end a call.
@@ -93,12 +93,12 @@ A `RateLimitedException` is thrown when local admission control refuses to start
 
 | Member | Description |
 | :--- | :--- |
-| `Limiter` | The name of the limiter that refused, or `null` if it was unnamed. |
+| `Limiter` | The name of the limiter that refused, or `null` if it was unnamed. The HTTP handler's published quota reports `"<host> quota"`. |
 | `RetryAfter` | When the limiter said a permit would be available, if it said. Honored over the backoff curve. |
 
 The [executor](index.md) always classifies it as `Verdict.Refused`, regardless of the configured classifier - so it is retried on the throttled curve, is never counted against the breaker, and is never charged to the [retry budget](../features/retry-budget.md). Because the executor handles it directly, a `Classifier` never sees it; calling `ClassifyException` with one returns `Permanent`.
 
-Throw it yourself from any limiter you bring, and it composes the same way. See [Rate limiting](../features/rate-limiting.md).
+Throw it yourself from any limiter you bring, and it composes the same way. See [Rate limiting](../features/rate-limiting.md). The HTTP handler throws it for a spent [published quota](../http/index.md#honor-the-allowance-the-dependency-publishes), which is the one guard the library ships.
 
 ## `ResilienceConfigurationException`
 

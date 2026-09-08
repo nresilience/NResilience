@@ -212,6 +212,28 @@ public enum CallEventKind : byte
     ///     </para>
     /// </summary>
     SaturationDetected,
+
+    /// <summary>
+    ///     The allowance the dependency publishes is spent, so the handler refused the attempt without
+    ///     sending it. <see cref="CallEvent.Delay" /> carries how long until the published window
+    ///     resets, which is also the pushback the retry honors.
+    ///     <para>
+    ///         Raised by the HTTP handler, per attempt it refuses, for a client whose
+    ///         <see cref="HttpResilienceOptions.Quota" /> is set - which it is by default - against a
+    ///         host that publishes rate-limit headers. Nothing else can detect it, and a host that
+    ///         publishes nothing raises nothing.
+    ///     </para>
+    ///     <para>
+    ///         Not terminal, and not one of the two refusals <see cref="CallEvent.IsRejection" />
+    ///         covers: a spent quota refuses one attempt rather than ending the call, exactly as any
+    ///         other <see cref="Verdict.Refused" /> does. The attempt is retried on the long backoff
+    ///         curve, and the call ends with <see cref="Succeeded" /> once the window resets inside
+    ///         its deadline, or with <see cref="Exhausted" /> or <see cref="DeadlineExceeded" /> when
+    ///         it does not. <see cref="CallEvent.Duration" /> is zero, because the handler does not
+    ///         hold the call's start.
+    ///     </para>
+    /// </summary>
+    RejectedByQuota,
 }
 
 /// <summary>
@@ -355,8 +377,13 @@ public readonly struct CallEvent
     public StopReason? Reason => _reason;
 
     /// <summary>
-    ///     True for the two refusals - <see cref="CallEventKind.RejectedByBreaker" /> and
-    ///     <see cref="CallEventKind.RejectedByBudget" /> - for a listener that treats them alike.
+    ///     True for the two refusals that end a call - <see cref="CallEventKind.RejectedByBreaker" />
+    ///     and <see cref="CallEventKind.RejectedByBudget" /> - for a listener that treats them alike.
+    ///     <para>
+    ///         False for <see cref="CallEventKind.RejectedByQuota" />, which refuses one attempt rather
+    ///         than the call. A listener counting refused calls must not count it; one counting refused
+    ///         attempts reads it directly.
+    ///     </para>
     /// </summary>
     public bool IsRejection => Kind is CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget;
 

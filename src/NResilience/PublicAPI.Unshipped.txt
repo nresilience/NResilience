@@ -164,6 +164,7 @@ NResilience.CallEventKind.NotRetried = 3 -> NResilience.CallEventKind
 NResilience.CallEventKind.OrphanedWork = 7 -> NResilience.CallEventKind
 NResilience.CallEventKind.RejectedByBreaker = 4 -> NResilience.CallEventKind
 NResilience.CallEventKind.RejectedByBudget = 5 -> NResilience.CallEventKind
+NResilience.CallEventKind.RejectedByQuota = 21 -> NResilience.CallEventKind
 NResilience.CallEventKind.Retrying = 1 -> NResilience.CallEventKind
 NResilience.CallEventKind.SaturationDetected = 20 -> NResilience.CallEventKind
 NResilience.CallEventKind.Stalled = 19 -> NResilience.CallEventKind
@@ -266,6 +267,8 @@ NResilience.HttpResilienceOptions.OwnTransportTimeout.get -> bool
 NResilience.HttpResilienceOptions.OwnTransportTimeout.set -> void
 NResilience.HttpResilienceOptions.PropagateDeadline.get -> bool
 NResilience.HttpResilienceOptions.PropagateDeadline.set -> void
+NResilience.HttpResilienceOptions.Quota.get -> NResilience.Quota?
+NResilience.HttpResilienceOptions.Quota.set -> void
 NResilience.HttpResilienceOptions.RetryUnsafeMethods.get -> bool
 NResilience.HttpResilienceOptions.RetryUnsafeMethods.set -> void
 NResilience.HttpResilienceOptions.Validate() -> void
@@ -316,6 +319,14 @@ NResilience.PolicyScope<TKey>.For(TKey key) -> NResilience.Resilience!
 NResilience.PolicyScope<TKey>.MaximumKeys.get -> int
 NResilience.PolicyScope<TKey>.PolicyScope(NResilience.Resilience! template, System.Func<TKey, NResilience.Resilience!>? shape = null, int maximumKeys = 1024, System.Collections.Generic.IEqualityComparer<TKey>? comparer = null) -> void
 NResilience.PolicyScope<TKey>.Template.get -> NResilience.Resilience!
+NResilience.Quota
+NResilience.Quota.<Clone>$() -> NResilience.Quota!
+NResilience.Quota.Equals(NResilience.Quota? other) -> bool
+NResilience.Quota.LegacyHeaders.get -> string![]?
+NResilience.Quota.LegacyHeaders.init -> void
+NResilience.Quota.Quota() -> void
+NResilience.Quota.Reserve.get -> double
+NResilience.Quota.Reserve.init -> void
 NResilience.RateLimitedException
 NResilience.RateLimitedException.Limiter.get -> string?
 NResilience.RateLimitedException.RateLimitedException() -> void
@@ -473,6 +484,9 @@ override NResilience.MeasuredBase.GetHashCode() -> int
 override NResilience.MeasuredBase.ToString() -> string!
 override NResilience.MeasuredValues.Equals(object? obj) -> bool
 override NResilience.MeasuredValues.GetHashCode() -> int
+override NResilience.Quota.Equals(object? obj) -> bool
+override NResilience.Quota.GetHashCode() -> int
+override NResilience.Quota.ToString() -> string!
 override NResilience.Recovery.GetHashCode() -> int
 override NResilience.Recovery.ToString() -> string!
 override NResilience.Resilience.Equals(object? obj) -> bool
@@ -530,6 +544,9 @@ static NResilience.MeasuredValues.operator ==(NResilience.MeasuredValues left, N
 static NResilience.NestedRetry.Begin(bool callerRetrying) -> NResilience.NestedRetry.Scope
 static NResilience.NestedRetry.IsCallerRetrying.get -> bool
 static NResilience.NestedRetry.IsMarker(string? value) -> bool
+static NResilience.Quota.Reserving(double reserve = 0.1) -> NResilience.Quota!
+static NResilience.Quota.operator !=(NResilience.Quota? left, NResilience.Quota? right) -> bool
+static NResilience.Quota.operator ==(NResilience.Quota? left, NResilience.Quota? right) -> bool
 static NResilience.Recovery.Over(double fraction = 0.25) -> NResilience.Recovery
 static NResilience.Recovery.operator !=(NResilience.Recovery left, NResilience.Recovery right) -> bool
 static NResilience.Recovery.operator ==(NResilience.Recovery left, NResilience.Recovery right) -> bool

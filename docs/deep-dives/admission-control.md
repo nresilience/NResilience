@@ -198,6 +198,28 @@ services.AddHttpClient("api")
 
 Registered the other way round the limiter is asked once per operation and every retry bypasses the quota. Nothing about the resulting behavior looks wrong until a dependency starts returning 429s under load, which is why the registration refuses it rather than accepting it.
 
+## The one guard the library ships
+
+Everything above is machinery for a guard you write. The library ships exactly one of its own, and it
+is the only guard whose number nobody has to supply: the
+[published quota](../http/index.md#honor-the-allowance-the-dependency-publishes). Most large APIs
+send the remaining allowance and the reset time on every response, so the rate a
+`PermitsPerSecond` would have to guess is already on the wire. The handler reads it, keeps it per
+host, and refuses an attempt once what is left is inside the reserve.
+
+It is a `RateLimitedException` thrown from inside the send rather than an `Admit` hook, and the
+reason is the accounting above. `Admit` selects the second execution path and charges a hoisted
+awaiter field to every caller that configures it - and the quota is on by default, so configuring
+`Admit` for it would charge that field to every HTTP client in every application, including the ones
+whose dependencies publish nothing. The send is already the seam: it runs per attempt, on the
+attempt's own token, inside the executor's `try`. The three properties
+[the callback is the seam](#the-callback-is-the-seam) asks for are true of it without adding
+anything.
+
+That is the general rule this section is here to record. **A guard that runs where the work runs
+should throw; a guard that runs instead of the work should be `Admit`.** The quota is the first kind:
+it is a question the handler can answer without leaving the method the send already occupies.
+
 ## The exception belongs to the core
 
 `RateLimitedException` is in `NResilience`, not beside any limiter. It needs no reference to `System.Threading.RateLimiting`, so the core package keeps its no-package-dependencies claim, and any limiter at all - the platform's, a distributed one, a hand-rolled semaphore - composes with the executor by throwing it.

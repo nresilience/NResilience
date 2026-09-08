@@ -161,6 +161,25 @@ public sealed class HttpResilienceOptions
     public string DeadlineHeader { get; set; } = AmbientDeadline.Header;
 
     /// <summary>
+    ///     The reserve to keep against the allowance the dependency publishes, or null to read no
+    ///     rate-limit headers at all. On by default, holding a tenth of the published allowance
+    ///     unspent.
+    ///     <para>
+    ///         The handler reads <c>RateLimit</c> and <c>RateLimit-Policy</c> - and the older
+    ///         <c>X-RateLimit-*</c> triple - from every response, keeps the numbers per host, and
+    ///         refuses an attempt locally once the remaining allowance is inside the reserve. The
+    ///         refusal never leaves the process, so it is not charged to the retry budget and is not
+    ///         evidence against the host's breaker.
+    ///     </para>
+    ///     <para>
+    ///         Invisible against a host that publishes nothing, which is the cold-start rule the
+    ///         measured terms follow. See <see cref="NResilience.Quota" /> for both header shapes and
+    ///         for the failure mode a multi-instance client has to know about.
+    ///     </para>
+    /// </summary>
+    public Quota? Quota { get; set; } = Quota.Reserving();
+
+    /// <summary>
     ///     Whether the handler stamps <see cref="NestedRetry.Header" /> on outbound
     ///     requests and reports nesting it detects. On by default; it costs one header on a request
     ///     that can be retried.
@@ -198,6 +217,8 @@ public sealed class HttpResilienceOptions
                 "DeadlineHeader must not be empty; it is the name of a header. " +
                 $"Leave it alone for the default of \"{AmbientDeadline.Header}\", or set PropagateDeadline to false to send none.");
         }
+
+        Quota?.Validate(problems);
 
         // Eagerly, rather than on the first request to the first host: the per-host breakers are
         // built lazily as hosts are seen, so a bad setting here would otherwise surface as a

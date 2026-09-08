@@ -169,6 +169,13 @@ internal static partial class Log
             "{Policy} cut off a transfer after {TransferredCount} byte(s) or element(s): nothing arrived for {StallMs} ms, which is the attempt timeout")]
     internal static partial void Stalled(ILogger logger, LogLevel level, string policy, long transferredCount, long stallMs);
 
+    [LoggerMessage(
+        EventId = Codes.RejectedByQuota,
+        EventName = nameof(Ids.RejectedByQuota),
+        Message =
+            "{Policy} refused an attempt because the allowance the dependency publishes is spent, and it resets in {ResetMs} ms. Nothing was sent. Refusals logged quietly since the previous warning: {Suppressed}.")]
+    internal static partial void RejectedByQuota(ILogger logger, LogLevel level, string policy, long resetMs, int suppressed);
+
     /// <summary>
     ///     The IDs as constants, so the <c>[LoggerMessage]</c> attributes and the level switches in
     ///     <c>LogListener</c> - both of which need a compile-time constant - name them rather than
@@ -206,6 +213,7 @@ internal static partial class Log
         internal const int HedgeSuppressed = 1027;
         internal const int Stalled = 1028;
         internal const int SaturationDetected = 1029;
+        internal const int RejectedByQuota = 1030;
     }
 
     /// <summary>
@@ -244,5 +252,6 @@ internal static partial class Log
         internal static readonly EventId HedgeSuppressed = new(Codes.HedgeSuppressed, nameof(HedgeSuppressed));
         internal static readonly EventId Stalled = new(Codes.Stalled, nameof(Stalled));
         internal static readonly EventId SaturationDetected = new(Codes.SaturationDetected, nameof(SaturationDetected));
+        internal static readonly EventId RejectedByQuota = new(Codes.RejectedByQuota, nameof(RejectedByQuota));
     }
 }

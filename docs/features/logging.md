@@ -102,7 +102,7 @@ var payments = (Resilience.Http with { Name = "payments" })
 
 The feature exists to handle pathological states; three noise types use three different mechanisms.
 
-- **Rejections.** An open breaker refuses every call for the duration of the break. Events 1010 and 1011 warn at most once per `RepeatWindow` (30 seconds by default) per policy and reason. Within the window, rejections are counted and written as event 1012 at `Debug`, and the count is included in the `Suppressed` field of the next warning. No records are dropped, only demoted. Set `RepeatWindow` to `TimeSpan.Zero` to warn on every rejection.
+- **Rejections.** An open breaker refuses every call for the duration of the break, and a spent [published quota](../http/index.md#honor-the-allowance-the-dependency-publishes) refuses every attempt until the window resets. Events 1010, 1011 and 1030 warn at most once per `RepeatWindow` (30 seconds by default) per policy and reason. Within the window, rejections are counted and written as event 1012 at `Debug`, and the count is included in the `Suppressed` field of the next warning. No records are dropped, only demoted. Set `RepeatWindow` to `TimeSpan.Zero` to warn on every rejection.
 - **Footguns.** `OrphanedWork` and `NestedRetry` are configuration errors. Each warns the first time it is detected for a policy and remains quiet thereafter.
 - **Unretried exception types.** Event 1007 names an exception type the first time a policy declines to retry it. HTTP status codes are classified from responses and arrive without exceptions, so they follow the quiet path even for the ten thousandth 404.
 
@@ -129,7 +129,7 @@ services.AddResilienceLogging(o => o.Sampling = LogSampling.OneIn(keepOneIn: 20)
 
 **What is sampled** is the records whose volume is proportional to traffic: events 1000-1005 and the three hedge records, 1022-1024. Breaker transitions, first sightings, rejections, adapted estimates and policy resolution are never sampled - each is already one line per event rather than one line per call.
 
-**What opens the window** is a breaker opening (1013) or a call refused by a breaker or by the retry budget (1010, 1011). Footguns and first-sighting exception types do not, because they recur for the life of the process and a window they hold open is sampling turned off without saying so. The window opens on the event rather than on the written record, so an incident whose warning your filter is not carrying still restores the detail.
+**What opens the window** is a breaker opening (1013), a call refused by a breaker or by the retry budget (1010, 1011), or an attempt refused because the dependency's published allowance is spent (1030). Footguns and first-sighting exception types do not, because they recur for the life of the process and a window they hold open is sampling turned off without saying so. The window opens on the event rather than on the written record, so an incident whose warning your filter is not carrying still restores the detail.
 
 The counting is exact rather than random: every twentieth record, counted per record and per policy. Two processes at the same traffic write the same number of lines, and an HTTP client with a policy per host samples each host on its own.
 

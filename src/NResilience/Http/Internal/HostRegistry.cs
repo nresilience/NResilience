@@ -45,6 +45,11 @@ internal sealed class HostScope : Scoped
         else
             Budget = policy.Budget;
 
+        // Built from the scoped policy, so the events it raises carry the same name the rest of this
+        // host's records do, and the same listener carries them.
+        if (options.Quota is { } quota)
+            Quota = new HostQuota(quota, host, policy.Time, scoped.Name, scoped.OnEvent);
+
         Retrying = scoped;
 
         // Hedging goes with the attempts: a hedge is a concurrent retry, so a request that may not be
@@ -63,6 +68,13 @@ internal sealed class HostScope : Scoped
     ///     outcome and the budget still receives its deposit, and nothing is sent twice.
     /// </summary>
     internal Resilience Single { get; }
+
+    /// <summary>
+    ///     This host's published allowance, or null when <see cref="HttpResilienceOptions.Quota" /> is
+    ///     off. Held per host for the reason the breaker is: one host's spent quota says nothing about
+    ///     another's.
+    /// </summary>
+    internal HostQuota? Quota { get; }
 
     /// <summary>This host's breaker, whether created here or inherited from the policy.</summary>
     internal Breaker? Breaker { get; }

@@ -37,13 +37,19 @@ namespace NResilience.Internal;
 ///     inside the classified region, where it becomes one more transient failure instead of an
 ///     exception the retry loop never hears about.
 /// </param>
+/// <param name="quota">
+///     This host's published allowance, or null when <see cref="HttpResilienceOptions.Quota" /> is
+///     off. Asked before every send and told about every response, which is the whole of the feature:
+///     the check is one comparison and the update is one header lookup.
+/// </param>
 internal sealed class HttpCall(
     HttpRequestMessage request,
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
     bool clone,
     bool concurrent = false,
     DeadlineStamp? deadline = null,
-    bool buffer = false)
+    bool buffer = false,
+    HostQuota? quota = null)
 {
     /// <summary>
     ///     Guards <see cref="Clone" /> on a hedged call. Reading an <c>HttpHeaders</c> collection parses
@@ -56,6 +62,13 @@ internal sealed class HttpCall(
 
     private byte[]? _body;
     private HttpResponseMessage? _previous;
+
+    /// <summary>
+    ///     How many sends this call has started, so a quota refusal can name one. Equal to the
+    ///     executor's attempt number on a sequential call; on a hedged one the legs overlap, so it is
+    ///     the order the sends were started in.
+    /// </summary>
+    private int _sends;
 
     /// <summary>
     ///     Buffers the request body, so that every attempt can be given its own copy of it.
@@ -99,6 +112,13 @@ internal sealed class HttpCall(
             _previous = null;
         }
 
+        // Before the request is even built: the point of a published quota is to spend nothing, and
+        // the throw reaches the executor's own RateLimitedException handling, which is where a
+        // self-imposed refusal already gets the long backoff curve, the pushback honored verbatim, no
+        // evidence against the breaker and no charge against the retry budget.
+        if (quota is not null && quota.Refusal(Interlocked.Increment(ref _sends)) is { } until)
+            throw new RateLimitedException(retryAfter: until, limiter: quota.Limiter);
+
         var attempt = clone ? Clone() : request;
 
         if (deadline is { } stamp)
@@ -114,6 +134,10 @@ internal sealed class HttpCall(
         try
         {
             var response = await send(attempt, cancellationToken).ConfigureAwait(false);
+
+            // Every response, whatever its status: the headers are published on the 200s as well, and
+            // reading them only on the 429 is reading them once the damage is done.
+            quota?.Observe(response);
 
             if (buffer && response.Content is { } body && body.Headers.ContentLength != 0)
             {
