@@ -51,7 +51,7 @@ The limiter goes inside the callback, not around the call.
 ```csharp
 // 100 calls per second, with one second of burst. The limiter is an object you hold: give
 // it the lifetime of whatever it protects, and dispose it with that.
-using var limiter = Limit.PerSecond(permits: 100);
+await using var limiter = Limit.PerSecond(permits: 100);
 
 var api = Resilience.Http;
 
@@ -110,7 +110,7 @@ var error = Assert.Throws<ResilienceConfigurationException>(() => new RateLimitO
 // limit between them is read from latency: a round of calls slower than this dependency
 // normally is means a queue downstream, and the limit backs off. Pass an
 // AdaptiveLimitOptions for the rest of the knobs; every one of them has a default.
-using var limiter = Limit.Adaptive(maximum: 200, name: "payments");
+await using var limiter = Limit.Adaptive(maximum: 200, name: "payments");
 
 var api = Resilience.Http;
 

@@ -17,7 +17,7 @@ public sealed class HealthCheckTests
     {
         var breaker = new Breaker();
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilienceHealthCheck());
 
@@ -39,7 +39,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task A_registered_policy_reports_which_bound_binds_first()
     {
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Http with { Deadline = TimeSpan.FromSeconds(5) })
             .AddHealthChecks().AddResilienceHealthCheck());
 
@@ -63,7 +63,7 @@ public sealed class HealthCheckTests
     {
         var breaker = new Breaker(new BreakerSettings { SlowCalls = SlowCalls.Above() });
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilienceHealthCheck());
 
@@ -89,7 +89,7 @@ public sealed class HealthCheckTests
     {
         var breaker = Tripped();
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilienceHealthCheck());
 
@@ -103,13 +103,13 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task The_reported_status_is_configurable_in_both_directions()
     {
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = Tripped() })
             .AddHealthChecks().AddResilienceHealthCheck(configure: o => o.BreakerOpenStatus = HealthStatus.Unhealthy));
 
         Assert.Equal(HealthStatus.Unhealthy, (await Check(provider)).Status);
 
-        using var lenient = Provider(services => services
+        await using var lenient = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = Tripped() })
             .AddHealthChecks().AddResilienceHealthCheck(configure: o => o.BreakerOpenStatus = HealthStatus.Healthy));
 
@@ -122,7 +122,7 @@ public sealed class HealthCheckTests
         var breaker = new Breaker();
         breaker.Isolate();
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilienceHealthCheck());
 
@@ -137,7 +137,7 @@ public sealed class HealthCheckTests
     {
         var budget = RetryBudget.Of(0.1, 1);
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Budget = budget })
             .AddHealthChecks().AddResilienceHealthCheck());
 
@@ -157,7 +157,7 @@ public sealed class HealthCheckTests
         {
         }
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Budget = budget })
             .AddHealthChecks().AddResilienceHealthCheck());
 
@@ -174,7 +174,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task The_None_and_Automatic_markers_are_not_reported_as_budgets()
     {
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("off", Resilience.Default with { Budget = RetryBudget.None })
             .AddResilience("auto", Resilience.Default with { Budget = RetryBudget.Automatic })
             .AddHealthChecks().AddResilienceHealthCheck());
@@ -194,7 +194,7 @@ public sealed class HealthCheckTests
     {
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(services =>
+        await using var provider = Provider(services =>
         {
             services.AddHttpClient("api")
                 .AddResilience(TestPolicy.InstantHttp)
@@ -218,7 +218,7 @@ public sealed class HealthCheckTests
     {
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(services =>
+        await using var provider = Provider(services =>
         {
             services.AddHttpClient("api")
                 .AddResilience(TestPolicy.InstantHttp)
@@ -238,7 +238,7 @@ public sealed class HealthCheckTests
     {
         var breaker = Tripped();
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddHealthChecks().AddResilienceHealthCheck(configure: o => o.Watch("payments", breaker)));
 
         var report = await Check(provider);
@@ -250,7 +250,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task A_process_with_nothing_to_report_says_so_rather_than_claiming_health()
     {
-        using var provider = Provider(services => services.AddHealthChecks().AddResilienceHealthCheck());
+        await using var provider = Provider(services => services.AddHealthChecks().AddResilienceHealthCheck());
 
         var report = await Check(provider);
 
@@ -270,7 +270,7 @@ public sealed class HealthCheckTests
     [Fact]
     public async Task The_check_registers_under_a_name_of_your_choosing()
     {
-        using var provider = Provider(services => services.AddHealthChecks().AddResilienceHealthCheck("nresilience"));
+        await using var provider = Provider(services => services.AddHealthChecks().AddResilienceHealthCheck("nresilience"));
 
         var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync();
 
@@ -324,7 +324,7 @@ public sealed class HealthCheckTests
 
         Assert.Equal(BreakerState.Recovering, breaker.State);
 
-        using var provider = Provider(services => services
+        await using var provider = Provider(services => services
             .AddResilience("api", Resilience.Default with { Breaker = breaker })
             .AddHealthChecks().AddResilienceHealthCheck());
 

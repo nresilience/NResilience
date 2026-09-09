@@ -311,8 +311,13 @@ public sealed class ResilienceExceptionHandlerTests
         var features = new FeatureCollection();
         features.Set<IHttpRequestFeature>(new HttpRequestFeature());
         features.Set<IHttpResponseFeature>(new StartedResponseFeature());
-        var context = new DefaultHttpContext(features);
-        context.Response.StatusCode = StatusCodes.Status200OK;
+        var context = new DefaultHttpContext(features)
+        {
+            Response =
+            {
+                StatusCode = StatusCodes.Status200OK,
+            },
+        };
 
         var handled = await handler.TryHandleAsync(context, new DeadlineExceededException(), CancellationToken.None);
 

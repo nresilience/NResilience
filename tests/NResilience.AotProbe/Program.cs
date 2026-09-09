@@ -461,7 +461,7 @@ internal static class Program
         // and reading a row out of it is what proves nothing on the path needed reflection.
         services.AddHealthChecks().AddResilienceHealthCheck();
 
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
         var policies = provider.GetRequiredService<IResiliencePolicies>();
 
         var api = policies["api"];
@@ -488,7 +488,7 @@ internal static class Program
         var strict = new ServiceCollection();
         strict.AddResilience(typo.GetSection("Resilience"));
 
-        using var strictProvider = strict.BuildServiceProvider();
+        await using var strictProvider = strict.BuildServiceProvider();
         var caught = false;
 
         try
@@ -550,7 +550,7 @@ internal static class Program
         clientServices.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = transport));
 
-        using var clientProvider = clientServices.BuildServiceProvider();
+        await using var clientProvider = clientServices.BuildServiceProvider();
         using var client = clientProvider.GetRequiredService<IHttpClientFactory>().CreateClient("probe");
 
         failures += Check("the registration owns the transport timeout", client.Timeout == Timeout.InfiniteTimeSpan);
@@ -588,7 +588,7 @@ internal static class Program
 
         failures += Check("limiter options bind under AOT", options is { Concurrency: 1, PerHost: true, QueueLimit: 0 });
 
-        using var limiter = options.ToLimiter();
+        await using var limiter = options.ToLimiter();
 
         using (await limiter.AcquireOrThrowAsync("probe").ConfigureAwait(false))
         {

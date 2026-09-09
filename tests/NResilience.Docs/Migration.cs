@@ -129,7 +129,7 @@ public sealed class Migration
             .AddRateLimit(options => options.Concurrency = 10);
 
         // For any other callback
-        using var limiter = Limit.Concurrency(permits: 10);
+        await using var limiter = Limit.Concurrency(permits: 10);
 
         var result = await policy.RunAsync(async ct =>
         {

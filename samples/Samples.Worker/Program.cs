@@ -30,7 +30,7 @@ services.AddHttpClient("orders")
     .AddRateLimit(configuration.GetSection("RateLimit"))
     .ConfigurePrimaryHttpMessageHandler(() => new FakeTransport());
 
-using var provider = services.BuildServiceProvider();
+await using var provider = services.BuildServiceProvider();
 
 // Everything the meter records, printed as it happens. In a real application this is
 // AddOpenTelemetry().WithMetrics(m => m.AddMeter(ResilienceTelemetry.MeterName)).
@@ -91,7 +91,7 @@ Console.WriteLine("The limiter allows one call in flight per host. A second, whi
 var budget = RetryBudget.Of(minimumPerSecond: 1);
 var limited = policies["api"] with { Backoff = Backoff.None, Budget = budget };
 
-using var limiter = new RateLimitOptions { Concurrency = 1 }.ToLimiter();
+await using var limiter = new RateLimitOptions { Concurrency = 1 }.ToLimiter();
 using var held = await limiter.AcquireOrThrowAsync("orders");
 
 var refused = await limited.TryRunAsync(

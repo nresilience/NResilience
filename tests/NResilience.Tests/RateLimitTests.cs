@@ -309,7 +309,7 @@ public sealed class RateLimitTests
     [Fact]
     public async Task A_limiter_with_no_permits_left_throws_rather_than_returning_a_dead_lease()
     {
-        using var limiter = Limit.Concurrency(1);
+        await using var limiter = Limit.Concurrency(1);
 
         using var held = await limiter.AcquireOrThrowAsync("bulk");
 
@@ -321,7 +321,7 @@ public sealed class RateLimitTests
     [Fact]
     public async Task A_released_permit_is_available_again()
     {
-        using var limiter = Limit.Concurrency(1);
+        await using var limiter = Limit.Concurrency(1);
 
         using (await limiter.AcquireOrThrowAsync())
         {
@@ -338,7 +338,7 @@ public sealed class RateLimitTests
 
         // Two permits for three attempts: the third is refused, and the refusal is a retry rather
         // than a failure of the dependency.
-        using var limiter = Limit.Concurrency(2);
+        await using var limiter = Limit.Concurrency(2);
         var held = new List<RateLimitLease>();
 
         var policy = TestPolicy.WithClock(time) with { Attempts = 3, Budget = RetryBudget.None };

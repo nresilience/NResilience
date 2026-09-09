@@ -77,7 +77,7 @@ public sealed class HostLifecycleTests
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new LoopbackHandler(server)));
 
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
         var factory = provider.GetRequiredService<IHttpClientFactory>();
 
         // Make enough calls via fresh clients to trip the breaker.
@@ -132,7 +132,7 @@ public sealed class HostLifecycleTests
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new LoopbackHandler(server)));
 
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
         var factory = provider.GetRequiredService<IHttpClientFactory>();
 
         // Trip the breaker.

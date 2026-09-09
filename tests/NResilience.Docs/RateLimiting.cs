@@ -15,7 +15,7 @@ public sealed class RateLimiting
         // <snippet:limit-callback>
         // 100 calls per second, with one second of burst. The limiter is an object you hold: give
         // it the lifetime of whatever it protects, and dispose it with that.
-        using var limiter = Limit.PerSecond(permits: 100);
+        await using var limiter = Limit.PerSecond(permits: 100);
 
         var api = Resilience.Http;
 
@@ -67,7 +67,7 @@ public sealed class RateLimiting
         // limit between them is read from latency: a round of calls slower than this dependency
         // normally is means a queue downstream, and the limit backs off. Pass an
         // AdaptiveLimitOptions for the rest of the knobs; every one of them has a default.
-        using var limiter = Limit.Adaptive(maximum: 200, name: "payments");
+        await using var limiter = Limit.Adaptive(maximum: 200, name: "payments");
 
         var api = Resilience.Http;
 
@@ -140,7 +140,7 @@ public sealed class RateLimiting
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Responds(HttpStatusCode.OK)));
 
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
         using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "api");
         using var response = await client.GetAsync(requestUri: new Uri(uriString: "https://api.test/thing"));
 
@@ -200,7 +200,7 @@ public sealed class RateLimiting
         services.ConfigureAll<HttpClientFactoryOptions>(o =>
             o.HttpMessageHandlerBuilderActions.Add(b => b.PrimaryHandler = new ScriptedHttpHandler().Responds(HttpStatusCode.OK)));
 
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
         using var client = provider.GetRequiredService<IHttpClientFactory>().CreateClient(name: "api");
         using var response = await client.GetAsync(requestUri: new Uri(uriString: "https://api.test/thing"));
 

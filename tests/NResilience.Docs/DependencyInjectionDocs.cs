@@ -192,7 +192,7 @@ public sealed class DependencyInjectionDocs
     {
         var services = new ServiceCollection();
         services.AddResilience(name: "api", policy: Resilience.Default with { Attempts = 1 });
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
 
         var client = new Orders(policies: provider.GetRequiredService<IResiliencePolicies>());
 
@@ -235,7 +235,7 @@ public sealed class DependencyInjectionDocs
 
         // </snippet:di-health-checks>
 
-        using var provider = services.BuildServiceProvider();
+        await using var provider = services.BuildServiceProvider();
         var report = await provider.GetRequiredService<HealthCheckService>().CheckHealthAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(expected: HealthStatus.Healthy, actual: report.Status);

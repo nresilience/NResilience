@@ -431,7 +431,7 @@ public sealed class StreamingTests
         {
             Assert.True(streams.Token.CanBeCanceled);
 
-            using var registration = streams.Token.Register(static () => { });
+            await using var registration = streams.Token.Register(static () => { });
             registrations++;
         }
 

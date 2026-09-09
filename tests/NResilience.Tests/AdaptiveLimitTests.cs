@@ -134,7 +134,7 @@ public sealed class AdaptiveLimitTests
     public async Task Queueing_is_off_by_default()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, time: time);
+        await using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, time: time);
 
         var held = limiter.AttemptAcquire();
         var queued = limiter.AcquireAsync().AsTask();
@@ -149,7 +149,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_queued_caller_is_admitted_when_a_slot_frees()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 2, time: time);
+        await using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 2, time: time);
 
         var held = limiter.AttemptAcquire();
         var queued = limiter.AcquireAsync().AsTask();
@@ -169,7 +169,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_full_queue_refuses_rather_than_grows()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 1, time: time);
+        await using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = limiter.AttemptAcquire();
         var queued = limiter.AcquireAsync().AsTask();
@@ -191,7 +191,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_queued_caller_that_gives_up_releases_its_reservation()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 1, time: time);
+        await using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 1, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = limiter.AttemptAcquire();
         using var abandoning = new CancellationTokenSource();
@@ -219,7 +219,7 @@ public sealed class AdaptiveLimitTests
     public async Task A_caller_that_arrives_while_someone_is_queued_does_not_overtake_them()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, queueLimit: 1, time: time);
+        await using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = Take(limiter, 2);
         var queued = limiter.AcquireAsync().AsTask();
@@ -426,7 +426,7 @@ public sealed class AdaptiveLimitTests
     public async Task Statistics_report_the_discovered_limit_and_what_is_waiting_on_it()
     {
         var time = new FakeTimeProvider();
-        using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, queueLimit: 1, time: time);
+        await using var limiter = Limit.Adaptive(options: new AdaptiveLimitOptions { Initial = 2, Minimum = 1 }, queueLimit: 1, time: time);
 
         var held = Take(limiter, 2);
         var queued = limiter.AcquireAsync().AsTask();

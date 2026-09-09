@@ -28,7 +28,7 @@ public sealed class HttpRateLimitTests
             .Responds(HttpStatusCode.ServiceUnavailable, 2)
             .Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             services => services.AddHttpClient("api")
                 .AddResilience(TestPolicy.InstantHttp, telemetry: false)
                 .AddRateLimit(limiter, "api"),
@@ -54,7 +54,7 @@ public sealed class HttpRateLimitTests
             .Responds(HttpStatusCode.ServiceUnavailable)
             .Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             services => services.AddHttpClient("api")
                 .AddResilience(TestPolicy.InstantHttp, telemetry: false)
                 .AddRateLimit(limiter, "api"),
@@ -98,7 +98,7 @@ public sealed class HttpRateLimitTests
         // One permit for the whole client. If the first attempt's lease is not released when the
         // attempt times out, the second attempt can never get one and the call fails as limited
         // rather than succeeding.
-        using var limiter = Limit.Concurrency(1);
+        await using var limiter = Limit.Concurrency(1);
         var calls = 0;
 
         var transport = new ConditionalTransport(async (_, ct) =>
@@ -116,7 +116,7 @@ public sealed class HttpRateLimitTests
             Deadline = Timeout.InfiniteTimeSpan,
         };
 
-        using var provider = Provider(
+        await using var provider = Provider(
             services => services.AddHttpClient("api")
                 .AddResilience(policy, telemetry: false)
                 .AddRateLimit(limiter, "api"),
@@ -130,13 +130,13 @@ public sealed class HttpRateLimitTests
     [Fact]
     public async Task A_permit_is_released_when_the_transport_throws()
     {
-        using var limiter = Limit.Concurrency(1);
+        await using var limiter = Limit.Concurrency(1);
 
         var transport = new ScriptedHttpHandler()
             .Throws(() => new HttpRequestException("reset"))
             .Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             services => services.AddHttpClient("api")
                 .AddResilience(TestPolicy.InstantHttp, telemetry: false)
                 .AddRateLimit(limiter, "api"),
@@ -162,7 +162,7 @@ public sealed class HttpRateLimitTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        using var provider = Provider(
+        await using var provider = Provider(
             services => services.AddHttpClient("api")
                 .AddResilience(TestPolicy.InstantHttp with { Attempts = 1 }, telemetry: false)
                 .AddRateLimit(o =>
@@ -200,7 +200,7 @@ public sealed class HttpRateLimitTests
             return new HttpResponseMessage(HttpStatusCode.OK);
         });
 
-        using var provider = Provider(
+        await using var provider = Provider(
             services => services.AddHttpClient("api")
                 .AddResilience(TestPolicy.InstantHttp with { Attempts = 1 }, telemetry: false)
                 .AddRateLimit(o =>
@@ -278,7 +278,7 @@ public sealed class HttpRateLimitTests
     [Fact]
     public async Task A_limiter_the_caller_passed_in_outlives_the_handler()
     {
-        using var limiter = Limit.Concurrency(1);
+        await using var limiter = Limit.Concurrency(1);
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.OK);
 
         var handler = new RateLimitHandler(limiter, "api", false) { InnerHandler = transport };

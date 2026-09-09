@@ -43,7 +43,7 @@ public sealed class HttpRegistrationTests
             .Responds(HttpStatusCode.ServiceUnavailable)
             .Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }),
             transport);
 
@@ -100,7 +100,7 @@ public sealed class HttpRegistrationTests
     {
         var names = new List<string?>();
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(
                 Resilience.Http with { Backoff = Backoff.None, OnEvent = e => names.Add(e.PolicyName) }),
             new ScriptedHttpHandler().Responds(HttpStatusCode.OK));
@@ -121,7 +121,7 @@ public sealed class HttpRegistrationTests
             .Responds(HttpStatusCode.ServiceUnavailable, 3)
             .Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s =>
             {
                 s.AddResilience("shared", Resilience.Http with { Attempts = 4, Backoff = Backoff.None });
@@ -165,7 +165,7 @@ public sealed class HttpRegistrationTests
     {
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }),
             transport);
 
@@ -180,7 +180,7 @@ public sealed class HttpRegistrationTests
     {
         var transport = new ScriptedHttpHandler().Responds(HttpStatusCode.ServiceUnavailable);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(
                 Resilience.Http with { Backoff = Backoff.None },
                 o => o.RetryUnsafeMethods = true),
@@ -217,7 +217,7 @@ public sealed class HttpRegistrationTests
             .Responds(HttpStatusCode.ServiceUnavailable)
             .Responds(HttpStatusCode.OK);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }),
             transport);
 
@@ -246,7 +246,7 @@ public sealed class HttpRegistrationTests
 
         ActivitySource.AddActivityListener(listener);
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }, telemetry: false),
             new ScriptedHttpHandler().Responds(HttpStatusCode.OK));
 
@@ -271,7 +271,7 @@ public sealed class HttpRegistrationTests
                 ? new HttpResponseMessage(HttpStatusCode.ServiceUnavailable)
                 : new HttpResponseMessage(HttpStatusCode.OK));
 
-        using var provider = Provider(
+        await using var provider = Provider(
             s => s.AddHttpClient("api").AddResilience(Resilience.Http with { Backoff = Backoff.None }),
             transport);
 
