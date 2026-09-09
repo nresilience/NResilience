@@ -325,22 +325,15 @@ public static class ShippingScenarios
     public static ValueTask<int> DefaultStreamSuspending() =>
         StreamGate.DrainAsync(Resilience.Default.RunAsync(static ct => StreamGate.SuspendAsync(ct)));
 
-    public sealed class LimitArm
+    public sealed class LimitArm(int refusals)
     {
         private readonly Func<Gate.LimitCounter, CancellationToken, Task<int>> _callback = Gate.SuspendThenLimitAsync;
-        private readonly Gate.LimitCounter _counter;
-        private readonly Resilience _policy;
-
-        public LimitArm(int refusals)
+        private readonly Gate.LimitCounter _counter = new(refusals);
+        private readonly Resilience _policy = Trivial with
         {
-            _counter = new Gate.LimitCounter(refusals);
-
-            _policy = Trivial with
-            {
-                Attempts = refusals + 1,
-                Backoff = Backoff.None,
-            };
-        }
+            Attempts = refusals + 1,
+            Backoff = Backoff.None,
+        };
 
         public void Reset() => _counter.Reset();
 
@@ -357,23 +350,16 @@ public static class ShippingScenarios
         return policy;
     }
 
-    public sealed class RetryArm
+    public sealed class RetryArm(int failures)
     {
         private readonly Func<Gate.FailCounter, CancellationToken, Task<int>> _callback = Gate.SuspendThenFailAsync;
-        private readonly Gate.FailCounter _counter;
-        private readonly Resilience _policy;
-
-        public RetryArm(int failures)
+        private readonly Gate.FailCounter _counter = new(failures);
+        private readonly Resilience _policy = Trivial with
         {
-            _counter = new Gate.FailCounter(failures);
-
-            _policy = Trivial with
-            {
-                Attempts = failures + 1,
-                Backoff = Backoff.None,
-                Budget = RetryBudget.None,
-            };
-        }
+            Attempts = failures + 1,
+            Backoff = Backoff.None,
+            Budget = RetryBudget.None,
+        };
 
         public void Reset() => _counter.Reset();
 

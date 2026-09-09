@@ -72,29 +72,22 @@ public static class PollyScenarios
 
     public static PollyRetryArm BuildRetryArm(int failures = 2) => new(failures);
 
-    public sealed class PollyRetryArm
+    public sealed class PollyRetryArm(int failures)
     {
         private readonly Func<Gate.FailCounter, CancellationToken, ValueTask<int>> _callback =
             static (counter, ct) => new ValueTask<int>(Gate.SuspendThenFailAsync(counter, ct));
 
-        private readonly Gate.FailCounter _counter;
-        private readonly ResiliencePipeline _pipeline;
-
-        public PollyRetryArm(int failures)
-        {
-            _counter = new Gate.FailCounter(failures);
-
-            _pipeline = new ResiliencePipelineBuilder()
-                .AddRetry(new RetryStrategyOptions
-                {
-                    MaxRetryAttempts = failures,
-                    BackoffType = DelayBackoffType.Constant,
-                    Delay = TimeSpan.Zero,
-                    UseJitter = false,
-                    ShouldHandle = new PredicateBuilder().Handle<IOException>(),
-                })
-                .Build();
-        }
+        private readonly Gate.FailCounter _counter = new(failures);
+        private readonly ResiliencePipeline _pipeline = new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
+            {
+                MaxRetryAttempts = failures,
+                BackoffType = DelayBackoffType.Constant,
+                Delay = TimeSpan.Zero,
+                UseJitter = false,
+                ShouldHandle = new PredicateBuilder().Handle<IOException>(),
+            })
+            .Build();
 
         public void Reset() => _counter.Reset();
 

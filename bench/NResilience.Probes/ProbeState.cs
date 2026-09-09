@@ -8,18 +8,11 @@ namespace NResilience.Probes;
 ///     is implemented in the shipping library; this stand-in ensures the fused loop incurs
 ///     the same cost as the shipping version.
 /// </summary>
-public sealed class ProbeBreaker
+public sealed class ProbeBreaker(int consecutiveFailures = 5, TimeSpan? breakDuration = null)
 {
-    private readonly long _breakDurationTicks;
-    private readonly int _consecutiveFailures;
+    private readonly long _breakDurationTicks = (breakDuration ?? TimeSpan.FromSeconds(15)).Ticks;
     private int _failures;
     private long _openedAtTicks;
-
-    public ProbeBreaker(int consecutiveFailures = 5, TimeSpan? breakDuration = null)
-    {
-        _consecutiveFailures = consecutiveFailures;
-        _breakDurationTicks = (breakDuration ?? TimeSpan.FromSeconds(15)).Ticks;
-    }
 
     public bool IsOpen => Volatile.Read(ref _openedAtTicks) != 0;
 
@@ -45,7 +38,7 @@ public sealed class ProbeBreaker
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RecordFailure(TimeProvider time)
     {
-        if (Interlocked.Increment(ref _failures) >= _consecutiveFailures)
+        if (Interlocked.Increment(ref _failures) >= consecutiveFailures)
             Volatile.Write(ref _openedAtTicks, time.GetUtcNow().UtcTicks);
     }
 
@@ -61,18 +54,10 @@ public sealed class ProbeBreaker
 ///     decision and one <see cref="Refund" /> per success, which is the total state the
 ///     executor frame accesses.
 /// </summary>
-public sealed class ProbeBudget
+public sealed class ProbeBudget(int capacity = 100, int refundPerSuccess = 1)
 {
-    private readonly int _capacity;
-    private readonly int _refundPerSuccess;
-    private int _tokens;
-
-    public ProbeBudget(int capacity = 100, int refundPerSuccess = 1)
-    {
-        _capacity = capacity;
-        _refundPerSuccess = refundPerSuccess;
-        _tokens = capacity;
-    }
+    private readonly int _capacity = capacity;
+    private int _tokens = capacity;
 
     public int Tokens => Volatile.Read(ref _tokens);
 
@@ -102,38 +87,20 @@ public sealed class ProbeBudget
         if (current >= _capacity)
             return;
 
-        Interlocked.Add(ref _tokens, _refundPerSuccess);
+        Interlocked.Add(ref _tokens, refundPerSuccess);
     }
 
     public void Reset() => Volatile.Write(ref _tokens, _capacity);
 }
 
 /// <summary>Thrown when the breaker refuses admission. This is a stand-in for the shipping exception.</summary>
-public sealed class ProbeBreakerOpenException : Exception
-{
-    public ProbeBreakerOpenException()
-        : base("The circuit breaker is open.")
-    {
-    }
-}
+public sealed class ProbeBreakerOpenException() : Exception("The circuit breaker is open.");
 
 /// <summary>Thrown when every attempt has been used. This is a stand-in for the shipping exception.</summary>
-public sealed class ProbeExhaustedException : Exception
+public sealed class ProbeExhaustedException(int attempts) : Exception($"All {attempts} attempt(s) failed.")
 {
-    public ProbeExhaustedException(int attempts)
-        : base($"All {attempts} attempt(s) failed.")
-    {
-        Attempts = attempts;
-    }
-
-    public int Attempts { get; }
+    public int Attempts { get; } = attempts;
 }
 
 /// <summary>Thrown when the operation-wide deadline expires. This is a stand-in for the shipping exception.</summary>
-public sealed class ProbeDeadlineException : Exception
-{
-    public ProbeDeadlineException()
-        : base("The operation deadline expired.")
-    {
-    }
-}
+public sealed class ProbeDeadlineException() : Exception("The operation deadline expired.");

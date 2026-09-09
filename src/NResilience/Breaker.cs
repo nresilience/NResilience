@@ -618,9 +618,9 @@ public sealed record BreakerSettings
 ///     public Breaker Payments { get; } = Breaker.Of(name: "payments");
 ///     public Breaker Search   { get; } = Breaker.Of(name: "search");
 /// }
-/// 
+///
 /// var payments = Resilience.Http with { Breaker = deps.Payments };
-/// 
+///
 /// app.MapGet("/health/payments", () =>
 ///     deps.Payments.State is BreakerState.Closed ? Results.Ok() : Results.StatusCode(503));
 /// </code>
@@ -1599,17 +1599,12 @@ public sealed class Breaker
     ///     normal was at the moment it most needs to know. It is guarded by the breaker's lock, like
     ///     the trip window, rather than being thread-safe on its own.
     /// </remarks>
-    private sealed class RateWindow
+    private sealed class RateWindow(TimeSpan window)
     {
         private readonly int[] _calls = new int[BucketCount];
         private readonly int[] _failures = new int[BucketCount];
-        private readonly long _ticksPerBucket;
+        private readonly long _ticksPerBucket = Math.Max(window.Ticks / BucketCount, 1);
         private long _epoch = -1;
-
-        public RateWindow(TimeSpan window)
-        {
-            _ticksPerBucket = Math.Max(window.Ticks / BucketCount, 1);
-        }
 
         public void Record(long now, bool failure)
         {

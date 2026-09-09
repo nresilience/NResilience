@@ -97,23 +97,16 @@ public static class Scenarios
     /// </summary>
     public static RetryArm BuildFusedRetry(int failures = 2) => new(failures);
 
-    public sealed class RetryArm
+    public sealed class RetryArm(int failures)
     {
         private readonly Func<Gate.FailCounter, CancellationToken, Task<int>> _callback = Gate.SuspendThenFailAsync;
-        private readonly Gate.FailCounter _counter;
-        private readonly FusedExecutor _executor;
-
-        public RetryArm(int failures)
+        private readonly Gate.FailCounter _counter = new(failures);
+        private readonly FusedExecutor _executor = new(FusedPolicy.NoTimeout with
         {
-            _counter = new Gate.FailCounter(failures);
-
-            _executor = new FusedExecutor(FusedPolicy.NoTimeout with
-            {
-                Attempts = failures + 1,
-                UseBackoff = false,
-                Budget = new ProbeBudget(int.MaxValue / 2),
-            });
-        }
+            Attempts = failures + 1,
+            UseBackoff = false,
+            Budget = new ProbeBudget(int.MaxValue / 2),
+        });
 
         public void Reset() => _counter.Reset();
 

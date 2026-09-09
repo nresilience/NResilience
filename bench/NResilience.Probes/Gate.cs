@@ -66,42 +66,28 @@ public static class Gate
     }
 
     /// <summary>A deterministic per-operation refusal sequence. This represents the limiter's state without a limiter.</summary>
-    public sealed class LimitCounter
+    public sealed class LimitCounter(int refusals)
     {
-        private readonly int _refusals;
         private int _seen;
 
-        public LimitCounter(int refusals)
-        {
-            _refusals = refusals;
+        // A cached instance, so the figure describes the refusal machinery rather than
+        // exception construction.
 
-            // A cached instance, so the figure describes the refusal machinery rather than
-            // exception construction.
-            Refusal = new RateLimitedException(limiter: "probe");
-        }
+        public RateLimitedException Refusal { get; } = new(limiter: "probe");
 
-        public RateLimitedException Refusal { get; }
-
-        public bool Next() => _seen++ < _refusals;
+        public bool Next() => _seen++ < refusals;
 
         public void Reset() => _seen = 0;
     }
 
     /// <summary>A deterministic per-operation failure sequence. The caller resets this between operations.</summary>
-    public sealed class FailCounter
+    public sealed class FailCounter(int failures)
     {
-        private readonly int _failures;
         private int _seen;
 
-        public FailCounter(int failures)
-        {
-            _failures = failures;
-            Fault = new IOException("probe transient fault");
-        }
+        public IOException Fault { get; } = new("probe transient fault");
 
-        public IOException Fault { get; }
-
-        public bool Next() => _seen++ < _failures;
+        public bool Next() => _seen++ < failures;
 
         public void Reset() => _seen = 0;
     }

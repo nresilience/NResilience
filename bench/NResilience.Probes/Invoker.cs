@@ -11,28 +11,14 @@ internal interface IInvoker<in TState, T>
     Task<T> Invoke(TState state, CancellationToken cancellationToken);
 }
 
-internal readonly struct StatefulInvoker<TState, T> : IInvoker<TState, T>
+internal readonly struct StatefulInvoker<TState, T>(Func<TState, CancellationToken, Task<T>> work) : IInvoker<TState, T>
 {
-    private readonly Func<TState, CancellationToken, Task<T>> _work;
-
-    public StatefulInvoker(Func<TState, CancellationToken, Task<T>> work)
-    {
-        _work = work;
-    }
-
-    public Task<T> Invoke(TState state, CancellationToken cancellationToken) => _work(state, cancellationToken);
+    public Task<T> Invoke(TState state, CancellationToken cancellationToken) => work(state, cancellationToken);
 }
 
-internal readonly struct StatelessInvoker<TState, T> : IInvoker<TState, T>
+internal readonly struct StatelessInvoker<TState, T>(Func<CancellationToken, Task<T>> work) : IInvoker<TState, T>
 {
-    private readonly Func<CancellationToken, Task<T>> _work;
-
-    public StatelessInvoker(Func<CancellationToken, Task<T>> work)
-    {
-        _work = work;
-    }
-
-    public Task<T> Invoke(TState state, CancellationToken cancellationToken) => _work(cancellationToken);
+    public Task<T> Invoke(TState state, CancellationToken cancellationToken) => work(cancellationToken);
 }
 
 /// <summary>Stand-in for the shipping internal <c>VoidResult</c>.</summary>

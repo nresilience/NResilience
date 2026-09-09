@@ -7,18 +7,11 @@ namespace NResilience.Probes;
 ///     shapes are measured on the same harness in the same run.
 ///     The gap between this and <see cref="FusedExecutor" /> represents the price of the real loop.
 /// </summary>
-public sealed class LeanFusedExecutor
+public sealed class LeanFusedExecutor(int attempts = 3)
 {
-    private readonly int _attempts;
-
-    public LeanFusedExecutor(int attempts = 3)
-    {
-        _attempts = attempts;
-    }
-
     public async ValueTask<T> RunAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken cancellationToken = default)
     {
-        var attempts = 0;
+        var attempts1 = 0;
 
         while (true)
         {
@@ -32,9 +25,9 @@ public sealed class LeanFusedExecutor
             }
             catch (Exception exception)
             {
-                attempts++;
+                attempts1++;
 
-                if (ProbeClassifier.Classify(exception).Kind != VerdictKind.Transient || attempts >= _attempts)
+                if (ProbeClassifier.Classify(exception).Kind != VerdictKind.Transient || attempts1 >= attempts)
                     throw;
             }
         }

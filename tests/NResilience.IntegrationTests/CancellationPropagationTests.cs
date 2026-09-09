@@ -164,14 +164,10 @@ public sealed class CancellationPropagationTests
     ///     were disposed - the real-IO version of <c>HttpHandlerTests</c>' <c>TrackedContent</c>.
     ///     Tracks the first content (the one a retry supersedes).
     /// </summary>
-    private sealed class TrackingHandler : DelegatingHandler
+    private sealed class TrackingHandler(HttpMessageHandler inner) : DelegatingHandler(inner)
     {
         internal bool FirstContentDisposed;
         private bool _seenFirst;
-
-        public TrackingHandler(HttpMessageHandler inner) : base(inner)
-        {
-        }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
