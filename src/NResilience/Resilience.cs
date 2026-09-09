@@ -325,6 +325,28 @@ public sealed partial record Resilience
     public bool UseAmbientDeadline { get; init; }
 
     /// <summary>
+    ///     Whether this policy reads the criticality of the current call, and lets it hold back
+    ///     amplification. Off by default.
+    ///     <para>
+    ///         When set, a call running at <see cref="NResilience.Criticality.Sheddable" /> is never
+    ///         hedged, and is refused a retry once the <see cref="Budget" /> bucket is more than half
+    ///         spent - so a backfill stops spending the retry capacity a checkout is about to need.
+    ///         Every other level behaves exactly as it does without this. Nothing is shed and no bound
+    ///         moves; what the levels mean for a given service stays with <see cref="Admit" />, which
+    ///         can read <see cref="AmbientCriticality.Current" />.
+    ///     </para>
+    ///     <para>
+    ///         Reading an <see cref="AsyncLocal{T}" /> has a cost, and most calls have no inbound
+    ///         criticality. When false, the cost is one branch per call; when true, it is one read,
+    ///         taken once at the start of the call for the reason <see cref="UseAmbientDeadline" />'s
+    ///         is. Use <see cref="AmbientCriticality.Begin" /> to publish a level, or
+    ///         <c>UseResilienceDeadline()</c> from <c>NResilience.AspNetCore</c>, which reads the
+    ///         inbound header in the same pass as the deadline.
+    ///     </para>
+    /// </summary>
+    public bool UseAmbientCriticality { get; init; }
+
+    /// <summary>
     ///     Whether a transfer that has stopped making progress counts as a failed attempt. Enabled by
     ///     default.
     ///     <para>
@@ -575,6 +597,18 @@ public sealed partial record Resilience
                     "Saturation only decides when to stop measuring, so it has nothing to do here - remove it, " +
                     "or drop Adaptive = false to keep the measured terms it guards.");
             }
+        }
+
+        // A criticality this policy cannot act on is a caller believing their backfill is holding
+        // back, so it is refused rather than ignored - the rule the AttemptCeiling, Hedge and
+        // Saturation checks around it follow. The two consumers are the hedge and the retry budget,
+        // and the budget needs both a second attempt and a bucket to charge.
+        if (UseAmbientCriticality && Hedge is null && (Attempts <= 1 || Budget is null or { IsNone: true }))
+        {
+            problems.Add(
+                "UseAmbientCriticality is set, but this policy has nothing for it to gate: criticality holds back " +
+                "hedges and retries funded by the budget, and this policy has no Hedge and no retry to refuse. " +
+                "Remove it, or give the policy more than one attempt and a Budget other than RetryBudget.None.");
         }
 
         if (Hedge is { } hedge)

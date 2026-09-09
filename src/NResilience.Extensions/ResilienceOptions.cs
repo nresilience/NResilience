@@ -109,6 +109,13 @@ public sealed class ResilienceOptions
     public bool? UseAmbientDeadline { get; set; }
 
     /// <summary>
+    ///     <see cref="Resilience.UseAmbientCriticality" /> - whether the policy reads how much the
+    ///     current request matters, and holds back hedges and budgeted retries for work nobody is
+    ///     waiting for. Off by default.
+    /// </summary>
+    public bool? UseAmbientCriticality { get; set; }
+
+    /// <summary>
     ///     <see cref="Resilience.BoundProgress" /> - whether a transfer that has stopped making
     ///     progress counts as a failed attempt. Enabled by default, and the bound is
     ///     <see cref="AttemptTimeout" /> rather than a number of its own.
@@ -227,6 +234,9 @@ public sealed class ResilienceOptions
 
         if (UseAmbientDeadline is { } ambient)
             policy = policy with { UseAmbientDeadline = ambient };
+
+        if (UseAmbientCriticality is { } criticality)
+            policy = policy with { UseAmbientCriticality = criticality };
 
         if (BoundProgress is { } progress)
             policy = policy with { BoundProgress = progress };

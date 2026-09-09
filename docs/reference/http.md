@@ -40,6 +40,8 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `BufferResponses` | `false` | Whether the response body is read inside the attempt, so a stalled or broken body is retried. Costs the body in memory. |
 | `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. The gRPC switch of the same name defaults to `true`, because `grpc-timeout` is a protocol field rather than a convention. |
 | `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `AmbientDeadline.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
+| `PropagateCriticality` | `false` | Whether each request carries how much the work it is part of matters: `AmbientCriticality.Current`, as one of the four `Criticality` names. The same value on every attempt. See [Criticality](../features/criticality.md). |
+| `CriticalityHeader` | `"X-Criticality"` | The header `PropagateCriticality` writes. `AmbientCriticality.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
 | `Quota` | `Quota.Reserving(0.1)` | The reserve to keep against the allowance the dependency publishes, or `null` to read no rate-limit headers. See [`Quota`](#quota). |
 
 | Method | Description |

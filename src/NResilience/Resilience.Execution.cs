@@ -329,6 +329,11 @@ public sealed partial record Resilience
         // would miss the per-thread cache - a continuation resumes on whichever pool thread is free.
         var budget = ExecutionState.BudgetFor(this);
 
+        // Whether this call is work nobody is waiting for. One byte of state-machine box, which lands
+        // in padding the box already has, and one AsyncLocal read for a policy that opted in - taken
+        // here for the reason the deadline's is, because the level cannot change mid-call.
+        var sheddable = UseAmbientCriticality && AmbientCriticality.Current == Criticality.Sheddable;
+
         var start = Time.GetTimestamp();
         AttemptSink log = default;
 
@@ -505,7 +510,7 @@ public sealed partial record Resilience
 
                 var next = AfterAttempt(
                     ref log, ref probe, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
-                    verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
+                    verdict, error, in value, hasValue, budget, sheddable, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
                 {
@@ -600,6 +605,11 @@ public sealed partial record Resilience
         var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
+
+        // Whether this call is work nobody is waiting for. One byte of state-machine box, which lands
+        // in padding the box already has, and one AsyncLocal read for a policy that opted in - taken
+        // here for the reason the deadline's is, because the level cannot change mid-call.
+        var sheddable = UseAmbientCriticality && AmbientCriticality.Current == Criticality.Sheddable;
         var start = Time.GetTimestamp();
         AttemptSink log = default;
 
@@ -739,7 +749,7 @@ public sealed partial record Resilience
 
                 var next = AfterAttempt(
                     ref log, ref probe, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
-                    verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
+                    verdict, error, in value, hasValue, budget, sheddable, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
                 {
@@ -842,6 +852,11 @@ public sealed partial record Resilience
     /// <param name="value">What the attempt returned, if it returned.</param>
     /// <param name="hasValue">Whether <paramref name="value" /> holds an answer from this attempt.</param>
     /// <param name="budget">The budget this call charges, already resolved.</param>
+    /// <param name="sheddable">
+    ///     Whether this call is running at <see cref="Criticality.Sheddable" />, resolved once at the
+    ///     start of the call beside the deadline. It reserves half the retry budget against the retry;
+    ///     see <see cref="UseAmbientCriticality" />.
+    /// </param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <param name="wait">
     ///     How long the loop pauses before acting on the return value: the backoff for
@@ -866,6 +881,7 @@ public sealed partial record Resilience
         in T value,
         bool hasValue,
         RetryBudget? budget,
+        bool sheddable,
         CancellationToken cancellationToken,
         out TimeSpan wait,
         out StopReason reason)
@@ -880,7 +896,9 @@ public sealed partial record Resilience
             ref log, ref probe, start, Time.GetElapsedTime(start, attemptStart).Ticks, Time.GetElapsedTime(attemptStart, now),
             timed, effective, verdict, error, in value, hasValue, AttemptFlags.None);
 
-        return Decide(log.Count, start, now, deadline, deadlineSpent, verdict, error, in value, hasValue, budget, cancellationToken, out wait, out reason);
+        return Decide(
+            log.Count, start, now, deadline, deadlineSpent, verdict, error, in value, hasValue, budget, sheddable, cancellationToken, out wait,
+            out reason);
     }
 
     /// <summary>
@@ -1009,6 +1027,11 @@ public sealed partial record Resilience
     /// <param name="value">What it returned, if it returned.</param>
     /// <param name="hasValue">Whether <paramref name="value" /> holds an answer.</param>
     /// <param name="budget">The budget this call charges, already resolved.</param>
+    /// <param name="sheddable">
+    ///     Whether this call is running at <see cref="Criticality.Sheddable" />, resolved once at the
+    ///     start of the call beside the deadline. It reserves half the retry budget against the retry;
+    ///     see <see cref="UseAmbientCriticality" />.
+    /// </param>
     /// <param name="cancellationToken">The caller's token.</param>
     /// <param name="wait">The pause the loop serves before acting on the return value. See <see cref="AfterAttempt{T}" />.</param>
     /// <param name="reason">Why the call stopped. Only meaningful for <see cref="NextStep.Stop" />.</param>
@@ -1024,6 +1047,7 @@ public sealed partial record Resilience
         in T value,
         bool hasValue,
         RetryBudget? budget,
+        bool sheddable,
         CancellationToken cancellationToken,
         out TimeSpan wait,
         out StopReason reason)
@@ -1103,7 +1127,12 @@ public sealed partial record Resilience
         // reached the dependency, and a retry of a call local admission control stopped costs the
         // dependency nothing - charging for it would let a burst of self-throttling quietly drain the
         // capacity real transient failures need.
-        if (budget is not null && !verdict.SelfImposed && !budget.TrySpend())
+        //
+        // Criticality is the second thing asked of the budget, in the same call: a Sheddable retry has
+        // to leave half the bucket behind, so a backfill stops amplifying while there is still
+        // capacity left for the work a user is waiting on. Every other level, and every policy that
+        // did not set UseAmbientCriticality, asks the question it always asked.
+        if (budget is not null && !verdict.SelfImposed && !budget.TrySpend(sheddable))
         {
             reason = StopReason.BudgetExhausted;
             wait = GuardDelay(left);

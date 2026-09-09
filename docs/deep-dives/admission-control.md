@@ -180,6 +180,35 @@ state-machine box is unchanged; `NResilience.Gates` gates this directly, in the 
 other budget in the library. Configuring `Admit` costs one hoisted `TaskAwaiter<Verdict>` field -
 measured at roughly 30 B per suspending call on top of the same policy without it.
 
+## Shedding stays with `Admit`, which reads the level
+
+Priority-aware shedding is the obvious next thing to want from an admission hook, and the library
+does not ship it. What `Sheddable` should cost depends entirely on what a service does - which
+endpoints are cheap, which have a fallback, what an operator would rather lose - and none of that is
+visible from inside a resilience library. So the decision stays with `Admit`.
+
+What the library does ship is the half `Admit` cannot reach: the level itself, carried across the
+process edge. [`AmbientCriticality`](../features/criticality.md) is the same shape as the ambient
+deadline and exists for the same reason - it coordinates nothing, it passes a value - and `Admit`
+reads it like any other ambient fact:
+
+```csharp
+var api = Resilience.Http with
+{
+    UseAmbientCriticality = true,
+    Admit = _ => Task.FromResult(
+        AmbientCriticality.Current < Criticality.Critical && Overloaded()
+            ? Verdict.Refused(TimeSpan.FromSeconds(1))
+            : Verdict.Ok),
+};
+```
+
+`UseAmbientCriticality` on the policy is a separate switch, and it is not what makes the value
+readable here - `AmbientCriticality.Current` is readable from anywhere. It is what lets the two
+consumers *inside* the executor act on it: the retry budget, which will not hand its last half to
+work nobody is waiting for, and the hedge gate, which never races a copy of it. Those are the two
+places `Admit` cannot reach, which is the whole argument for the feature being in the library at all.
+
 ## The callback is the seam
 
 Which leaves the question of where a limiter runs, and the answer is that it needs no new place. Inside the executed callback, every property it needs is already true:

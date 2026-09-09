@@ -80,6 +80,11 @@ public sealed partial record Resilience
         var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
+
+        // Whether this call is work nobody is waiting for. Read once, like the deadline and the budget
+        // above, and it decides two things here: a Sheddable call is never hedged at all, and its
+        // retries have to leave half the budget behind. See Resilience.UseAmbientCriticality.
+        var sheddable = UseAmbientCriticality && AmbientCriticality.Current == Criticality.Sheddable;
         var start = Time.GetTimestamp();
         AttemptSink log = default;
 
@@ -309,7 +314,7 @@ public sealed partial record Resilience
                     // has nothing to say. Going through it anyway is what keeps the budget deposit and
                     // the terminal event in one place for all three loops.
                     _ = Decide(winner, start, Time.GetTimestamp(), deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget,
-                        cancellationToken, out _, out _);
+                        sheddable, cancellationToken, out _, out _);
 
                     var succeeded = shaper.WantsLogOnSuccess
                         ? log.Materialize(Time.GetElapsedTime(start), deadline)
@@ -328,7 +333,7 @@ public sealed partial record Resilience
                 // round ended.
                 var next = Decide(
                     log.Count, start, Time.GetTimestamp(), deadline, outcome.DeadlineSpent, verdict, error, in value, hasValue, budget,
-                    cancellationToken, out var wait, out var stopped);
+                    sheddable, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Stop)
                 {
@@ -433,6 +438,14 @@ public sealed partial record Resilience
             arming = null;
 
             if (hedgeRefused || legs.Count >= Hedge!.Value.MaximumConcurrent || started >= Attempts)
+                return null;
+
+            // Sheddable work is never hedged, whatever the estimator says. A hedge is a second copy of
+            // a request sent to spend capacity on latency, and there is no latency worth spending it on
+            // when nobody is waiting for the answer. Refused here rather than at the firing point, so
+            // no timer is armed at all, and silently for the reason an open breaker is silent -
+            // HedgeSuppressed reports a judgment about hedging, and this is a bound on the call.
+            if (sheddable)
                 return null;
 
             // Half-open counts as not closed: those attempts are probes, and a probe that is raced is not

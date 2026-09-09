@@ -74,6 +74,12 @@ if (result.Exception is CallRejectedException rejection)
 ```
 <!-- endsnippet -->
 
+## Hold capacity back for work that matters
+
+A backfill and a checkout draw on the same bucket. With [`UseAmbientCriticality`](criticality.md) set on the policy, a call running at `Criticality.Sheddable` has to leave half the bucket behind: while the dependency is healthy nothing is refused, and once the bucket starts draining the backfill stops so the capacity left is there for work someone is waiting on.
+
+Every other level - including `SheddablePlus` - spends the bucket exactly as it does without the feature. A `Sheddable` refusal is the ordinary `StopReason.BudgetExhausted`.
+
 ## Monitor budget utilization
 
 Watch a budget's utilization to spot retries being refused.

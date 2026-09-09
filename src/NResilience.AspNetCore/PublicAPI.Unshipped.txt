@@ -2,10 +2,16 @@
 Microsoft.Extensions.DependencyInjection.ResilienceExceptionHandlerServiceCollectionExtensions
 NResilience.AspNetCore.ResilienceDeadlineApplicationBuilderExtensions
 NResilience.AspNetCore.ResilienceDeadlineOptions
+NResilience.AspNetCore.ResilienceDeadlineOptions.CriticalityHeader.get -> string!
+NResilience.AspNetCore.ResilienceDeadlineOptions.CriticalityHeader.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.Header.get -> string!
 NResilience.AspNetCore.ResilienceDeadlineOptions.Header.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.Maximum.get -> System.TimeSpan?
 NResilience.AspNetCore.ResilienceDeadlineOptions.Maximum.set -> void
+NResilience.AspNetCore.ResilienceDeadlineOptions.ReadCriticality.get -> bool
+NResilience.AspNetCore.ResilienceDeadlineOptions.ReadCriticality.set -> void
+NResilience.AspNetCore.ResilienceDeadlineOptions.RejectExpired.get -> bool
+NResilience.AspNetCore.ResilienceDeadlineOptions.RejectExpired.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.get -> System.TimeSpan
 NResilience.AspNetCore.ResilienceDeadlineOptions.Reserve.set -> void
 NResilience.AspNetCore.ResilienceDeadlineOptions.ResilienceDeadlineOptions() -> void

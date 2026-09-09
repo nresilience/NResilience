@@ -161,6 +161,31 @@ public sealed class HttpResilienceOptions
     public string DeadlineHeader { get; set; } = AmbientDeadline.Header;
 
     /// <summary>
+    ///     Whether each outbound request carries how much the work it is part of matters. Off by
+    ///     default, for the reason <see cref="PropagateDeadline" /> is: this header is a convention the
+    ///     library invented, and one the other side does not read is not worth sending.
+    ///     <para>
+    ///         The value is <see cref="AmbientCriticality.Current" /> - <c>Critical</c> unless
+    ///         something published a level - written to <see cref="CriticalityHeader" /> as one of the
+    ///         four <see cref="NResilience.Criticality" /> names. It is fixed for the whole call, not
+    ///         recomputed per attempt: a backfill does not become a checkout because its first attempt
+    ///         failed.
+    ///     </para>
+    ///     <para>
+    ///         This is the half that makes criticality worth having, because the point of a level is
+    ///         that the service three hops down can read it. What the peer does with it is the peer's
+    ///         business; a peer that ignores the header is unaffected.
+    ///     </para>
+    /// </summary>
+    public bool PropagateCriticality { get; set; }
+
+    /// <summary>
+    ///     The header <see cref="PropagateCriticality" /> writes. Defaults to
+    ///     <see cref="AmbientCriticality.Header" />, which is what the inbound half reads.
+    /// </summary>
+    public string CriticalityHeader { get; set; } = AmbientCriticality.Header;
+
+    /// <summary>
     ///     The reserve to keep against the allowance the dependency publishes, or null to read no
     ///     rate-limit headers at all. On by default, holding a tenth of the published allowance
     ///     unspent.
@@ -216,6 +241,13 @@ public sealed class HttpResilienceOptions
             problems.Add(
                 "DeadlineHeader must not be empty; it is the name of a header. " +
                 $"Leave it alone for the default of \"{AmbientDeadline.Header}\", or set PropagateDeadline to false to send none.");
+        }
+
+        if (string.IsNullOrWhiteSpace(CriticalityHeader))
+        {
+            problems.Add(
+                "CriticalityHeader must not be empty; it is the name of a header. " +
+                $"Leave it alone for the default of \"{AmbientCriticality.Header}\", or set PropagateCriticality to false to send none.");
         }
 
         Quota?.Validate(problems);

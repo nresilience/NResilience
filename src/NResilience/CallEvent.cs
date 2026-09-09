@@ -166,8 +166,10 @@ public enum CallEventKind : byte
     ///     </para>
     ///     <para>
     ///         Not raised when the retry budget refuses to fund the hedge, and not raised for a hedge
-    ///         that was never armed - an open breaker, a concurrency ceiling, or a deadline too close to
-    ///         fit another attempt. Those are bounds on the call rather than judgments about hedging.
+    ///         that was never armed - an open breaker, a concurrency ceiling, a deadline too close to
+    ///         fit another attempt, or a call running at <see cref="Criticality.Sheddable" /> under
+    ///         <see cref="Resilience.UseAmbientCriticality" />. Those are bounds on the call rather
+    ///         than judgments about hedging.
     ///     </para>
     /// </summary>
     HedgeSuppressed,

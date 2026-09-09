@@ -58,7 +58,17 @@ Three decisions in it are worth stating, because each one costs something.
 
 **The policy is not derived per call.** The tempting alternative - clamp by handing the loops a `policy with { Deadline = clamped }` - would cost non-users nothing at all. It is wrong for a reason that has nothing to do with allocation: the automatic retry budget and the hedging latency window are keyed by policy instance, so a fresh policy per call would hand every call a fresh budget and a fresh latency estimate. A budget that resets on every call is not a budget. The 16 bytes buy a clamp that leaves both of those where they are.
 
-An inherited deadline that has already expired stops the call before it starts: no attempt runs, `DeadlineExceededException` reports the deadline that applied, and the dependency is never asked for an answer nobody is waiting for. That is the whole point of the feature, and it is why the inbound middleware does not reject the request itself - the request may still be answerable from cache, and refusing it would be a policy decision the library has no standing to make.
+An inherited deadline that has already expired stops the call before it starts: no attempt runs, `DeadlineExceededException` reports the deadline that applied, and the dependency is never asked for an answer nobody is waiting for. That is the whole point of the feature, and it is why the inbound middleware does not reject the request itself by default - the request may still be answerable from cache, and refusing it would be a policy decision the library has no standing to make on its own. `ResilienceDeadlineOptions.RejectExpired` is that decision written down by the service that does have standing: off unless set, and paired with the `Reserve` that says what answering actually costs.
+
+## Shedding stays with the caller, which reads the level
+
+A deadline is not the only fact that stops at the process edge. How much a request matters stops there too, and the consequence is sharper: the service three hops down sheds the checkout and serves the backfill, because from where it stands the two are identical.
+
+`UseAmbientCriticality` passes that number the same way, deliberately - the same `AsyncLocal<T>`, the same scope struct, the same opt-in property, and the same read-once-per-call rule, for the reasons above. What differs is that a level does not decay, so the ambient value is a cached instance per level rather than a start timestamp and a remaining span, and the read costs one byte in the state-machine box rather than sixteen.
+
+Two things read it, and both are inside the executor where user code cannot reach: the retry budget, which will not hand its last half to work nobody is waiting for, and the hedge gate, which will not spend capacity buying latency nobody is waiting on. Neither sheds. Shedding is a decision about a particular service and it stays with `Admit`, which is exactly the earlier argument for not building priority-aware shedding into the library. What this feature adds is the value `Admit` reads, which is the half `Admit` could not reach on its own.
+
+The escalation clamp is a security property rather than a performance one, and both guardrails [Criticality](../features/criticality.md) states hold here: `AmbientCriticality.TryParse` clamps inbound values at `Critical`, so the top level is reachable only by local code, and an unlabeled call is `Critical`, never `Sheddable`.
 
 ## `HttpClient.Timeout`
 

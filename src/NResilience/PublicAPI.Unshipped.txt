@@ -1,4 +1,8 @@
 #nullable enable
+NResilience.AmbientCriticality
+NResilience.AmbientCriticality.Scope
+NResilience.AmbientCriticality.Scope.Dispose() -> void
+NResilience.AmbientCriticality.Scope.Scope() -> void
 NResilience.AmbientDeadline
 NResilience.AmbientDeadline.Scope
 NResilience.AmbientDeadline.Scope.Dispose() -> void
@@ -203,6 +207,11 @@ NResilience.Classifier.ClassifyResult<T>(T value) -> NResilience.Verdict
 NResilience.Classifier.On<TException>(NResilience.Verdict verdict) -> NResilience.Classifier!
 NResilience.Classifier.On<TException>(System.Func<TException!, NResilience.Verdict>! judge) -> NResilience.Classifier!
 NResilience.Classifier.OnResult<T>(System.Func<T, NResilience.Verdict>! judge) -> NResilience.Classifier!
+NResilience.Criticality
+NResilience.Criticality.Critical = 2 -> NResilience.Criticality
+NResilience.Criticality.CriticalPlus = 3 -> NResilience.Criticality
+NResilience.Criticality.Sheddable = 0 -> NResilience.Criticality
+NResilience.Criticality.SheddablePlus = 1 -> NResilience.Criticality
 NResilience.DeadlineExceededException
 NResilience.DeadlineExceededException.Attempts.get -> NResilience.AttemptLog!
 NResilience.DeadlineExceededException.Deadline.get -> System.TimeSpan
@@ -258,6 +267,8 @@ NResilience.HttpResilienceOptions.BudgetPerHost.get -> bool
 NResilience.HttpResilienceOptions.BudgetPerHost.set -> void
 NResilience.HttpResilienceOptions.BufferResponses.get -> bool
 NResilience.HttpResilienceOptions.BufferResponses.set -> void
+NResilience.HttpResilienceOptions.CriticalityHeader.get -> string!
+NResilience.HttpResilienceOptions.CriticalityHeader.set -> void
 NResilience.HttpResilienceOptions.DeadlineHeader.get -> string!
 NResilience.HttpResilienceOptions.DeadlineHeader.set -> void
 NResilience.HttpResilienceOptions.DetectNestedRetries.get -> bool
@@ -267,6 +278,8 @@ NResilience.HttpResilienceOptions.MaximumHosts.get -> int
 NResilience.HttpResilienceOptions.MaximumHosts.set -> void
 NResilience.HttpResilienceOptions.OwnTransportTimeout.get -> bool
 NResilience.HttpResilienceOptions.OwnTransportTimeout.set -> void
+NResilience.HttpResilienceOptions.PropagateCriticality.get -> bool
+NResilience.HttpResilienceOptions.PropagateCriticality.set -> void
 NResilience.HttpResilienceOptions.PropagateDeadline.get -> bool
 NResilience.HttpResilienceOptions.PropagateDeadline.set -> void
 NResilience.HttpResilienceOptions.Quota.get -> NResilience.Quota?
@@ -400,6 +413,8 @@ NResilience.Resilience.TryRunAsync<T>(System.Func<System.Threading.CancellationT
 NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<System.Collections.Generic.IAsyncEnumerable<T>!>>
 NResilience.Resilience.TryRunAsync<TState, T>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<T>>
 NResilience.Resilience.TryRunAsync<TState>(System.Func<TState, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! work, TState state, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult>
+NResilience.Resilience.UseAmbientCriticality.get -> bool
+NResilience.Resilience.UseAmbientCriticality.init -> void
 NResilience.Resilience.UseAmbientDeadline.get -> bool
 NResilience.Resilience.UseAmbientDeadline.init -> void
 NResilience.Resilience.Validate() -> void
@@ -465,6 +480,7 @@ NResilience.WinRate.MinimumSamples.init -> void
 NResilience.WinRate.WinRate() -> void
 NResilience.WinRate.Window.get -> System.TimeSpan
 NResilience.WinRate.Window.init -> void
+const NResilience.AmbientCriticality.Header = "X-Criticality" -> string!
 const NResilience.AmbientDeadline.Header = "X-Deadline-Ms" -> string!
 const NResilience.AttemptLog.DataKey = "NResilience.Attempts" -> string!
 const NResilience.NestedRetry.Header = "X-NResilience-Retrying" -> string!
@@ -504,6 +520,10 @@ override NResilience.Verdict.GetHashCode() -> int
 override NResilience.Verdict.ToString() -> string!
 override NResilience.WinRate.GetHashCode() -> int
 override NResilience.WinRate.ToString() -> string!
+static NResilience.AmbientCriticality.Begin(NResilience.Criticality criticality) -> NResilience.AmbientCriticality.Scope
+static NResilience.AmbientCriticality.Current.get -> NResilience.Criticality
+static NResilience.AmbientCriticality.Format(NResilience.Criticality criticality) -> string!
+static NResilience.AmbientCriticality.TryParse(string? value, out NResilience.Criticality criticality) -> bool
 static NResilience.AmbientDeadline.Begin(System.TimeSpan remaining, System.TimeProvider? time = null) -> NResilience.AmbientDeadline.Scope
 static NResilience.AmbientDeadline.Format(System.TimeSpan remaining) -> string?
 static NResilience.AmbientDeadline.Remaining.get -> System.TimeSpan?

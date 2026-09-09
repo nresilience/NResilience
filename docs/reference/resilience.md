@@ -27,6 +27,7 @@ The presets cover common scenarios:
 | `AttemptTimeout` | `TimeSpan` | 10 s | The maximum duration for a single attempt. The effective value is the minimum of this property and the remaining time on the deadline. |
 | `AttemptCeiling` | `AttemptCeiling?` | `AttemptCeiling.Above(3)` | A measured attempt ceiling. Set it to `null` to leave `AttemptTimeout` as the only per-attempt bound. The measured term can only lower the ceiling. No default is supplied when `AttemptTimeout` is `Timeout.InfiniteTimeSpan` or at or below `AttemptCeiling.Floor`, because there is no ceiling there to lower. |
 | `UseAmbientDeadline` | `bool` | `false` | Whether the deadline is clamped by the one the current call inherited from its caller. When set, the effective deadline is the minimum of `Deadline` and `AmbientDeadline.Remaining`, resolved once per call. |
+| `UseAmbientCriticality` | `bool` | `false` | Whether the policy reads how much the current call matters. When set, a `Sheddable` call is never hedged and is refused a retry once the `Budget` bucket is more than half spent; every other level is unaffected. Requires a `Hedge`, or more than one attempt and a `Budget` other than `RetryBudget.None`. See [Criticality](../features/criticality.md). |
 | `Backoff` | `Backoff` | `Backoff.Default` | The delay between attempts. |
 | `Classifier` | `Classifier` | `Classifier.Default` | The logic used to classify outcomes. |
 | `Breaker` | `Breaker?` | `null` | The circuit breaker. A `null` value indicates no breaking is active. |
@@ -269,6 +270,20 @@ The `NextAttempt` `readonly struct` is passed to `BeforeAttempt`, `Admit` and `B
 | `Format(remaining)` | Writes a header value: whole milliseconds, rounded down, never below 1. `null` when there is nothing to say. |
 
 The effective deadline is `min(Deadline, Remaining)`, resolved once when the call starts. See [deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) for both halves, and [the cancellation contract](../deep-dives/cancellation.md) for what the ambient read costs.
+
+## `AmbientCriticality`
+
+`AmbientCriticality` is a `static class` holding how much the current logical call matters, plus the two helpers that put a level on a wire. The executor reads it only for a policy whose `UseAmbientCriticality` is set.
+
+| Member | Description |
+| :--- | :--- |
+| `Header` | The default header name: `"X-Criticality"`. |
+| `Current` | The level this call is running at. `Criticality.Critical` when nothing published one. |
+| `Begin(criticality)` | Publishes a level for the current logical call. Returns an `AmbientCriticality.Scope` that restores the previous value when disposed. An undeclared level throws `ArgumentOutOfRangeException`. |
+| `TryParse(value, out criticality)` | Reads a header value: one of the four level names, matched without regard to case. `"CriticalPlus"` parses and clamps to `Critical`, because a caller cannot escalate itself. Anything else is no level, the failure is silent, and the out value is `Critical`. |
+| `Format(criticality)` | Writes a header value: the level's name. An undeclared level throws `ArgumentOutOfRangeException`. |
+
+`Criticality` is a `byte`-backed enum ordered from least to most important: `Sheddable`, `SheddablePlus`, `Critical`, `CriticalPlus`. See [Criticality](../features/criticality.md) for both halves and for what the executor does with a level.
 
 ## `NestedRetry`
 

@@ -246,6 +246,8 @@ NResilience.Extensions.ResilienceOptions.Saturation.set -> void
 NResilience.Extensions.ResilienceOptions.Telemetry.get -> bool?
 NResilience.Extensions.ResilienceOptions.Telemetry.set -> void
 NResilience.Extensions.ResilienceOptions.ToPolicy(NResilience.Resilience? baseline = null) -> NResilience.Resilience!
+NResilience.Extensions.ResilienceOptions.UseAmbientCriticality.get -> bool?
+NResilience.Extensions.ResilienceOptions.UseAmbientCriticality.set -> void
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.get -> bool?
 NResilience.Extensions.ResilienceOptions.UseAmbientDeadline.set -> void
 NResilience.Extensions.ResilienceTelemetry

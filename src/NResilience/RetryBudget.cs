@@ -49,6 +49,18 @@ public sealed class RetryBudget
     /// <summary>The per-second floor <see cref="Automatic" /> resolves to. Internal for the reason <see cref="DefaultFraction" /> is.</summary>
     internal const int DefaultMinimumPerSecond = 3;
 
+    /// <summary>
+    ///     How much of the bucket is held back from <see cref="Criticality.Sheddable" /> work: half,
+    ///     so a backfill retries freely while the dependency is healthy and stops as soon as the
+    ///     bucket starts draining.
+    ///     <para>
+    ///         Not a knob. Criticality is a statement about the work, not a tuning parameter, and a
+    ///         second fraction beside <see cref="Fraction" /> would be one more number to get wrong -
+    ///         see the plan's rule that a feature carries a dimensionless number or none at all.
+    ///     </para>
+    /// </summary>
+    private const double SheddableReserve = 0.5;
+
     private static readonly ConcurrentDictionary<string, RetryBudget> SharedBudgets = new(StringComparer.Ordinal);
     private readonly double _capacity;
     private readonly double _fraction;
@@ -185,7 +197,12 @@ public sealed class RetryBudget
         new(null, DefaultFraction, DefaultMinimumPerSecond, time);
 
     /// <summary>Charges one retry. False means the retry is refused.</summary>
-    internal bool TrySpend()
+    /// <param name="sheddable">
+    ///     Whether the call is running at <see cref="Criticality.Sheddable" />, which reserves
+    ///     <see cref="SheddableReserve" /> of the bucket against it. False for every call of a policy
+    ///     whose <see cref="Resilience.UseAmbientCriticality" /> is not set.
+    /// </param>
+    internal bool TrySpend(bool sheddable = false)
     {
         // The executor resolves None to null and never calls this, so the guard is for the sake of a
         // caller that holds the instance directly rather than for the hot path.
@@ -195,11 +212,16 @@ public sealed class RetryBudget
         // Read outside the lock, so the critical section is arithmetic and nothing else. See Refill.
         var now = _time.GetTimestamp();
 
+        // What the retry has to leave behind. A backfill and a checkout draw on one bucket, and the
+        // bucket is a fraction of traffic rather than a queue, so the only thing that can hold
+        // capacity for the checkout is refusing to hand the last of it to work nobody is waiting for.
+        var floor = sheddable ? 1 + SheddableReserve * _capacity : 1;
+
         lock (_gate)
         {
             Refill(now);
 
-            if (_tokens < 1)
+            if (_tokens < floor)
                 return false;
 
             _tokens -= 1;

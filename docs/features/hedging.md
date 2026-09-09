@@ -221,7 +221,7 @@ The [attempt log](../reference/call-result.md) shows both legs, and a discarded 
 
 ## When a hedge does not fire
 
-All six conditions must hold. If any fails, the call waits exactly as it would without hedging:
+All seven conditions must hold. If any fails, the call waits exactly as it would without hedging:
 
 1. `Hedge` is set on the policy.
 2. The call is repeatable. For HTTP, the same gate retry uses.
@@ -229,6 +229,7 @@ All six conditions must hold. If any fails, the call waits exactly as it would w
 4. The error rate is below `SuppressAt` of the breaker's trip point. Closed is not the same as healthy.
 5. The estimate has at least `MinimumSamples` samples. A cold process does not guess a threshold.
 6. The [retry budget](retry-budget.md) funds it. Hedges and retries draw on one bucket, so a policy already retrying at its limit stops hedging - a retry is evidence that something failed, a hedge only a guess that something is slow.
+7. The call is not [`Sheddable`](criticality.md), for a policy with `UseAmbientCriticality` set. Hedging spends capacity to buy latency, and there is no latency worth buying when nobody is waiting for the answer.
 
 The threshold is measured from wall clock, so a local thread pool deep enough to add 400 ms to every call raises it, and hedges stop firing during exactly the incident where a second copy of the work is the wrong answer. [`Saturation`](saturation.md) is the opt-in switch that stops the estimate learning that.
 
@@ -237,4 +238,5 @@ The threshold is measured from wall clock, so a local thread pool deep enough to
 - [Hedging internals](../deep-dives/hedging-internals.md) - why an adaptive threshold is safe and a constant one is not, and how the quantile is estimated.
 - [Local saturation](saturation.md) - not measuring while this process is the bottleneck.
 - [Retry budget](retry-budget.md) - the bucket hedges and retries share.
+- [Criticality](criticality.md) - the gate that holds a hedge back for work nobody is waiting for.
 - [Idempotency](../http/idempotency.md) - what makes a request repeatable.

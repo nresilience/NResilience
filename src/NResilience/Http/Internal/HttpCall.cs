@@ -42,6 +42,11 @@ namespace NResilience.Internal;
 ///     off. Asked before every send and told about every response, which is the whole of the feature:
 ///     the check is one comparison and the update is one header lookup.
 /// </param>
+/// <param name="criticality">
+///     Tells the peer how much this work matters, or null when
+///     <see cref="HttpResilienceOptions.PropagateCriticality" /> is off. Written on every attempt and
+///     the same on each, because the level is a fact about the work rather than about the attempt.
+/// </param>
 internal sealed class HttpCall(
     HttpRequestMessage request,
     Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send,
@@ -49,7 +54,8 @@ internal sealed class HttpCall(
     bool concurrent = false,
     DeadlineStamp? deadline = null,
     bool buffer = false,
-    HostQuota? quota = null)
+    HostQuota? quota = null,
+    CriticalityStamp? criticality = null)
 {
     /// <summary>
     ///     Guards <see cref="Clone" /> on a hedged call. Reading an <c>HttpHeaders</c> collection parses
@@ -129,6 +135,15 @@ internal sealed class HttpCall(
 
             if (stamp.Value() is { } left)
                 attempt.Headers.TryAddWithoutValidation(stamp.Header, left);
+        }
+
+        if (criticality is { } level)
+        {
+            // Replaced rather than added, for the reason the deadline is: a clone carries whatever the
+            // caller wrote, and this process's own level is the one that describes the work it is
+            // actually doing.
+            attempt.Headers.Remove(level.Header);
+            attempt.Headers.TryAddWithoutValidation(level.Header, level.Value);
         }
 
         try

@@ -61,6 +61,7 @@ All properties are nullable. A `null` leaves the property as it is on the base p
 | `Name` | The policy name. Defaults to the registration name. |
 | `Attempts` | The total number of attempts, including the first call. |
 | `Deadline`, `AttemptTimeout` | Time bounds for the call. Use `"Infinite"` for no bound. |
+| `UseAmbientDeadline`, `UseAmbientCriticality` | Whether the policy reads what the current call inherited: the caller's deadline, and how much the work matters. Both off by default. |
 | `Backoff` | A `BackoffOptions` section: `TransientBase`, `ThrottledBase`, `MaximumDelay`, `Factor`, `Jitter`. |
 | `Budget` | A `BudgetOptions` section: `Enabled`, `Fraction`, `MinimumPerSecond`, `Shared`. |
 | `AttemptCeiling` | An `AttemptCeilingOptions` section. Enabled by default; `"AttemptCeiling": { "Enabled": false }` leaves `AttemptTimeout` as the only per-attempt bound. |

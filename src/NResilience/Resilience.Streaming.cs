@@ -291,6 +291,11 @@ public sealed partial record Resilience
 
         // The budget this call charges, resolved once, likewise.
         var budget = ExecutionState.BudgetFor(this);
+
+        // Whether this call is work nobody is waiting for. One byte of state-machine box, which lands
+        // in padding the box already has, and one AsyncLocal read for a policy that opted in - taken
+        // here for the reason the deadline's is, because the level cannot change mid-call.
+        var sheddable = UseAmbientCriticality && AmbientCriticality.Current == Criticality.Sheddable;
         var start = Time.GetTimestamp();
         AttemptSink log = default;
 
@@ -536,7 +541,7 @@ public sealed partial record Resilience
 
                 var next = AfterAttempt(
                     ref log, ref probe, start, attemptStart, deadline, attemptSource is not null, effective, deadlineSpent,
-                    verdict, error, in value, hasValue, budget, cancellationToken, out var wait, out var stopped);
+                    verdict, error, in value, hasValue, budget, sheddable, cancellationToken, out var wait, out var stopped);
 
                 if (next == NextStep.Succeeded)
                 {

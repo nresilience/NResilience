@@ -236,7 +236,23 @@ In an ASP.NET Core app, install `NResilience.AspNetCore` and read the header wit
 app.UseResilienceDeadline();
 ```
 
-Register it before anything that makes an outbound call. `UseResilienceDeadline` also takes a callback: `Header` changes the header it reads, `Maximum` caps what it believes from a caller, and `Reserve` keeps part of the deadline back for this service's own work.
+Register it before anything that makes an outbound call. One pass reads both propagated values - the deadline, and how much the work matters; see [Criticality](criticality.md) for the second half.
+
+`UseResilienceDeadline` also takes a callback: `Header` changes the header it reads, `Maximum` caps what it believes from a caller, `Reserve` keeps part of the deadline back for this service's own work, and `RejectExpired` refuses a request that arrives with nothing left.
+
+### Refuse a request that arrives too late
+
+By default the middleware runs a request whose deadline has already expired, because it may well be answerable from cache. `RejectExpired` takes the other side of that trade: a request arriving with less time than answering costs is refused with `504` and an [RFC 9457 problem document](../http/error-responses.md) instead of running.
+
+```csharp
+app.UseResilienceDeadline(o =>
+{
+    o.Reserve = TimeSpan.FromMilliseconds(200); // what answering actually costs
+    o.RejectExpired = true;                     // refuse anything that arrives with less
+});
+```
+
+Pair it with `Reserve`, which is what states that cost. A deadline header carries a positive number or nothing at all, so with no reserve set there is no request this can refuse.
 
 `UseAmbientDeadline` is off by default and stays off in every preset, because reading the ambient value costs an `AsyncLocal<T>` read on calls that mostly have no inbound deadline to read. For what that costs and why the read happens once per call rather than once per attempt, see [the cancellation contract](../deep-dives/cancellation.md).
 

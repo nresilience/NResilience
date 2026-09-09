@@ -23,6 +23,7 @@ The table below summarizes each feature and its default setting.
 | Keyed policy scope | Disabled (opt-in; on by default per host for HTTP and per service for gRPC) | [Keyed policy scope](policy-scope.md) |
 | Streaming calls | Opt-in, through the `RunAsync` and `TryRunAsync` overloads taking a source | [Streaming](streaming.md) |
 | Deadline propagation | Disabled (opt-in on both halves) | [Deadlines](deadlines.md#propagate-the-deadline-across-a-hop) |
+| Criticality | Disabled (opt-in on both halves) | [Criticality](criticality.md) |
 | Telemetry | Enabled for registered policies; disabled for hand-built policies | [Telemetry](telemetry.md) |
 | Logging | Enabled for registered policies; opt-in for hand-built policies | [Logging](logging.md) |
 

@@ -150,7 +150,7 @@ public sealed class HttpResilienceHandler : DelegatingHandler
         // A hedged policy runs the callback concurrently and disposes every response it discards, so the
         // call must not also dispose "the previous one" - there is no such thing when attempts overlap.
         var call = new HttpCall(
-            request, _send, retrying, policy.Hedge is not null, StampFor(policy), Options.BufferResponses, scope.Quota);
+            request, _send, retrying, policy.Hedge is not null, StampFor(policy), Options.BufferResponses, scope.Quota, CriticalityFor());
 
         if (retrying)
             await call.BufferAsync(cancellationToken).ConfigureAwait(false);
@@ -269,6 +269,21 @@ public sealed class HttpResilienceHandler : DelegatingHandler
 
         return new DeadlineStamp(Options.DeadlineHeader, deadline, policy.AttemptTimeout, policy.Time.GetTimestamp(), policy.Time);
     }
+
+    /// <summary>
+    ///     Tells the peer how much this work matters, or null when
+    ///     <see cref="HttpResilienceOptions.PropagateCriticality" /> is off.
+    /// </summary>
+    /// <remarks>
+    ///     Read once per call rather than per attempt, because the level cannot change while the call
+    ///     runs - and unlike the deadline there is no arithmetic to redo. Independent of the policy's
+    ///     <see cref="Resilience.UseAmbientCriticality" />: sending a level and acting on one are two
+    ///     halves that are each useful without the other, exactly as they are for the deadline.
+    /// </remarks>
+    private CriticalityStamp? CriticalityFor() =>
+        Options.PropagateCriticality
+            ? new CriticalityStamp(Options.CriticalityHeader, AmbientCriticality.Format(AmbientCriticality.Current))
+            : null;
 
     private bool ShouldRetry(HttpRequestMessage request) => Policy.Attempts > 1 && IsRepeatable(request);
 

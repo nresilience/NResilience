@@ -82,7 +82,7 @@ If the policy has no name of its own, it is named after the client. That keeps m
 
 ## `UseResilienceDeadline` on `IApplicationBuilder`
 
-`UseResilienceDeadline` is in the `NResilience.AspNetCore` package, kept separate because it is the only part of NResilience that requires ASP.NET Core. It reads the deadline a caller sent and publishes it for the rest of the request, so every policy with `UseAmbientDeadline` set is bounded by `min(its own deadline, the time the caller is still waiting)`.
+`UseResilienceDeadline` is in the `NResilience.AspNetCore` package, kept separate because it is the only part of NResilience that requires ASP.NET Core. It reads what the caller propagated and publishes it for the rest of the request, in one pass: the deadline, so every policy with `UseAmbientDeadline` set is bounded by `min(its own deadline, the time the caller is still waiting)`; and how much the work matters, so every policy with `UseAmbientCriticality` set stops amplifying a request nobody is waiting for.
 
 | Overload | Description |
 | :--- | :--- |
@@ -95,8 +95,11 @@ If the policy has no name of its own, it is named after the client. That keeps m
 | `Header` | `"X-Deadline-Ms"` | The header carrying whole milliseconds left. |
 | `Maximum` | `null` | The longest inbound deadline this service believes. A header above it is ignored. `null` believes any of them. |
 | `Reserve` | `TimeSpan.Zero` | How much of the inbound deadline is kept back for this service's own work, and therefore withheld from outbound calls. |
+| `ReadCriticality` | `true` | Whether the pass also reads how much the caller says the work matters, and publishes it as `AmbientCriticality.Current`. |
+| `CriticalityHeader` | `"X-Criticality"` | The header carrying one of the four `Criticality` names. An unrecognized value, and `"CriticalPlus"`, leave the request at `Critical`. |
+| `RejectExpired` | `false` | Whether a request whose inbound deadline is at or below `Reserve` is refused with `504` and a problem document rather than run. Pair it with `Reserve`; without one there is no request this can refuse. |
 
-The clock is `TimeProvider` from the container when one is registered, `TimeProvider.System` otherwise. An expired inbound deadline does not fail the request; it fails the outbound calls. [Deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) explains that distinction.
+The clock is `TimeProvider` from the container when one is registered, `TimeProvider.System` otherwise. An expired inbound deadline does not fail the request unless `RejectExpired` says so; it fails the outbound calls. [Deadline propagation](../features/deadlines.md#propagate-the-deadline-across-a-hop) explains that distinction, and [Criticality](../features/criticality.md) covers the second half of the pass.
 
 ## `UseResilienceNestedRetry` on `IApplicationBuilder`
 
@@ -150,7 +153,7 @@ The `IResiliencePolicies` service gives access to registered policies.
 
 `ResilienceOptions` is a `sealed class` for binding configuration to a policy. All properties are nullable; `null` means "leave this property alone". An unrecognized key is an error, not a no-op - see [An unrecognized key is an error](../di/configuration.md#an-unrecognized-key-is-an-error).
 
-**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `BoundProgress`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`, `Saturation`. `Backoff` carries a `MeasuredBase` subsection of its own.
+**Properties**: the policy's own scalars - `Preset`, `Name`, `Attempts`, `Deadline`, `AttemptTimeout`, `UseAmbientDeadline`, `UseAmbientCriticality`, `BoundProgress`, `Adaptive`, `Telemetry`, `Logging` - and one section per optional feature: `Backoff`, `Budget`, `AttemptCeiling`, `Breaker`, `Hedge`, `Saturation`. `Backoff` carries a `MeasuredBase` subsection of its own.
 
 - **`ToPolicy(Resilience? baseline = null)`**: Projects the options onto a `Resilience` record. It applies the preset first, then overrides properties that are not null. No validation happens here; that occurs at registration or execution.
 - **`Logging`**: A string of `"Off"`, `"Normal"`, or `"Verbose"` (case-insensitive). A string rather than an enum, so a typo names the valid values (like `Preset`). Anything outside the set fails at registration.

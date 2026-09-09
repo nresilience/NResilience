@@ -12,11 +12,12 @@ dotnet add package NResilience.AspNetCore
 
 ## What it adds
 
-### Deadline propagation (inbound half)
+### Deadline and criticality propagation (inbound half)
 
-Middleware that reads the deadline a caller sent with the request and publishes it for the rest of that request, so any policy configured with
+One middleware pass that reads what the caller propagated and publishes it for the rest of the request: the deadline, so any policy configured with
 `UseAmbientDeadline = true` is bounded by
-`min(its own deadline, the time the caller is still waiting)`.
+`min(its own deadline, the time the caller is still waiting)`, and how much the work matters, so any policy configured with
+`UseAmbientCriticality = true` stops hedging a backfill and stops spending a depleted retry budget on one.
 
 ```csharp
 var app = builder.Build();
@@ -24,7 +25,9 @@ var app = builder.Build();
 app.UseResilienceDeadline();
 ```
 
-The outbound half - writing the header on the way out - is in the core package, on `HttpResilienceOptions.PropagateDeadline`.
+The outbound halves - writing the headers on the way out - are in the core package, on `HttpResilienceOptions.PropagateDeadline` and
+`HttpResilienceOptions.PropagateCriticality`. `ReadCriticality` turns the second half of the pass off, and `RejectExpired` refuses a request that arrives
+with less time left than the `Reserve` says answering costs.
 
 ### Nested-retry propagation
 
@@ -62,6 +65,7 @@ It is the only part of NResilience that requires ASP.NET Core. A worker or a con
 ## Documentation
 
 See [deadline propagation](https://github.com/nresilience/NResilience/blob/main/docs/features/deadlines.md)
-for both halves, [nested retries](https://github.com/nresilience/NResilience/blob/main/docs/features/nested-retries.md)
+and [criticality](https://github.com/nresilience/NResilience/blob/main/docs/features/criticality.md)
+for both halves of each, [nested retries](https://github.com/nresilience/NResilience/blob/main/docs/features/nested-retries.md)
 for the retry-rejection marker, and [the cancellation deep dive](https://github.com/nresilience/NResilience/blob/main/docs/deep-dives/cancellation.md)
 for what an inherited deadline costs and why it is opt-in.

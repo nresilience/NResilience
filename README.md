@@ -26,6 +26,7 @@ NResilience replaces complex fluent builders, confusing policy ordering, and man
 - **It reads the quota the dependency publishes.** Most large APIs send how much allowance is left on every response. The HTTP handler reads it, keeps it per host, and refuses an attempt locally before the 429 - no rate to guess, because the dependency supplies it.
 - **Hedging.** When a call is slow, a duplicate request races it. Hedges pause while the dependency degrades, so they never pile onto a struggling service.
 - **Deadline propagation.** Deadlines travel across services: the gRPC interceptor sends `grpc-timeout`, and the ASP.NET middleware reads what a caller sent so outbound calls inherit it.
+- **Criticality propagation.** How much a request matters travels with it, so a backfill stops spending the retry capacity a checkout needs and is never hedged. The library carries the level and holds back amplification; what to shed stays your decision.
 - **Testable.** Scripted callbacks, a recording listener, and fault injection make policies deterministic in tests.
 - **It explains itself.** One call prints the worst-case timeline attempt by attempt and reports which measured terms are warm, so "how long can this call take?" has an answer you can read.
 - **Telemetry.** Every call raises one event carrying its verdict, retries, and delays; meters and an activity source expose them.
