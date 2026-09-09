@@ -329,7 +329,7 @@ public static class ResilienceTelemetry
                 StallCounter.Add(
                     1,
                     new KeyValuePair<string, object?>("nresilience.policy", policy),
-                    new KeyValuePair<string, object?>("nresilience.stall", e.Exception is AttemptStalledException { Transferred: var moved } && moved > 0 ? "partial" : "empty"));
+                    new KeyValuePair<string, object?>("nresilience.stall", e.Exception is AttemptStalledException { Transferred: > 0 } ? "partial" : "empty"));
 
                 Annotate(e, "nresilience.stalled");
                 break;
@@ -376,7 +376,7 @@ public static class ResilienceTelemetry
         CallCounter.Add(1, policyTag, outcome);
         CallDuration.Record(e.Duration.TotalSeconds, policyTag, outcome);
 
-        if (Activity.Current is { } activity && activity.IsAllDataRequested)
+        if (Activity.Current is { IsAllDataRequested: true } activity)
         {
             activity.SetTag("nresilience.policy", policy);
             activity.SetTag("nresilience.outcome", outcome.Value);

@@ -416,7 +416,7 @@ public sealed record BreakerSettings
 
             // Only worth asking once the two values it is measured against are themselves sane; each of
             // those has its own message, and a second one derived from a NaN would only be noise.
-            if (TripWindow > TimeSpan.Zero && SlowCallRatio > 0 && SlowCallRatio <= 1)
+            if (TripWindow > TimeSpan.Zero && SlowCallRatio is > 0 and <= 1)
                 ValidateRace(adaptive, problems);
         }
 

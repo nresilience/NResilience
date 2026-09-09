@@ -196,7 +196,7 @@ public sealed class RateLimitTests
             Backoff = Backoff.Exponential(throttledBase: TimeSpan.FromMinutes(5)) with { Jitter = Jitter.None },
             OnEvent = e =>
             {
-                if (e.Kind == CallEventKind.Retrying && e.Delay is { } delay)
+                if (e is { Kind: CallEventKind.Retrying, Delay: { } delay })
                     delays.Add(delay);
             },
         };

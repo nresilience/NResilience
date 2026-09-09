@@ -156,7 +156,7 @@ public sealed class PerCallStateAnalyzer : DiagnosticAnalyzer
         if (current is IInvocationOperation { TargetMethod.Name: "Measured" })
             return "Backoff.MeasuredBase";
 
-        if (current is IWithOperation with && with.Initializer is { } initializer)
+        if (current is IWithOperation { Initializer: { } initializer })
         {
             foreach (var assignment in initializer.Initializers.OfType<ISimpleAssignmentOperation>())
             {

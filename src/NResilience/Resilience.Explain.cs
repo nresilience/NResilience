@@ -383,7 +383,7 @@ public sealed partial record Resilience
                 "it is " + Lower(breaker.State.ToString()) + ", so calls are refused now; everything below applies again when it closes");
         }
 
-        if (Attempts > 1 && readings.Budget is { } budget && budget.Utilization >= 1)
+        if (Attempts > 1 && readings.Budget is { Utilization: >= 1 })
         {
             return new BoundFirst(
                 "the retry budget",

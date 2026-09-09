@@ -63,7 +63,6 @@ public sealed class ThreadPoolSaturationTests
         // the executor makes rather than one invented for the test.
         var target = idle * 5;
         var starved = TimeSpan.Zero;
-        PoolProbe.Reading reading = default;
 
         try
         {
@@ -71,7 +70,7 @@ public sealed class ThreadPoolSaturationTests
             // backlog this test just created, and the loop would not resume until it had drained.
             for (var i = 0; i < 20 && starved <= target; i++)
             {
-                reading = PoolProbe.Read(minimumSamples: 1);
+                var reading = PoolProbe.Read(minimumSamples: 1);
 
                 if (reading.Delay > starved)
                     starved = reading.Delay;

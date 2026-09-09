@@ -113,13 +113,13 @@ internal sealed class ResilienceHealthCheck(
 
     private static string Describe(in Tally tally)
     {
-        if (tally.Breakers == 0 && tally.Budgets == 0)
+        if (tally is { Breakers: 0, Budgets: 0 })
         {
             return "No breakers or retry budgets are registered. Either nothing is configured with one, "
                    + "or the policies that have them are not registered in this container.";
         }
 
-        if (tally.OpenBreakers == 0 && tally.ExhaustedBudgets == 0)
+        if (tally is { OpenBreakers: 0, ExhaustedBudgets: 0 })
             return $"{tally.Breakers} breaker(s) closed, {tally.Budgets} retry budget(s) funding retries.";
 
         var problems = new List<string>(2);

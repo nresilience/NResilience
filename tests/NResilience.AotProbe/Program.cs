@@ -292,8 +292,8 @@ internal static class Program
 
         var result = await instant.TryRunAsync(ct => calls.NextAsync(ct)).ConfigureAwait(false);
 
-        failures += Check("testing: a scripted sequence retries to success", result.IsSuccess && result.Value == Gate.Value);
-        failures += Check("testing: the sequence served every scripted step", calls.CallCount == 2 && calls.Remaining == 0);
+        failures += Check("testing: a scripted sequence retries to success", result is { IsSuccess: true, Value: Gate.Value });
+        failures += Check("testing: the sequence served every scripted step", calls is { CallCount: 2, Remaining: 0 });
 
         failures += Check(
             "testing: the recorder captured the whole event sequence",
@@ -392,7 +392,7 @@ internal static class Program
 
         failures += Check(
             "library: a refusal reports DependencyUnavailable",
-            refused.Reason == StopReason.DependencyUnavailable && refused.Exception is CallRejectedException);
+            refused is { Reason: StopReason.DependencyUnavailable, Exception: CallRejectedException });
 
         breaker.Reset();
         failures += Check("library: Reset closes the breaker", breaker.State == BreakerState.Closed);

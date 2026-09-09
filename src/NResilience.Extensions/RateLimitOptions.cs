@@ -153,7 +153,7 @@ public sealed class RateLimitOptions
 
     private static void Positive(int? value, string name, List<string> problems)
     {
-        if (value is { } set && set < 1)
+        if (value is { } set and < 1)
             problems.Add($"{name} must be at least 1; it is {set}.");
     }
 }

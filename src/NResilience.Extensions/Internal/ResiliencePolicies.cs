@@ -288,7 +288,7 @@ internal sealed class ResiliencePolicies : IResiliencePolicies, IDisposable
                 live.Budget ??= budget;
                 policy = policy with { Budget = live.Budget };
             }
-            else if (policy.Budget is { IsAutomatic: true } && policy.Attempts > 1)
+            else if (policy is { Budget: { IsAutomatic: true }, Attempts: > 1 })
             {
                 // RetryBudget.Automatic resolves to a bucket keyed by policy *instance*, and reload
                 // produces a new instance - so the accumulated traffic history would be thrown away

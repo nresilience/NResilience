@@ -125,7 +125,6 @@ public sealed class HttpResilienceHandler : DelegatingHandler
         var retrying = ShouldRetry(request);
         var policy = retrying ? scope.Retrying : scope.Single;
 
-        var nested = false;
         var wasInside = false;
 
         if (retrying && Options.DetectNestedRetries)
@@ -138,7 +137,7 @@ public sealed class HttpResilienceHandler : DelegatingHandler
             // half that needs a server to read it, and the one that makes the middle hop of a chain able to
             // see the amplification it is part of. The ambient read is last so a call already known to be
             // nested does not pay for it.
-            nested = wasInside || inbound || NestedRetry.IsCallerRetrying;
+            var nested = wasInside || inbound || NestedRetry.IsCallerRetrying;
 
             if (nested && policy.OnEvent is { } listener)
                 listener(new CallEvent(CallEventKind.NestedRetry, policy.Name, 1, Verdict.Ok, TimeSpan.Zero, null, null, null, null));

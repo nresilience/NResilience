@@ -52,7 +52,7 @@ public sealed class GrpcInterceptorTests
         using var call = Call(Interceptor(Policy() with { OnEvent = events.Add }), script);
 
         Assert.Equal("ok", await call.ResponseAsync);
-        Assert.Contains(events, e => e.Kind == CallEventKind.Attempt && e.Verdict.Kind == VerdictKind.Throttled);
+        Assert.Contains(events, e => e is { Kind: CallEventKind.Attempt, Verdict.Kind: VerdictKind.Throttled });
     }
 
     [Theory]
