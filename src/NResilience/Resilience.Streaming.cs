@@ -743,6 +743,246 @@ public sealed partial record Resilience
         throw failure;
     }
 
+    /// <summary>
+    ///     Runs a cold source addressed by a checkpoint, restarting it from the caller's last checkpoint
+    ///     when it fails after delivering elements, instead of stopping the way the other overloads do.
+    ///     <para>
+    ///         Retried before the first element exactly like
+    ///         <see cref="RunAsync{TState,T}(Func{TState,CancellationToken,IAsyncEnumerable{T}},TState,CancellationToken)" />
+    ///         - the
+    ///         same <see cref="Attempts" />, backoff and guards - because the checkpoint is not needed
+    ///         until something has been delivered. Once at least one element has been handed over, a
+    ///         failure re-invokes <paramref name="source" /> with the checkpoint <paramref name="checkpoint" />
+    ///         read off the last element accepted, up to <see cref="Restarts" /> times. Nothing is
+    ///         duplicated and nothing is dropped, because the caller defined both what a checkpoint is
+    ///         and how to read one off an element - see
+    ///         <see href="https://docs.nresilience.net/faq#can-i-retry-a-stream">the FAQ</see> for why
+    ///         no other overload can do this on the caller's behalf.
+    ///     </para>
+    ///     <para>
+    ///         A restart is a retry, not a second call nobody is tracking: it is charged to the same
+    ///         <see cref="Budget" />, admitted through the same <see cref="Breaker" />, and bounded by a
+    ///         <see cref="Deadline" /> clamped to what is left of this call's own. <see cref="Restarts" />
+    ///         is the separate bound that keeps a stream which delivers one element and then fails,
+    ///         forever, from restarting forever - progress refills the attempt count each restart is
+    ///         given, but nothing refills <see cref="Restarts" /> itself.
+    ///     </para>
+    /// </summary>
+    /// <typeparam name="TCheckpoint">
+    ///     The checkpoint's type: a byte offset, an event id, a continuation token - whatever
+    ///     <paramref name="source" /> needs to resume where the last accepted element left off.
+    /// </typeparam>
+    /// <typeparam name="T">The element type of the source.</typeparam>
+    /// <param name="source">The cold source, taking the checkpoint to resume from and the attempt's cancellation token.</param>
+    /// <param name="start">The checkpoint to start from.</param>
+    /// <param name="checkpoint">Reads the checkpoint off one element. Called once for every element this method yields, before yielding it.</param>
+    /// <param name="cancellationToken">The caller's token. Cancelling it aborts the operation immediately and is never treated as a failure.</param>
+    /// <returns>The elements the policy accepted, resumed transparently across restarts.</returns>
+    /// <exception cref="ResilienceConfigurationException">This policy has a <see cref="Hedge" /> configured.</exception>
+    public IAsyncEnumerable<T> RunAsync<TCheckpoint, T>(
+        Func<TCheckpoint, CancellationToken, IAsyncEnumerable<T>> source,
+        TCheckpoint start,
+        Func<T, TCheckpoint> checkpoint,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        ExecutionState.EnsureValidated(this);
+
+        // Refused here, eagerly, for the same reason the other streaming entry points are: an
+        // iterator method cannot throw synchronously at all - the whole body, including this check,
+        // would otherwise run on the consumer's first MoveNextAsync instead of at this call. So the
+        // check is here, on a plain method, and the iterator is a private method this one returns.
+        if (Hedge is not null)
+        {
+            throw new ResilienceConfigurationException(HedgedStreamRefusal);
+        }
+
+        return RunCheckpointedAsync(source, start, checkpoint, cancellationToken);
+    }
+
+    /// <summary>
+    ///     The checkpointed loop, split from the throwing entry point above so that the entry point's
+    ///     validation runs eagerly rather than on the consumer's first <c>MoveNextAsync</c>. See
+    ///     <see cref="RunAsync{TCheckpoint,T}(Func{TCheckpoint,CancellationToken,IAsyncEnumerable{T}},TCheckpoint,Func{T,TCheckpoint},CancellationToken)" />
+    ///     for what it does.
+    /// </summary>
+    private async IAsyncEnumerable<T> RunCheckpointedAsync<TCheckpoint, T>(
+        Func<TCheckpoint, CancellationToken, IAsyncEnumerable<T>> source,
+        TCheckpoint start,
+        Func<T, TCheckpoint> checkpoint,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        // Resolved once, the way the call paths resolve it: a restart's own Deadline is a clamp of
+        // what this one has left, never a fresh window, so the bound applies to the whole checkpointed
+        // operation rather than to each restart independently.
+        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
+        var callStart = Time.GetTimestamp();
+        var current = start;
+        var restarts = 0;
+
+        while (true)
+        {
+            var remaining = Remaining(Time, callStart, deadline);
+
+            // this with { Deadline = remaining } rather than the unclamped policy: every restart is a
+            // fresh call to the stateful RunAsync, which resolves its own deadline from scratch, so
+            // without this a restart would get a brand-new window rather than what is left of this
+            // one's. UseAmbientDeadline is turned off on the copy for the same reason - the ambient
+            // clamp already ran, once, above.
+            var attempt = this with { Deadline = remaining, UseAmbientDeadline = false };
+
+            var enumerator = attempt.RunAsync(source, current, cancellationToken).GetAsyncEnumerator(cancellationToken);
+            var progressed = false;
+
+            try
+            {
+                while (true)
+                {
+                    bool moved;
+
+                    try
+                    {
+                        moved = await enumerator.MoveNextAsync().ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        // Never a restart candidate: the caller asked to stop.
+                        throw;
+                    }
+                    catch (Exception fault) when (progressed && restarts < Restarts && HasTimeLeft(Time, callStart, deadline))
+                    {
+                        // A failure before any element ever arrived is the inner RunAsync's own
+                        // Attempts exhausted, or a guard's refusal, or the deadline - all of them
+                        // final, and none of them a "reconnect from where we were" situation, because
+                        // there is no "where we were" yet. Only progress makes a restart the right
+                        // answer, which is why this filter tests it rather than treating every fault
+                        // alike.
+                        restarts++;
+                        NotifyResumed(restarts, Time.GetElapsedTime(callStart), fault);
+
+                        break;
+                    }
+
+                    if (!moved)
+                        yield break;
+
+                    progressed = true;
+                    current = checkpoint(enumerator.Current);
+
+                    yield return enumerator.Current;
+                }
+            }
+            finally
+            {
+                await enumerator.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Starts a checkpointed source and reports the outcome instead of throwing. Same success
+    ///     point as <see cref="TryRunAsync{T}(Func{CancellationToken,IAsyncEnumerable{T}},CancellationToken)" />
+    ///     - the await ends at the first element - and restarts belong entirely to what happens after
+    ///     it, exactly as they do for the throwing form.
+    ///     <para>
+    ///         <see cref="CallResult{T}.Attempts" /> is <see cref="AttemptLog.Empty" /> on a successful
+    ///         result: the log the throwing form's exception carries on failure is internal to one
+    ///         restart's own <c>RunAsync</c>, and a checkpointed stream's history spans restarts no
+    ///         single <see cref="AttemptLog" /> was shaped to describe. Read <see cref="OnEvent" /> for
+    ///         the full picture, including every <see cref="CallEventKind.StreamResumed" />.
+    ///     </para>
+    /// </summary>
+    /// <typeparam name="TCheckpoint">The checkpoint's type. See the throwing overload.</typeparam>
+    /// <typeparam name="T">The element type of the source.</typeparam>
+    /// <param name="source">The cold source. See the throwing overload for what its token bounds and when it is re-invoked.</param>
+    /// <param name="start">The checkpoint to start from.</param>
+    /// <param name="checkpoint">Reads the checkpoint off one element.</param>
+    /// <param name="cancellationToken">The caller's token. Its cancellation is the one thing this method still throws.</param>
+    /// <returns>The outcome, carrying the started stream when the policy started one.</returns>
+    /// <exception cref="ResilienceConfigurationException">This policy has a <see cref="Hedge" /> configured.</exception>
+    public ValueTask<CallResult<IAsyncEnumerable<T>>> TryRunAsync<TCheckpoint, T>(
+        Func<TCheckpoint, CancellationToken, IAsyncEnumerable<T>> source,
+        TCheckpoint start,
+        Func<T, TCheckpoint> checkpoint,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(checkpoint);
+        ExecutionState.EnsureValidated(this);
+
+        // Refused here rather than inside the async method below: an async method's body runs
+        // synchronously up to its first await, but an exception thrown there is captured onto the
+        // returned ValueTask rather than thrown at this call site - the same eagerness argument as
+        // the throwing overload, for a different compiler reason.
+        if (Hedge is not null)
+        {
+            throw new ResilienceConfigurationException(HedgedStreamRefusal);
+        }
+
+        return TryRunCheckpointedAsync(source, start, checkpoint, cancellationToken);
+    }
+
+    private async ValueTask<CallResult<IAsyncEnumerable<T>>> TryRunCheckpointedAsync<TCheckpoint, T>(
+        Func<TCheckpoint, CancellationToken, IAsyncEnumerable<T>> source,
+        TCheckpoint start,
+        Func<T, TCheckpoint> checkpoint,
+        CancellationToken cancellationToken)
+    {
+        var enumerator = RunAsync(source, start, checkpoint, cancellationToken).GetAsyncEnumerator(cancellationToken);
+        bool started;
+
+        try
+        {
+            started = await enumerator.MoveNextAsync().ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The one thing this method still throws, exactly as the buffered TryRunAsync overloads
+            // already document.
+            await enumerator.DisposeAsync().ConfigureAwait(false);
+            throw;
+        }
+        catch (Exception fault)
+        {
+            // The throwing overload already shaped this into the exception a failed call would throw
+            // - the same reason, the same log - attached to it two different ways depending on what
+            // it is. A library-invented failure - a deadline, a rejection, a timeout - implements
+            // IResilienceFailure and carries both directly. A failure the library did not invent is
+            // rethrown unchanged, so the reason and the log ride on Exception.Data instead, put there
+            // by the same FailureException.Build that shaped the throwing form. Either way this is
+            // reading back what already happened rather than re-deriving it.
+            await enumerator.DisposeAsync().ConfigureAwait(false);
+
+            var reason = fault is IResilienceFailure failure ? failure.Reason : AttemptLog.ReasonOf(fault) ?? StopReason.AttemptsExhausted;
+            var attempts = fault is IResilienceFailure withLog ? withLog.Attempts : AttemptLog.Of(fault) ?? AttemptLog.Empty;
+
+            return new CallResult<IAsyncEnumerable<T>>(false, null, false, fault, reason, attempts);
+        }
+
+        // Empty rather than the winning restart's own log: that log is internal to the public RunAsync
+        // this method composes over, and a checkpointed stream's history spans restarts a single
+        // AttemptLog was never shaped to describe. CallResult<T>.Attempts is therefore not populated
+        // for this overload - the one place its contract narrows, and it is narrowed rather than
+        // faked.
+        return new CallResult<IAsyncEnumerable<T>>(
+            true, new StartedStream<T>(enumerator, started), true, null, StopReason.Succeeded, AttemptLog.Empty);
+    }
+
+    /// <summary>Whether any time is left on a deadline, treating <see cref="Timeout.InfiniteTimeSpan" /> as always some.</summary>
+    private static bool HasTimeLeft(TimeProvider time, long start, TimeSpan deadline)
+    {
+        var remaining = Remaining(time, start, deadline);
+        return remaining == Timeout.InfiniteTimeSpan || remaining > TimeSpan.Zero;
+    }
+
+    /// <summary>Tells the listener a checkpointed stream is restarting, once, from the thread that decided to.</summary>
+    private void NotifyResumed(int restartNumber, TimeSpan elapsed, Exception fault)
+    {
+        if (OnEvent is not null)
+            Notify(CallEventKind.StreamResumed, restartNumber, Verdict.Transient, elapsed, null, fault, null);
+    }
+
     /// <summary>Builds the stall and tells the listener, once, from the thread that found it.</summary>
     /// <param name="stall">The bound that was exceeded.</param>
     /// <param name="delivered">How many elements had arrived.</param>

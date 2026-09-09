@@ -38,6 +38,7 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 | `MaximumHosts` | `1024` | The number of hosts the per-host registry keeps. At least 1; the least-recently-seen hosts are dropped past the cap. There is no unbounded mode - `int.MaxValue` is as close as it gets. |
 | `DetectNestedRetries` | `true` | Whether the nested-retry header is added to requests and whether nesting is reported. |
 | `BufferResponses` | `false` | Whether the response body is read inside the attempt, so a stalled or broken body is retried. Costs the body in memory. |
+| `ResumeDownloads` | `false` | Whether a body that stalls while the caller is reading it is resumed with a `Range` request instead of ending the read. See [Resuming a stalled download](#resuming-a-stalled-download). |
 | `PropagateDeadline` | `false` | Whether each attempt carries the time this side will wait for it: `min(AttemptTimeout, time left on the deadline)`, in whole milliseconds, recomputed per attempt and per hedged leg. The gRPC switch of the same name defaults to `true`, because `grpc-timeout` is a protocol field rather than a convention. |
 | `DeadlineHeader` | `"X-Deadline-Ms"` | The header `PropagateDeadline` writes. `AmbientDeadline.Header` is the same value, and is what the inbound middleware reads. Must not be empty. |
 | `PropagateCriticality` | `false` | Whether each request carries how much the work it is part of matters: `AmbientCriticality.Current`, as one of the four `Criticality` names. The same value on every attempt. See [Criticality](../features/criticality.md). |
@@ -63,6 +64,14 @@ Both constructors validate the provided policy. The synchronous `Send` method is
 The handler reads two shapes off every response and keeps the numbers per host. The standard fields - `RateLimit-Policy` carrying the quota `q` and window `w`, and `RateLimit` carrying the remaining allowance `r` and the seconds until reset `t` - win where both shapes are present, and the most constraining member of `RateLimit` is the one that binds. The legacy triple's reset is whole seconds, read as a Unix timestamp when it is too large to be a count from now.
 
 A refusal is `Verdict.Refused`, carrying the time until the window resets as the pushback: retried on the long backoff curve, never charged to the retry budget, never evidence against the host's breaker, and reported as the [`RejectedByQuota`](events.md#calleventkind) event and `RateLimitedException`. A host that publishes nothing, a remaining count with no quota to take a fraction of, a window that has already reset, and a malformed field all leave the guard with no opinion.
+
+## Resuming a stalled download
+
+`ResumeDownloads` resumes a body that stalls while the caller is reading it, with an HTTP `Range` request, instead of ending the read with `AttemptStalledException`. It is the alternative `BufferResponses` offers for a caller who cannot hold a large body in memory: a download that stalls at 3.9 GB of 4 GB re-requests only what is left.
+
+A resume is only ever attempted when it is safe. The first response has to carry a strong `ETag` and `Accept-Ranges: bytes`; the resumed request sends the `ETag` back as `If-Range`, so the server itself refuses to splice a representation that has since changed. A response missing either header, a resume request that fails outright, and a resume that comes back `200` where a `206` was expected all fall back to the ordinary stall - the worst case is identical to `ResumeDownloads` being off. A stream resumes at most five times before a further stall is reported rather than retried again.
+
+Requires `Resilience.BoundProgress`, which is on by default, and applies only to `GET`. A successful resume raises [`StreamResumed`](events.md#calleventkind), the same event a checkpointed stream's own resume raises - see [Checkpointed resume](../features/streaming.md#checkpointed-resume).
 
 ## `HttpResilience`
 

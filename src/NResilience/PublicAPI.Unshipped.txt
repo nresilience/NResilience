@@ -619,3 +619,9 @@ static NResilience.WinRate.operator ==(NResilience.WinRate left, NResilience.Win
 ~override NResilience.Saturation.Equals(object obj) -> bool
 ~override NResilience.SlowCalls.Equals(object obj) -> bool
 ~override NResilience.WinRate.Equals(object obj) -> bool
+NResilience.HttpResilienceOptions.ResumeDownloads.get -> bool
+NResilience.HttpResilienceOptions.ResumeDownloads.set -> void
+NResilience.Resilience.Restarts.get -> int
+NResilience.Resilience.Restarts.init -> void
+NResilience.Resilience.RunAsync<TCheckpoint, T>(System.Func<TCheckpoint, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, TCheckpoint start, System.Func<T, TCheckpoint>! checkpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<T>!
+NResilience.Resilience.TryRunAsync<TCheckpoint, T>(System.Func<TCheckpoint, System.Threading.CancellationToken, System.Collections.Generic.IAsyncEnumerable<T>!>! source, TCheckpoint start, System.Func<T, TCheckpoint>! checkpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<NResilience.CallResult<System.Collections.Generic.IAsyncEnumerable<T>!>>

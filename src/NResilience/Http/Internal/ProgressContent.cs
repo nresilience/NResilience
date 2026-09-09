@@ -30,6 +30,7 @@ internal sealed class ProgressContent : HttpContent
     private readonly string? _policyName;
     private readonly TimeSpan _stall;
     private readonly TimeProvider _time;
+    private readonly Func<long, CancellationToken, Task<Stream?>>? _resume;
 
     /// <summary>Wraps a body.</summary>
     /// <param name="inner">The transport's content.</param>
@@ -37,13 +38,16 @@ internal sealed class ProgressContent : HttpContent
     /// <param name="time">The clock.</param>
     /// <param name="policyName">The policy's name, for the event.</param>
     /// <param name="onEvent">The policy's listener.</param>
-    internal ProgressContent(HttpContent inner, TimeSpan stall, TimeProvider time, string? policyName, Action<CallEvent>? onEvent)
+    /// <param name="resume">See <see cref="ProgressStream" />'s parameter of the same name. Null when <see cref="HttpResilienceOptions.ResumeDownloads" /> does not apply.</param>
+    internal ProgressContent(HttpContent inner, TimeSpan stall, TimeProvider time, string? policyName, Action<CallEvent>? onEvent,
+        Func<long, CancellationToken, Task<Stream?>>? resume = null)
     {
         _inner = inner;
         _stall = stall;
         _time = time;
         _policyName = policyName;
         _onEvent = onEvent;
+        _resume = resume;
 
         foreach (var header in inner.Headers)
         {
@@ -55,14 +59,14 @@ internal sealed class ProgressContent : HttpContent
     protected override async Task<Stream> CreateContentReadStreamAsync()
     {
         var body = await _inner.ReadAsStreamAsync().ConfigureAwait(false);
-        return new ProgressStream(body, _stall, _time, _policyName, _onEvent);
+        return new ProgressStream(body, _stall, _time, _policyName, _onEvent, _resume);
     }
 
     /// <inheritdoc />
     protected override async Task<Stream> CreateContentReadStreamAsync(CancellationToken cancellationToken)
     {
         var body = await _inner.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        return new ProgressStream(body, _stall, _time, _policyName, _onEvent);
+        return new ProgressStream(body, _stall, _time, _policyName, _onEvent, _resume);
     }
 
     /// <inheritdoc />

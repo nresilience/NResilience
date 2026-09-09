@@ -233,4 +233,46 @@ public sealed class StreamingDocs
         Assert.Equal(expected: 2, actual: streams.CallCount);
         Assert.Equal(expected: 2, actual: streams.DisposedEnumerators);
     }
+
+    [Fact]
+    public async Task A_checkpointed_source_resumes_instead_of_stopping()
+    {
+        var events = Events();
+        var api = Resilience.Default;
+        var received = new List<int>();
+
+        // <snippet:stream-checkpoint>
+        // The source takes the checkpoint to resume from. Here the checkpoint is the value of
+        // the last element itself, so a failure right after element 2 re-invokes the source with
+        // 2, and it resumes at 3 - nothing already delivered is delivered again.
+        await foreach (var item in api.RunAsync(
+                           (from, ct) => events.ReadFrom(from, ct),
+                           start: 0,
+                           checkpoint: static value => value))
+        {
+            received.Add(item);
+        }
+        // </snippet:stream-checkpoint>
+
+        Assert.Equal(expected: [1, 2, 3, 4], actual: received);
+    }
+
+    /// <summary>A source that fails right after element 2, for <see cref="A_checkpointed_source_resumes_instead_of_stopping" />.</summary>
+    private static CheckpointedEvents Events() => new();
+
+    private sealed class CheckpointedEvents
+    {
+        public async IAsyncEnumerable<int> ReadFrom(int from, [EnumeratorCancellation] CancellationToken ct)
+        {
+            await Task.Yield();
+
+            for (var next = from + 1; next <= 4; next++)
+            {
+                yield return next;
+
+                if (next == 2)
+                    throw new IOException("connection reset");
+            }
+        }
+    }
 }

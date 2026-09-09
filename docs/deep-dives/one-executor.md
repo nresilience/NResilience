@@ -92,4 +92,6 @@ Two C# restrictions do real work in this design. `yield return` cannot appear in
 
 `Admit` composes inside this one path rather than forking a fifth, and that decision is a measurement rather than doctrine: the "one bit, zero bytes" argument that split the call paths is about fields every caller pays for. This path's floor is already an iterator box plus a surviving token source, so one more hoisted awaiter field is below its own noise. The same reasoning runs the other way for the hedge: two interleaved enumerables is a buffering problem, not a hedge, so the streaming overloads refuse a hedged policy at the call rather than pretend.
 
+[Checkpointed resume](../features/streaming.md#checkpointed-resume) does not touch any of this. It is a loop written on top of the public `RunAsync<TState,T>`, re-invoking it once per restart with a `Deadline` clamped to what is left of the whole operation; each restart is therefore a complete, ordinary run of the path above, with its own fresh iterator, its own fresh token, and its own fresh `Attempts`. The only state the wrapper keeps is which checkpoint to pass in next and how many restarts remain.
+
 For more details on memory management, see [Where the allocations are](allocations.md).

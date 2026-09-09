@@ -23,6 +23,7 @@ The presets cover common scenarios:
 | Property | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `Attempts` | `int` | 3 | How many attempts to make. `1` means no retry; `3` means try, then retry twice. A count of calls, not a count of retries. |
+| `Restarts` | `int` | 3 | How many times a checkpointed stream may reconnect after failing part-way through. Read only by the `RunAsync`/`TryRunAsync` overloads that take a checkpoint. Each restart is a fresh attempt sequence with its own `Attempts`, so this bounds the total separately. See [Checkpointed resume](../features/streaming.md#checkpointed-resume). |
 | `Deadline` | `TimeSpan` | 30 s | The wall-clock budget for the entire call. Use `Timeout.InfiniteTimeSpan` to disable the bound. |
 | `AttemptTimeout` | `TimeSpan` | 10 s | The maximum duration for a single attempt. The effective value is the minimum of this property and the remaining time on the deadline. |
 | `AttemptCeiling` | `AttemptCeiling?` | `AttemptCeiling.Above(3)` | A measured attempt ceiling. Set it to `null` to leave `AttemptTimeout` as the only per-attempt bound. The measured term can only lower the ceiling. No default is supplied when `AttemptTimeout` is `Timeout.InfiniteTimeSpan` or at or below `AttemptCeiling.Floor`, because there is no ceiling there to lower. |
@@ -159,13 +160,15 @@ The `Resilience` record provides the execution methods.
 | `RunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `IAsyncEnumerable<T>` |
 | `TryRunAsync<T>(Func<CancellationToken, IAsyncEnumerable<T>>, CancellationToken)` | `ValueTask<CallResult<IAsyncEnumerable<T>>>` |
 | `TryRunAsync<TState, T>(Func<TState, CancellationToken, IAsyncEnumerable<T>>, TState, CancellationToken)` | `ValueTask<CallResult<IAsyncEnumerable<T>>>` |
+| `RunAsync<TCheckpoint, T>(Func<TCheckpoint, CancellationToken, IAsyncEnumerable<T>>, TCheckpoint, Func<T, TCheckpoint>, CancellationToken)` | `IAsyncEnumerable<T>` |
+| `TryRunAsync<TCheckpoint, T>(Func<TCheckpoint, CancellationToken, IAsyncEnumerable<T>>, TCheckpoint, Func<T, TCheckpoint>, CancellationToken)` | `ValueTask<CallResult<IAsyncEnumerable<T>>>` |
 | `Explain()` | `string` |
 | `Explain(TextWriter)` | `void` |
 | `Validate()` | `void` |
 | `Validated()` | `Resilience` |
 | `WithListener(Action<CallEvent>)` | `Resilience` |
 
-The eight execution overloads have counterparts that take `ValueTask`-returning callbacks, for `Channel`, `PipeReader`, `Socket`, `Stream` and anything else built on `IValueTaskSource`. These counterparts use the same names and argument order:
+The eight buffered execution overloads have counterparts that take `ValueTask`-returning callbacks, for `Channel`, `PipeReader`, `Socket`, `Stream` and anything else built on `IValueTaskSource`. These counterparts use the same names and argument order:
 
 | Method | Return Type |
 | :--- | :--- |
@@ -196,9 +199,11 @@ var name = await api.RunAsync(attempt => db.ReadNameAsync(id: id, cancellationTo
 
 To use the `ValueTask` path with an `async` lambda, provide an explicit return type: `async ValueTask<int> (ct) => …`. This is rarely necessary, because an `async` lambda allocates its own state machine regardless of return type. See [where the allocations are](../deep-dives/allocations.md) for what the overloads save and why they are shaped this way.
 
-The four streaming overloads take a **cold source** - a callback returning `IAsyncEnumerable<T>` - rather than a task, so a lambda binds to them by return type alone. Each attempt re-invokes the source, retrying until the first element is yielded, then hands the rest of the enumeration to the caller untouched. A policy with `Hedge` configured is refused by these overloads at the call. See [streaming](../features/streaming.md) for the semantics.
+The six streaming overloads take a **cold source** - a callback returning `IAsyncEnumerable<T>` - rather than a task, so a lambda binds to them by return type alone. Each attempt re-invokes the source, retrying until the first element is yielded, then hands the rest of the enumeration to the caller untouched. A policy with `Hedge` configured is refused by these overloads at the call. See [streaming](../features/streaming.md) for the semantics.
 
 The streaming `TryRunAsync` awaits to the **first element** and reports what a failed `RunAsync` would have thrown from the first `MoveNextAsync`. The value of a successful `CallResult<IAsyncEnumerable<T>>` is the started enumeration: it is enumerable once, and it implements `IAsyncDisposable` for a caller who reads `IsSuccess` and then decides not to consume it. A fault after the first element is not part of the result - it throws from `MoveNextAsync`, because the result was decided before that element existed.
+
+The two checkpointed overloads take a `start` checkpoint and a `checkpoint` reader alongside the source, and restart the source from the last one accepted instead of stopping when a fault arrives after the first element - see [checkpointed resume](../features/streaming.md#checkpointed-resume). `CallResult<IAsyncEnumerable<T>>.Attempts` is `AttemptLog.Empty` on a successful checkpointed `TryRunAsync`: the log on the throwing form's failure is one restart's own, and a checkpointed stream's history spans restarts no single `AttemptLog` was shaped to describe.
 
 > [!NOTE]
 > A lambda that only throws needs an explicit return type here - `TryRunAsync(Task<int> (ct) => throw new IOException())` - because a lambda with no return statement is ambiguous between the `Task<T>` and `IAsyncEnumerable<T>` overloads.

@@ -22,6 +22,7 @@ The table below summarizes each feature and its default setting.
 | Local saturation | Disabled (opt-in; it changes what every other measured term learns) | [Local saturation](saturation.md) |
 | Keyed policy scope | Disabled (opt-in; on by default per host for HTTP and per service for gRPC) | [Keyed policy scope](policy-scope.md) |
 | Streaming calls | Opt-in, through the `RunAsync` and `TryRunAsync` overloads taking a source | [Streaming](streaming.md) |
+| Checkpointed stream resume | Opt-in, through the overloads taking a checkpoint; three restarts by default | [Checkpointed resume](streaming.md#checkpointed-resume) |
 | Deadline propagation | Disabled (opt-in on both halves) | [Deadlines](deadlines.md#propagate-the-deadline-across-a-hop) |
 | Criticality | Disabled (opt-in on both halves) | [Criticality](criticality.md) |
 | Telemetry | Enabled for registered policies; disabled for hand-built policies | [Telemetry](telemetry.md) |

@@ -107,7 +107,7 @@ internal static class FailureException
         if (reason == StopReason.DeadlineExceeded)
         {
             var deadlineExceeded = new DeadlineExceededException(deadline, attempts, error);
-            attempts.AttachTo(deadlineExceeded);
+            attempts.AttachTo(deadlineExceeded, reason);
             return deadlineExceeded;
         }
 
@@ -117,7 +117,7 @@ internal static class FailureException
         if (reason is StopReason.DependencyUnavailable or StopReason.BudgetExhausted)
         {
             var rejected = new CallRejectedException(reason, attempts, retryAfter, error);
-            attempts.AttachTo(rejected);
+            attempts.AttachTo(rejected, reason);
             return rejected;
         }
 
@@ -132,7 +132,7 @@ internal static class FailureException
                 timedOut.Reason = reason;
             }
 
-            attempts.AttachTo(error);
+            attempts.AttachTo(error, reason);
             return error;
         }
 

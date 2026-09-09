@@ -146,6 +146,35 @@ catch (InvalidOperationException e)
 
 `AttemptTimeout` bounds **time to the first element only**. Once the element is in hand the ceiling is disarmed, so a slow middle of a stream never loses the enumeration. `Deadline` and `Backoff` work between attempts exactly as for calls, and the first `MoveNextAsync` throws the exception a failed call would have thrown: `DeadlineExceededException`, `CallRejectedException`, `AttemptTimeoutException`, or the original exception, with the attempt log attached.
 
+## Checkpointed resume
+
+A checkpoint is the exception to "a fault after the first element belongs to the consumer": when the caller can say where a stream picks up, retrying it no longer duplicates or drops work. The `RunAsync` and `TryRunAsync` overloads that take a checkpoint restart the source from that point instead of stopping.
+
+<!-- snippet: stream-checkpoint -->
+```csharp
+// The source takes the checkpoint to resume from. Here the checkpoint is the value of
+// the last element itself, so a failure right after element 2 re-invokes the source with
+// 2, and it resumes at 3 - nothing already delivered is delivered again.
+await foreach (var item in api.RunAsync(
+                   (from, ct) => events.ReadFrom(from, ct),
+                   start: 0,
+                   checkpoint: static value => value))
+{
+    received.Add(item);
+}
+```
+<!-- endsnippet -->
+
+Three things make this different from the plain overloads above:
+
+- **Before the first element, it is the ordinary retry loop.** `Attempts`, `Backoff` and the classifier apply exactly as they do for any stream; the checkpoint is not needed until something has been delivered.
+- **After the first element, a failure restarts rather than stops.** The source is re-invoked with `checkpoint` read off the last element this method yielded, up to `Resilience.Restarts` times - a bound separate from `Attempts`, because a restart is a fresh attempt sequence with its own.
+- **A restart is a retry, not a second call nobody is tracking.** It goes through the same `Budget` and the same `Breaker`, and it is bounded by a `Deadline` clamped to what is left of the whole operation's own - not a fresh window per restart.
+
+A restart raises `CallEventKind.StreamResumed`, so a listener can tell "this call needed to reconnect" from the ordinary attempt log. See [the events reference](../reference/events.md#event-invariants-and-behavior).
+
+`HttpResilienceOptions.ResumeDownloads` is the same idea for a response body a caller reads directly: a stalled download resumes with an HTTP `Range` request instead of ending the read. See [Resuming a stalled download](../reference/http.md#resuming-a-stalled-download).
+
 ## What composes, what is refused
 
 Everything composes except hedging. A hedge is a concurrent second copy of a value-returning attempt; two interleaved enumerables are a buffering problem, not a hedge. The streaming overloads refuse a hedged policy **at the `RunAsync` call** rather than silently doing nothing. The same policy still runs calls.

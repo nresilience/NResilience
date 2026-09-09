@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Http.Headers;
 using NResilience.Internal;
 
 namespace NResilience;
@@ -164,7 +166,7 @@ public sealed class HttpResilienceHandler : DelegatingHandler
 
             // A buffered body is already read, so there is nothing left to stall on and nothing to
             // wrap - the attempt covered it, which is the whole point of the option.
-            return Options.BufferResponses ? response : Bound(response, policy);
+            return Options.BufferResponses ? response : Bound(response, policy, request);
         }
         catch
         {
@@ -211,8 +213,9 @@ public sealed class HttpResilienceHandler : DelegatingHandler
     /// </remarks>
     /// <param name="response">The response the executor returned.</param>
     /// <param name="policy">The host-scoped policy that produced it.</param>
+    /// <param name="request">The final request that produced <paramref name="response" />, for a resume's <c>Range</c>/<c>If-Range</c>.</param>
     /// <returns>The same response, with its content wrapped where that applies.</returns>
-    private static HttpResponseMessage Bound(HttpResponseMessage response, Resilience policy)
+    private HttpResponseMessage Bound(HttpResponseMessage response, Resilience policy, HttpRequestMessage request)
     {
         // An infinite attempt timeout is the absence of the bound this feature applies, so there is
         // nothing to apply. Said here rather than in ProgressStream so the timer is never created.
@@ -222,9 +225,86 @@ public sealed class HttpResilienceHandler : DelegatingHandler
         if (response.Content is not { } body || body.Headers.ContentLength == 0 || body is ProgressContent)
             return response;
 
-        response.Content = new ProgressContent(body, policy.AttemptTimeout, policy.Time, policy.Name, policy.OnEvent);
+        response.Content = new ProgressContent(
+            body, policy.AttemptTimeout, policy.Time, policy.Name, policy.OnEvent, ResumeFor(response, request));
 
         return response;
+    }
+
+    /// <summary>
+    ///     Builds the callback a stalled read resumes through, or null when
+    ///     <see cref="HttpResilienceOptions.ResumeDownloads" /> does not apply to this response.
+    /// </summary>
+    /// <remarks>
+    ///     Read here, once, from the response the caller is about to start reading - not per stall -
+    ///     because the precondition is a fact about <i>this</i> representation and does not change
+    ///     while the caller reads it.
+    /// </remarks>
+    /// <param name="response">The response whose body may need resuming.</param>
+    /// <param name="request">The request that produced it.</param>
+    /// <returns>The callback, or null.</returns>
+    private Func<long, CancellationToken, Task<Stream?>>? ResumeFor(HttpResponseMessage response, HttpRequestMessage request)
+    {
+        if (!Options.ResumeDownloads || request.Method != HttpMethod.Get)
+            return null;
+
+        if (response.Headers.ETag is not { IsWeak: false } etag || !AcceptsByteRanges(response))
+            return null;
+
+        return async (offset, cancellationToken) =>
+        {
+            using var next = new HttpRequestMessage(request.Method, request.RequestUri) { Version = request.Version, VersionPolicy = request.VersionPolicy };
+
+            foreach (var header in request.Headers)
+            {
+                next.Headers.TryAddWithoutValidation(header.Key, header.Value);
+            }
+
+            next.Headers.Range = new RangeHeaderValue(offset, null);
+            next.Headers.IfRange = new RangeConditionHeaderValue(etag);
+
+            HttpResponseMessage resumed;
+
+            try
+            {
+                resumed = await _send(next, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                // The resume attempt itself failed to reach the dependency. Not the caller's stall to
+                // hear about twice - ProgressStream reports the original one.
+                return null;
+            }
+
+            // Anything but 206 means the server did not resume: a 200 says the representation moved
+            // on despite the ETag matching for If-Range's own purposes, and anything else is a
+            // response this method has no reading for. Spliced content is worse than none, so this
+            // is refused rather than guessed at.
+            if (resumed.StatusCode != HttpStatusCode.PartialContent || resumed.Content is not { } continuation)
+            {
+                resumed.Dispose();
+                return null;
+            }
+
+            var stream = await continuation.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+
+            // The continuation's HttpResponseMessage owns the connection the stream reads from, and
+            // nothing else references it once this method returns - so it is disposed with the stream
+            // rather than leaked until finalization.
+            return new ResponseOwnedStream(resumed, stream);
+        };
+    }
+
+    /// <summary>Whether a response declared it can serve byte ranges of itself.</summary>
+    private static bool AcceptsByteRanges(HttpResponseMessage response)
+    {
+        foreach (var range in response.Headers.AcceptRanges)
+        {
+            if (string.Equals(range, "bytes", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     /// <summary>

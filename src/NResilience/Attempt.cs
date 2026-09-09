@@ -334,7 +334,30 @@ public sealed class AttemptLog : IReadOnlyList<Attempt>
         return text.ToString();
     }
 
-    internal void AttachTo(Exception exception) => exception.Data[DataKey] = this;
+    /// <summary>
+    ///     The key <see cref="ReasonOf" /> reads back. Separate from <see cref="DataKey" /> because a
+    ///     raw rethrown exception carries no <see cref="IResilienceFailure" /> wrapper to read
+    ///     <see cref="StopReason" /> off, and a caller that only knows this returned - the checkpointed
+    ///     <c>TryRunAsync</c> overloads, so far - needs a second place to keep it that is not the
+    ///     public interface every wrapped failure already exposes.
+    /// </summary>
+    private const string ReasonKey = "NResilience.StopReason";
+
+    internal void AttachTo(Exception exception, StopReason reason)
+    {
+        exception.Data[DataKey] = this;
+        exception.Data[ReasonKey] = reason;
+    }
+
+    /// <summary>
+    ///     The reason attached to an exception the library rethrew unchanged - the counterpart to
+    ///     <see cref="Of" /> for the one fact <see cref="IResilienceFailure.Reason" /> would otherwise
+    ///     carry, on the one shape of failure that has no <see cref="IResilienceFailure" /> wrapper to
+    ///     carry it.
+    /// </summary>
+    /// <param name="exception">The exception that came out of a call.</param>
+    /// <returns>The reason, or null when the exception did not come from this library.</returns>
+    internal static StopReason? ReasonOf(Exception exception) => exception.Data[ReasonKey] as StopReason?;
 
     private static string Format(TimeSpan value) =>
         value.TotalSeconds >= 1

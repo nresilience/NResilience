@@ -62,6 +62,11 @@ public sealed partial record Resilience
         // Resilience.None says so here rather than leaving it to be inferred from AttemptTimeout
         // being infinite - the two are separate switches, and only one of them is about the body.
         BoundProgress = false,
+
+        // A restart is a retry a checkpointed stream asks for on its own, and passthrough means no
+        // retry of any shape - stated here for the same reason Attempts = 1 is, rather than left to
+        // be inferred from it.
+        Restarts = 0,
     };
 
     /// <summary>
@@ -102,6 +107,27 @@ public sealed partial record Resilience
     ///     <see cref="Timeout.InfiniteTimeSpan" /> means the deadline is the only bound.
     /// </summary>
     public TimeSpan AttemptTimeout { get; init; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    ///     How many times a checkpointed stream may reconnect after failing part-way through. Read
+    ///     only by the <c>RunAsync</c>/<c>TryRunAsync</c> overloads that take a checkpoint; every other
+    ///     entry point ignores it. Default <c>3</c>.
+    ///     <para>
+    ///         A separate bound from <see cref="Attempts" />, and it has to be: a restart re-invokes the
+    ///         source with a fresh checkpoint, which is itself a fresh attempt sequence with its own
+    ///         <see cref="Attempts" /> budget, its own backoff and its own admission through
+    ///         <see cref="Breaker" />. Nothing refills a consecutive-failure count across a restart, so
+    ///         without a bound of its own a stream that delivers one element and then fails, forever,
+    ///         would restart forever. This is that bound.
+    ///     </para>
+    ///     <para>
+    ///         A restart is charged like a retry: it goes through the same <see cref="Budget" />, the
+    ///         same <see cref="Breaker" /> and a <see cref="Deadline" /> clamped to what is left of the
+    ///         call's own, because each restart is a fresh <c>RunAsync</c> under that remaining window
+    ///         rather than a second call nobody is tracking.
+    ///     </para>
+    /// </summary>
+    public int Restarts { get; init; } = 3;
 
     /// <summary>
     ///     The per-attempt ceiling measured from the dependency's own recent latency, on by default at
@@ -535,6 +561,9 @@ public sealed partial record Resilience
 
         if (Attempts < 1)
             problems.Add($"Attempts must be at least 1; it is {Attempts}.");
+
+        if (Restarts < 0)
+            problems.Add($"Restarts must not be negative; it is {Restarts}.");
 
         CheckDuration(Deadline, nameof(Deadline), problems);
         CheckDuration(AttemptTimeout, nameof(AttemptTimeout), problems);

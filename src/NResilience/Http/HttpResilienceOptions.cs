@@ -73,6 +73,35 @@ public sealed class HttpResilienceOptions
     public bool BufferResponses { get; set; }
 
     /// <summary>
+    ///     Whether a response body that stalls while the caller is reading it is resumed with a
+    ///     <c>Range</c> request instead of ending the read. Disabled by default.
+    ///     <para>
+    ///         This is the alternative <see cref="BufferResponses" /> offers in its place, for the
+    ///         caller who cannot afford to hold a large body in memory: a download that stalls at
+    ///         3.9 GB of 4 GB re-requests only what is left, rather than restarting the whole transfer
+    ///         or ending the caller's read with <see cref="AttemptStalledException" />.
+    ///     </para>
+    ///     <para>
+    ///         <b>Only attempted when it is safe.</b> A <c>Range</c> request against a representation
+    ///         that changed since the first response splices two different objects together, so a
+    ///         resume is only ever attempted when the first response carried a strong <c>ETag</c> and
+    ///         <c>Accept-Ranges: bytes</c> - sent as <c>If-Range</c>, so the server itself refuses to
+    ///         resume a representation that no longer matches. A response missing either header, a
+    ///         resume request that fails outright, and a resume that comes back <c>200</c> where a
+    ///         <c>206</c> was expected - the representation changed - all fall back to the ordinary
+    ///         stall: <see cref="AttemptStalledException" /> ends the caller's read exactly as it does
+    ///         with this off. The worst case is identical to today's; the feature can only help.
+    ///     </para>
+    ///     <para>
+    ///         Requires <see cref="Resilience.BoundProgress" />, which is on by default: there is no
+    ///         stall to resume from otherwise. Has no effect on a request whose method is not
+    ///         <c>GET</c>, and none once <see cref="BufferResponses" /> has already moved the read
+    ///         inside the attempt, where a stall is retried by the ordinary loop instead.
+    ///     </para>
+    /// </summary>
+    public bool ResumeDownloads { get; set; }
+
+    /// <summary>
     ///     Whether each host gets its own circuit breaker. On by default.
     ///     <para>
     ///         One breaker across every host means a dead host trips calls to the healthy ones, which is

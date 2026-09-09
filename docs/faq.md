@@ -32,6 +32,8 @@ Unary and server-streaming calls are covered: a stream is retried until its firs
 ### Can I retry a stream?
 Yes, through the `RunAsync` and `TryRunAsync` overloads that take an `IAsyncEnumerable<T>` source. Retry stops at the first element: once the caller has received one, a retry would duplicate or drop work they have already acted on. Everything after the first element goes to the caller untouched. `TryRunAsync` awaits to that first element and reports the outcome instead of throwing, so a stream has the same non-throwing form a call does. See [Streaming](features/streaming.md) for the core primitive and [gRPC streaming](grpc/streaming.md) for the server-streaming calls the interceptor wraps on the same semantic.
 
+That reasoning holds while the library is the one deciding where to resume - it cannot know. It stops applying the moment the caller can say: the overloads that also take a checkpoint restart the source from the caller's own last-accepted-element marker instead of stopping, up to `Resilience.Restarts` times. See [Checkpointed resume](features/streaming.md#checkpointed-resume).
+
 ### Why does a streaming `TryRunAsync` result have to be enumerated or disposed?
 Because its first element has already been pulled. `TryRunAsync` over an `IAsyncEnumerable<T>` awaits to the first element - the only point where a stream can be asked whether it worked - so a successful `CallResult<IAsyncEnumerable<T>>` carries a started enumeration, not a source that can be re-run. Enumerate it once, or dispose it when you decide not to.
 

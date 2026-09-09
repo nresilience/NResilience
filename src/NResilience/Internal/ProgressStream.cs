@@ -35,13 +35,25 @@ namespace NResilience.Internal;
 /// </remarks>
 internal sealed class ProgressStream : Stream
 {
-    private readonly Stream _inner;
+    /// <summary>
+    ///     How many times one stream may resume before a stall is reported instead of retried again -
+    ///     small and constant, for the reason <see cref="Resilience.Restarts" /> exists at all: a body
+    ///     that stalls every few bytes must eventually reach the caller as a failure rather than resume
+    ///     forever.
+    /// </summary>
+    private const int MaxResumes = 5;
+
     private readonly string? _policyName;
     private readonly Action<CallEvent>? _onEvent;
     private readonly TimeSpan _stall;
-    private readonly CancellationTokenSource _stalled = new();
     private readonly TimeProvider _time;
+    private readonly Func<long, CancellationToken, Task<Stream?>>? _resume;
+
     private readonly ITimer _timer;
+
+    private Stream _inner;
+    private CancellationTokenSource _stalled = new();
+    private int _resumes;
 
     /// <summary>The consumer's token behind <see cref="_linked" />, so an unchanged one is recognized.</summary>
     private CancellationToken _linkedFor;
@@ -65,13 +77,22 @@ internal sealed class ProgressStream : Stream
     /// <param name="time">The clock.</param>
     /// <param name="policyName">The policy's name, for the event.</param>
     /// <param name="onEvent">The policy's listener, told when a stall fires.</param>
-    internal ProgressStream(Stream inner, TimeSpan stall, TimeProvider time, string? policyName, Action<CallEvent>? onEvent)
+    /// <param name="resume">
+    ///     Re-requests the body from <see cref="HttpResilienceOptions.ResumeDownloads" />'s byte
+    ///     offset, or null when the option is off, the method was not <c>GET</c>, or the first response
+    ///     carried no strong <c>ETag</c>. Returning null - preconditions unmet, the resume request
+    ///     itself failed, or it came back <c>200</c> where a <c>206</c> was expected - is treated exactly
+    ///     as if this were null: the stall is reported.
+    /// </param>
+    internal ProgressStream(Stream inner, TimeSpan stall, TimeProvider time, string? policyName, Action<CallEvent>? onEvent,
+        Func<long, CancellationToken, Task<Stream?>>? resume = null)
     {
         _inner = inner;
         _stall = stall;
         _time = time;
         _policyName = policyName;
         _onEvent = onEvent;
+        _resume = resume;
 
         // Created last, and after every field it reads is set: the callback can run on another
         // thread the instant this returns.
@@ -115,6 +136,14 @@ internal sealed class ProgressStream : Stream
         }
         catch (OperationCanceledException e) when (Faulted(cancellationToken))
         {
+            if (await TryResumeAsync(cancellationToken).ConfigureAwait(false))
+            {
+                // The read that stalled is gone with the stream that produced it; the resumed stream
+                // has not been asked for anything yet, so this is a fresh read rather than a retry of
+                // the one that failed.
+                return await ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+            }
+
             throw Stall(e);
         }
         finally
@@ -232,6 +261,68 @@ internal sealed class ProgressStream : Stream
     /// <returns>True when the stall bound is what cancelled the read.</returns>
     private bool Faulted(CancellationToken cancellationToken) =>
         !cancellationToken.IsCancellationRequested && _stalled.IsCancellationRequested;
+
+    /// <summary>
+    ///     Asks <see cref="_resume" /> for a continuation of the body and, if one comes back, swaps this
+    ///     stream onto it - a new <see cref="_stalled" /> source, a rearmed timer, the same
+    ///     <see cref="_transferred" /> count - so the caller's next read is a fresh one against the
+    ///     continuation rather than a retry of the read that failed.
+    /// </summary>
+    /// <param name="cancellationToken">The consumer's token for the read that stalled.</param>
+    /// <returns>True when the swap happened.</returns>
+    private async ValueTask<bool> TryResumeAsync(CancellationToken cancellationToken)
+    {
+        if (_resume is not { } resume || _resumes >= MaxResumes)
+            return false;
+
+        Stream? next;
+
+        try
+        {
+            next = await resume(Transferred, cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The resume attempt is not the failure the caller asked about; a broken resume falls
+            // back to reporting the stall it was trying to avoid, exactly as a missing ETag would.
+            next = null;
+        }
+
+        if (next is null)
+            return false;
+
+        _resumes++;
+
+        var previous = _inner;
+        _inner = next;
+
+        var stale = _stalled;
+        _stalled = new CancellationTokenSource();
+
+        _linked?.Dispose();
+        _linked = null;
+
+        Rearm(_stall);
+
+        // Disposed after the swap, not before: disposing the old stalled source first would leave a
+        // window where Link() could hand out a token from a source nothing points at any more.
+        previous.Dispose();
+        stale.Dispose();
+
+        if (_onEvent is { } listener)
+        {
+            try
+            {
+                listener(CallEvent.Create(CallEventKind.StreamResumed, _policyName, attemptNumber: _resumes, verdict: Verdict.Transient));
+            }
+            catch
+            {
+                // Telemetry that can fail the operation it is observing is worse than no telemetry.
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>
     ///     Builds the exception and raises the event. Called from the read that was cancelled rather
