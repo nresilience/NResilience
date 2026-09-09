@@ -90,18 +90,25 @@ public sealed class ResilienceFailureTests
     [Fact]
     public async Task One_catch_reaches_the_log_whichever_of_the_three_ended_the_call()
     {
-        var timedOut = await Caught(Resilience.None with
-        {
-            Attempts = 1,
-            AttemptTimeout = TimeSpan.FromMilliseconds(20),
-            AttemptCeiling = null,
-        });
+        // The body never returns, so the attempt timeout is the only thing that can end the call:
+        // a body that merely outlasts the timeout would race it on a loaded machine, and losing
+        // that race throws the body's own IOException, which is not an IResilienceFailure.
+        var timedOut = await Caught(
+            Resilience.None with
+            {
+                Attempts = 1,
+                AttemptTimeout = TimeSpan.FromMilliseconds(20),
+                AttemptCeiling = null,
+            },
+            Timeout.InfiniteTimeSpan);
 
-        var refused = await Caught(TestPolicy.Instant with
-        {
-            Attempts = 3,
-            Breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1 }),
-        });
+        var refused = await Caught(
+            TestPolicy.Instant with
+            {
+                Attempts = 3,
+                Breaker = new Breaker(new BreakerSettings { ConsecutiveFailures = 1 }),
+            },
+            TimeSpan.Zero);
 
         foreach (var failure in new[] { timedOut, refused })
         {
@@ -111,14 +118,14 @@ public sealed class ResilienceFailureTests
 
         return;
 
-        static async Task<IResilienceFailure?> Caught(Resilience policy)
+        static async Task<IResilienceFailure?> Caught(Resilience policy, TimeSpan hold)
         {
             try
             {
                 await policy.RunAsync(
                     async ct =>
                     {
-                        await Task.Delay(TimeSpan.FromMilliseconds(50), ct);
+                        await Task.Delay(hold, ct);
                         throw new IOException("down");
                     },
                     CancellationToken.None);
