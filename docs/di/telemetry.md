@@ -55,6 +55,7 @@ The library uses `StartActivity`, which returns `null` when the tracing system i
 | `nresilience.orphaned_work` | An attempt kept running after the call returned. |
 | `nresilience.nested_retry` | The call is already inside a retrying client. |
 | `nresilience.rejected_by_quota` | The dependency's published allowance is spent, so the attempt was refused without being sent. |
+| `nresilience.stream_resumed` | A stream was restarted from the caller's last checkpoint. Declared for [checkpointed resume](../reference/events.md#event-invariants-and-behavior); nothing raises it. |
 
 ## Tag reference
 
@@ -76,7 +77,7 @@ One key, three disjoint value sets, told apart by the instrument. This is delibe
 
 | Instrument | Values | Question it answers |
 | :--- | :--- | :--- |
-| `nresilience.calls`, `nresilience.call.duration`, and the span | `succeeded`, `permanent`, `deadline_exceeded`, `dependency_unavailable`, `budget_exhausted`, `attempts_exhausted` | How did the logical call end? |
+| `nresilience.calls`, `nresilience.call.duration`, and the span | `succeeded`, `permanent`, `deadline_exceeded`, `dependency_unavailable`, `budget_exhausted`, `attempts_exhausted`, `draining` | How did the logical call end? |
 | `nresilience.hedges` | `started`, `won`, `suppressed`, `discarded` | What happened to a hedged leg? |
 | `nresilience.limiter.leases`, `nresilience.limiter.wait.duration` | `acquired`, `denied` | Did the caller get a permit? |
 

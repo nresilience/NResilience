@@ -215,6 +215,21 @@ internal sealed class LogListener
                 }
 
                 break;
+
+            // Both of these belong to behavior no execution path performs, and the records exist for
+            // the reason the event kinds do: an ID is a contract the moment an alert is built on it,
+            // so the number is reserved beside the member rather than after it.
+            case CallEventKind.StreamResumed:
+                if (Level(Log.Ids.StreamResumed, e) is { } resumed)
+                    Log.StreamResumed(_logger, resumed, policy, e.AttemptNumber);
+
+                break;
+
+            case CallEventKind.Draining:
+                if (Level(Log.Ids.Draining, e) is { } draining)
+                    Log.Draining(_logger, draining, e.Exception, policy, e.AttemptNumber, Ms(e.Duration), ErrorType(e));
+
+                break;
         }
     }
 

@@ -154,6 +154,7 @@ NResilience.CallEventKind.BreakerClosed = 9 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerHalfOpened = 10 -> NResilience.CallEventKind
 NResilience.CallEventKind.BreakerOpened = 8 -> NResilience.CallEventKind
 NResilience.CallEventKind.DeadlineExceeded = 6 -> NResilience.CallEventKind
+NResilience.CallEventKind.Draining = 23 -> NResilience.CallEventKind
 NResilience.CallEventKind.Exhausted = 12 -> NResilience.CallEventKind
 NResilience.CallEventKind.HedgeDiscarded = 15 -> NResilience.CallEventKind
 NResilience.CallEventKind.HedgeStarted = 13 -> NResilience.CallEventKind
@@ -168,6 +169,7 @@ NResilience.CallEventKind.RejectedByQuota = 21 -> NResilience.CallEventKind
 NResilience.CallEventKind.Retrying = 1 -> NResilience.CallEventKind
 NResilience.CallEventKind.SaturationDetected = 20 -> NResilience.CallEventKind
 NResilience.CallEventKind.Stalled = 19 -> NResilience.CallEventKind
+NResilience.CallEventKind.StreamResumed = 22 -> NResilience.CallEventKind
 NResilience.CallEventKind.Succeeded = 2 -> NResilience.CallEventKind
 NResilience.CallRejectedException
 NResilience.CallRejectedException.Attempts.get -> NResilience.AttemptLog!
@@ -437,6 +439,7 @@ NResilience.StopReason.AttemptsExhausted = 2 -> NResilience.StopReason
 NResilience.StopReason.BudgetExhausted = 4 -> NResilience.StopReason
 NResilience.StopReason.DeadlineExceeded = 3 -> NResilience.StopReason
 NResilience.StopReason.DependencyUnavailable = 5 -> NResilience.StopReason
+NResilience.StopReason.Draining = 6 -> NResilience.StopReason
 NResilience.StopReason.Permanent = 1 -> NResilience.StopReason
 NResilience.StopReason.Succeeded = 0 -> NResilience.StopReason
 NResilience.ValueTaskExtensions

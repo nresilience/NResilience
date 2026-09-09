@@ -30,6 +30,17 @@ public enum StopReason : byte
 
     /// <summary>A circuit breaker refused the call.</summary>
     DependencyUnavailable,
+
+    /// <summary>
+    ///     This process is shutting down, so the call stopped with the failure it has rather than
+    ///     starting another attempt.
+    ///     <para>
+    ///         Declared for drain-aware shutdown, which nothing performs, and paired with
+    ///         <see cref="CallEventKind.Draining" /> - see that member for why a reason is declared
+    ///         ahead of the behavior that sets it.
+    ///     </para>
+    /// </summary>
+    Draining,
 }
 
 /// <summary>

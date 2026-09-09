@@ -176,6 +176,18 @@ internal static partial class Log
             "{Policy} refused an attempt because the allowance the dependency publishes is spent, and it resets in {ResetMs} ms. Nothing was sent. Refusals logged quietly since the previous warning: {Suppressed}.")]
     internal static partial void RejectedByQuota(ILogger logger, LogLevel level, string policy, long resetMs, int suppressed);
 
+    [LoggerMessage(
+        EventId = Codes.StreamResumed,
+        EventName = nameof(Ids.StreamResumed),
+        Message = "{Policy} resumed a stream on attempt {Attempt} from the caller's last checkpoint")]
+    internal static partial void StreamResumed(ILogger logger, LogLevel level, string policy, int attempt);
+
+    [LoggerMessage(
+        EventId = Codes.Draining,
+        EventName = nameof(Ids.Draining),
+        Message = "{Policy} stopped after attempt {Attempt} in {ElapsedMs} ms without retrying: this process is draining, and failed with {ErrorType}")]
+    internal static partial void Draining(ILogger logger, LogLevel level, Exception? exception, string policy, int attempt, long elapsedMs, string errorType);
+
     /// <summary>
     ///     The IDs as constants, so the <c>[LoggerMessage]</c> attributes and the level switches in
     ///     <c>LogListener</c> - both of which need a compile-time constant - name them rather than
@@ -214,6 +226,8 @@ internal static partial class Log
         internal const int Stalled = 1028;
         internal const int SaturationDetected = 1029;
         internal const int RejectedByQuota = 1030;
+        internal const int StreamResumed = 1031;
+        internal const int Draining = 1032;
     }
 
     /// <summary>
@@ -253,5 +267,7 @@ internal static partial class Log
         internal static readonly EventId Stalled = new(Codes.Stalled, nameof(Stalled));
         internal static readonly EventId SaturationDetected = new(Codes.SaturationDetected, nameof(SaturationDetected));
         internal static readonly EventId RejectedByQuota = new(Codes.RejectedByQuota, nameof(RejectedByQuota));
+        internal static readonly EventId StreamResumed = new(Codes.StreamResumed, nameof(StreamResumed));
+        internal static readonly EventId Draining = new(Codes.Draining, nameof(Draining));
     }
 }

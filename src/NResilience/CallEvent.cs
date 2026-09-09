@@ -92,7 +92,7 @@ public enum CallEventKind : byte
     ///         This is the ordinary way a retried call gives up, and it exists so that <i>every</i> call
     ///         ends with exactly one terminal event - <see cref="Succeeded" />, <see cref="NotRetried" />,
     ///         <see cref="RejectedByBreaker" />, <see cref="RejectedByBudget" />,
-    ///         <see cref="DeadlineExceeded" /> or this. A listener counting logical
+    ///         <see cref="DeadlineExceeded" />, <see cref="Draining" /> or this. A listener counting logical
     ///         operations can only be trusted if the count includes the failures, and those are the calls
     ///         worth counting.
     ///     </para>
@@ -234,6 +234,39 @@ public enum CallEventKind : byte
     ///     </para>
     /// </summary>
     RejectedByQuota,
+
+    /// <summary>
+    ///     A stream that failed part-way through was restarted from the caller's last checkpoint, so
+    ///     the elements already delivered are not delivered again.
+    ///     <see cref="CallEvent.AttemptNumber" /> is the attempt the restart begins.
+    ///     <para>
+    ///         Declared for checkpointed stream resume, which no execution path performs: a retry over
+    ///         an <see cref="IAsyncEnumerable{T}" /> stops at the first element, because only the
+    ///         caller knows where a stream picks up. See
+    ///         <see href="https://docs.nresilience.net/faq#can-i-retry-a-stream">the FAQ</see>.
+    ///     </para>
+    ///     <para>
+    ///         The member is declared without the behavior because this enum is a value a listener
+    ///         persists and exports, so its numbering is a contract from the first release that has
+    ///         it. Adding the member and the behavior in separate releases costs a reader one member
+    ///         that never fires; adding them together renumbers everything after it.
+    ///     </para>
+    /// </summary>
+    StreamResumed,
+
+    /// <summary>
+    ///     This process is shutting down, so the call stopped with the failure it has rather than
+    ///     starting another attempt. Terminal, and carries <see cref="StopReason.Draining" />.
+    ///     <para>
+    ///         Declared for drain-aware shutdown, which nothing performs: the library reads no host
+    ///         lifetime, so a call retrying when a pod's grace period starts runs to its own bounds
+    ///         and holds the connection for as long as they allow.
+    ///     </para>
+    ///     <para>
+    ///         Declared without the behavior for the reason <see cref="StreamResumed" /> is.
+    ///     </para>
+    /// </summary>
+    Draining,
 }
 
 /// <summary>
@@ -392,7 +425,8 @@ public readonly struct CallEvent
     /// </summary>
     public bool IsTerminal =>
         Kind is CallEventKind.Succeeded or CallEventKind.NotRetried or CallEventKind.DeadlineExceeded
-            or CallEventKind.Exhausted or CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget;
+            or CallEventKind.Exhausted or CallEventKind.RejectedByBreaker or CallEventKind.RejectedByBudget
+            or CallEventKind.Draining;
 
     /// <summary>
     ///     Creates a <see cref="CallEvent" /> for testing an <see cref="Resilience.OnEvent" /> listener

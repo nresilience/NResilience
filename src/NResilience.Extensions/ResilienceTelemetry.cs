@@ -272,7 +272,15 @@ public static class ResilienceTelemetry
             case CallEventKind.NotRetried:
             case CallEventKind.DeadlineExceeded:
             case CallEventKind.Exhausted:
+            case CallEventKind.Draining:
                 Terminal(e, policy);
+                break;
+
+            // No instrument, for the reason the quota refusal has none: a restart is an attempt, and
+            // nresilience.attempts counts it. What only this event says is that the attempt picked up
+            // from a checkpoint rather than from the beginning, which belongs on the span.
+            case CallEventKind.StreamResumed:
+                Annotate(e, "nresilience.stream_resumed");
                 break;
 
             case CallEventKind.HedgeStarted:
@@ -439,6 +447,7 @@ public static class ResilienceTelemetry
             StopReason.DeadlineExceeded => "deadline_exceeded",
             StopReason.DependencyUnavailable => "dependency_unavailable",
             StopReason.BudgetExhausted => "budget_exhausted",
+            StopReason.Draining => "draining",
             _ => "attempts_exhausted",
         });
 
