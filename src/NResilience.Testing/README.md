@@ -1,7 +1,7 @@
 # NResilience.Testing
 
-Test helpers for [NResilience](https://github.com/nresilience/NResilience): scripted callbacks, a recording telemetry listener, and fake-time support for
-deterministic, fast tests.
+Test helpers for [NResilience](https://github.com/nresilience/NResilience): scripted callbacks, a recording telemetry listener, fake-time support, and a
+deterministic simulator, for fast tests that measure what a policy actually costs.
 
 ## Install
 
@@ -128,12 +128,35 @@ the transport failures a classifier has to see.
 `CallCount` is how many attempts reached the handler. `Requests` is a snapshot of what each attempt sent, in order: the method, the URI, the headers, and - only
 when `CaptureBodies` is `true` - the body.
 
+## Simulate a whole configuration
+
+`Simulate` runs your real policy against a modeled dependency on a virtual clock and reports what it cost. Nothing sleeps, so five simulated minutes cost about
+what a unit test costs, and the same seed produces the same report on any machine:
+
+```csharp
+SimulationReport report = Simulate.Policy(api)
+    .Against(Dependency
+        .Healthy(p50: TimeSpan.FromMilliseconds(20), p99: TimeSpan.FromMilliseconds(200))
+        .Brownout(after: TimeSpan.FromSeconds(30), slower: 8, lasting: TimeSpan.FromMinutes(1)))
+    .Under(Load.Constant(perSecond: 500))
+    .For(TimeSpan.FromMinutes(5))
+    .Run(seed: 42);
+
+Assert.True(report.LoadMultiplier <= 1.2);   // attempts that reached the dependency, per call you made
+Assert.True(report.Availability >= 0.9);
+```
+
+`LoadMultiplier`, `Amplification`, `Availability`, `Latency(quantile)`, `BreakerOpens`, and `TimeToRecover` are the measurements; `CountOf(kind)` reaches the
+rest of the telemetry. Only the clock, the random source, and the dependency are modeled - the executor, the breaker, the retry budget, the classifier, and
+every estimator are the shipping ones.
+
 ## Documentation
 
 For more information, see the following resources:
 
 - [Testing guide](https://github.com/nresilience/NResilience/blob/main/docs/testing/index.md) - the full walkthrough, including best practices for keeping tests
   fast and deterministic.
+- [Simulation](https://github.com/nresilience/NResilience/blob/main/docs/testing/simulation.md) - modeling a dependency, offering load, and reading the report.
 
 ## Feedback
 

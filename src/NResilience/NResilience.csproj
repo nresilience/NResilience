@@ -74,6 +74,14 @@
     -->
     <InternalsVisibleTo Include="NResilience.Grpc"/>
 
+    <!--
+      Rng.SeedWith. The simulator drives a whole run on one thread against a virtual clock, and a
+      report is only reproducible if the jitter the breaker and the backoff curve draw comes from
+      the same seed as everything else. Seeding a thread-static stream is the only thing the
+      testing package needs, and pinning it is meaningless outside a simulation.
+    -->
+    <InternalsVisibleTo Include="NResilience.Testing"/>
+
     <!-- The behavioral suite constructs NextAttempt and reads the inline log directly. -->
     <InternalsVisibleTo Include="NResilience.Tests"/>
     <InternalsVisibleTo Include="NResilience.IntegrationTests"/>

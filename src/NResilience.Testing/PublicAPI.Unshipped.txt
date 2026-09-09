@@ -27,6 +27,19 @@ NResilience.Testing.ChaosHandler.Chaos.get -> NResilience.Testing.Chaos!
 NResilience.Testing.ChaosHandler.ChaosHandler(NResilience.Testing.Chaos! chaos, System.Func<System.Net.Http.HttpResponseMessage!>? response = null) -> void
 NResilience.Testing.ChaosHandler.Injected.get -> int
 NResilience.Testing.ChaosHandler.Slowed.get -> int
+NResilience.Testing.Dependency
+NResilience.Testing.Dependency.<Clone>$() -> NResilience.Testing.Dependency!
+NResilience.Testing.Dependency.Brownout(System.TimeSpan after, double slower, System.TimeSpan lasting) -> NResilience.Testing.Dependency!
+NResilience.Testing.Dependency.Capacity(int concurrent) -> NResilience.Testing.Dependency!
+NResilience.Testing.Dependency.Concurrency.get -> int
+NResilience.Testing.Dependency.Equals(NResilience.Testing.Dependency? other) -> bool
+NResilience.Testing.Dependency.Failing(double rate) -> NResilience.Testing.Dependency!
+NResilience.Testing.Dependency.FailureRate.get -> double
+NResilience.Testing.Dependency.Outage(System.TimeSpan after, System.TimeSpan lasting) -> NResilience.Testing.Dependency!
+NResilience.Testing.Dependency.P50.get -> System.TimeSpan
+NResilience.Testing.Dependency.P99.get -> System.TimeSpan
+NResilience.Testing.Dependency.Validate() -> void
+NResilience.Testing.Dependency.Validated() -> NResilience.Testing.Dependency!
 NResilience.Testing.EventRecorder
 NResilience.Testing.EventRecorder.Clear() -> void
 NResilience.Testing.EventRecorder.Count.get -> int
@@ -38,6 +51,13 @@ NResilience.Testing.EventRecorder.OfKind(NResilience.CallEventKind kind) -> Syst
 NResilience.Testing.EventRecorder.Record(NResilience.CallEvent callEvent) -> void
 NResilience.Testing.EventRecorder.Single(NResilience.CallEventKind kind) -> NResilience.CallEvent
 NResilience.Testing.EventRecorder.this[int index].get -> NResilience.CallEvent
+NResilience.Testing.Load
+NResilience.Testing.Load.<Clone>$() -> NResilience.Testing.Load!
+NResilience.Testing.Load.Equals(NResilience.Testing.Load? other) -> bool
+NResilience.Testing.Load.Peers.get -> int
+NResilience.Testing.Load.PerSecond.get -> int
+NResilience.Testing.Load.Validate() -> void
+NResilience.Testing.Load.Validated() -> NResilience.Testing.Load!
 NResilience.Testing.ScriptedHttpHandler
 NResilience.Testing.ScriptedHttpHandler.CallCount.get -> int
 NResilience.Testing.ScriptedHttpHandler.CaptureBodies.get -> bool
@@ -85,6 +105,32 @@ NResilience.Testing.Sequence<T>.Returns(T result) -> NResilience.Testing.Sequenc
 NResilience.Testing.Sequence<T>.Returns(T result, int count) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.Throws(System.Exception! exception) -> NResilience.Testing.Sequence<T>!
 NResilience.Testing.Sequence<T>.Throws(System.Exception! exception, int count) -> NResilience.Testing.Sequence<T>!
+NResilience.Testing.Simulate
+NResilience.Testing.Simulation
+NResilience.Testing.Simulation.<Clone>$() -> NResilience.Testing.Simulation!
+NResilience.Testing.Simulation.Against(NResilience.Testing.Dependency! dependency) -> NResilience.Testing.Simulation!
+NResilience.Testing.Simulation.Dependency.get -> NResilience.Testing.Dependency?
+NResilience.Testing.Simulation.Duration.get -> System.TimeSpan
+NResilience.Testing.Simulation.Equals(NResilience.Testing.Simulation? other) -> bool
+NResilience.Testing.Simulation.For(System.TimeSpan duration) -> NResilience.Testing.Simulation!
+NResilience.Testing.Simulation.Load.get -> NResilience.Testing.Load?
+NResilience.Testing.Simulation.Policy.get -> NResilience.Resilience!
+NResilience.Testing.Simulation.Run(int seed) -> NResilience.Testing.SimulationReport!
+NResilience.Testing.Simulation.Under(NResilience.Testing.Load! load) -> NResilience.Testing.Simulation!
+NResilience.Testing.SimulationReport
+NResilience.Testing.SimulationReport.Amplification.get -> double
+NResilience.Testing.SimulationReport.Availability.get -> double
+NResilience.Testing.SimulationReport.BreakerOpens.get -> int
+NResilience.Testing.SimulationReport.Calls.get -> int
+NResilience.Testing.SimulationReport.CountOf(NResilience.CallEventKind kind) -> int
+NResilience.Testing.SimulationReport.Duration.get -> System.TimeSpan
+NResilience.Testing.SimulationReport.Failed.get -> int
+NResilience.Testing.SimulationReport.Latency(double quantile) -> System.TimeSpan
+NResilience.Testing.SimulationReport.LoadMultiplier.get -> double
+NResilience.Testing.SimulationReport.Reached.get -> int
+NResilience.Testing.SimulationReport.Seed.get -> int
+NResilience.Testing.SimulationReport.Succeeded.get -> int
+NResilience.Testing.SimulationReport.TimeToRecover.get -> System.TimeSpan?
 NResilience.Testing.TestPolicy
 NResilience.Testing.VoidSequence
 NResilience.Testing.VoidSequence.CallCount.get -> int
@@ -95,13 +141,6 @@ NResilience.Testing.VoidSequence.Returns() -> NResilience.Testing.VoidSequence!
 NResilience.Testing.VoidSequence.Returns(int count) -> NResilience.Testing.VoidSequence!
 NResilience.Testing.VoidSequence.Throws(System.Exception! exception) -> NResilience.Testing.VoidSequence!
 NResilience.Testing.VoidSequence.Throws(System.Exception! exception, int count) -> NResilience.Testing.VoidSequence!
-override NResilience.Testing.Chaos.Equals(object? obj) -> bool
-override NResilience.Testing.Chaos.GetHashCode() -> int
-override NResilience.Testing.Chaos.ToString() -> string!
-override NResilience.Testing.EventRecorder.ToString() -> string!
-override NResilience.Testing.SentRequest.Equals(object? obj) -> bool
-override NResilience.Testing.SentRequest.GetHashCode() -> int
-override NResilience.Testing.SentRequest.ToString() -> string!
 static NResilience.Testing.Chaos.None.get -> NResilience.Testing.Chaos!
 static NResilience.Testing.Chaos.operator !=(NResilience.Testing.Chaos? left, NResilience.Testing.Chaos? right) -> bool
 static NResilience.Testing.Chaos.operator ==(NResilience.Testing.Chaos? left, NResilience.Testing.Chaos? right) -> bool
@@ -111,12 +150,38 @@ static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Ch
 static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>! work, System.Func<T>! outcome) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<T>!>!
 static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>!
 static NResilience.Testing.ChaosExtensions.Inject<T>(this NResilience.Testing.Chaos! chaos, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>! work, System.Func<T>! outcome) -> System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<T>>!
+static NResilience.Testing.Dependency.Healthy(System.TimeSpan p50, System.TimeSpan p99) -> NResilience.Testing.Dependency!
+static NResilience.Testing.Dependency.operator !=(NResilience.Testing.Dependency? left, NResilience.Testing.Dependency? right) -> bool
+static NResilience.Testing.Dependency.operator ==(NResilience.Testing.Dependency? left, NResilience.Testing.Dependency? right) -> bool
+static NResilience.Testing.Load.Constant(int perSecond, int peers = 1) -> NResilience.Testing.Load!
+static NResilience.Testing.Load.operator !=(NResilience.Testing.Load? left, NResilience.Testing.Load? right) -> bool
+static NResilience.Testing.Load.operator ==(NResilience.Testing.Load? left, NResilience.Testing.Load? right) -> bool
 static NResilience.Testing.ScriptedStream.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.ScriptedStream<T>!
 static NResilience.Testing.SentRequest.operator !=(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.SentRequest.operator ==(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.Sequence.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<T>!
 static NResilience.Testing.Sequence.ForVoid(System.TimeProvider? time = null) -> NResilience.Testing.VoidSequence!
+static NResilience.Testing.Simulate.Policy(NResilience.Resilience! policy) -> NResilience.Testing.Simulation!
+static NResilience.Testing.Simulation.operator !=(NResilience.Testing.Simulation? left, NResilience.Testing.Simulation? right) -> bool
+static NResilience.Testing.Simulation.operator ==(NResilience.Testing.Simulation? left, NResilience.Testing.Simulation? right) -> bool
 static NResilience.Testing.TestPolicy.Instant.get -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.InstantHttp.get -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.WithClock(System.TimeProvider! time) -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.WithClock(this NResilience.Resilience! policy, System.TimeProvider! time) -> NResilience.Resilience!
+override NResilience.Testing.Chaos.Equals(object? obj) -> bool
+override NResilience.Testing.Chaos.GetHashCode() -> int
+override NResilience.Testing.Chaos.ToString() -> string!
+override NResilience.Testing.Dependency.Equals(object? obj) -> bool
+override NResilience.Testing.Dependency.GetHashCode() -> int
+override NResilience.Testing.Dependency.ToString() -> string!
+override NResilience.Testing.EventRecorder.ToString() -> string!
+override NResilience.Testing.Load.Equals(object? obj) -> bool
+override NResilience.Testing.Load.GetHashCode() -> int
+override NResilience.Testing.Load.ToString() -> string!
+override NResilience.Testing.SentRequest.Equals(object? obj) -> bool
+override NResilience.Testing.SentRequest.GetHashCode() -> int
+override NResilience.Testing.SentRequest.ToString() -> string!
+override NResilience.Testing.Simulation.Equals(object? obj) -> bool
+override NResilience.Testing.Simulation.GetHashCode() -> int
+override NResilience.Testing.Simulation.ToString() -> string!
+override NResilience.Testing.SimulationReport.ToString() -> string!

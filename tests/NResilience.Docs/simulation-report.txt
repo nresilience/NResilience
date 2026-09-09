@@ -1,0 +1,11 @@
+Simulation seed 42 over 00:05:00
+  Calls            149742
+  Succeeded        135155
+  Failed           14587
+  Availability     0.9026
+  LoadMultiplier   1.016
+  Amplification    1.104
+  Latency p50      00:00:00.0255265
+  Latency p99      00:00:00.4341090
+  BreakerOpens     0
+  TimeToRecover    00:00:00.0006885

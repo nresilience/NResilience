@@ -26,6 +26,7 @@ NResilience replaces fluent builders, strategy ordering, and mandatory `Build()`
 - **Criticality propagation.** How much a request matters travels with it, so a backfill stops spending the retry capacity a checkout needs and is never hedged. The library carries the level and holds back amplification; what to shed stays your decision.
 - **Drain-aware shutdown.** When the host starts shutting down, calls stop retrying into the rollout and deadlines clamp to what is left of the grace period. On by default for registered policies, because a retry sent after the load balancer stopped routing here is one nobody will read the answer to.
 - **Testable.** Scripted callbacks, a recording listener, and fault injection make policies deterministic in tests.
+- **Simulate before you ship.** Run your policy against a modeled brownout on a virtual clock and read the load multiplier, the availability, and the p99 it produces. Five simulated minutes cost about as much as a unit test.
 - **It explains itself.** One call prints the worst-case timeline attempt by attempt and reports which measured terms are warm, so "how long can this call take?" has an answer you can read.
 - **Telemetry.** Every call raises one event carrying its verdict, retries, and delays; meters and an activity source expose them.
 - **Production-ready.** Built-in analyzers catch common mistakes, such as passing the wrong cancellation token.

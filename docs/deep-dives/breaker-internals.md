@@ -175,6 +175,8 @@ Callers refused during a ramp would have been served by a cliffed breaker. That 
 
 `RampedRecoveryTests` makes that argument rather than asserting it, in the shape the adaptive limiter's capacity simulation established: a fake dependency whose success rate and latency are functions of the load offered to it, which warms over ten seconds of being used and is knocked back when it is overloaded, driven on a fake clock with no randomness anywhere. Over the forty-five seconds after a five-second outage, a ramped breaker serves 8,250 of the offered calls and a cliffed one serves 3,002.
 
+The same argument is available for your own configuration rather than only for this one: [Simulation](../testing/simulation.md) runs the real breaker against a modeled dependency and reports what it cost.
+
 The failure mode is documented on [the feature page](../features/circuit-breaker.md#hand-the-traffic-back-over-a-ramp) and is worth repeating: a ramp against a dependency that answers but stays slow never finishes, and `State` reports `Recovering` for as long as that lasts. A breaker that has been recovering for longer than its break duration is worth an alert.
 
 ## Concurrency and implementation

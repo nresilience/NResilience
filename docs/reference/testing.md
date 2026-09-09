@@ -1,6 +1,6 @@
 ---
 title: Testing reference
-description: Reference for the Sequence, EventRecorder, TestPolicy, and ScriptedHttpHandler tools used for testing resilience policies.
+description: Reference for the Sequence, EventRecorder, TestPolicy, ScriptedHttpHandler, Chaos, and Simulate tools used for testing resilience policies.
 order: 11
 ---
 
@@ -185,3 +185,69 @@ Chaos applies only to the asynchronous path. This is not a limitation in practic
 | `RequestUri` | The `Uri` of the request. |
 | `Headers` | The request headers, copied before disposal. |
 | `Body` | The request body, or null when `CaptureBodies` is off. |
+
+## `Simulate`
+
+`Simulate` runs a policy against a modeled dependency on a virtual clock and reports what it cost. See [Simulation](../testing/simulation.md).
+
+| Member | Description |
+| :--- | :--- |
+| `Simulate.Policy(Resilience policy)` | Starts a simulation of a policy, returning a `Simulation`. The policy's `Time` is replaced by the virtual clock and any breaker it carries is rebuilt on that clock. |
+
+## `Simulation`
+
+`Simulation` is a `record` describing one simulation. Every method returns a new value, so a half-built simulation can be shared between tests that vary the rest.
+
+| Member | Description |
+| :--- | :--- |
+| `Against(Dependency dependency)` | The dependency the policy calls. Required. |
+| `Under(Load load)` | The traffic to offer. Required. |
+| `For(TimeSpan duration)` | How long to offer load for. Required, and positive. Calls in flight when it elapses are allowed to finish. |
+| `Run(int seed)` | Runs the simulation and returns a `SimulationReport`. The same seed produces the same report. |
+| `Policy`, `Dependency`, `Load`, `Duration` | What has been set so far. `Dependency` and `Load` are null until set. |
+
+`Run` validates the policy, the dependency, and the load, throwing `ResilienceConfigurationException`. A simulation missing its dependency, its load, or its duration throws `InvalidOperationException` naming the method that was not called.
+
+## `Dependency`
+
+`Dependency` is a `record` describing the thing a simulated policy calls. It is the only modeled part of a simulation: the executor, breaker, retry budget, classifier, and estimators are the real ones.
+
+| Member | Description |
+| :--- | :--- |
+| `Dependency.Healthy(TimeSpan p50, TimeSpan p99)` | A dependency that answers every call, with the latency spread these two quantiles describe. `p50` must be positive and `p99` at least `p50`. |
+| `Brownout(TimeSpan after, double slower, TimeSpan lasting)` | A stretch during which the dependency is slower but still answering. `slower` must be at least 1. |
+| `Outage(TimeSpan after, TimeSpan lasting)` | A stretch during which every call fails immediately. |
+| `Failing(double rate)` | The fraction of calls that fail while nothing else is wrong, from 0 to 1. A failure is an `IOException`. |
+| `Capacity(int concurrent)` | Calls served at once before queueing begins. Past the bound the dependency slows in proportion; past three times it fails immediately. Zero, the default, is unbounded. |
+| `P50`, `P99`, `FailureRate`, `Concurrency` | What has been set. |
+| `Validate()` / `Validated()` | Throws `ResilienceConfigurationException` listing every problem at once, or returns the dependency. |
+
+Impairments compose: two overlapping brownouts multiply, and an outage inside a brownout fails.
+
+## `Load`
+
+`Load` is a `record` describing the traffic a simulation offers.
+
+| Member | Description |
+| :--- | :--- |
+| `Load.Constant(int perSecond, int peers = 1)` | A steady rate for the whole run. Gaps between arrivals are spread rather than even, so the run contains bursts. |
+| `PerSecond` | Calls this process starts per second, on average. |
+| `Peers` | How many other processes offer the same rate to the same dependency. Their load counts against `Capacity`; their own retries, breakers, and budgets are not simulated. |
+| `Validate()` / `Validated()` | Throws `ResilienceConfigurationException` listing every problem at once, or returns the load. |
+
+## `SimulationReport`
+
+`SimulationReport` is what a run measured. The same seed produces the same report on any operating system and any processor.
+
+| Member | Description |
+| :--- | :--- |
+| `LoadMultiplier` | Attempts that reached the dependency divided by calls the caller made. |
+| `Amplification` | The worst one-second window's load multiplier, counting only seconds the caller made a call in. |
+| `Availability` | The fraction of calls that ended in success, from 0 to 1. |
+| `Latency(double quantile)` | Caller-observed latency at a quantile, over every call in the run by nearest rank. Includes retries and backoff. Throws `ArgumentOutOfRangeException` outside 0 to 1. |
+| `BreakerOpens` | How many times a breaker tripped. |
+| `TimeToRecover` | How long after the last impairment ended before a full second of calls all succeeded. Null when the dependency was never impaired, or when the run ended first. |
+| `CountOf(CallEventKind kind)` | How many events of one kind the run raised. |
+| `Calls`, `Succeeded`, `Failed`, `Reached` | The raw counts the ratios come from. |
+| `Seed`, `Duration` | The seed the run was drawn from, and how long it offered load for. |
+| `ToString()` | The report as a fixed block of invariant-formatted text, one measurement per line. |

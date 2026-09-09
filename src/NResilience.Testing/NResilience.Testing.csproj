@@ -15,8 +15,8 @@
     <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
 
     <PackageId>NResilience.Testing</PackageId>
-    <Description>Test helpers for NResilience: a scripted callback and a recording telemetry listener. Deliberately small - the core was designed to be testable, so a fake clock and the attempt log already do most of the work.</Description>
-    <PackageTags>resilience;retry;testing;polly</PackageTags>
+    <Description>Test helpers for NResilience: a scripted callback, a recording telemetry listener, fault injection, and a deterministic simulator that measures what a policy costs a dependency over simulated minutes of a brownout.</Description>
+    <PackageTags>resilience;retry;testing;simulation;polly</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
 
     <!-- The nuget.org package page shows this package's own README, not the root one. -->

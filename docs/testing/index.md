@@ -245,3 +245,7 @@ To keep your tests fast and deterministic, follow these practices:
 ## Inject faults on purpose
 
 The tools above script a dependency's behavior exactly. When what you want instead is a *rate* - one call in ten fails, one in five is slow - see [Fault injection](fault-injection.md). It wraps the callback rather than the policy, so an injected failure is classified, retried, and logged exactly like a real one.
+
+## Measure a whole configuration
+
+Scripts and injected faults show you what one call does. To find out what your policy costs a dependency over five simulated minutes of a brownout - the load multiplier, the availability, the p99 - see [Simulation](simulation.md). It runs your real policy against a modeled dependency on a virtual clock and reports numbers you can assert on.

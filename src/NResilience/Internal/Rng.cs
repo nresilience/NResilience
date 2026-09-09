@@ -14,6 +14,27 @@ internal static class Rng
 
     [ThreadStatic] private static bool t_seeded;
 
+    /// <summary>
+    ///     Pins this thread's stream to a seed, so a run that draws jitter is repeatable. Used by the
+    ///     simulator in <c>NResilience.Testing</c>, which drives the whole run on one thread and needs
+    ///     the same seed to produce the same report.
+    /// </summary>
+    /// <param name="seed">The seed.</param>
+    internal static void SeedWith(uint seed)
+    {
+        var x = seed ^ 0x9E3779B97F4A7C15UL;
+
+        t_s0 = SplitMix(ref x);
+        t_s1 = SplitMix(ref x);
+        t_s2 = SplitMix(ref x);
+        t_s3 = SplitMix(ref x);
+
+        if ((t_s0 | t_s1 | t_s2 | t_s3) == 0)
+            t_s0 = 1;
+
+        t_seeded = true;
+    }
+
     /// <summary>A uniform double in [0, 1).</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static double NextDouble() => (NextUInt32() >> 8) * (1.0 / (1u << 24));
@@ -51,14 +72,14 @@ internal static class Rng
             t_s0 = 1;
 
         t_seeded = true;
+    }
 
-        static uint SplitMix(ref ulong state)
-        {
-            state += 0x9E3779B97F4A7C15UL;
-            var z = state;
-            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
-            z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
-            return (uint)((z ^ (z >> 31)) >> 32);
-        }
+    private static uint SplitMix(ref ulong state)
+    {
+        state += 0x9E3779B97F4A7C15UL;
+        var z = state;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
+        return (uint)((z ^ (z >> 31)) >> 32);
     }
 }

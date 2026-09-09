@@ -112,6 +112,9 @@ A free rejection inside a polling loop becomes a CPU spin, turning a load-sheddi
 ### Why is telemetry off for hand-built policies but on for registered ones?
 `OnEvent = null` keeps telemetry free when unused. Policies registered through DI are typically production policies, so the registration attaches a listener automatically. Disable it with `telemetry: false` or `ResilienceOptions.Telemetry = false`. Logging works the same way for the same reason: a registered policy logs, a hand-built one opts in with `WithLogging`, and `ResilienceOptions.Logging = "Off"` turns it off. See [Logging](features/logging.md).
 
+### How do I know my configuration is safe before it meets a real incident?
+Simulate it. `Simulate.Policy(api).Against(dependency).Under(load).For(time).Run(seed)` runs your real policy against a modeled brownout on a virtual clock and reports the load multiplier, the availability, and the p99 it produces. See [Simulation](testing/simulation.md).
+
 ## Compatibility and performance
 
 ### Is it AOT and trimming safe?
