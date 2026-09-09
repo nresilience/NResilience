@@ -43,6 +43,7 @@ Registration methods live in the `NResilience.Extensions` package as extension m
 | [`Limit`](#limit-and-acquireorthrowasync), [`AdaptiveLimitOptions`](#adaptivelimitoptions), [`AdaptiveLimiter`](#adaptivelimiter) | Building a limiter, including the adaptive one. |
 | [`AddResilience` on `IHealthChecksBuilder`](#addresilience-on-ihealthchecksbuilder) and [`ResilienceHealthOptions`](#resiliencehealthoptions) | Health reporting. |
 | [`ResilienceTelemetry`](#resiliencetelemetry), [`ResilienceLogging`](#resiliencelogging), [`ResilienceLoggingOptions`](#resilienceloggingoptions) | Metrics and logs. |
+| [`ResilienceDrainOptions`](#resiliencedrainoptions) | Whether shutdown stops retrying, and the grace period. |
 
 **ASP.NET Core middleware**
 
@@ -64,6 +65,7 @@ Register resilience policies in the DI container with these methods.
 | `AddResilience(IConfiguration section)` | Registers every child of the configuration section as a policy, using the keys as names. |
 | `AddResilience()` | Registers the `IResiliencePolicies` service without any initial policies. |
 | `AddResilienceLogging(Action<ResilienceLoggingOptions>? configure = null)` | Sets the process-wide log listener settings. A registered policy already logs, so this does not turn logging on. |
+| `AddResilienceDraining(Action<ResilienceDrainOptions>? configure = null)` | Sets the process-wide drain settings. A registered policy already drains, so this does not turn draining on. |
 
 The optional `configure` parameter is a `Func<Resilience, Resilience>` that runs last, after the configuration section is processed and live objects are re-attached.
 
@@ -409,6 +411,15 @@ The `ResilienceLogging` static class holds the log listener and category derivat
 | `WithLogging(this Resilience policy, ILoggerFactory loggerFactory, ResilienceLoggingOptions? options = null)` | The same, but creates the logger under the policy's own category. |
 
 At most one log listener attaches per policy; the first one attached wins.
+
+## `ResilienceDrainOptions`
+
+| Member | Default | Description |
+| :--- | :--- | :--- |
+| `DrainOnShutdown` | `true` | Whether `IHostApplicationLifetime.ApplicationStopping` latches `Draining`, so no call starts another attempt. |
+| `Grace` | 30 seconds | The grace period every deadline is clamped to once draining begins. `Timeout.InfiniteTimeSpan` drains without clamping anything. |
+
+`Grace` defaults to the same 30 seconds `HostOptions.ShutdownTimeout` defaults to, but the two are not read from one place. Set `Grace` to match if you changed the host's timeout. See [Drain-aware shutdown](../features/draining.md).
 
 ## `ResilienceLoggingOptions`
 

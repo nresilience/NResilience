@@ -35,9 +35,10 @@ public enum StopReason : byte
     ///     This process is shutting down, so the call stopped with the failure it has rather than
     ///     starting another attempt.
     ///     <para>
-    ///         Declared for drain-aware shutdown, which nothing performs, and paired with
-    ///         <see cref="CallEventKind.Draining" /> - see that member for why a reason is declared
-    ///         ahead of the behavior that sets it.
+    ///         The failure reported is the one the last attempt produced, not a refusal of the library's
+    ///         own: no guard turned the call away, so unlike <see cref="BudgetExhausted" /> and
+    ///         <see cref="DependencyUnavailable" /> this does not produce a
+    ///         <see cref="CallRejectedException" /> around it. See <see cref="NResilience.Draining" />.
     ///     </para>
     /// </summary>
     Draining,

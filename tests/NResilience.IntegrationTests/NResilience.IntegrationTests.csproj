@@ -43,6 +43,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="xunit.runner.json" CopyToOutputDirectory="PreserveNewest"/>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../src/NResilience/NResilience.csproj"/>
     <ProjectReference Include="../../src/NResilience.AspNetCore/NResilience.AspNetCore.csproj"/>
     <ProjectReference Include="../../src/NResilience.Extensions/NResilience.Extensions.csproj"/>

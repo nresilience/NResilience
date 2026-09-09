@@ -56,7 +56,7 @@ The `StopReason` enum, carried on `Reason`, says why the resilience loop stopped
 | `DeadlineExceeded` | The overall wall-clock budget for the call expired. |
 | `BudgetExhausted` | The retry budget refused to fund another attempt. |
 | `DependencyUnavailable` | A circuit breaker refused to execute the call. |
-| `Draining` | The process is shutting down, so the call stopped with the failure it had rather than starting another attempt. Declared for drain-aware shutdown; nothing sets it - see [the event reference](events.md#event-invariants-and-behavior). |
+| `Draining` | The process is shutting down, so the call stopped with the failure it had rather than starting another attempt. The failure is the dependency's own, not a `CallRejectedException` - see [Drain-aware shutdown](../features/draining.md). |
 
 ## `AttemptLog`
 

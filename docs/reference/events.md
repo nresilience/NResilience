@@ -71,7 +71,7 @@ The `CallEventKind` enum defines the event types raised during a call.
 - **Published quota**: `RejectedByQuota` fires when the allowance the dependency publishes is spent and the HTTP handler refused an attempt without sending it, and carries the time until the published window resets on `Delay` - which is also the pushback the retry honors. The call still ends with `Succeeded`, `Exhausted` or `DeadlineExceeded`. `Duration` is zero, because the handler does not hold the call's start. Raised only by the HTTP handler. See [the published quota](../http/index.md#honor-the-allowance-the-dependency-publishes).
 - **Breaker transitions**: Breaker state transitions are raised on the call that triggered the transition, outside the breaker's internal lock.
 - **Checkpointed resume**: `StreamResumed` fires when a stream that failed part-way through was restarted from the caller's last checkpoint, and when an HTTP body that stalled while the caller was reading it resumed with a `Range` request. `AttemptNumber` is the restart, counting from one - not the underlying attempt count, which each restart's own retry sequence resets. See [Checkpointed resume](../features/streaming.md#checkpointed-resume) and [resuming a stalled download](http.md#resuming-a-stalled-download).
-- **Declared members with no behavior**: `Draining`, and the `Draining` stop reason, describe drain-aware shutdown. No execution path raises it: the library reads no host lifetime. It is declared because the numbering of these enums is a contract for any listener that persists or exports a value, and a member added later renumbers everything after it. A `switch` over the kinds handles it the way it handles a kind it does not recognize.
+- **Draining**: `Draining` fires when a call stops because the process is shutting down, and carries `StopReason.Draining`. It replaces the retry the call would otherwise have made, so it is terminal, and the failure reported is the dependency's own rather than a refusal of the library's. `Duration` is how long the call ran, and `Delay` is null, because nothing is going to wait. A hedge is not armed while draining either, and raises nothing. See [Drain-aware shutdown](../features/draining.md).
 
 ## Listener contract
 
@@ -124,7 +124,7 @@ Every record is written every time unless you opt into [sampling](../features/lo
 | 1031 | `StreamResumed` | `Debug` | `Information` | `{Policy} resumed a stream on attempt {Attempt} from the caller's last checkpoint` |
 | 1032 | `Draining` | `Debug` | `Information` | `{Policy} stopped after attempt {Attempt} in {ElapsedMs} ms without retrying: this process is draining, and failed with {ErrorType}` |
 
-ID 1032 belongs to the declared event kind nothing raises, and is reserved beside it for the reason the member is: an ID is a contract the moment an alert is built on it.
+Event 1032 is written once per drained call, so its rate during a rollout is a count of calls the shutdown cut short.
 
 Field names are shared with the metric tag vocabulary wherever both exist (`Policy`, `Verdict`, `Reason`), so a structured record and a metric describe the same call with the same words.
 

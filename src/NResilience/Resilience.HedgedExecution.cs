@@ -77,7 +77,7 @@ public sealed partial record Resilience
 
         // The effective deadline, resolved once per call. See the sequential loop for why the ambient
         // read happens here and not per attempt; the local functions below close over it.
-        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
+        var deadline = Draining.Clamp(UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline);
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
 
@@ -445,7 +445,11 @@ public sealed partial record Resilience
             // when nobody is waiting for the answer. Refused here rather than at the firing point, so
             // no timer is armed at all, and silently for the reason an open breaker is silent -
             // HedgeSuppressed reports a judgment about hedging, and this is a bound on the call.
-            if (sheddable)
+            //
+            // A draining process is the same argument at the other end: a second copy of a request
+            // whose answer this process will not be here to read. Decide stops the retry; this stops
+            // the hedge, and the two together are what "no new attempt starts" means.
+            if (sheddable || Draining.IsDraining)
                 return null;
 
             // Half-open counts as not closed: those attempts are probes, and a probe that is raced is not

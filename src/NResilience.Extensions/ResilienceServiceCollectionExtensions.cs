@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using NResilience;
@@ -197,9 +198,45 @@ public static class ResilienceServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    ///     Sets the process-wide drain settings: whether shutdown stops retrying, and the grace period
+    ///     deadlines are clamped to.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="configure">Sets the settings.</param>
+    /// <returns>The service collection.</returns>
+    /// <example>
+    ///     <code>
+    /// services.AddResilienceDraining(o => o.Grace = TimeSpan.FromSeconds(20));
+    /// </code>
+    /// </example>
+    /// <remarks>
+    ///     This does not enable draining: a policy registered in a container drains by default, the way
+    ///     it logs by default. This method is where that is tuned or turned off, and it is on
+    ///     <c>services</c> so IntelliSense offers it beside <c>AddResilience</c>.
+    /// </remarks>
+    public static IServiceCollection AddResilienceDraining(
+        this IServiceCollection services,
+        Action<ResilienceDrainOptions>? configure = null)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        Register(services, null);
+
+        if (configure is not null)
+            services.Configure(configure);
+
+        return services;
+    }
+
     private static void Register(IServiceCollection services, string? name)
     {
         services.AddOptions();
+
+        // Drain-aware shutdown, on by default for every registered policy. A hosted service and
+        // nothing else, so a container built without a host - the shape most of the test suite uses -
+        // never resolves it and never subscribes to anything. See DrainSubscription.
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, DrainSubscription>());
 
         // A factory rather than a constructor-injected registration, because both logging services
         // are optional: GetService, not GetRequiredService, so a container with no logging at all

@@ -183,6 +183,12 @@ NResilience.Extensions.RecoveryOptions.MaximumDuration.set -> void
 NResilience.Extensions.RecoveryOptions.MinimumDuration.get -> System.TimeSpan?
 NResilience.Extensions.RecoveryOptions.MinimumDuration.set -> void
 NResilience.Extensions.RecoveryOptions.RecoveryOptions() -> void
+NResilience.Extensions.ResilienceDrainOptions
+NResilience.Extensions.ResilienceDrainOptions.DrainOnShutdown.get -> bool
+NResilience.Extensions.ResilienceDrainOptions.DrainOnShutdown.set -> void
+NResilience.Extensions.ResilienceDrainOptions.Grace.get -> System.TimeSpan
+NResilience.Extensions.ResilienceDrainOptions.Grace.set -> void
+NResilience.Extensions.ResilienceDrainOptions.ResilienceDrainOptions() -> void
 NResilience.Extensions.ResilienceHealthOptions
 NResilience.Extensions.ResilienceHealthOptions.BreakerOpenStatus.get -> Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus
 NResilience.Extensions.ResilienceHealthOptions.BreakerOpenStatus.set -> void
@@ -304,6 +310,7 @@ static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExten
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, Microsoft.Extensions.Configuration.IConfiguration! section, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, NResilience.Resilience! policy, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilience(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, string! name, System.Action<NResilience.Extensions.ResilienceOptions!>! configureOptions, System.Func<NResilience.Resilience!, NResilience.Resilience!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
+static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilienceDraining(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<NResilience.Extensions.ResilienceDrainOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.ResilienceServiceCollectionExtensions.AddResilienceLogging(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<NResilience.Extensions.ResilienceLoggingOptions!>? configure = null) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static NResilience.Extensions.Limit.Adaptive(int? initial = null, int? maximum = null, NResilience.Extensions.AdaptiveLimitOptions? options = null, int queueLimit = 0, string? name = null, System.TimeProvider? time = null) -> NResilience.Extensions.AdaptiveLimiter!
 static NResilience.Extensions.Limit.Concurrency(int permits, int queueLimit = 0) -> System.Threading.RateLimiting.RateLimiter!

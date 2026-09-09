@@ -1,0 +1,5 @@
+{
+  "$schema": "https://xunit.net/schema/current/xunit.runner.schema.json",
+  "//": "Draining is a process-wide latch, so DrainingTests cannot run beside a test that retries. This suite is 80 IO-bound tests; serializing them is the cheapest way to keep that promise.",
+  "parallelizeTestCollections": false
+}

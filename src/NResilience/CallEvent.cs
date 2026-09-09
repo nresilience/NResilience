@@ -240,18 +240,12 @@ public enum CallEventKind : byte
     /// <summary>
     ///     A stream that failed part-way through was restarted from the caller's last checkpoint, so
     ///     the elements already delivered are not delivered again.
-    ///     <see cref="CallEvent.AttemptNumber" /> is the attempt the restart begins.
+    ///     <see cref="CallEvent.AttemptNumber" /> is the restart, counting from one.
     ///     <para>
-    ///         Declared for checkpointed stream resume, which no execution path performs: a retry over
-    ///         an <see cref="IAsyncEnumerable{T}" /> stops at the first element, because only the
-    ///         caller knows where a stream picks up. See
-    ///         <see href="https://docs.nresilience.net/faq#can-i-retry-a-stream">the FAQ</see>.
-    ///     </para>
-    ///     <para>
-    ///         The member is declared without the behavior because this enum is a value a listener
-    ///         persists and exports, so its numbering is a contract from the first release that has
-    ///         it. Adding the member and the behavior in separate releases costs a reader one member
-    ///         that never fires; adding them together renumbers everything after it.
+    ///         Raised by the <c>RunAsync</c> and <c>TryRunAsync</c> overloads that take a checkpoint,
+    ///         and by the HTTP handler when a stalled response body resumes with a <c>Range</c>
+    ///         request. A retry over a plain <see cref="IAsyncEnumerable{T}" /> still stops at the
+    ///         first element, because only the caller knows where a stream picks up.
     ///     </para>
     /// </summary>
     StreamResumed,
@@ -260,12 +254,10 @@ public enum CallEventKind : byte
     ///     This process is shutting down, so the call stopped with the failure it has rather than
     ///     starting another attempt. Terminal, and carries <see cref="StopReason.Draining" />.
     ///     <para>
-    ///         Declared for drain-aware shutdown, which nothing performs: the library reads no host
-    ///         lifetime, so a call retrying when a pod's grace period starts runs to its own bounds
-    ///         and holds the connection for as long as they allow.
-    ///     </para>
-    ///     <para>
-    ///         Declared without the behavior for the reason <see cref="StreamResumed" /> is.
+    ///         Raised once <see cref="NResilience.Draining.Begin()" /> has been called - by
+    ///         <c>AddResilience</c> from <c>IHostApplicationLifetime.ApplicationStopping</c>, or by the
+    ///         process itself. The attempt that was already running is left alone; only the next one is
+    ///         refused.
     ///     </para>
     /// </summary>
     Draining,

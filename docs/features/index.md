@@ -25,6 +25,7 @@ The table below summarizes each feature and its default setting.
 | Checkpointed stream resume | Opt-in, through the overloads taking a checkpoint; three restarts by default | [Checkpointed resume](streaming.md#checkpointed-resume) |
 | Deadline propagation | Disabled (opt-in on both halves) | [Deadlines](deadlines.md#propagate-the-deadline-across-a-hop) |
 | Criticality | Disabled (opt-in on both halves) | [Criticality](criticality.md) |
+| Drain-aware shutdown | Enabled for registered policies; a hand-built policy latches it itself | [Drain-aware shutdown](draining.md) |
 | Telemetry | Enabled for registered policies; disabled for hand-built policies | [Telemetry](telemetry.md) |
 | Logging | Enabled for registered policies; opt-in for hand-built policies | [Logging](logging.md) |
 

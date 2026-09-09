@@ -287,7 +287,7 @@ public sealed partial record Resilience
         where TStarter : struct, IStreamStarter<TState, T>
     {
         // The effective deadline, resolved once, for the same reasons as the call paths.
-        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
+        var deadline = Draining.Clamp(UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline);
 
         // The budget this call charges, resolved once, likewise.
         var budget = ExecutionState.BudgetFor(this);
@@ -816,7 +816,7 @@ public sealed partial record Resilience
         // Resolved once, the way the call paths resolve it: a restart's own Deadline is a clamp of
         // what this one has left, never a fresh window, so the bound applies to the whole checkpointed
         // operation rather than to each restart independently.
-        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
+        var deadline = Draining.Clamp(UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline);
         var callStart = Time.GetTimestamp();
         var current = start;
         var restarts = 0;

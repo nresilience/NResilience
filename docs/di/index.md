@@ -101,8 +101,15 @@ Budgets and breakers are pinned to the registration name rather than the policy 
 
 An `HttpClient` observes a reloaded policy at the next handler rotation. `IHttpClientFactory` rebuilds handler chains every two minutes by default. Handlers hold per-host state, so rebuilding them on every request for instant reloads would throw that state away.
 
+## Stop retrying when the host shuts down
+
+Registration also subscribes to `IHostApplicationLifetime.ApplicationStopping`. From that moment no call starts another attempt, and every deadline clamps to what is left of the grace period - so a rolling deploy is not held open by retries the load balancer has already stopped routing to.
+
+It needs no configuration. `AddResilienceDraining` is where the grace period is tuned or the subscription turned off. See [Drain-aware shutdown](../features/draining.md) for the grace period's relationship to `HostOptions.ShutdownTimeout`.
+
 ## Next steps
 
 - [Configuration](configuration.md): The bindable configuration shape, and what JSON cannot express.
 - [Telemetry](telemetry.md): Which metrics are on by default, and how to manage them.
 - [Logging](logging.md): What a registered policy writes through `ILogger`, and how to filter it per policy. For profiles and levels, see [Logging](../features/logging.md).
+- [Drain-aware shutdown](../features/draining.md): What a registered policy does when the host stops.

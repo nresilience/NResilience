@@ -220,6 +220,7 @@ NResilience.DeadlineExceededException.DeadlineExceededException(System.TimeSpan 
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message) -> void
 NResilience.DeadlineExceededException.DeadlineExceededException(string! message, System.Exception! innerException) -> void
 NResilience.DeadlineExceededException.Reason.get -> NResilience.StopReason
+NResilience.Draining
 NResilience.Failures
 NResilience.Failures.Equals(NResilience.Failures other) -> bool
 NResilience.Failures.Failures() -> void
@@ -549,6 +550,10 @@ static NResilience.Classifier.Data.get -> NResilience.Classifier!
 static NResilience.Classifier.Default.get -> NResilience.Classifier!
 static NResilience.Classifier.Http.get -> NResilience.Classifier!
 static NResilience.Classifier.RetryEverything.get -> NResilience.Classifier!
+static NResilience.Draining.Begin() -> void
+static NResilience.Draining.Begin(System.TimeSpan grace, System.TimeProvider? time = null) -> void
+static NResilience.Draining.IsDraining.get -> bool
+static NResilience.Draining.Remaining.get -> System.TimeSpan?
 static NResilience.Failures.Above(double multiple = 5) -> NResilience.Failures
 static NResilience.Failures.operator !=(NResilience.Failures left, NResilience.Failures right) -> bool
 static NResilience.Failures.operator ==(NResilience.Failures left, NResilience.Failures right) -> bool

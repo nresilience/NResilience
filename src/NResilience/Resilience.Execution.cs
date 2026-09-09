@@ -316,11 +316,12 @@ public sealed partial record Resilience
         // on every suspending call to save a field load that the JIT keeps in a register anyway.
         // `this` is already a field of the box, so reading a property off it is free.
         // The effective deadline: the policy's own, or the tighter of it and the one this call
-        // inherited from its caller. Resolved once here rather than per attempt, because an inbound
-        // deadline is a fixed point in time and re-reading the AsyncLocal it lives in would charge
-        // every attempt for a value that cannot have changed. Costs 8 bytes of state-machine box on
-        // the suspending path for every caller, set or not; see Budgets.AmbientDeadlineDelta.
-        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
+        // inherited from its caller, and tighter again while this process is draining. Resolved once
+        // here rather than per attempt, because an inbound deadline is a fixed point in time and
+        // re-reading the AsyncLocal it lives in would charge every attempt for a value that cannot
+        // have changed. Costs 8 bytes of state-machine box on the suspending path for every caller,
+        // set or not; see Budgets.AmbientDeadlineDelta.
+        var deadline = Draining.Clamp(UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline);
         TShaper shaper = default;
 
         // The one local the breaker and budget add to the box, at 8 bytes: either the policy's own
@@ -598,11 +599,12 @@ public sealed partial record Resilience
         var admit = Admit!;
 
         // The effective deadline: the policy's own, or the tighter of it and the one this call
-        // inherited from its caller. Resolved once here rather than per attempt, because an inbound
-        // deadline is a fixed point in time and re-reading the AsyncLocal it lives in would charge
-        // every attempt for a value that cannot have changed. Costs 8 bytes of state-machine box on
-        // the suspending path for every caller, set or not; see Budgets.AmbientDeadlineDelta.
-        var deadline = UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline;
+        // inherited from its caller, and tighter again while this process is draining. Resolved once
+        // here rather than per attempt, because an inbound deadline is a fixed point in time and
+        // re-reading the AsyncLocal it lives in would charge every attempt for a value that cannot
+        // have changed. Costs 8 bytes of state-machine box on the suspending path for every caller,
+        // set or not; see Budgets.AmbientDeadlineDelta.
+        var deadline = Draining.Clamp(UseAmbientDeadline ? AmbientDeadline.Clamp(Deadline) : Deadline);
         TShaper shaper = default;
         var budget = ExecutionState.BudgetFor(this);
 
@@ -1115,6 +1117,26 @@ public sealed partial record Resilience
         {
             reason = StopReason.DeadlineExceeded;
             NotifyDeadline(attempts, verdict, Time.GetElapsedTime(start, now), error);
+            return NextStep.Stop;
+        }
+
+        // The process is going away, so nothing is going to read the answer. Checked here, ahead of
+        // the budget, because a retry nobody will wait for should not spend a token that funds one
+        // somebody will - and because draining is the more useful of the two things to be told. The
+        // call stops with the failure it has rather than with a refusal of its own: no guard turned
+        // this attempt away, the process simply stopped asking for another.
+        //
+        // One volatile read of one static field, on the retry path only. See Draining.
+        if (Draining.IsDraining)
+        {
+            reason = StopReason.Draining;
+
+            if (OnEvent is not null)
+            {
+                Notify(CallEventKind.Draining, attempts, verdict, Time.GetElapsedTime(start, now), null, error, ResultOf(value, hasValue),
+                    StopReason.Draining);
+            }
+
             return NextStep.Stop;
         }
 
