@@ -349,5 +349,5 @@ public sealed record LoopbackResponse(
 
     /// <summary>Convenience: a response with a <c>Retry-After</c> header, in seconds.</summary>
     public static LoopbackResponse WithRetryAfter(HttpStatusCode statusCode, int seconds, byte[]? body = null) =>
-        new(statusCode, body, default, new Dictionary<string, string> { ["Retry-After"] = seconds.ToString() });
+        new(statusCode, body, TimeSpan.Zero, new Dictionary<string, string> { ["Retry-After"] = seconds.ToString() });
 }

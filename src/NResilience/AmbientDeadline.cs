@@ -23,7 +23,7 @@ namespace NResilience;
 ///     <code>
 /// // Inbound: the deadline a caller sent us, for the length of this request.
 /// using var scope = AmbientDeadline.Begin(TimeSpan.FromMilliseconds(200));
-/// 
+///
 /// // Anything running inside the scope with UseAmbientDeadline set is bounded by whichever of the
 /// // two deadlines is tighter.
 /// var policy = Resilience.Default with { UseAmbientDeadline = true };
@@ -88,7 +88,7 @@ public static class AmbientDeadline
     /// </remarks>
     public static bool TryParse(string? value, out TimeSpan remaining)
     {
-        remaining = default;
+        remaining = TimeSpan.Zero;
 
         if (string.IsNullOrEmpty(value))
             return false;

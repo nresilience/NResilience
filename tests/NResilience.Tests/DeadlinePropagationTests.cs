@@ -89,7 +89,7 @@ public sealed class DeadlinePropagationTests
     public void Anything_else_is_no_deadline_at_all(string? value)
     {
         Assert.False(AmbientDeadline.TryParse(value, out var remaining));
-        Assert.Equal(default, remaining);
+        Assert.Equal(TimeSpan.Zero, remaining);
     }
 
     [Fact]

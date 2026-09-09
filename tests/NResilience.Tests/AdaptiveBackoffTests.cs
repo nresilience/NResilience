@@ -229,7 +229,7 @@ public sealed class AdaptiveBackoffTests
     {
         var backoff = Backoff.Measured(1.0, Configured) with { Jitter = Jitter.None };
 
-        Assert.Equal(Configured, backoff.Compute(new NextAttempt(2, Verdict.Transient, null, Timeout.InfiniteTimeSpan, default)));
+        Assert.Equal(Configured, backoff.Compute(new NextAttempt(2, Verdict.Transient, null, Timeout.InfiniteTimeSpan, CancellationToken.None)));
     }
 
     // ---- Self-correction ----
@@ -415,7 +415,7 @@ public sealed class AdaptiveBackoffTests
         Assert.Throws<ResilienceConfigurationException>(policy.Validate).Problems;
 
     private static TimeSpan Delay(Backoff backoff, Verdict previous, int attemptNumber, TimeSpan normal) =>
-        backoff.Compute(new NextAttempt(attemptNumber, previous, null, Timeout.InfiniteTimeSpan, default), normal);
+        backoff.Compute(new NextAttempt(attemptNumber, previous, null, Timeout.InfiniteTimeSpan, CancellationToken.None), normal);
 
     /// <summary>
     ///     Records <paramref name="times" /> samples of <paramref name="duration" /> into the policy's

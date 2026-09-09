@@ -505,7 +505,7 @@ public sealed partial record Resilience
             }
 
             leg.Source = cancellationToken.CanBeCanceled
-                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, leg.Timer?.Token ?? default)
+                ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, leg.Timer?.Token ?? CancellationToken.None)
                 : leg.Timer is { } own
                     ? CancellationTokenSource.CreateLinkedTokenSource(own.Token)
                     : new CancellationTokenSource();

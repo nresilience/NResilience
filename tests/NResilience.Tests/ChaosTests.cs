@@ -56,7 +56,7 @@ public sealed class ChaosTests
     public void The_default_fault_is_one_the_shipped_classifiers_retry()
     {
         var chaos = new Chaos { Enabled = true, FaultRate = 1 };
-        var thrown = Assert.Throws<IOException>(() => chaos.Inject(static _ => Task.FromResult(1))(default).GetAwaiter().GetResult());
+        var thrown = Assert.Throws<IOException>(() => chaos.Inject(static _ => Task.FromResult(1))(CancellationToken.None).GetAwaiter().GetResult());
 
         Assert.Equal(VerdictKind.Transient, Classifier.Default.ClassifyException(thrown).Kind);
         Assert.Equal(VerdictKind.Transient, Classifier.Http.ClassifyException(thrown).Kind);

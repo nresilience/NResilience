@@ -13,7 +13,7 @@ internal static class TimeSpanValue
 {
     internal static bool TryEvaluate(IOperation operation, KnownSymbols known, out TimeSpan value)
     {
-        value = default;
+        value = TimeSpan.Zero;
 
         if (operation is IConversionOperation conversion)
             return TryEvaluate(conversion.Operand, known, out value);
@@ -41,7 +41,7 @@ internal static class TimeSpanValue
 
     private static bool TryWellKnownField(IFieldReferenceOperation field, KnownSymbols known, out TimeSpan value)
     {
-        value = default;
+        value = TimeSpan.Zero;
         ITypeSymbol? owner = field.Field.ContainingType;
 
         if (SymbolEqualityComparer.Default.Equals(owner, known.Timeout) && field.Field.Name == "InfiniteTimeSpan")
@@ -71,7 +71,7 @@ internal static class TimeSpanValue
 
     private static bool TryFactory(IInvocationOperation invocation, KnownSymbols known, out TimeSpan value)
     {
-        value = default;
+        value = TimeSpan.Zero;
 
         if (!SymbolEqualityComparer.Default.Equals(invocation.TargetMethod.ContainingType, known.TimeSpan)
             || invocation.Arguments.Length != 1
@@ -114,7 +114,7 @@ internal static class TimeSpanValue
 
     private static bool TryConstructor(IObjectCreationOperation creation, KnownSymbols known, out TimeSpan value)
     {
-        value = default;
+        value = TimeSpan.Zero;
 
         if (!SymbolEqualityComparer.Default.Equals(creation.Type, known.TimeSpan))
             return false;

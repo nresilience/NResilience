@@ -129,7 +129,9 @@ internal struct AttemptBuffer
 /// </summary>
 internal struct AttemptSink
 {
+#pragma warning disable CS0649 // Field is never assigned to, and will always have its default value
     private AttemptBuffer _inline;
+#pragma warning restore CS0649
     private AttemptRecord[]? _spill;
     private Exception?[]? _exceptions;
 

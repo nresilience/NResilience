@@ -1165,5 +1165,5 @@ public sealed class ResilienceOptionsTests
     }
 
     private static TimeSpan Delay(Resilience policy, int attemptNumber) =>
-        policy.Backoff.Compute(new NextAttempt(attemptNumber, Verdict.Transient, null, Timeout.InfiniteTimeSpan, default));
+        policy.Backoff.Compute(new NextAttempt(attemptNumber, Verdict.Transient, null, Timeout.InfiniteTimeSpan, CancellationToken.None));
 }

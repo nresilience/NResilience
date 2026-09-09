@@ -351,5 +351,5 @@ public sealed class BackoffTests
     }
 
     private static TimeSpan Delay(Backoff backoff, Verdict previous, int attemptNumber) =>
-        backoff.Compute(new NextAttempt(attemptNumber, previous, null, Timeout.InfiniteTimeSpan, default));
+        backoff.Compute(new NextAttempt(attemptNumber, previous, null, Timeout.InfiniteTimeSpan, CancellationToken.None));
 }
