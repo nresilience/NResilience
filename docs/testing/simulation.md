@@ -115,6 +115,55 @@ Assert.True(condition: report.Amplification > report.LoadMultiplier);
 > [!IMPORTANT]
 > Peers are a term in the dependency's arithmetic and nothing more. Their offered load counts against `Capacity`; their own retries, breakers, and budgets are not simulated. That is enough to answer "does my retry budget hold when I am one of fifty" and not enough to claim fifty policies were simulated.
 
+## Model the thread pool
+
+Every estimator in the library times the callback with a wall clock and attributes all of it to the dependency. When the local thread pool is the bottleneck that attribution is wrong: a queue delay of 400 ms reads, from inside the executor, exactly like a dependency that got 400 ms slower. [`Saturation`](../features/saturation.md) is the switch that tells the two apart, and `WithPool` is how a run gets a pool for it to measure.
+
+`Pool.Healthy(delay)` is the baseline every stall is judged against - `Saturation.Above(5)` is relative, so it is not enough for a stall to be deep, it has to be deep relative to what this process normally does. `Stall` is a stretch during which work items wait far longer than that:
+
+<!-- snippet: simulation-pool -->
+```csharp
+var api = Resilience.Http with
+{
+    Deadline = TimeSpan.FromSeconds(value: 10),
+    AttemptCeiling = AttemptCeiling.Above(multiple: 3),
+    Saturation = Saturation.Above(multiple: 5),
+    Name = "api",
+};
+
+// A healthy pool queues for tens of microseconds. This one stops keeping up half a minute in:
+// work items wait 400 ms for a thread, and every call looks 400 ms slower from inside the
+// executor while the dependency is fine.
+var pool = Pool
+    .Healthy(delay: TimeSpan.FromMicroseconds(value: 80))
+    .Stall(after: TimeSpan.FromSeconds(value: 30), delay: TimeSpan.FromMilliseconds(value: 400),
+        lasting: TimeSpan.FromSeconds(value: 20));
+
+var report = Simulate.Policy(policy: api)
+    .Against(dependency: Dependency
+        .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200)))
+    .Under(load: Load.Constant(perSecond: 200))
+    .WithPool(pool: pool)
+    .For(duration: TimeSpan.FromMinutes(value: 2))
+    .Run(seed: 42);
+
+// One event for one episode, raised at its onset - so this is a count of local incidents.
+Assert.Equal(expected: 1, actual: report.CountOf(kind: CallEventKind.SaturationDetected));
+```
+<!-- endsnippet -->
+
+The modeled delay is spent inside the call, not just reported to the probe. That is the point: a stall lengthens every attempt, so it reaches the availability, the latency quantiles, and the load multiplier the same way a slow dependency does - which is exactly why the two are hard to tell apart, and why a simulation that only counted events would flatter the feature.
+
+A pool is a property of the run, not of the policy, so `WithPool` is accepted on a policy with no `Saturation` at all. That is the comparison worth running: the same pool and the same seed against a policy that can tell a stalled pool from a slow dependency and one that cannot. Refusing it would leave only "stalled" against "not stalled", which measures the stall rather than the setting.
+
+> [!IMPORTANT]
+> The simulator reproduces the probe's two blind spots rather than smoothing them over, because both change what your policy would actually do:
+>
+> - **A cold baseline is never saturated.** Probes are queued four times a second, so `Saturation.MinimumSamples` of 20 is five seconds during which no stall registers however deep it is.
+> - **A long stall stops being detected partway through.** The baseline is a rolling median over the last minute, so a stall that comes to cover more than half of it *becomes* the median. The onset is reported and then the episode goes quiet while the queue is still deep - which is why a count of `SaturationDetected` is a count of onsets rather than of minutes.
+
+Leaving `WithPool` off does not fall back to the real thread pool. A policy that configures `Saturation` then reads a modeled pool that never queues and so is never saturated, which keeps a report reproducible to the last byte on a machine whose own pool happens to be busy.
+
 ## Compare two configurations
 
 The seed fixes the run, so two simulations that differ in one setting differ only because of that setting. This is how a configuration argument becomes a number:
@@ -148,7 +197,7 @@ Assert.True(condition: budgeted.CountOf(kind: CallEventKind.RejectedByBudget) > 
 
 ## What is fake, and what is not
 
-Three things are fake: the clock, the random source, and the dependency. The policy is yours, and the executor, the breaker, the retry budget, the classifier, and every estimator are the shipping ones - nothing about the decision logic is re-implemented for the simulator. A simulator that modeled the library would be worse than no simulator.
+Four things are fake: the clock, the random source, the dependency, and - when you ask for one - this process's own thread pool. The policy is yours, and the executor, the breaker, the retry budget, the classifier, and every estimator are the shipping ones - nothing about the decision logic is re-implemented for the simulator. A simulator that modeled the library would be worse than no simulator.
 
 The report is reproducible to the last byte: `Run(seed)` twice with the same seed and `ToString()` returns the same string, on any operating system and any processor, because the simulator's own arithmetic uses only operations IEEE-754 specifies exactly. Assert on that in your own suite if you like - a run that stops reproducing means something on the path is reading a clock or a random source it does not own.
 
@@ -157,7 +206,7 @@ The report is reproducible to the last byte: `Run(seed)` twice with the same see
 Three, and each is a property of the design rather than a gap to fill:
 
 - **One process.** The simulator cannot model fifty pods making their own decisions. `peers` scales the load without simulating the peers, which is an approximation and says so.
-- **[Saturation](../features/saturation.md) reads nothing.** The thread pool it measures is the real one, and the real one is idle while a simulation runs.
+- **The pool is a model, and a coarser one than the dependency.** [`Pool`](#model-the-thread-pool) supplies the queue delay rather than measuring it, and spends it once per attempt where a real deep queue is paid again at every resumption - so the direction of the error is to understate a stall. A process that is *always* starved has no episode to find, in the simulator and in production alike.
 - **The dependency is a model.** Latency, capacity, and impairment are the three dimensions it has. A dependency whose failure mode is none of those is one the simulator cannot show you.
 
 ## Go deeper

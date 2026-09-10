@@ -119,3 +119,4 @@ That is the same shape as the [adaptive limiter](rate-limiting.md#let-it-find-it
 - [Deadlines and attempt timeouts](deadlines.md#measure-the-attempt-ceiling-instead-of-guessing-it) - the reader whose contamination is easiest to see.
 - [`Resilience` reference](../reference/resilience.md) - the `Saturation` property and the `Measured` readings.
 - [Events](../reference/events.md) - `SaturationDetected` and what it carries.
+- [Simulation](../testing/simulation.md#model-the-thread-pool) - `Pool` models a stalled thread pool on a virtual clock, so what this switch does to your availability and p99 is a number rather than an argument.

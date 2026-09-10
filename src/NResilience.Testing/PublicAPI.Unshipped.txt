@@ -58,6 +58,13 @@ NResilience.Testing.Load.Peers.get -> int
 NResilience.Testing.Load.PerSecond.get -> int
 NResilience.Testing.Load.Validate() -> void
 NResilience.Testing.Load.Validated() -> NResilience.Testing.Load!
+NResilience.Testing.Pool
+NResilience.Testing.Pool.<Clone>$() -> NResilience.Testing.Pool!
+NResilience.Testing.Pool.Delay.get -> System.TimeSpan
+NResilience.Testing.Pool.Equals(NResilience.Testing.Pool? other) -> bool
+NResilience.Testing.Pool.Stall(System.TimeSpan after, System.TimeSpan delay, System.TimeSpan lasting) -> NResilience.Testing.Pool!
+NResilience.Testing.Pool.Validate() -> void
+NResilience.Testing.Pool.Validated() -> NResilience.Testing.Pool!
 NResilience.Testing.ScriptedHttpHandler
 NResilience.Testing.ScriptedHttpHandler.CallCount.get -> int
 NResilience.Testing.ScriptedHttpHandler.CaptureBodies.get -> bool
@@ -115,8 +122,10 @@ NResilience.Testing.Simulation.Equals(NResilience.Testing.Simulation? other) -> 
 NResilience.Testing.Simulation.For(System.TimeSpan duration) -> NResilience.Testing.Simulation!
 NResilience.Testing.Simulation.Load.get -> NResilience.Testing.Load?
 NResilience.Testing.Simulation.Policy.get -> NResilience.Resilience!
+NResilience.Testing.Simulation.Pool.get -> NResilience.Testing.Pool?
 NResilience.Testing.Simulation.Run(int seed) -> NResilience.Testing.SimulationReport!
 NResilience.Testing.Simulation.Under(NResilience.Testing.Load! load) -> NResilience.Testing.Simulation!
+NResilience.Testing.Simulation.WithPool(NResilience.Testing.Pool! pool) -> NResilience.Testing.Simulation!
 NResilience.Testing.SimulationReport
 NResilience.Testing.SimulationReport.Amplification.get -> double
 NResilience.Testing.SimulationReport.Availability.get -> double
@@ -156,6 +165,9 @@ static NResilience.Testing.Dependency.operator ==(NResilience.Testing.Dependency
 static NResilience.Testing.Load.Constant(int perSecond, int peers = 1) -> NResilience.Testing.Load!
 static NResilience.Testing.Load.operator !=(NResilience.Testing.Load? left, NResilience.Testing.Load? right) -> bool
 static NResilience.Testing.Load.operator ==(NResilience.Testing.Load? left, NResilience.Testing.Load? right) -> bool
+static NResilience.Testing.Pool.Healthy(System.TimeSpan delay) -> NResilience.Testing.Pool!
+static NResilience.Testing.Pool.operator !=(NResilience.Testing.Pool? left, NResilience.Testing.Pool? right) -> bool
+static NResilience.Testing.Pool.operator ==(NResilience.Testing.Pool? left, NResilience.Testing.Pool? right) -> bool
 static NResilience.Testing.ScriptedStream.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.ScriptedStream<T>!
 static NResilience.Testing.SentRequest.operator !=(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
 static NResilience.Testing.SentRequest.operator ==(NResilience.Testing.SentRequest? left, NResilience.Testing.SentRequest? right) -> bool
@@ -178,6 +190,9 @@ override NResilience.Testing.EventRecorder.ToString() -> string!
 override NResilience.Testing.Load.Equals(object? obj) -> bool
 override NResilience.Testing.Load.GetHashCode() -> int
 override NResilience.Testing.Load.ToString() -> string!
+override NResilience.Testing.Pool.Equals(object? obj) -> bool
+override NResilience.Testing.Pool.GetHashCode() -> int
+override NResilience.Testing.Pool.ToString() -> string!
 override NResilience.Testing.SentRequest.Equals(object? obj) -> bool
 override NResilience.Testing.SentRequest.GetHashCode() -> int
 override NResilience.Testing.SentRequest.ToString() -> string!

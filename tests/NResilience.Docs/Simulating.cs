@@ -92,6 +92,40 @@ public sealed class Simulating
         // </snippet:simulation-peers>
     }
 
+    [Fact]
+    public void A_local_thread_pool_stall_can_be_told_apart_from_a_slow_dependency()
+    {
+        // <snippet:simulation-pool>
+        var api = Resilience.Http with
+        {
+            Deadline = TimeSpan.FromSeconds(value: 10),
+            AttemptCeiling = AttemptCeiling.Above(multiple: 3),
+            Saturation = Saturation.Above(multiple: 5),
+            Name = "api",
+        };
+
+        // A healthy pool queues for tens of microseconds. This one stops keeping up half a minute in:
+        // work items wait 400 ms for a thread, and every call looks 400 ms slower from inside the
+        // executor while the dependency is fine.
+        var pool = Pool
+            .Healthy(delay: TimeSpan.FromMicroseconds(value: 80))
+            .Stall(after: TimeSpan.FromSeconds(value: 30), delay: TimeSpan.FromMilliseconds(value: 400),
+                lasting: TimeSpan.FromSeconds(value: 20));
+
+        var report = Simulate.Policy(policy: api)
+            .Against(dependency: Dependency
+                .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200)))
+            .Under(load: Load.Constant(perSecond: 200))
+            .WithPool(pool: pool)
+            .For(duration: TimeSpan.FromMinutes(value: 2))
+            .Run(seed: 42);
+
+        // One event for one episode, raised at its onset - so this is a count of local incidents.
+        Assert.Equal(expected: 1, actual: report.CountOf(kind: CallEventKind.SaturationDetected));
+
+        // </snippet:simulation-pool>
+    }
+
     /// <summary>The published report, read off disk so the page and the assertion cannot disagree.</summary>
     private static string Published()
     {

@@ -32,6 +32,20 @@ internal sealed class SimulationClock : TimeProvider
 
     private long _order;
 
+    /// <summary>
+    ///     Called with the new time every time the clock moves, before anything due at it runs. How a
+    ///     modeled <see cref="Pool" /> keeps the reading the executor is about to take in step with the
+    ///     virtual clock.
+    ///     <para>
+    ///         A hook rather than something the driver does between advances, because
+    ///         <see cref="AdvanceTo" /> fires timers on the way to its target and the continuations
+    ///         waiting on them start attempts. A reading refreshed only at arrivals would be stale for
+    ///         every retry and every hedge - which is to say, for exactly the attempts a saturation
+    ///         episode is about.
+    ///     </para>
+    /// </summary>
+    internal Action<long>? OnAdvance { get; set; }
+
     /// <summary>Ticks since the start of the run.</summary>
     internal long Now => _now;
 
@@ -64,14 +78,21 @@ internal sealed class SimulationClock : TimeProvider
     {
         while (_timers.TryPeek(out _, out var priority) && priority.Due <= target)
         {
-            _now = priority.Due > _now ? priority.Due : _now;
+            if (priority.Due > _now)
+            {
+                _now = priority.Due;
+                OnAdvance?.Invoke(_now);
+            }
 
             var entry = _timers.Dequeue();
             entry.Fire();
         }
 
         if (target > _now)
+        {
             _now = target;
+            OnAdvance?.Invoke(_now);
+        }
     }
 
     /// <summary>

@@ -27,6 +27,9 @@ public sealed record Simulation
     /// <summary>The policy being simulated.</summary>
     public Resilience Policy { get; }
 
+    /// <summary>This process's own thread pool, as the run models it. Set it with <see cref="WithPool" />.</summary>
+    public Pool? Pool { get; private init; }
+
     /// <summary>The dependency the policy calls.</summary>
     /// <param name="dependency">The dependency.</param>
     /// <returns>A new simulation. The receiver is unchanged.</returns>
@@ -55,6 +58,37 @@ public sealed record Simulation
     }
 
     /// <summary>
+    ///     This process's own thread pool, which is what <see cref="Resilience.Saturation" /> measures.
+    ///     A property of the run rather than of the policy: every attempt waits in it, whether or not
+    ///     the policy is configured to notice.
+    /// </summary>
+    /// <param name="pool">The pool.</param>
+    /// <returns>A new simulation. The receiver is unchanged.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="pool" /> is null.</exception>
+    /// <remarks>
+    ///     <para>
+    ///         Deliberately accepted on a policy with no <see cref="Resilience.Saturation" />, because
+    ///         that is the comparison worth running: the same pool and the same seed against two
+    ///         policies, one that tells a stalled pool apart from a slow dependency and one that cannot.
+    ///         Refusing it would leave only "stalled" against "not stalled", which measures the stall
+    ///         rather than the setting.
+    ///     </para>
+    ///     <para>
+    ///         Leaving this off does not fall back to the real thread pool. A policy that configures
+    ///         <see cref="Resilience.Saturation" /> then reads a modeled pool that never queues and so
+    ///         is never saturated - the documented behaviour, and a guarantee rather than an accident of
+    ///         the host being idle. Reading the real pool would put a machine-dependent term in a report
+    ///         that is otherwise reproducible to the last byte.
+    ///     </para>
+    /// </remarks>
+    public Simulation WithPool(Pool pool)
+    {
+        ArgumentNullException.ThrowIfNull(pool);
+
+        return this with { Pool = pool };
+    }
+
+    /// <summary>
     ///     Runs the simulation and reports what happened. Nothing sleeps: five simulated minutes cost
     ///     whatever the arithmetic costs.
     /// </summary>
@@ -76,6 +110,7 @@ public sealed record Simulation
         Policy.Validate();
         Dependency.Validate();
         Load.Validate();
+        Pool?.Validate();
 
         return new Execution(this, seed).Execute();
     }
@@ -115,6 +150,15 @@ public sealed record Simulation
 
         private readonly Func<CancellationToken, Task> _work;
 
+        /// <summary>The modeled pool, or null when the policy does not measure one.</summary>
+        private readonly Pool? _pool;
+
+        /// <summary>How many probes the modeled baseline needs, mirrored off the policy's own setting.</summary>
+        private readonly int _samples;
+
+        /// <summary>Which probe interval the substituted reading was last computed for, or -1 for none.</summary>
+        private long _probed = -1;
+
         /// <summary>The first exception a call threw out of <c>TryRunAsync</c>, which would be a library bug.</summary>
         private Exception? _fault;
 
@@ -136,6 +180,27 @@ public sealed record Simulation
             _seed = seed;
             _dice = new ChaosDice(seed);
             _work = Serve;
+
+            // The pool lengthens every attempt whatever the policy thinks, so it is installed first and
+            // unconditionally. Only the reading below is conditional.
+            _pool = simulation.Pool;
+
+            // A policy that does not configure Saturation never asks for a reading, and the
+            // process-wide probe is never even queued for it. One that does gets a modeled reading
+            // whether or not a pool was supplied: the alternative is reading the real pool, which is the
+            // one input to a run the simulator would not own.
+            if (simulation.Policy.Saturation is not { } saturation)
+                return;
+
+            if (_pool is null)
+            {
+                ExecutionState.OverrideProbe(_policy, new PoolProbe.Reading(TimeSpan.Zero, null));
+                return;
+            }
+
+            _samples = saturation.MinimumSamples;
+            _clock.OnAdvance = Probe;
+            Probe(_clock.Now);
         }
 
         internal SimulationReport Execute()
@@ -267,8 +332,31 @@ public sealed record Simulation
         }
 
         /// <summary>One attempt against the dependency. This is the callback the real executor drives.</summary>
+        /// <remarks>
+        ///     A modeled pool is waited on before the dependency is reached, because that is where the
+        ///     wait actually is: a work item sits in the queue before it runs, and the executor's stopwatch
+        ///     is already running when it does. Every estimator in the library therefore attributes the
+        ///     queue delay to the dependency, and correcting that is the whole of what
+        ///     <see cref="Resilience.Saturation" /> does - so a simulation that reported the delay to the
+        ///     probe without also putting it inside the measured duration would have nothing for
+        ///     saturation to protect, and would make the feature look like a counter of events.
+        ///     <para>
+        ///         Once per attempt rather than once per resumption, which understates a deep queue: a
+        ///         real attempt pays the wait again every time a continuation is scheduled. The
+        ///         conservative direction, and the one that does not need a model of how many times the
+        ///         executor's own await points suspend.
+        ///     </para>
+        /// </remarks>
         private async Task Serve(CancellationToken cancellationToken)
         {
+            if (_pool is { } pool)
+            {
+                var queued = pool.DelayAt(TimeSpan.FromTicks(_clock.Now));
+
+                if (queued > TimeSpan.Zero && !await _clock.Sleep(queued, cancellationToken).ConfigureAwait(false))
+                    cancellationToken.ThrowIfCancellationRequested();
+            }
+
             _reached++;
             BucketAt(_clock.Now).Reached++;
             _inflight++;
@@ -319,6 +407,31 @@ public sealed record Simulation
         }
 
         private void Record(CallEvent callEvent) => _kinds[(int)callEvent.Kind]++;
+
+        /// <summary>
+        ///     Points the policy's saturation reading at what the modeled pool last published. Called on
+        ///     every move of the virtual clock, so an attempt starting from a retry timer reads the
+        ///     instant that timer fired at rather than the last arrival's.
+        /// </summary>
+        /// <param name="ticks">Ticks since the start of the run.</param>
+        /// <remarks>
+        ///     Held to the interval the shipping probe actually publishes on, four times a second, and
+        ///     evaluated at the boundary rather than at <paramref name="ticks" />. A reading recomputed on
+        ///     every advance of a virtual clock would be an oracle rather than a probe: it would notice a
+        ///     stall the instant it began, where a real reader sees the previous sample until the next one
+        ///     lands. Only the <i>measurement</i> is quantized - the delay an attempt actually waits is
+        ///     read at the instant it waits it.
+        /// </remarks>
+        private void Probe(long ticks)
+        {
+            var interval = ticks / PoolProbe.Interval.Ticks;
+
+            if (interval == _probed)
+                return;
+
+            _probed = interval;
+            ExecutionState.OverrideProbe(_policy, _pool!.At(TimeSpan.FromTicks(interval * PoolProbe.Interval.Ticks), _samples));
+        }
 
         /// <summary>
         ///     How long after the last impairment ended before a full second of calls all succeeded.

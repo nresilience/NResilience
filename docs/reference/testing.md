@@ -203,14 +203,15 @@ Chaos applies only to the asynchronous path. This is not a limitation in practic
 | `Against(Dependency dependency)` | The dependency the policy calls. Required. |
 | `Under(Load load)` | The traffic to offer. Required. |
 | `For(TimeSpan duration)` | How long to offer load for. Required, and positive. Calls in flight when it elapses are allowed to finish. |
+| `WithPool(Pool pool)` | This process's own thread pool, which is what `Saturation` measures. Optional. Accepted on a policy with no `Saturation`, because the delay is spent either way. |
 | `Run(int seed)` | Runs the simulation and returns a `SimulationReport`. The same seed produces the same report. |
-| `Policy`, `Dependency`, `Load`, `Duration` | What has been set so far. `Dependency` and `Load` are null until set. |
+| `Policy`, `Dependency`, `Load`, `Duration`, `Pool` | What has been set so far. `Dependency`, `Load` and `Pool` are null until set. |
 
-`Run` validates the policy, the dependency, and the load, throwing `ResilienceConfigurationException`. A simulation missing its dependency, its load, or its duration throws `InvalidOperationException` naming the method that was not called.
+`Run` validates the policy, the dependency, the load, and the pool if there is one, throwing `ResilienceConfigurationException`. A simulation missing its dependency, its load, or its duration throws `InvalidOperationException` naming the method that was not called.
 
 ## `Dependency`
 
-`Dependency` is a `record` describing the thing a simulated policy calls. It is the only modeled part of a simulation: the executor, breaker, retry budget, classifier, and estimators are the real ones.
+`Dependency` is a `record` describing the thing a simulated policy calls. With [`Pool`](#pool) it is one of two modeled parts of a simulation: the executor, breaker, retry budget, classifier, and estimators are the real ones.
 
 | Member | Description |
 | :--- | :--- |
@@ -234,6 +235,23 @@ Impairments compose: two overlapping brownouts multiply, and an outage inside a 
 | `PerSecond` | Calls this process starts per second, on average. |
 | `Peers` | How many other processes offer the same rate to the same dependency. Their load counts against `Capacity`; their own retries, breakers, and budgets are not simulated. |
 | `Validate()` / `Validated()` | Throws `ResilienceConfigurationException` listing every problem at once, or returns the load. |
+
+## `Pool`
+
+`Pool` is a `record` describing this process's own thread pool - what [`Resilience.Saturation`](resilience.md) measures, and the one term in the library that is about the caller rather than the dependency. Set it with `Simulation.WithPool`.
+
+| Member | Description |
+| :--- | :--- |
+| `Pool.Healthy(TimeSpan delay)` | A pool whose work items wait `delay` for a thread, always. Must be positive. There is no default, because `Saturation.Multiple` is relative to it. |
+| `Stall(TimeSpan after, TimeSpan delay, TimeSpan lasting)` | A stretch during which work items wait `delay` for a thread. Both must be positive. |
+| `Delay` | The normal queue delay. |
+| `Validate()` / `Validated()` | Throws `ResilienceConfigurationException` listing every problem at once, or returns the pool. |
+
+Overlapping stalls take the deepest rather than compounding, which is where this parts company with `Dependency`: a brownout is a multiplier on a dependency's own work and two of them genuinely stack, while a queue delay is one number about one queue.
+
+The modeled delay is both what the probe reports and what each attempt waits before it reaches the dependency - so a stall reaches availability, latency and the load multiplier, not only `CountOf(CallEventKind.SaturationDetected)`. It is spent once per attempt, where a real deep queue is paid again at every resumption, so the model understates a stall rather than overstating it.
+
+The baseline is modeled as the rolling median the shipping probe computes, so both of its blind spots are reproduced: a stall inside the first `Saturation.MinimumSamples` quarter-seconds of a run is never detected, and a stall that comes to cover more than half the last minute becomes the median and stops being detected while the queue is still deep.
 
 ## `SimulationReport`
 
