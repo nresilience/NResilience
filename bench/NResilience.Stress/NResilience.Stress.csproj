@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>NResilience.Stress</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      The stress suite reuses the A/B arms and the fairness rules they carry, so its numbers are
+      comparable with the gate's and the latency harness's. Kestrel is needed for the HTTP-level
+      cells; the executor-level cells need none of it, which is why the framework reference sits
+      here rather than in the probes.
+    -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../NResilience.Probes.Polly/NResilience.Probes.Polly.csproj"/>
+  </ItemGroup>
+
+</Project>

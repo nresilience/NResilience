@@ -80,6 +80,41 @@ public static class Gate
         public void Reset() => _seen = 0;
     }
 
+    /// <summary>
+    ///     A deterministic repeating failure pattern: one failure in every
+    ///     <paramref name="period" /> operations, forever. No per-operation reset - the pattern
+    ///     is the property of the traffic, not of one call, which is the shape sustained-load
+    ///     failure pressure takes.
+    /// </summary>
+    public sealed class FailPatternCounter(int period)
+    {
+        private long _seen;
+
+        public IOException Fault { get; } = new("probe intermittent fault");
+
+        public bool Next() => Interlocked.Increment(ref _seen) % period == 0;
+
+        public long Seen => Interlocked.Read(ref _seen);
+    }
+
+    /// <summary>
+    ///     Suspends, then fails transiently one operation in every <paramref name="period" /> - the
+    ///     pattern the budget-under-load arms drive. Unlike <see cref="SuspendThenFailAsync" /> this
+    ///     does not resolve within a fixed number of retries: a failing operation fails outright
+    ///     (or is refused by the budget) and the next operation starts fresh, which is what a
+    ///     dependency under sustained partial failure does to a client.
+    /// </summary>
+    public static async Task<int> SuspendThenFailIntermittentlyAsync(FailPatternCounter counter, CancellationToken cancellationToken)
+    {
+        await Task.Yield();
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (counter.Next())
+            throw counter.Fault;
+
+        return Value;
+    }
+
     /// <summary>A deterministic per-operation failure sequence. The caller resets this between operations.</summary>
     public sealed class FailCounter(int failures)
     {
