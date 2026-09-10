@@ -20,5 +20,5 @@ The **executor** is the internal loop that runs each attempt: it applies deadlin
 | [Exceptions](exceptions.md) | `CallRejectedException`, `DeadlineExceededException`, `AttemptTimeoutException`, `ResilienceConfigurationException` |
 | [HTTP](http.md) | `HttpResilienceHandler`, `HttpResilienceOptions`, `HttpResilience`, `HttpRequestExtensions` |
 | [Options and registration](options.md) | `ResilienceOptions`, `BreakerOptions`, `IResiliencePolicies`, `ResilienceTelemetry`, `AddResilience`, `UseResilienceDeadline`, `UseResilienceNestedRetry`, `AddResilienceExceptionHandler` |
-| [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder`, `TestPolicy`, `ScriptedHttpHandler`, `SentRequest`, `Chaos`, `Simulate`, `Dependency`, `Load`, `SimulationReport` |
+| [Testing](testing.md) | `Sequence`, `Sequence<T>`, `EventRecorder`, `TestPolicy`, `ScriptedHttpHandler`, `SentRequest`, `Chaos`, `Simulate`, `Dependency`, `Load`, `Pool`, `SimulationReport` |
 | [Analyzers](analyzers.md) | Diagnostics `NRES001` through `NRES007` |
