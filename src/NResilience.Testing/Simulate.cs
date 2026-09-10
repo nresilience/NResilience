@@ -23,11 +23,11 @@ namespace NResilience.Testing;
 /// </example>
 /// <remarks>
 ///     <para>
-///         <b>Three things are fake and no more:</b> the clock, the random source, and the dependency.
-///         The policy is yours, and the executor, the breaker, the retry budget, the classifier and
-///         every estimator are the shipping ones. Nothing about the decision logic is re-implemented
-///         here - a simulator that modeled the library would be worse than no simulator, and this one
-///         cannot, because it does not know how.
+///         <b>Four things are fake and no more:</b> the clock, the random source, the dependency, and
+///         this process's own thread pool. The policy is yours, and the executor, the breaker, the
+///         retry budget, the classifier and every estimator are the shipping ones. Nothing about the
+///         decision logic is re-implemented here - a simulator that modeled the library would be worse
+///         than no simulator, and this one cannot, because it does not know how.
 ///     </para>
 ///     <para>
 ///         <b>One process.</b> It cannot model fifty pods sharing a dependency and does not pretend to:
@@ -35,9 +35,15 @@ namespace NResilience.Testing;
 ///         peers' own decisions.
 ///     </para>
 ///     <para>
-///         <b>One thread.</b> Which is also why <see cref="Resilience.Saturation" /> reads nothing
-///         useful in a simulation: the thread pool it measures is the real one, and the real one is
-///         idle while a simulation runs.
+///         <b>One thread.</b> Which is why the pool <see cref="Resilience.Saturation" /> measures is
+///         modeled rather than observed: the real one is idle while a simulation runs, so a run reads
+///         what <see cref="Simulation.WithPool" /> describes, and a policy that configures
+///         <see cref="Resilience.Saturation" /> without one reads a pool that never queues.
+///     </para>
+///     <para>
+///         <b>One seed is one sample.</b> <see cref="Simulation.Run" /> is exact about the run it did;
+///         it is <see cref="Simulation.RunAll" /> that is honest about the configuration, because the
+///         numbers worth tuning on move from seed to seed even when the averages do not.
 ///     </para>
 /// </remarks>
 /// <seealso cref="Dependency" />

@@ -67,6 +67,8 @@ Simulation seed 42 over 00:05:00
 | `BreakerOpens` | How many times a breaker tripped. |
 | `TimeToRecover` | How long after the last impairment ended before a full second of calls all succeeded. `null` when the run ended first, and a `null` of that kind is the finding. |
 | `CountOf(kind)` | How many [`CallEvent`](../reference/events.md)s of one kind the run raised, so a claim about suppressed hedges or budget refusals is a number. |
+| `Timeline` | Every event the run raised, each with the virtual time it was raised at. `null` unless the run was asked to [record one](#record-a-timeline). |
+| `EngineVersion` | Which build of the library produced the report. Determinism is a promise about one version, so two reports are comparable when this matches. |
 
 `Calls`, `Succeeded`, `Failed`, and `Reached` are the raw counts the ratios come from.
 
@@ -166,7 +168,13 @@ Leaving `WithPool` off does not fall back to the real thread pool. A policy that
 
 ## Compare two configurations
 
-The seed fixes the run, so two simulations that differ in one setting differ only because of that setting. This is how a configuration argument becomes a number:
+The seed fixes the run, so two simulations that differ in one setting differ only because of that setting.
+
+One seed is still one sample. Arrival gaps, latency draws, failure draws, and backoff jitter all come off it, so the numbers a tuning decision turns on - the worst second's amplification, the time to recover, how many times the breaker tripped - move from seed to seed even where the averages hold still. Two policies compared on seed 42 can swap places on seed 43, and nothing in a single pair of reports says which happened.
+
+`RunAll` runs the same scenario once per seed and reports a [`Band`](../reference/testing.md) per measurement - `Median`, `Minimum`, `Maximum`, and `Spread` - instead of a number. Nothing sleeps, so twenty seeds cost twenty times almost nothing. `Separates` is the comparison worth making: two bands that overlap are two policies this scenario cannot tell apart, and saying so is the point.
+
+This is how a configuration argument becomes a number:
 
 <!-- snippet: simulation-compare -->
 ```csharp
@@ -176,24 +184,65 @@ var slowing = Dependency
     .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200))
     .Brownout(after: TimeSpan.FromSeconds(value: 30), slower: 8, lasting: TimeSpan.FromMinutes(value: 1));
 
-// The same seed and the same dependency, one setting different - so the difference between
-// the two reports is the setting rather than the run.
+// The same seeds and the same dependency, one setting different - so the difference between
+// the two bands is the setting rather than the run.
 var unbudgeted = Simulate.Policy(policy: api with { Budget = RetryBudget.None })
     .Against(dependency: slowing)
     .Under(load: Load.Constant(perSecond: 500))
     .For(duration: TimeSpan.FromMinutes(value: 5))
-    .Run(seed: 42);
+    .RunAll(1, 2, 3, 4, 5);
 
 var budgeted = Simulate.Policy(policy: api)
     .Against(dependency: slowing)
     .Under(load: Load.Constant(perSecond: 500))
     .For(duration: TimeSpan.FromMinutes(value: 5))
-    .Run(seed: 42);
+    .RunAll(1, 2, 3, 4, 5);
 
-Assert.True(condition: budgeted.LoadMultiplier < unbudgeted.LoadMultiplier);
-Assert.True(condition: budgeted.CountOf(kind: CallEventKind.RejectedByBudget) > 0);
+// Not "it won on seed 42" - the two ranges do not overlap, so it wins on every seed.
+Assert.True(condition: budgeted.LoadMultiplier.Separates(other: unbudgeted.LoadMultiplier));
+Assert.True(condition: budgeted.LoadMultiplier.Maximum < unbudgeted.LoadMultiplier.Minimum);
 ```
 <!-- endsnippet -->
+
+## Record a timeline
+
+The counts a report carries say what a run cost. The timeline says how it got there: which attempt the breaker opened between, what the backoff actually delayed by, how far into the brownout the attempt ceiling adapted.
+
+`Recording()` asks for one. It is off by default because a five-minute run at 500 rps raises a few hundred thousand events, and a report read only for its ratios should not pay to keep them.
+
+<!-- snippet: simulation-timeline -->
+```csharp
+var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10), Name = "api" };
+
+var report = Simulate.Policy(policy: api)
+    .Against(dependency: Dependency
+        .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200))
+        .Failing(rate: 0.2))
+    .Under(load: Load.Constant(perSecond: 50))
+    .For(duration: TimeSpan.FromSeconds(value: 10))
+    .Recording()
+    .Run(seed: 42);
+
+// Every event the run raised, in order, each with the virtual time it was raised at. Null
+// unless the run was asked to record one, because a five-minute run raises a few hundred
+// thousand of them.
+var timeline = report.Timeline!;
+
+foreach (var entry in timeline.Take(count: 20))
+{
+    Console.WriteLine(value: entry);
+}
+
+// Which makes a claim about ordering an assertion rather than an argument: the backoff a
+// retry served is on the event that scheduled it.
+var retry = timeline.First(entry => entry.Event.Kind == CallEventKind.Retrying);
+
+Assert.NotNull(@object: retry.Event.Delay);
+Assert.True(condition: retry.At > TimeSpan.Zero);
+```
+<!-- endsnippet -->
+
+Recording changes nothing about what the run does. The events are the ones the policy already raises to its listener, and the whole simulation is single-threaded on a virtual clock, so the time beside each one is read rather than measured - a recorded run and an unrecorded one from the same seed print the same report.
 
 ## What is fake, and what is not
 
@@ -208,6 +257,8 @@ Three, and each is a property of the design rather than a gap to fill:
 - **One process.** The simulator cannot model fifty pods making their own decisions. `peers` scales the load without simulating the peers, which is an approximation and says so.
 - **The pool is a model, and a coarser one than the dependency.** [`Pool`](#model-the-thread-pool) supplies the queue delay rather than measuring it, and spends it once per attempt where a real deep queue is paid again at every resumption - so the direction of the error is to understate a stall. A process that is *always* starved has no episode to find, in the simulator and in production alike.
 - **The dependency is a model.** Latency, capacity, and impairment are the three dimensions it has. A dependency whose failure mode is none of those is one the simulator cannot show you.
+
+A fourth is not a limit so much as a habit: **one seed is one sample.** Reach for [`RunAll`](#compare-two-configurations) rather than `Run` whenever the answer is going to decide a setting.
 
 ## Go deeper
 

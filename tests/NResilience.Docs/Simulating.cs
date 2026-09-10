@@ -47,22 +47,23 @@ public sealed class Simulating
             .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200))
             .Brownout(after: TimeSpan.FromSeconds(value: 30), slower: 8, lasting: TimeSpan.FromMinutes(value: 1));
 
-        // The same seed and the same dependency, one setting different - so the difference between
-        // the two reports is the setting rather than the run.
+        // The same seeds and the same dependency, one setting different - so the difference between
+        // the two bands is the setting rather than the run.
         var unbudgeted = Simulate.Policy(policy: api with { Budget = RetryBudget.None })
             .Against(dependency: slowing)
             .Under(load: Load.Constant(perSecond: 500))
             .For(duration: TimeSpan.FromMinutes(value: 5))
-            .Run(seed: 42);
+            .RunAll(1, 2, 3, 4, 5);
 
         var budgeted = Simulate.Policy(policy: api)
             .Against(dependency: slowing)
             .Under(load: Load.Constant(perSecond: 500))
             .For(duration: TimeSpan.FromMinutes(value: 5))
-            .Run(seed: 42);
+            .RunAll(1, 2, 3, 4, 5);
 
-        Assert.True(condition: budgeted.LoadMultiplier < unbudgeted.LoadMultiplier);
-        Assert.True(condition: budgeted.CountOf(kind: CallEventKind.RejectedByBudget) > 0);
+        // Not "it won on seed 42" - the two ranges do not overlap, so it wins on every seed.
+        Assert.True(condition: budgeted.LoadMultiplier.Separates(other: unbudgeted.LoadMultiplier));
+        Assert.True(condition: budgeted.LoadMultiplier.Maximum < unbudgeted.LoadMultiplier.Minimum);
 
         // </snippet:simulation-compare>
     }
@@ -124,6 +125,41 @@ public sealed class Simulating
         Assert.Equal(expected: 1, actual: report.CountOf(kind: CallEventKind.SaturationDetected));
 
         // </snippet:simulation-pool>
+    }
+
+    [Fact]
+    public void A_run_can_be_asked_to_record_what_it_did()
+    {
+        // <snippet:simulation-timeline>
+        var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10), Name = "api" };
+
+        var report = Simulate.Policy(policy: api)
+            .Against(dependency: Dependency
+                .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200))
+                .Failing(rate: 0.2))
+            .Under(load: Load.Constant(perSecond: 50))
+            .For(duration: TimeSpan.FromSeconds(value: 10))
+            .Recording()
+            .Run(seed: 42);
+
+        // Every event the run raised, in order, each with the virtual time it was raised at. Null
+        // unless the run was asked to record one, because a five-minute run raises a few hundred
+        // thousand of them.
+        var timeline = report.Timeline!;
+
+        foreach (var entry in timeline.Take(count: 20))
+        {
+            Console.WriteLine(value: entry);
+        }
+
+        // Which makes a claim about ordering an assertion rather than an argument: the backoff a
+        // retry served is on the event that scheduled it.
+        var retry = timeline.First(entry => entry.Event.Kind == CallEventKind.Retrying);
+
+        Assert.NotNull(@object: retry.Event.Delay);
+        Assert.True(condition: retry.At > TimeSpan.Zero);
+
+        // </snippet:simulation-timeline>
     }
 
     /// <summary>The published report, read off disk so the page and the assertion cannot disagree.</summary>

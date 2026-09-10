@@ -1,4 +1,12 @@
 #nullable enable
+NResilience.Testing.Band
+NResilience.Testing.Band.Band() -> void
+NResilience.Testing.Band.Band(double median, double minimum, double maximum) -> void
+NResilience.Testing.Band.Maximum.get -> double
+NResilience.Testing.Band.Median.get -> double
+NResilience.Testing.Band.Minimum.get -> double
+NResilience.Testing.Band.Separates(NResilience.Testing.Band other) -> bool
+NResilience.Testing.Band.Spread.get -> double
 NResilience.Testing.Chaos
 NResilience.Testing.Chaos.<Clone>$() -> NResilience.Testing.Chaos!
 NResilience.Testing.Chaos.Chaos() -> void
@@ -123,9 +131,26 @@ NResilience.Testing.Simulation.For(System.TimeSpan duration) -> NResilience.Test
 NResilience.Testing.Simulation.Load.get -> NResilience.Testing.Load?
 NResilience.Testing.Simulation.Policy.get -> NResilience.Resilience!
 NResilience.Testing.Simulation.Pool.get -> NResilience.Testing.Pool?
+NResilience.Testing.Simulation.Recording() -> NResilience.Testing.Simulation!
+NResilience.Testing.Simulation.Records.get -> bool
 NResilience.Testing.Simulation.Run(int seed) -> NResilience.Testing.SimulationReport!
+NResilience.Testing.Simulation.RunAll(params int[]! seeds) -> NResilience.Testing.SimulationBand!
 NResilience.Testing.Simulation.Under(NResilience.Testing.Load! load) -> NResilience.Testing.Simulation!
 NResilience.Testing.Simulation.WithPool(NResilience.Testing.Pool! pool) -> NResilience.Testing.Simulation!
+NResilience.Testing.SimulationBand
+NResilience.Testing.SimulationBand.Amplification.get -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.Availability.get -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.BreakerOpens.get -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.Calls.get -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.CountOf(NResilience.CallEventKind kind) -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.Duration.get -> System.TimeSpan
+NResilience.Testing.SimulationBand.EngineVersion.get -> string!
+NResilience.Testing.SimulationBand.Latency(double quantile) -> NResilience.Testing.TimeBand
+NResilience.Testing.SimulationBand.LoadMultiplier.get -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.Recovered.get -> int
+NResilience.Testing.SimulationBand.Reports.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.SimulationReport!>!
+NResilience.Testing.SimulationBand.Seeds.get -> System.Collections.Generic.IReadOnlyList<int>!
+NResilience.Testing.SimulationBand.TimeToRecover.get -> NResilience.Testing.TimeBand?
 NResilience.Testing.SimulationReport
 NResilience.Testing.SimulationReport.Amplification.get -> double
 NResilience.Testing.SimulationReport.Availability.get -> double
@@ -133,6 +158,7 @@ NResilience.Testing.SimulationReport.BreakerOpens.get -> int
 NResilience.Testing.SimulationReport.Calls.get -> int
 NResilience.Testing.SimulationReport.CountOf(NResilience.CallEventKind kind) -> int
 NResilience.Testing.SimulationReport.Duration.get -> System.TimeSpan
+NResilience.Testing.SimulationReport.EngineVersion.get -> string!
 NResilience.Testing.SimulationReport.Failed.get -> int
 NResilience.Testing.SimulationReport.Latency(double quantile) -> System.TimeSpan
 NResilience.Testing.SimulationReport.LoadMultiplier.get -> double
@@ -140,7 +166,21 @@ NResilience.Testing.SimulationReport.Reached.get -> int
 NResilience.Testing.SimulationReport.Seed.get -> int
 NResilience.Testing.SimulationReport.Succeeded.get -> int
 NResilience.Testing.SimulationReport.TimeToRecover.get -> System.TimeSpan?
+NResilience.Testing.SimulationReport.Timeline.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.TimelineEntry>?
 NResilience.Testing.TestPolicy
+NResilience.Testing.TimeBand
+NResilience.Testing.TimeBand.Maximum.get -> System.TimeSpan
+NResilience.Testing.TimeBand.Median.get -> System.TimeSpan
+NResilience.Testing.TimeBand.Minimum.get -> System.TimeSpan
+NResilience.Testing.TimeBand.Separates(NResilience.Testing.TimeBand other) -> bool
+NResilience.Testing.TimeBand.Spread.get -> System.TimeSpan
+NResilience.Testing.TimeBand.TimeBand() -> void
+NResilience.Testing.TimeBand.TimeBand(System.TimeSpan median, System.TimeSpan minimum, System.TimeSpan maximum) -> void
+NResilience.Testing.TimelineEntry
+NResilience.Testing.TimelineEntry.At.get -> System.TimeSpan
+NResilience.Testing.TimelineEntry.Event.get -> NResilience.CallEvent
+NResilience.Testing.TimelineEntry.TimelineEntry() -> void
+NResilience.Testing.TimelineEntry.TimelineEntry(System.TimeSpan at, NResilience.CallEvent callEvent) -> void
 NResilience.Testing.VoidSequence
 NResilience.Testing.VoidSequence.CallCount.get -> int
 NResilience.Testing.VoidSequence.Delays(System.TimeSpan delay) -> NResilience.Testing.VoidSequence!
@@ -180,6 +220,7 @@ static NResilience.Testing.TestPolicy.Instant.get -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.InstantHttp.get -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.WithClock(System.TimeProvider! time) -> NResilience.Resilience!
 static NResilience.Testing.TestPolicy.WithClock(this NResilience.Resilience! policy, System.TimeProvider! time) -> NResilience.Resilience!
+override NResilience.Testing.Band.ToString() -> string!
 override NResilience.Testing.Chaos.Equals(object? obj) -> bool
 override NResilience.Testing.Chaos.GetHashCode() -> int
 override NResilience.Testing.Chaos.ToString() -> string!
@@ -199,4 +240,7 @@ override NResilience.Testing.SentRequest.ToString() -> string!
 override NResilience.Testing.Simulation.Equals(object? obj) -> bool
 override NResilience.Testing.Simulation.GetHashCode() -> int
 override NResilience.Testing.Simulation.ToString() -> string!
+override NResilience.Testing.SimulationBand.ToString() -> string!
 override NResilience.Testing.SimulationReport.ToString() -> string!
+override NResilience.Testing.TimeBand.ToString() -> string!
+override NResilience.Testing.TimelineEntry.ToString() -> string!

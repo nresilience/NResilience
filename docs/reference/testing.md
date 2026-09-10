@@ -204,8 +204,10 @@ Chaos applies only to the asynchronous path. This is not a limitation in practic
 | `Under(Load load)` | The traffic to offer. Required. |
 | `For(TimeSpan duration)` | How long to offer load for. Required, and positive. Calls in flight when it elapses are allowed to finish. |
 | `WithPool(Pool pool)` | This process's own thread pool, which is what `Saturation` measures. Optional. Accepted on a policy with no `Saturation`, because the delay is spent either way. |
+| `Recording()` | Records every event the run raises into `SimulationReport.Timeline`. Optional, and off by default. |
 | `Run(int seed)` | Runs the simulation and returns a `SimulationReport`. The same seed produces the same report. |
-| `Policy`, `Dependency`, `Load`, `Duration`, `Pool` | What has been set so far. `Dependency`, `Load` and `Pool` are null until set. |
+| `RunAll(params int[] seeds)` | Runs the simulation once per seed and returns a `SimulationBand`. At least one seed, and no repeats - a repeated seed throws `ArgumentException`, because the second copy would narrow the band rather than widen it. |
+| `Policy`, `Dependency`, `Load`, `Duration`, `Pool`, `Records` | What has been set so far. `Dependency`, `Load` and `Pool` are null until set. |
 
 `Run` validates the policy, the dependency, the load, and the pool if there is one, throwing `ResilienceConfigurationException`. A simulation missing its dependency, its load, or its duration throws `InvalidOperationException` naming the method that was not called.
 
@@ -268,4 +270,42 @@ The baseline is modeled as the rolling median the shipping probe computes, so bo
 | `CountOf(CallEventKind kind)` | How many events of one kind the run raised. |
 | `Calls`, `Succeeded`, `Failed`, `Reached` | The raw counts the ratios come from. |
 | `Seed`, `Duration` | The seed the run was drawn from, and how long it offered load for. |
+| `Timeline` | Every event the run raised as `TimelineEntry` values, in order. Null unless `Simulation.Recording()` asked for one. |
+| `EngineVersion` | Which build of the library produced the report. Deliberately absent from `ToString()`, so the block of text a determinism test pins does not change every release. |
 | `ToString()` | The report as a fixed block of invariant-formatted text, one measurement per line. |
+
+## `TimelineEntry`
+
+`TimelineEntry` is one event a run raised and the virtual time it was raised at. A `readonly struct` rather than a record: a `CallEvent` carries an exception and a result, so value equality over one would compare two references and call the answer a measurement.
+
+| Member | Description |
+| :--- | :--- |
+| `At` | How far into the run the event was raised, on the virtual clock. |
+| `Event` | The [`CallEvent`](events.md). |
+| `ToString()` | The entry as one invariant-formatted line: the virtual time, then the event's own layout. |
+
+## `SimulationBand`
+
+`SimulationBand` is what a set of seeds measured - the same scenario run once per seed, reported as a range per measurement rather than a number per measurement. Returned by `Simulation.RunAll`.
+
+| Member | Description |
+| :--- | :--- |
+| `Availability`, `LoadMultiplier`, `Amplification`, `BreakerOpens`, `Calls` | The report's ratios and counts as a `Band`. |
+| `Latency(double quantile)`, `TimeToRecover` | The report's durations as a `TimeBand`. `TimeToRecover` is null when no run recovered, and covers only the runs that did. |
+| `CountOf(CallEventKind kind)` | How many events of one kind the runs raised, as a `Band`. |
+| `Recovered` | How many of the runs recovered at all. A count below `Seeds.Count` is the finding. |
+| `Reports`, `Seeds` | The individual reports and the seeds they came from, in the order the seeds were given. |
+| `Duration`, `EngineVersion` | The same for every seed - they are inputs. |
+| `ToString()` | The band as a fixed block of invariant-formatted text, in the layout `SimulationReport.ToString()` uses. |
+
+## `Band` and `TimeBand`
+
+One measurement across a set of seeds. `Band` carries doubles and `TimeBand` carries `TimeSpan`s; both are `readonly struct`s with the same four members.
+
+| Member | Description |
+| :--- | :--- |
+| `Median` | The middle value by nearest rank - a value one of the runs actually produced, not an average of two that neither did. |
+| `Minimum`, `Maximum` | The lowest and highest values across the seeds. |
+| `Spread` | `Maximum - Minimum`. Zero is a measurement the seed does not touch. |
+| `Separates(Band other)` | Whether the two bands are disjoint. False when they overlap, which is the answer "these two policies are indistinguishable over these seeds". |
+| `ToString()` | `median (minimum-maximum)`, invariant-formatted. |

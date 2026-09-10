@@ -27,6 +27,9 @@ public sealed record Simulation
     /// <summary>The policy being simulated.</summary>
     public Resilience Policy { get; }
 
+    /// <summary>Whether the run records a timeline. Set it with <see cref="Recording" />.</summary>
+    public bool Records { get; private init; }
+
     /// <summary>This process's own thread pool, as the run models it. Set it with <see cref="WithPool" />.</summary>
     public Pool? Pool { get; private init; }
 
@@ -40,6 +43,21 @@ public sealed record Simulation
 
         return this with { Dependency = dependency };
     }
+
+    /// <summary>
+    ///     Records every event the run raises, with the virtual time it was raised at, into
+    ///     <see cref="SimulationReport.Timeline" />.
+    /// </summary>
+    /// <returns>A new simulation. The receiver is unchanged.</returns>
+    /// <remarks>
+    ///     Off by default because a five-minute run at 500 rps raises a few hundred thousand events,
+    ///     and a report that is only read for its ratios should not pay to keep them. Recording changes
+    ///     nothing about what the run does: the events are the ones the policy already raises to its
+    ///     listener, and the whole simulation is single-threaded on a virtual clock, so the time beside
+    ///     each one is read rather than measured. A recorded run reproduces byte for byte from its seed
+    ///     exactly as an unrecorded one does.
+    /// </remarks>
+    public Simulation Recording() => this with { Records = true };
 
     /// <summary>How long to offer load for. Calls still in flight when it elapses are allowed to finish.</summary>
     /// <param name="duration">The run length. Must be positive.</param>
@@ -116,6 +134,46 @@ public sealed record Simulation
     }
 
     /// <summary>
+    ///     Runs the simulation once per seed and reports the band of what they measured.
+    ///     <para>
+    ///         One run is one sample. The numbers a tuning decision turns on - the worst second's
+    ///         amplification, the time to recover, how many times the breaker tripped - are the least
+    ///         stable of the ones a report carries, so two policies compared on a single seed can swap
+    ///         places on the next one. Nothing here sleeps, so a band of twenty costs twenty times
+    ///         almost nothing.
+    ///     </para>
+    /// </summary>
+    /// <param name="seeds">The seeds. At least one, and no repeats.</param>
+    /// <returns>The band.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="seeds" /> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="seeds" /> is empty, or names a seed twice.</exception>
+    /// <exception cref="ResilienceConfigurationException">The policy, the dependency or the load cannot be run.</exception>
+    /// <exception cref="InvalidOperationException">The simulation is missing its dependency, its load or its duration.</exception>
+    /// <remarks>
+    ///     A repeated seed is refused rather than run twice, because the second copy narrows the band
+    ///     it was added to widen: it would make the answer look more robust for having been measured
+    ///     less. The seeds are a part of the scenario like the load and the duration are - the same set
+    ///     produces the same band - so they belong beside it in source rather than being drawn here.
+    /// </remarks>
+    public SimulationBand RunAll(params int[] seeds)
+    {
+        ArgumentNullException.ThrowIfNull(seeds);
+
+        if (seeds.Length == 0)
+            throw new ArgumentException("A band needs at least one seed.", nameof(seeds));
+
+        if (new HashSet<int>(seeds).Count != seeds.Length)
+            throw new ArgumentException("A band cannot run the same seed twice - the repeat would narrow the band rather than widen it.", nameof(seeds));
+
+        var reports = new SimulationReport[seeds.Length];
+
+        for (var i = 0; i < seeds.Length; i++)
+            reports[i] = Run(seeds[i]);
+
+        return new SimulationBand(reports);
+    }
+
+    /// <summary>
     ///     One execution. A class rather than a pile of locals because the arrival driver, the
     ///     dependency callback and the listener all write to the same tallies, and closures over a
     ///     dozen locals read worse than fields do.
@@ -153,6 +211,9 @@ public sealed record Simulation
         /// <summary>The modeled pool, or null when the policy does not measure one.</summary>
         private readonly Pool? _pool;
 
+        /// <summary>The recording, or null when the run was not asked for one.</summary>
+        private readonly List<TimelineEntry>? _timeline;
+
         /// <summary>How many probes the modeled baseline needs, mirrored off the policy's own setting.</summary>
         private readonly int _samples;
 
@@ -180,6 +241,7 @@ public sealed record Simulation
             _seed = seed;
             _dice = new ChaosDice(seed);
             _work = Serve;
+            _timeline = simulation.Records ? [] : null;
 
             // The pool lengthens every attempt whatever the policy thinks, so it is installed first and
             // unconditionally. Only the reading below is conditional.
@@ -224,7 +286,8 @@ public sealed record Simulation
                 Amplification(),
                 TimeToRecover(),
                 [.. _latencies],
-                _kinds);
+                _kinds,
+                _timeline is null ? null : [.. _timeline]);
         }
 
         /// <summary>
@@ -406,7 +469,16 @@ public sealed record Simulation
             return worst;
         }
 
-        private void Record(CallEvent callEvent) => _kinds[(int)callEvent.Kind]++;
+        /// <summary>
+        ///     The listener. Events fire inline on the driver thread, so the clock is already at the
+        ///     instant the event describes and the reading beside it is a read rather than a
+        ///     measurement.
+        /// </summary>
+        private void Record(CallEvent callEvent)
+        {
+            _kinds[(int)callEvent.Kind]++;
+            _timeline?.Add(new TimelineEntry(TimeSpan.FromTicks(_clock.Now), callEvent));
+        }
 
         /// <summary>
         ///     Points the policy's saturation reading at what the modeled pool last published. Called on

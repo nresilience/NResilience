@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using NResilience.Testing.Internal;
 
 namespace NResilience.Testing;
 
@@ -28,7 +29,8 @@ public sealed class SimulationReport
         double amplification,
         TimeSpan? timeToRecover,
         long[] latencies,
-        int[] kinds)
+        int[] kinds,
+        TimelineEntry[]? timeline)
     {
         Seed = seed;
         Duration = duration;
@@ -37,6 +39,8 @@ public sealed class SimulationReport
         Reached = reached;
         Amplification = amplification;
         TimeToRecover = timeToRecover;
+
+        Timeline = timeline;
 
         _latencies = latencies;
         _kinds = kinds;
@@ -63,6 +67,18 @@ public sealed class SimulationReport
     /// <summary>How long the run offered load for. Calls in flight at the end were allowed to finish.</summary>
     public TimeSpan Duration { get; }
 
+    /// <summary>
+    ///     The engine that produced this report, as its version - <c>1.4.0</c>, or <c>1.4.0-beta.1</c>.
+    ///     <para>
+    ///         Determinism is a promise about one version of the library. Two reports are comparable
+    ///         when this matches; comparing across versions measures the upgrade rather than the
+    ///         configuration, which is a useful thing to do deliberately and a misleading thing to do
+    ///         by accident. Deliberately absent from <see cref="ToString" />, so the block of text a
+    ///         determinism test pins does not change every release.
+    ///     </para>
+    /// </summary>
+    public string EngineVersion { get; } = Engine.Version;
+
     /// <summary>How many calls did not end in success.</summary>
     public int Failed => Calls - Succeeded;
 
@@ -81,6 +97,19 @@ public sealed class SimulationReport
 
     /// <summary>The seed the run was drawn from. The same one reproduces this report exactly.</summary>
     public int Seed { get; }
+
+    /// <summary>
+    ///     Every event the run raised, in order, each with the virtual time it was raised at - or null
+    ///     when the run was not asked to record one.
+    ///     <para>
+    ///         The counts a report carries say what a run cost. The timeline says how it got there:
+    ///         which attempt the breaker opened between, what the backoff actually delayed by, how far
+    ///         into the brownout the attempt ceiling adapted. It is byte-identical from a seed the same
+    ///         way every other number here is, so it can be asserted on rather than only read.
+    ///     </para>
+    /// </summary>
+    /// <seealso cref="Simulation.Recording" />
+    public IReadOnlyList<TimelineEntry>? Timeline { get; }
 
     /// <summary>How many calls ended in success.</summary>
     public int Succeeded { get; }
