@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using NResilience.Internal;
 using NResilience.Testing.Internal;
 
@@ -45,22 +46,30 @@ public sealed class Topology
 {
     private readonly Declared[] _edges;
 
+    private readonly Limited[] _limiters;
+
     private readonly Offered[] _loads;
 
     private readonly Leafed[] _leaves;
+
+    private readonly Pooled[] _pools;
 
     internal Topology()
     {
         _edges = [];
         _leaves = [];
         _loads = [];
+        _limiters = [];
+        _pools = [];
     }
 
-    private Topology(Declared[] edges, Leafed[] leaves, Offered[] loads, TimeSpan duration, bool records)
+    private Topology(Declared[] edges, Leafed[] leaves, Offered[] loads, Limited[] limiters, Pooled[] pools, TimeSpan duration, bool records)
     {
         _edges = edges;
         _leaves = leaves;
         _loads = loads;
+        _limiters = limiters;
+        _pools = pools;
         Duration = duration;
         Records = records;
     }
@@ -96,7 +105,7 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(callee);
         ArgumentNullException.ThrowIfNull(policy);
 
-        return new Topology([.. _edges, new Declared(caller, callee, policy)], _leaves, _loads, Duration, Records);
+        return new Topology([.. _edges, new Declared(caller, callee, policy)], _leaves, _loads, _limiters, _pools, Duration, Records);
     }
 
     /// <summary>
@@ -113,7 +122,7 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(dependency);
 
-        return new Topology(_edges, [.. _leaves, new Leafed(name, dependency)], _loads, Duration, Records);
+        return new Topology(_edges, [.. _leaves, new Leafed(name, dependency)], _loads, _limiters, _pools, Duration, Records);
     }
 
     /// <summary>
@@ -136,20 +145,83 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(load);
         ArgumentNullException.ThrowIfNull(at);
 
-        return new Topology(_edges, _leaves, [.. _loads, new Offered(at, load)], Duration, Records);
+        return new Topology(_edges, _leaves, [.. _loads, new Offered(at, load)], _limiters, _pools, Duration, Records);
+    }
+
+    /// <summary>
+    ///     The limiter one call acquires a permit from, built fresh for each run against the virtual
+    ///     clock. A limiter guards one outbound call, which is why it goes on a call rather than on a
+    ///     service: a checkout's bulkhead for its payment provider is not its bulkhead for its catalog.
+    /// </summary>
+    /// <param name="caller">The service making the call.</param>
+    /// <param name="callee">The service or leaf being called.</param>
+    /// <param name="limiter">Builds the limiter. The argument is the run's virtual clock.</param>
+    /// <returns>A new topology. The receiver is unchanged.</returns>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    /// <remarks>
+    ///     The same two kinds <see cref="Simulation.WithLimiter" /> refuses are refused here, for the
+    ///     same reasons: a replenishing limiter refills against a wall clock the run does not have, and
+    ///     a queueing one resumes a queued wait on the thread pool rather than on the thread the run
+    ///     drives everything from. The permit is acquired before the attempt is counted as having
+    ///     reached the callee, because a refused attempt never left.
+    /// </remarks>
+    public Topology WithLimiter(string caller, string callee, Func<TimeProvider, RateLimiter> limiter)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        ArgumentNullException.ThrowIfNull(callee);
+        ArgumentNullException.ThrowIfNull(limiter);
+
+        return new Topology(_edges, _leaves, _loads, [.. _limiters, new Limited(caller, callee, limiter)], _pools, Duration, Records);
+    }
+
+    /// <summary>
+    ///     One service's own thread pool, as the run models it. A pool belongs to a service because it
+    ///     is a property of a process, and in a graph each service is one.
+    /// </summary>
+    /// <param name="service">The service. It must make calls of its own - a leaf is outside what is simulated.</param>
+    /// <param name="pool">The pool.</param>
+    /// <returns>A new topology. The receiver is unchanged.</returns>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    /// <remarks>
+    ///     <para>
+    ///         The queue delay is paid by every attempt this service makes, on every call it makes,
+    ///         whether or not the policy on that call is configured to notice - because that is where
+    ///         the wait actually is. A policy that does configure <see cref="Resilience.Saturation" />
+    ///         reads <i>its caller's</i> pool: the work item waiting for a thread is the outbound call,
+    ///         and the process it waits in is the one making it.
+    ///     </para>
+    ///     <para>
+    ///         This is the shape the feature exists for, at the scale it actually bites.
+    ///         <see cref="Resilience.Saturation" /> stops a stalled process mistaking itself for a slow
+    ///         dependency - but to everyone <i>calling</i> that process, a stall and a slow dependency
+    ///         are still the same thing, and their estimators adapt to a problem that is not theirs. A
+    ///         graph is the only place that shows.
+    ///     </para>
+    ///     <para>
+    ///         A policy that configures <see cref="Resilience.Saturation" /> on a call from a service
+    ///         with no pool reads a modeled pool that never queues, exactly as
+    ///         <see cref="Simulation.WithPool" /> documents for a run with none.
+    ///     </para>
+    /// </remarks>
+    public Topology WithPool(string service, Pool pool)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(pool);
+
+        return new Topology(_edges, _leaves, _loads, _limiters, [.. _pools, new Pooled(service, pool)], Duration, Records);
     }
 
     /// <summary>How long to offer load for. Calls still in flight when it elapses are allowed to finish.</summary>
     /// <param name="duration">The run length. Must be positive.</param>
     /// <returns>A new topology. The receiver is unchanged.</returns>
-    public Topology For(TimeSpan duration) => new(_edges, _leaves, _loads, duration, Records);
+    public Topology For(TimeSpan duration) => new(_edges, _leaves, _loads, _limiters, _pools, duration, Records);
 
     /// <summary>
     ///     Records every event each edge's policy raises, with the virtual time it was raised at, into
     ///     that edge's <see cref="SimulationReport.Timeline" />.
     /// </summary>
     /// <returns>A new topology. The receiver is unchanged.</returns>
-    public Topology Recording() => new(_edges, _leaves, _loads, Duration, true);
+    public Topology Recording() => new(_edges, _leaves, _loads, _limiters, _pools, Duration, true);
 
     /// <summary>
     ///     Runs the graph and reports what happened, per edge and per service. Nothing sleeps.
@@ -250,6 +322,28 @@ public sealed class Topology
             }
         }
 
+        var limited = new HashSet<(string, string)>();
+
+        foreach (var limiter in _limiters)
+        {
+            if (!declared.Contains((limiter.Caller, limiter.Callee)))
+                problems.Add($"A limiter is declared for '{limiter.Caller}' calling '{limiter.Callee}', which is not a call this topology makes.");
+            else if (!limited.Add((limiter.Caller, limiter.Callee)))
+                problems.Add($"'{limiter.Caller}' calling '{limiter.Callee}' has more than one limiter. One call, one limiter.");
+        }
+
+        var pooled = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var pool in _pools)
+        {
+            if (leaves.Contains(pool.Service))
+                problems.Add($"'{pool.Service}' is a leaf and cannot have a pool. A leaf is the edge of what is simulated, and its own process is not.");
+            else if (!callers.Contains(pool.Service))
+                problems.Add($"A pool is declared for '{pool.Service}', which makes no calls. A pool is what the attempts a service makes wait in.");
+            else if (!pooled.Add(pool.Service))
+                problems.Add($"'{pool.Service}' has more than one pool. One service, one process, one pool.");
+        }
+
         if (Cycle() is { } cycle)
             problems.Add($"The calls form a cycle: {cycle}. A run would never finish, and a cycle is a different simulator.");
 
@@ -261,6 +355,9 @@ public sealed class Topology
 
         foreach (var leaf in _leaves)
             leaf.Dependency.Validate();
+
+        foreach (var pool in _pools)
+            pool.Pool.Validate();
 
         foreach (var offered in _loads)
             offered.Load.Validate();
@@ -336,6 +433,9 @@ public sealed class Topology
 
         private int _outstanding;
 
+        /// <summary>Keeps every saturation-aware policy reading what its caller's pool published.</summary>
+        private ProbeDriver? _probes;
+
         internal Execution(Topology topology, int seed)
         {
             _seed = seed;
@@ -365,6 +465,43 @@ public sealed class Topology
                 edges.Add(edge);
             }
 
+            foreach (var pooled in topology._pools)
+                Node(pooled.Service).Pool = pooled.Pool;
+
+            // A policy that configures Saturation reads its *caller's* pool: the work item waiting for
+            // a thread is the outbound call, and the process it waits in is the one making it. One that
+            // configures it from a service with no pool reads a pool that never queues, which is the
+            // same guarantee a single-dependency run gives - never the real host pool, which would put
+            // a machine-dependent term in a report that is otherwise reproducible to the last byte.
+            var readers = new List<ProbeDriver.Reader>();
+
+            foreach (var edge in edges)
+            {
+                if (edge.Policy.Saturation is not { } saturation)
+                    continue;
+
+                if (edge.Caller.Pool is { } pool)
+                    readers.Add(new ProbeDriver.Reader(pool, edge.Policy, saturation.MinimumSamples));
+                else
+                    ProbeDriver.Freeze(edge.Policy);
+            }
+
+            if (readers.Count > 0)
+            {
+                _probes = new ProbeDriver([.. readers]);
+                _clock.OnAdvance = _probes.Refresh;
+                _probes.Refresh(_clock.Now);
+            }
+
+            foreach (var limited in topology._limiters)
+            {
+                var edge = edges.Single(candidate =>
+                    string.Equals(candidate.CallerName, limited.Caller, StringComparison.Ordinal)
+                    && string.Equals(candidate.CalleeName, limited.Callee, StringComparison.Ordinal));
+
+                edge.Gate = new LimiterGate(limited.Build, _clock, $"'{limited.Caller}' calling '{limited.Callee}'");
+            }
+
             _edges = [.. edges];
             _entries = [.. topology._loads.Select(offered => new EntryState(Node(offered.At), offered.Load))];
 
@@ -382,6 +519,12 @@ public sealed class Topology
             Rng.SeedWith(unchecked((uint)_seed));
 
             Drive();
+
+            foreach (var edge in _edges)
+            {
+                if (edge.Gate is { Queued: true })
+                    throw new InvalidOperationException(LimiterGate.QueuedMessage($"'{edge.CallerName}' calling '{edge.CalleeName}'"));
+            }
 
             if (_fault is not null)
                 throw new InvalidOperationException("A simulated call failed outside every policy in the graph.", _fault);
@@ -622,17 +765,44 @@ public sealed class Topology
         }
 
         /// <summary>One attempt reaching the callee. This is the callback the real executor drives.</summary>
+        /// <remarks>
+        ///     The permit is acquired first, so a refused attempt is not counted as having reached the
+        ///     callee - it never left the caller. The lease is held for the length of the attempt, which
+        ///     is what makes a concurrency limit a bulkhead.
+        /// </remarks>
         private async Task Reach(EdgeState edge, CancellationToken cancellationToken)
         {
-            edge.Reached++;
-            edge.BucketAt(_clock.Now).Reached++;
+            // The caller's own pool, because this attempt is the caller's outbound work item. Waited
+            // before the permit and before the attempt counts, and spent inside the measured duration -
+            // which is the whole mechanism: a stall lengthens every attempt, so it reaches availability
+            // and the latency quantiles exactly as a slow callee does, and that is what Saturation
+            // exists to tell apart.
+            if (edge.Caller.Pool is { } pool)
+            {
+                var queued = pool.DelayAt(TimeSpan.FromTicks(_clock.Now));
 
-            // The caller's own multiplier is what it sends downstream per request it served, across
-            // every edge it has - fan-out and retries together, which is what its own callee feels.
-            edge.Caller.Downstream++;
-            edge.Caller.BucketAt(_clock.Now).Reached++;
+                if (queued > TimeSpan.Zero && !await _clock.Sleep(queued, cancellationToken).ConfigureAwait(false))
+                    cancellationToken.ThrowIfCancellationRequested();
+            }
 
-            await Serve(edge.Callee, cancellationToken).ConfigureAwait(false);
+            var lease = edge.Gate is null ? null : await edge.Gate.AcquireAsync(cancellationToken).ConfigureAwait(false);
+
+            try
+            {
+                edge.Reached++;
+                edge.BucketAt(_clock.Now).Reached++;
+
+                // The caller's own multiplier is what it sends downstream per request it served, across
+                // every edge it has - fan-out and retries together, which is what its own callee feels.
+                edge.Caller.Downstream++;
+                edge.Caller.BucketAt(_clock.Now).Reached++;
+
+                await Serve(edge.Callee, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                lease?.Dispose();
+            }
         }
 
         /// <summary>One second of a run, from the caller's side and from the callee's.</summary>
@@ -666,6 +836,9 @@ public sealed class Topology
             internal int[] Offered { get; } = new int[Enum.GetValues<Criticality>().Length];
 
             internal List<EdgeState> Out { get; } = [];
+
+            /// <summary>This service's own modeled thread pool, or null when the run models none for it.</summary>
+            internal Pool? Pool { get; set; }
 
             internal Bucket BucketAt(long ticks)
             {
@@ -735,6 +908,9 @@ public sealed class Topology
 
             internal NodeState Callee { get; } = callee;
 
+            /// <summary>This call's limiter, or null when it has none.</summary>
+            internal LimiterGate? Gate { get; set; }
+
             internal string CalleeName { get; } = calleeName;
 
             internal NodeState Caller { get; } = caller;
@@ -784,7 +960,7 @@ public sealed class Topology
                     _kinds,
                     Offered,
                     Served,
-                    0,
+                    Gate?.Refused ?? 0,
                     _timeline is null ? null : [.. _timeline]);
 
             private double Amplification()
@@ -871,6 +1047,12 @@ public sealed class Topology
 
     /// <summary>One declared leaf.</summary>
     private readonly record struct Leafed(string Name, Dependency Dependency);
+
+    /// <summary>One call's limiter, before the graph is resolved.</summary>
+    private readonly record struct Limited(string Caller, string Callee, Func<TimeProvider, RateLimiter> Build);
+
+    /// <summary>One service's modeled thread pool, before the graph is resolved.</summary>
+    private readonly record struct Pooled(string Service, Pool Pool);
 
     /// <summary>One declared entry point and the traffic arriving at it.</summary>
     private readonly record struct Offered(string At, Load Load);

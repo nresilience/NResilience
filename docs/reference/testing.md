@@ -225,6 +225,8 @@ A limiter that cannot answer on a virtual clock throws `InvalidOperationExceptio
 | `Leaf(string name, Dependency dependency)` | Declares a leaf: a node that makes no further calls, modeled as a `Simulate.Policy` dependency. |
 | `Under(Load load, string at)` | Offers traffic at one service. Call it more than once for several entry points. `Load.Peers` must be 1. |
 | `For(TimeSpan duration)` | How long to offer load for. Required, and positive. |
+| `WithPool(string service, Pool pool)` | One service's own modeled thread pool. Every attempt it makes waits in it; a policy configuring `Saturation` reads its caller's pool. Refused on a leaf, on a name that makes no calls, or twice for one service. |
+| `WithLimiter(string caller, string callee, Func<TimeProvider, RateLimiter> limiter)` | The limiter one call acquires from, built per run against the virtual clock. Refused for a call the topology does not make, or twice for one call. The same replenishing and queueing limiters `Simulation.WithLimiter` refuses are refused here, and the message names the call. |
 | `Recording()` | Records a timeline per edge, into each `On(caller, callee).Timeline`. |
 | `Run(int seed)` | Runs the graph and returns a `TopologyReport`. |
 | `RunAll(params int[] seeds)` | Runs it once per seed and returns a `TopologyBand`. No repeats. |
@@ -232,6 +234,8 @@ A limiter that cannot answer on a virtual clock throws `InvalidOperationExceptio
 | `Edges`, `Duration`, `Records` | What has been declared so far. |
 
 A service makes its calls **in the order they were declared, one after another**. Cycles, self-calls, duplicate calls, a leaf that also makes calls, a callee that was never declared, load offered at a service that makes no calls, and `Load.Peers` above one are all refused.
+
+A call's report carries its own `RefusedByLimiter`. A service's pool is paid before that call's permit is acquired and before the attempt counts as having reached the callee, which is the order a single-dependency run uses.
 
 ## `Edge`
 

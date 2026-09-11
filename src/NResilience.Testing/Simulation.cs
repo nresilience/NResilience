@@ -274,26 +274,17 @@ public sealed record Simulation
 
         private readonly Func<CancellationToken, Task> _work;
 
-        /// <summary>The modeled pool, or null when the policy does not measure one.</summary>
+        /// <summary>The modeled pool, or null when the run models none.</summary>
         private readonly Pool? _pool;
 
         /// <summary>This run's limiter, or null when the run has none.</summary>
-        private readonly RateLimiter? _limiter;
+        private readonly LimiterGate? _gate;
 
-        /// <summary>Attempts the limiter refused before they could leave the process.</summary>
-        private int _refused;
-
-        /// <summary>Whether the limiter queued an attempt, which a virtual clock cannot carry.</summary>
-        private bool _queued;
+        /// <summary>Keeps the policy's saturation reading at what the modeled pool last published.</summary>
+        private ProbeDriver? _probes;
 
         /// <summary>The recording, or null when the run was not asked for one.</summary>
         private readonly List<TimelineEntry>? _timeline;
-
-        /// <summary>How many probes the modeled baseline needs, mirrored off the policy's own setting.</summary>
-        private readonly int _samples;
-
-        /// <summary>Which probe interval the substituted reading was last computed for, or -1 for none.</summary>
-        private long _probed = -1;
 
         /// <summary>The first exception a call threw out of <c>TryRunAsync</c>, which would be a library bug.</summary>
         private Exception? _fault;
@@ -325,22 +316,7 @@ public sealed record Simulation
             // Built here rather than by the caller so it gets this run's clock, and built once per run
             // so a band measures the scenario rather than the order its seeds were listed in.
             if (simulation.Limiter is { } build)
-            {
-                _limiter = build(_clock)
-                    ?? throw new InvalidOperationException("The limiter factory returned null. WithLimiter must build a limiter.");
-
-                // A token bucket and a sliding window refill against the wall clock, and this run has
-                // none: five virtual minutes are a few real milliseconds, so one would hand out a
-                // single window and refuse everything after it. Refused rather than reported, because
-                // a limit nobody configured is worse than no limit at all.
-                if (_limiter is ReplenishingRateLimiter)
-                {
-                    throw new InvalidOperationException(
-                        "A replenishing limiter cannot run on a virtual clock: it refills against the wall clock, and a "
-                        + "simulation's five minutes are a few real milliseconds, so it would hand out one window of permits "
-                        + "and refuse everything after it. Limit.Concurrency and Limit.Adaptive measure what a run gives them.");
-                }
-            }
+                _gate = new LimiterGate(build, _clock, "the simulation");
 
             // A policy that does not configure Saturation never asks for a reading, and the
             // process-wide probe is never even queued for it. One that does gets a modeled reading
@@ -351,13 +327,13 @@ public sealed record Simulation
 
             if (_pool is null)
             {
-                ExecutionState.OverrideProbe(_policy, new PoolProbe.Reading(TimeSpan.Zero, null));
+                ProbeDriver.Freeze(_policy);
                 return;
             }
 
-            _samples = saturation.MinimumSamples;
-            _clock.OnAdvance = Probe;
-            Probe(_clock.Now);
+            _probes = new ProbeDriver([new ProbeDriver.Reader(_pool, _policy, saturation.MinimumSamples)]);
+            _clock.OnAdvance = _probes.Refresh;
+            _probes.Refresh(_clock.Now);
         }
 
         internal SimulationReport Execute()
@@ -369,15 +345,8 @@ public sealed record Simulation
 
             Drive();
 
-            if (_queued)
-            {
-                throw new InvalidOperationException(
-                    "The limiter queued an attempt, and a queueing limiter cannot run on a virtual clock: the wait ends "
-                    + "when another caller releases a permit, and the platform resumes it on the thread pool rather than "
-                    + "on the single thread a run drives everything from. Build the limiter with queueLimit 0 - the "
-                    + "default, and the one the library recommends, because a refusal a policy can retry on the "
-                    + "throttled backoff curve beats opaque latency charged against AttemptTimeout.");
-            }
+            if (_gate is { Queued: true })
+                throw new InvalidOperationException(LimiterGate.QueuedMessage("the simulation"));
 
             if (_fault is not null)
                 throw new InvalidOperationException("A simulated call failed outside the policy.", _fault);
@@ -394,7 +363,7 @@ public sealed record Simulation
                 _kinds,
                 _offered,
                 _served,
-                _refused,
+                _gate?.Refused ?? 0,
                 _timeline is null ? null : [.. _timeline]);
         }
 
@@ -557,41 +526,7 @@ public sealed record Simulation
             // callback acquires it: the work item is scheduled, then it runs and asks for a permit,
             // then it sends. The lease is held for the length of the attempt, which is the whole of
             // what makes a concurrency limit a bulkhead.
-            RateLimitLease? lease = null;
-
-            if (_limiter is not null)
-            {
-                var pending = _limiter.AcquireAsync(1, cancellationToken);
-
-                // A limiter with a queue hands back a task that completes when somebody else's permit
-                // is released, and it completes that task on the thread pool rather than inline. Every
-                // other suspension in a run is on the virtual clock and resumes on this thread, so
-                // awaiting this one would put a second thread inside a single-threaded simulation and
-                // corrupt the tallies it is halfway through writing. It is recorded and the run is
-                // stopped afterwards rather than awaited - see Execute.
-                if (!pending.IsCompleted)
-                {
-                    _queued = true;
-
-                    throw new RateLimitedException();
-                }
-
-                lease = await pending.ConfigureAwait(false);
-            }
-
-            if (lease is { IsAcquired: false })
-            {
-                var retryAfter = lease.TryGetMetadata(MetadataName.RetryAfter, out var after) ? after : (TimeSpan?)null;
-
-                lease.Dispose();
-                _refused++;
-
-                // The one exception the executor reads as local admission control: Verdict.Refused, no
-                // evidence against the breaker, and nothing charged to the retry budget, because the
-                // call never left. That decision is the shipping one - this only throws what a real
-                // callback throws.
-                throw new RateLimitedException(retryAfter);
-            }
+            var lease = _gate is null ? null : await _gate.AcquireAsync(cancellationToken).ConfigureAwait(false);
 
             try
             {
@@ -658,31 +593,6 @@ public sealed record Simulation
         {
             _kinds[(int)callEvent.Kind]++;
             _timeline?.Add(new TimelineEntry(TimeSpan.FromTicks(_clock.Now), callEvent));
-        }
-
-        /// <summary>
-        ///     Points the policy's saturation reading at what the modeled pool last published. Called on
-        ///     every move of the virtual clock, so an attempt starting from a retry timer reads the
-        ///     instant that timer fired at rather than the last arrival's.
-        /// </summary>
-        /// <param name="ticks">Ticks since the start of the run.</param>
-        /// <remarks>
-        ///     Held to the interval the shipping probe actually publishes on, four times a second, and
-        ///     evaluated at the boundary rather than at <paramref name="ticks" />. A reading recomputed on
-        ///     every advance of a virtual clock would be an oracle rather than a probe: it would notice a
-        ///     stall the instant it began, where a real reader sees the previous sample until the next one
-        ///     lands. Only the <i>measurement</i> is quantized - the delay an attempt actually waits is
-        ///     read at the instant it waits it.
-        /// </remarks>
-        private void Probe(long ticks)
-        {
-            var interval = ticks / PoolProbe.Interval.Ticks;
-
-            if (interval == _probed)
-                return;
-
-            _probed = interval;
-            ExecutionState.OverrideProbe(_policy, _pool!.At(TimeSpan.FromTicks(interval * PoolProbe.Interval.Ticks), _samples));
         }
 
         /// <summary>

@@ -385,11 +385,24 @@ The finding is usually the gap between two of them: every policy behaving exactl
 > [!IMPORTANT]
 > **A service makes its calls one after another, in the order they were declared.** This does not model parallel fan-out. Modeling parallel calls as sequential would incorrectly sum wait times and fail to reflect that a failed first call may prevent subsequent ones. Two calls a caller really does make in sequence are exactly this.
 
+### Guards that belong to a process
+
+A [thread pool](#model-the-thread-pool) and a [limiter](#bound-what-leaves-the-process) are properties of one process, and in a graph each service is one.
+
+`WithPool(service, pool)` gives a service its own pool. Every attempt that service makes waits in it, on every call it makes, whether or not the policy on that call is configured to notice. A policy that *does* configure `Saturation` reads **its caller's** pool: the work item waiting for a thread is the outbound call, and the process it waits in is the one making it. A call from a service with no pool reads a pool that never queues, exactly as a single-dependency run with no `WithPool` does.
+
+`WithLimiter(caller, callee, limiter)` goes on a call rather than a service, because a limiter guards one outbound call - a checkout's bulkhead for its payment provider is not its bulkhead for its catalog. The same two kinds are refused, and the message names the call.
+
+> [!TIP]
+> **This is where a pool stall stops being local.** `Saturation` stops a stalled process mistaking itself for a slow dependency. But to everyone *calling* that process, a stall and a slow dependency are still the same thing: in a chain where payments' pool stalls for twenty seconds, the bank answers in its usual time throughout and the checkout's p99 goes from 98 ms to 1.1 s. Payments detects its own episode; the checkout detects nothing, because it has nothing to detect. A graph is the only place that shows.
+>
+> It compounds with the [attempt ceiling](../features/deadlines.md). A ceiling learned while the pool was healthy describes a dependency that never changed, so once the pool stalls every attempt overruns it - and because a service makes its calls one after another, the call that follows the failed one is never made at all. The cost of the misattribution is a whole downstream call rather than a retry.
+
 ### What a graph will not do
 
 - **Cycles are refused.** A run would never finish, and a service that calls itself back is a different simulator.
 - **`peers` is refused.** It exists so a single-dependency run can ask "does my retry budget hold when I am one of fifty" without claiming to have simulated fifty policies - and a topology is the place where the peers *do* have policies, so approximating them away is the one thing it should not offer. Offer load at another entry instead.
-- **No pool and no limiter yet.** [`WithPool`](#model-the-thread-pool) and [`WithLimiter`](#bound-what-leaves-the-process) are properties of one process, and a graph is one process per service. Both belong on a node; neither is there yet.
+- **One limiter per call.** A process that shares one bulkhead across everything it calls is a real shape and is not this one.
 
 ## What is fake, and what is not
 
