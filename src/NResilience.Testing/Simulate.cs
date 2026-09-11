@@ -51,6 +51,19 @@ namespace NResilience.Testing;
 /// <seealso cref="SimulationReport" />
 public static class Simulate
 {
+    /// <summary>
+    ///     Starts a simulation of a graph of services calling each other. Chain <c>Calls</c>,
+    ///     <c>Leaf</c>, <c>Under</c>, <c>For</c> and <c>Run</c>.
+    ///     <para>
+    ///         <see cref="Policy" /> answers what one policy costs one dependency. This answers the
+    ///         question a team has instead: when the thing at the bottom browns out, what happens at the
+    ///         top. A retry storm is a property of a call graph, and no arrangement of a
+    ///         single-dependency run can show one.
+    ///     </para>
+    /// </summary>
+    /// <returns>The empty topology.</returns>
+    public static Topology Topology() => new();
+
     /// <summary>Starts a simulation of a policy. Chain <c>Against</c>, <c>Under</c>, <c>For</c> and <c>Run</c>.</summary>
     /// <param name="policy">The policy to simulate. Its <see cref="Resilience.Time" /> is replaced by the virtual clock.</param>
     /// <returns>The simulation.</returns>

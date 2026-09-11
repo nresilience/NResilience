@@ -48,6 +48,11 @@ NResilience.Testing.Dependency.P50.get -> System.TimeSpan
 NResilience.Testing.Dependency.P99.get -> System.TimeSpan
 NResilience.Testing.Dependency.Validate() -> void
 NResilience.Testing.Dependency.Validated() -> NResilience.Testing.Dependency!
+NResilience.Testing.Edge
+NResilience.Testing.Edge.Callee.get -> string!
+NResilience.Testing.Edge.Caller.get -> string!
+NResilience.Testing.Edge.Edge() -> void
+NResilience.Testing.Edge.Edge(string! caller, string! callee) -> void
 NResilience.Testing.EventRecorder
 NResilience.Testing.EventRecorder.Clear() -> void
 NResilience.Testing.EventRecorder.Count.get -> int
@@ -192,6 +197,37 @@ NResilience.Testing.TimelineEntry.At.get -> System.TimeSpan
 NResilience.Testing.TimelineEntry.Event.get -> NResilience.CallEvent
 NResilience.Testing.TimelineEntry.TimelineEntry() -> void
 NResilience.Testing.TimelineEntry.TimelineEntry(System.TimeSpan at, NResilience.CallEvent callEvent) -> void
+NResilience.Testing.Topology
+NResilience.Testing.Topology.Calls(string! caller, string! callee, NResilience.Resilience! policy) -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.Duration.get -> System.TimeSpan
+NResilience.Testing.Topology.Edges.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.Edge>!
+NResilience.Testing.Topology.For(System.TimeSpan duration) -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.Leaf(string! name, NResilience.Testing.Dependency! dependency) -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.Recording() -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.Records.get -> bool
+NResilience.Testing.Topology.Run(int seed) -> NResilience.Testing.TopologyReport!
+NResilience.Testing.Topology.RunAll(params int[]! seeds) -> NResilience.Testing.TopologyBand!
+NResilience.Testing.Topology.Under(NResilience.Testing.Load! load, string! at) -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.Validate() -> void
+NResilience.Testing.TopologyBand
+NResilience.Testing.TopologyBand.At(string! service) -> NResilience.Testing.SimulationBand!
+NResilience.Testing.TopologyBand.Duration.get -> System.TimeSpan
+NResilience.Testing.TopologyBand.Edges.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.Edge>!
+NResilience.Testing.TopologyBand.EngineVersion.get -> string!
+NResilience.Testing.TopologyBand.Entries.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NResilience.Testing.TopologyBand.On(string! caller, string! callee) -> NResilience.Testing.SimulationBand!
+NResilience.Testing.TopologyBand.Reports.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.TopologyReport!>!
+NResilience.Testing.TopologyBand.Seeds.get -> System.Collections.Generic.IReadOnlyList<int>!
+NResilience.Testing.TopologyBand.Services.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NResilience.Testing.TopologyReport
+NResilience.Testing.TopologyReport.At(string! service) -> NResilience.Testing.SimulationReport!
+NResilience.Testing.TopologyReport.Duration.get -> System.TimeSpan
+NResilience.Testing.TopologyReport.Edges.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.Edge>!
+NResilience.Testing.TopologyReport.EngineVersion.get -> string!
+NResilience.Testing.TopologyReport.Entries.get -> System.Collections.Generic.IReadOnlyList<string!>!
+NResilience.Testing.TopologyReport.On(string! caller, string! callee) -> NResilience.Testing.SimulationReport!
+NResilience.Testing.TopologyReport.Seed.get -> int
+NResilience.Testing.TopologyReport.Services.get -> System.Collections.Generic.IReadOnlyList<string!>!
 NResilience.Testing.VoidSequence
 NResilience.Testing.VoidSequence.CallCount.get -> int
 NResilience.Testing.VoidSequence.Delays(System.TimeSpan delay) -> NResilience.Testing.VoidSequence!
@@ -225,6 +261,7 @@ static NResilience.Testing.SentRequest.operator ==(NResilience.Testing.SentReque
 static NResilience.Testing.Sequence.For<T>(System.TimeProvider? time = null) -> NResilience.Testing.Sequence<T>!
 static NResilience.Testing.Sequence.ForVoid(System.TimeProvider? time = null) -> NResilience.Testing.VoidSequence!
 static NResilience.Testing.Simulate.Policy(NResilience.Resilience! policy) -> NResilience.Testing.Simulation!
+static NResilience.Testing.Simulate.Topology() -> NResilience.Testing.Topology!
 static NResilience.Testing.Simulation.operator !=(NResilience.Testing.Simulation? left, NResilience.Testing.Simulation? right) -> bool
 static NResilience.Testing.Simulation.operator ==(NResilience.Testing.Simulation? left, NResilience.Testing.Simulation? right) -> bool
 static NResilience.Testing.TestPolicy.Instant.get -> NResilience.Resilience!
@@ -238,6 +275,7 @@ override NResilience.Testing.Chaos.ToString() -> string!
 override NResilience.Testing.Dependency.Equals(object? obj) -> bool
 override NResilience.Testing.Dependency.GetHashCode() -> int
 override NResilience.Testing.Dependency.ToString() -> string!
+override NResilience.Testing.Edge.ToString() -> string!
 override NResilience.Testing.EventRecorder.ToString() -> string!
 override NResilience.Testing.Load.Equals(object? obj) -> bool
 override NResilience.Testing.Load.GetHashCode() -> int
@@ -255,3 +293,4 @@ override NResilience.Testing.SimulationBand.ToString() -> string!
 override NResilience.Testing.SimulationReport.ToString() -> string!
 override NResilience.Testing.TimeBand.ToString() -> string!
 override NResilience.Testing.TimelineEntry.ToString() -> string!
+override NResilience.Testing.TopologyReport.ToString() -> string!

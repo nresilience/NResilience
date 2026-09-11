@@ -193,6 +193,7 @@ Chaos applies only to the asynchronous path. This is not a limitation in practic
 | Member | Description |
 | :--- | :--- |
 | `Simulate.Policy(Resilience policy)` | Starts a simulation of a policy, returning a `Simulation`. The policy's `Time` is replaced by the virtual clock and any breaker it carries is rebuilt on that clock. |
+| `Simulate.Topology()` | Starts a simulation of a graph of services calling each other, returning a `Topology`. |
 
 ## `Simulation`
 
@@ -213,6 +214,44 @@ Chaos applies only to the asynchronous path. This is not a limitation in practic
 `Run` validates the policy, the dependency, the load, and the pool if there is one, throwing `ResilienceConfigurationException`. A simulation missing its dependency, its load, or its duration throws `InvalidOperationException` naming the method that was not called.
 
 A limiter that cannot answer on a virtual clock throws `InvalidOperationException` too: a `ReplenishingRateLimiter` - `Limit.PerSecond`, `Limit.PerWindow` - refills against the wall clock, and a limiter with a `queueLimit` above zero resumes a queued wait on the thread pool. `Limit.Concurrency` and `Limit.Adaptive`, built with `queueLimit: 0`, are what a run can measure.
+
+## `Topology`
+
+`Topology` is a graph of services calling each other. A class rather than a `record` - it holds arrays, so generated equality would compare references - but nothing mutates, so every method returns a new value, similarly to `Simulation`. See [Simulate a call graph](../testing/simulation.md#simulate-a-call-graph).
+
+| Member | Description |
+| :--- | :--- |
+| `Calls(string caller, string callee, Resilience policy)` | Declares that one service calls another under a policy. Policies are associated with calls. A service is any name that makes a call. |
+| `Leaf(string name, Dependency dependency)` | Declares a leaf: a node that makes no further calls, modeled as a `Simulate.Policy` dependency. |
+| `Under(Load load, string at)` | Offers traffic at one service. Call it more than once for several entry points. `Load.Peers` must be 1. |
+| `For(TimeSpan duration)` | How long to offer load for. Required, and positive. |
+| `Recording()` | Records a timeline per edge, into each `On(caller, callee).Timeline`. |
+| `Run(int seed)` | Runs the graph and returns a `TopologyReport`. |
+| `RunAll(params int[] seeds)` | Runs it once per seed and returns a `TopologyBand`. No repeats. |
+| `Validate()` | Throws `InvalidOperationException` listing every problem at once, then validates each policy, dependency and load. |
+| `Edges`, `Duration`, `Records` | What has been declared so far. |
+
+A service makes its calls **in the order they were declared, one after another**. Cycles, self-calls, duplicate calls, a leaf that also makes calls, a callee that was never declared, load offered at a service that makes no calls, and `Load.Peers` above one are all refused.
+
+## `Edge`
+
+`Edge` is one call in a topology: a `Caller` and a `Callee`, and a `ToString()` of `caller -> callee`.
+
+## `TopologyReport`
+
+What a graph run measured. The same seed produces the same report.
+
+| Member | Description |
+| :--- | :--- |
+| `On(string caller, string callee)` | What one call measured, as a `SimulationReport`. `Calls` is the caller's invocations, `Reached` the attempts that got to the callee, and `TimeToRecover` is measured against the callee's own impairment - null for a call into a service, because only a leaf is impaired on a schedule. |
+| `At(string service)` | What one service measured, as a `SimulationReport`. `Calls` is requests served, `Reached` is attempts sent downstream across every call it makes. A leaf's `Reached` equals its `Calls`, so its multiplier is one. |
+| `Edges`, `Entries`, `Services` | The calls declared, the services load was offered at, and every name in the graph. |
+| `Seed`, `Duration`, `EngineVersion` | What the run was. |
+| `ToString()` | Every entry then every call, as a fixed block of invariant-formatted text. |
+
+## `TopologyBand`
+
+What a set of seeds measured over a graph. `On(caller, callee)` and `At(service)` each return a `SimulationBand`; `Reports`, `Seeds`, `Edges`, `Entries`, `Services`, `Duration` and `EngineVersion` are as `TopologyReport` has them.
 
 ## `Dependency`
 

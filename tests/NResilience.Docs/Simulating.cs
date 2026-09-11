@@ -226,6 +226,36 @@ public sealed class Simulating
         // </snippet:simulation-timeline>
     }
 
+    [Fact]
+    public void A_retry_storm_compounds_down_a_call_graph()
+    {
+        // <snippet:simulation-topology>
+        var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10) };
+
+        var report = Simulate.Topology()
+            .Calls(caller: "checkout", callee: "payments", policy: api with { Name = "payments" })
+            .Calls(caller: "payments", callee: "bank", policy: api with { Name = "bank" })
+            .Leaf(name: "bank", dependency: Dependency
+                .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 100))
+                .Brownout(after: TimeSpan.FromSeconds(value: 10), slower: 10, lasting: TimeSpan.FromSeconds(value: 15)))
+            .Under(load: Load.Constant(perSecond: 200), at: "checkout")
+            .For(duration: TimeSpan.FromSeconds(value: 40))
+            .Run(seed: 42);
+
+        // Each policy retries about as much as it was told to.
+        var upper = report.On(caller: "checkout", callee: "payments");
+        var lower = report.On(caller: "payments", callee: "bank");
+
+        // And the thing at the bottom feels the product of them - the number nobody configured, and
+        // the one no single-dependency run can show you.
+        Assert.True(condition: lower.Amplification > upper.Amplification);
+
+        // The calls payments makes are the attempts checkout sent it.
+        Assert.Equal(expected: upper.Reached, actual: lower.Calls);
+
+        // </snippet:simulation-topology>
+    }
+
     /// <summary>The published report, read off disk so the page and the assertion cannot disagree.</summary>
     private static string Published()
     {

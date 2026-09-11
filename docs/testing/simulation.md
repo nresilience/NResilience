@@ -334,6 +334,63 @@ Assert.True(condition: retry.At > TimeSpan.Zero);
 
 Recording changes nothing about what the run does. The events are the ones the policy already raises to its listener, and the whole simulation is single-threaded on a virtual clock, so the time beside each one is read rather than measured - a recorded run and an unrecorded one from the same seed print the same report.
 
+## Simulate a call graph
+
+`Simulate.Policy` answers what one policy costs one dependency, which is the question a policy's author has. The question a team has is the other one: **when the bank browns out, does the checkout fall over?**
+
+That is a property of a call graph rather than of a policy. A retry storm is B retrying C while A retries B, and B's breaker opening changes the load A offers - so no arrangement of a single-dependency run can show one. `Simulate.Topology` runs the graph:
+
+<!-- snippet: simulation-topology -->
+```csharp
+var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10) };
+
+var report = Simulate.Topology()
+    .Calls(caller: "checkout", callee: "payments", policy: api with { Name = "payments" })
+    .Calls(caller: "payments", callee: "bank", policy: api with { Name = "bank" })
+    .Leaf(name: "bank", dependency: Dependency
+        .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 100))
+        .Brownout(after: TimeSpan.FromSeconds(value: 10), slower: 10, lasting: TimeSpan.FromSeconds(value: 15)))
+    .Under(load: Load.Constant(perSecond: 200), at: "checkout")
+    .For(duration: TimeSpan.FromSeconds(value: 40))
+    .Run(seed: 42);
+
+// Each policy retries about as much as it was told to.
+var upper = report.On(caller: "checkout", callee: "payments");
+var lower = report.On(caller: "payments", callee: "bank");
+
+// And the thing at the bottom feels the product of them - the number nobody configured, and
+// the one no single-dependency run can show you.
+Assert.True(condition: lower.Amplification > upper.Amplification);
+
+// The calls payments makes are the attempts checkout sent it.
+Assert.Equal(expected: upper.Reached, actual: lower.Calls);
+```
+<!-- endsnippet -->
+
+**A policy belongs to a call, not to a service.** A checkout retries its payment provider on different terms than its catalog, so `Calls(caller, callee, policy)` is the unit - and the unit the numbers come back on, because the load multiplier on `payments -> bank` is the number the bank's owner asks for.
+
+Everything else is what it already was. The policies are yours and the executors are the shipping ones; one virtual clock and one random stream drive the whole graph, so a run reproduces to the last byte from its seed exactly as a single-dependency run does. A `Leaf` is the same modeled `Dependency`. A downstream failure is raised to the caller as the downstream's own exception, so the caller's classifier judges what actually happened.
+
+### Read the report
+
+| Member | What it answers |
+| :--- | :--- |
+| `On(caller, callee)` | What one call measured, as an ordinary [`SimulationReport`](#read-the-report). `Calls` is how often the caller invoked it, `Reached` how many attempts got to the callee, and `LoadMultiplier` between them is what the callee feels. |
+| `At(service)` | What one service measured. `Calls` is the requests it served, `Availability` the fraction it answered, and `Reached` the attempts it sent downstream across every call it makes - so its `LoadMultiplier` is fan-out and retries together. A leaf sends nothing on, so its multiplier is one. |
+| `Edges`, `Entries`, `Services` | What the graph contains. |
+| `RunAll(seeds)` | A `TopologyBand`, with `On` and `At` returning a [`SimulationBand`](#compare-two-configurations) each. |
+
+The finding is usually the gap between two of them: every policy behaving exactly as configured while the thing at the bottom feels several times the load anybody asked for.
+
+> [!IMPORTANT]
+> **A service makes its calls one after another, in the order they were declared.** This does not model parallel fan-out. Modeling parallel calls as sequential would incorrectly sum wait times and fail to reflect that a failed first call may prevent subsequent ones. Two calls a caller really does make in sequence are exactly this.
+
+### What a graph will not do
+
+- **Cycles are refused.** A run would never finish, and a service that calls itself back is a different simulator.
+- **`peers` is refused.** It exists so a single-dependency run can ask "does my retry budget hold when I am one of fifty" without claiming to have simulated fifty policies - and a topology is the place where the peers *do* have policies, so approximating them away is the one thing it should not offer. Offer load at another entry instead.
+- **No pool and no limiter yet.** [`WithPool`](#model-the-thread-pool) and [`WithLimiter`](#bound-what-leaves-the-process) are properties of one process, and a graph is one process per service. Both belong on a node; neither is there yet.
+
 ## What is fake, and what is not
 
 Four things are fake: the clock, the random source, the dependency, and - when you ask for one - this process's own thread pool. The policy is yours, and the executor, the breaker, the retry budget, the classifier, and every estimator are the shipping ones - nothing about the decision logic is re-implemented for the simulator. A simulator that modeled the library would be worse than no simulator.
