@@ -148,6 +148,32 @@ public sealed class RetryBudget
     /// </summary>
     internal bool IsNone => _time is null && !IsAutomatic;
 
+    /// <summary>
+    ///     This budget's settings as a fresh, full bucket on another clock.
+    ///     <para>
+    ///         For the simulator. A budget refills against the clock it was built with, and a budget
+    ///         built by <see cref="Of(double, int, TimeProvider?)" /> or
+    ///         <see cref="Shared(string, double, int)" /> outside a test was built against
+    ///         <see cref="TimeProvider.System" /> - so dropped into a run on a virtual clock it would
+    ///         refill at the rate the real seconds passed rather than the simulated ones, which makes
+    ///         the run depend on how fast the machine happened to be. Rebasing it onto the run's own
+    ///         clock is what makes a simulated budget behave like the budget it is modelling.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="Automatic" /> and <see cref="None" /> are returned unchanged: neither holds a
+    ///         bucket. Automatic is a marker the executor resolves per policy instance, already against
+    ///         that policy's own clock.
+    ///     </para>
+    /// </summary>
+    /// <param name="time">The clock the rebased budget refills against.</param>
+    /// <returns>A new budget on that clock, or this one when there is nothing to rebase.</returns>
+    internal RetryBudget OnClock(TimeProvider time)
+    {
+        ArgumentNullException.ThrowIfNull(time);
+
+        return IsAutomatic || IsNone ? this : new RetryBudget(Name, _fraction, (int)_refillPerSecond, time);
+    }
+
     /// <summary>A budget private to whoever holds this instance.</summary>
     /// <param name="fraction">
     ///     Retries funded per successful attempt, so 0.1 means one retry per ten successes in steady

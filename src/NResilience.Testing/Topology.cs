@@ -501,6 +501,11 @@ public sealed class Topology
 
             var edges = new List<EdgeState>();
 
+            // One scope for the whole graph run: two services configured with the same budget - which
+            // is what RetryBudget.Shared hands out for a name - keep sharing one bucket within this
+            // run, and share nothing with any other run.
+            var budgets = new BudgetClock(_clock);
+
             foreach (var declared in topology._edges)
             {
                 var caller = Node(declared.Caller);
@@ -510,7 +515,7 @@ public sealed class Topology
                 // the edge that raised them - which is what keeps a graph's telemetry attributable when
                 // a dozen policies are raising events into the same run.
                 edge.Policy = declared.Policy
-                    .WithClock(_clock)
+                    .WithClock(_clock, budgets)
                     .WithListener(raised => edge.Record(TimeSpan.FromTicks(_clock.Now), raised));
 
                 edge.Work = token => Reach(edge, token);

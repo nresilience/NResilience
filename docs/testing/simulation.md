@@ -264,6 +264,8 @@ One seed is still one sample. Arrival gaps, latency draws, failure draws, and ba
 
 `RunAll` runs the same scenario once per seed and reports a [`Band`](../reference/testing.md) per measurement - `Median`, `Minimum`, `Maximum`, and `Spread` - instead of a number. Nothing sleeps, so twenty seeds cost twenty times almost nothing. `Separates` is the comparison worth making: two bands that overlap are two policies this scenario cannot tell apart, and saying so is the point.
 
+The seeds run at the same time as each other, on as many threads as the machine has. A run builds its own clock, breaker, retry budget and limiter and seeds its own thread's jitter stream, so a band reports exactly what the same seeds report run one at a time - the threads make it finish sooner and change nothing else. The gain is bounded by allocation rather than by cores, so a host that runs large bands should enable [server GC](https://learn.microsoft.com/dotnet/core/runtime-config/garbage-collector). A simulation configured with `WithLimiter` runs its seeds one at a time instead, because the factory it takes is your code and has always been called one seed at a time.
+
 This is how a configuration argument becomes a number:
 
 <!-- snippet: simulation-compare -->
@@ -332,7 +334,7 @@ Assert.True(condition: retry.At > TimeSpan.Zero);
 ```
 <!-- endsnippet -->
 
-Recording changes nothing about what the run does. The events are the ones the policy already raises to its listener, and the whole simulation is single-threaded on a virtual clock, so the time beside each one is read rather than measured - a recorded run and an unrecorded one from the same seed print the same report.
+Recording changes nothing about what the run does. The events are the ones the policy already raises to its listener, and a run is single-threaded on a virtual clock, so the time beside each one is read rather than measured - a recorded run and an unrecorded one from the same seed print the same report.
 
 ## Simulate a call graph
 

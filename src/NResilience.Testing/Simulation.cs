@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Threading.RateLimiting;
 using NResilience.Internal;
 using NResilience.Testing.Internal;
@@ -203,6 +204,13 @@ public sealed record Simulation
     ///         places on the next one. Nothing here sleeps, so a band of twenty costs twenty times
     ///         almost nothing.
     ///     </para>
+    ///     <para>
+    ///         The seeds run at the same time as each other, on as many threads as the machine has.
+    ///         Each one is self-contained, so the band is identical to running them one at a time -
+    ///         only faster. A policy carrying a <i>shared</i> retry budget is the one exception and
+    ///         runs its seeds one after another, because a process-wide bucket is the one thing two
+    ///         runs would contend on.
+    ///     </para>
     /// </summary>
     /// <param name="seeds">The seeds. At least one, and no repeats.</param>
     /// <returns>The band.</returns>
@@ -228,10 +236,63 @@ public sealed record Simulation
 
         var reports = new SimulationReport[seeds.Length];
 
-        for (var i = 0; i < seeds.Length; i++)
-            reports[i] = Run(seeds[i]);
+        if (seeds.Length > 1 && SeedsAreIndependent)
+            RunInParallel(seeds, reports);
+        else
+            for (var i = 0; i < seeds.Length; i++)
+                reports[i] = Run(seeds[i]);
 
         return new SimulationBand(reports);
+    }
+
+    /// <summary>
+    ///     Whether the seeds of a band can run at the same time as each other.
+    ///     <para>
+    ///         A run builds its own clock, its own breaker (<c>WithClock</c> rebuilds one rather than
+    ///         rebasing it), its own limiter, and seeds its own thread's jitter stream, so two runs
+    ///         share nothing of those and cannot see each other.
+    ///     </para>
+    ///     <para>
+    ///         The retry budget used to be an exception and is not one any more: a budget is rebased
+    ///         onto the run's own clock when the policy is, so each seed holds its own bucket rather
+    ///         than all of them sharing the one the policy was configured with.
+    ///     </para>
+    ///     <para>
+    ///         A limiter is the exception that remains, and the reason is the caller's rather than the
+    ///         engine's: the factory <see cref="WithLimiter" /> takes is someone else's code, it has
+    ///         always been called one seed at a time, and a factory that keeps a list of what it built
+    ///         - a perfectly reasonable thing to do - would quietly lose entries the first time it was
+    ///         called from two threads at once. Speeding a band up is not worth reaching into a
+    ///         caller's code and changing the threading rules under it.
+    ///     </para>
+    /// </summary>
+    private bool SeedsAreIndependent => Limiter is null;
+
+    /// <summary>
+    ///     Runs each seed on its own thread.
+    ///     <para>
+    ///         Safe because nothing sleeps: <c>Drive</c> is a synchronous loop over a manual clock, so
+    ///         one run happens start to finish on one thread and the thread-static jitter stream it
+    ///         seeded stays its own. The reports land by index, so the band is in seed order however
+    ///         the threads interleave, and the numbers are identical to running them one after another.
+    ///     </para>
+    /// </summary>
+    /// <param name="seeds">The seeds.</param>
+    /// <param name="reports">Where to put each seed's report, by index.</param>
+    private void RunInParallel(int[] seeds, SimulationReport[] reports)
+    {
+        try
+        {
+            Parallel.For(0, seeds.Length, i => reports[i] = Run(seeds[i]));
+        }
+
+        // Parallel.For wraps whatever the body threw. A caller asked for a simulation, not a band of
+        // tasks, so it gets the exception Run() documents rather than an AggregateException around it.
+        catch (AggregateException aggregate) when (aggregate.InnerExceptions.Count > 0)
+        {
+            ExceptionDispatchInfo.Capture(aggregate.InnerExceptions[0]).Throw();
+            throw;
+        }
     }
 
     /// <summary>
@@ -303,7 +364,9 @@ public sealed record Simulation
 
         internal Execution(Simulation simulation, int seed)
         {
-            _policy = simulation.Policy.WithClock(_clock).WithListener(Record);
+            // One budget scope for this run: the policy's budget is rebased onto this run's clock, and
+            // no other run can see the bucket it gets.
+            _policy = simulation.Policy.WithClock(_clock, new BudgetClock(_clock)).WithListener(Record);
             _dependency = simulation.Dependency!;
             _load = simulation.Load!;
             _duration = simulation.Duration;

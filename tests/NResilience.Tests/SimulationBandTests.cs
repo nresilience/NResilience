@@ -18,6 +18,9 @@ public sealed class SimulationBandTests
     private static readonly Dependency Fast =
         Dependency.Healthy(TimeSpan.FromMilliseconds(20), TimeSpan.FromMilliseconds(200));
 
+    /// <summary>Browned out hard enough to make the retry budget bind, so a budget test measures one.</summary>
+    private static readonly Dependency Slow = Fast.Brownout(TimeSpan.FromSeconds(5), slower: 20, TimeSpan.FromSeconds(15));
+
     private static readonly Resilience Api = TestPolicy.Instant with
     {
         Attempts = 3,
@@ -124,6 +127,36 @@ public sealed class SimulationBandTests
 
         Assert.Null(band.TimeToRecover);
         Assert.Equal(0, band.Recovered);
+    }
+
+    [Fact]
+    public void A_band_equals_the_same_seeds_run_one_at_a_time()
+    {
+        // The seeds of a band run at the same time as each other. This is the whole safety argument
+        // for that: a run built its own clock, breaker, limiter and jitter stream, so whether the
+        // seeds ran together or one after another cannot change a single number. Compared against
+        // isolated runs rather than a serial band, because an isolated run cannot be affected by
+        // batching of any kind.
+        var alone = Seeds.Select(seed => Run(Api, Fast).Run(seed).ToString()).ToArray();
+
+        var band = Run(Api, Fast).RunAll(Seeds);
+
+        Assert.Equal(alone, band.Reports.Select(report => report.ToString()));
+    }
+
+    [Fact]
+    public void A_band_whose_policy_holds_a_live_budget_equals_the_same_seeds_run_one_at_a_time()
+    {
+        // A budget that is not Automatic or None is a live bucket on the policy, and the policy is
+        // one object for the whole band - so this would once have had the seeds draining each other's
+        // tokens. Each run rebases the budget onto its own clock, which is what makes a seed's numbers
+        // its own.
+        var policy = Api with { Budget = RetryBudget.Of(fraction: 0.1, minimumPerSecond: 3) };
+
+        var alone = Seeds.Select(seed => Run(policy, Slow).Run(seed).ToString()).ToArray();
+        var band = Run(policy, Slow).RunAll(Seeds);
+
+        Assert.Equal(alone, band.Reports.Select(report => report.ToString()));
     }
 
     [Fact]
