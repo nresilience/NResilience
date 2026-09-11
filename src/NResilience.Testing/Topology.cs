@@ -54,24 +54,29 @@ public sealed class Topology
 
     private readonly Pooled[] _pools;
 
+    private readonly Shared[] _shared;
+
     internal Topology()
     {
         _edges = [];
         _leaves = [];
         _loads = [];
         _limiters = [];
+        _shared = [];
         _pools = [];
     }
 
-    private Topology(Declared[] edges, Leafed[] leaves, Offered[] loads, Limited[] limiters, Pooled[] pools, TimeSpan duration, bool records)
+    private Topology(Topology from, Declared[]? edges = null, Leafed[]? leaves = null, Offered[]? loads = null,
+        Limited[]? limiters = null, Shared[]? shared = null, Pooled[]? pools = null, TimeSpan? duration = null, bool? records = null)
     {
-        _edges = edges;
-        _leaves = leaves;
-        _loads = loads;
-        _limiters = limiters;
-        _pools = pools;
-        Duration = duration;
-        Records = records;
+        _edges = edges ?? from._edges;
+        _leaves = leaves ?? from._leaves;
+        _loads = loads ?? from._loads;
+        _limiters = limiters ?? from._limiters;
+        _shared = shared ?? from._shared;
+        _pools = pools ?? from._pools;
+        Duration = duration ?? from.Duration;
+        Records = records ?? from.Records;
     }
 
     /// <summary>How long the run offers load for. Set it with <see cref="For" />.</summary>
@@ -105,7 +110,7 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(callee);
         ArgumentNullException.ThrowIfNull(policy);
 
-        return new Topology([.. _edges, new Declared(caller, callee, policy)], _leaves, _loads, _limiters, _pools, Duration, Records);
+        return new Topology(this, edges: [.. _edges, new Declared(caller, callee, policy)]);
     }
 
     /// <summary>
@@ -122,7 +127,7 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(name);
         ArgumentNullException.ThrowIfNull(dependency);
 
-        return new Topology(_edges, [.. _leaves, new Leafed(name, dependency)], _loads, _limiters, _pools, Duration, Records);
+        return new Topology(this, leaves: [.. _leaves, new Leafed(name, dependency)]);
     }
 
     /// <summary>
@@ -145,7 +150,7 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(load);
         ArgumentNullException.ThrowIfNull(at);
 
-        return new Topology(_edges, _leaves, [.. _loads, new Offered(at, load)], _limiters, _pools, Duration, Records);
+        return new Topology(this, loads: [.. _loads, new Offered(at, load)]);
     }
 
     /// <summary>
@@ -171,7 +176,44 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(callee);
         ArgumentNullException.ThrowIfNull(limiter);
 
-        return new Topology(_edges, _leaves, _loads, [.. _limiters, new Limited(caller, callee, limiter)], _pools, Duration, Records);
+        return new Topology(this, limiters: [.. _limiters, new Limited(caller, callee, limiter)]);
+    }
+
+    /// <summary>
+    ///     The limiter one service acquires a permit from on <i>every</i> call it makes, built fresh for
+    ///     each run against the virtual clock. The process-wide bulkhead: a bound on how much work this
+    ///     service has in flight anywhere, rather than on how much it has in flight against one callee.
+    /// </summary>
+    /// <param name="service">The service. It must make calls of its own.</param>
+    /// <param name="limiter">Builds the limiter. The argument is the run's virtual clock.</param>
+    /// <returns>A new topology. The receiver is unchanged.</returns>
+    /// <exception cref="ArgumentNullException">An argument is null.</exception>
+    /// <remarks>
+    ///     <para>
+    ///         One limiter, shared by every call the service makes, which makes it a bound on the
+    ///         <i>total</i> this service has in flight rather than on each call separately - and so a
+    ///         much tighter bound than the same number written per call. That is the difference between
+    ///         the two guards, and the reason to reach for one rather than the other.
+    ///     </para>
+    ///     <para>
+    ///         It is <b>not</b> a way to see a slow callee starve the calls to a healthy one. That shape
+    ///         needs a service whose calls run at the same time, and a service here makes its calls one
+    ///         after another: a request holds one permit at a time, and a request whose first call is
+    ///         refused never makes its second. A graph cannot show that failure, and says so rather than
+    ///         producing a number that looks like it.
+    ///     </para>
+    ///     <para>
+    ///         A service may have this and a per-call limiter at once, which is the two-level bulkhead:
+    ///         the service's permit is acquired first, then the call's, so the broader bound is the one
+    ///         a refusal reports first. Either refusal is counted against the call that was attempting.
+    ///     </para>
+    /// </remarks>
+    public Topology WithLimiter(string service, Func<TimeProvider, RateLimiter> limiter)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        ArgumentNullException.ThrowIfNull(limiter);
+
+        return new Topology(this, shared: [.. _shared, new Shared(service, limiter)]);
     }
 
     /// <summary>
@@ -208,20 +250,20 @@ public sealed class Topology
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(pool);
 
-        return new Topology(_edges, _leaves, _loads, _limiters, [.. _pools, new Pooled(service, pool)], Duration, Records);
+        return new Topology(this, pools: [.. _pools, new Pooled(service, pool)]);
     }
 
     /// <summary>How long to offer load for. Calls still in flight when it elapses are allowed to finish.</summary>
     /// <param name="duration">The run length. Must be positive.</param>
     /// <returns>A new topology. The receiver is unchanged.</returns>
-    public Topology For(TimeSpan duration) => new(_edges, _leaves, _loads, _limiters, _pools, duration, Records);
+    public Topology For(TimeSpan duration) => new(this, duration: duration);
 
     /// <summary>
     ///     Records every event each edge's policy raises, with the virtual time it was raised at, into
     ///     that edge's <see cref="SimulationReport.Timeline" />.
     /// </summary>
     /// <returns>A new topology. The receiver is unchanged.</returns>
-    public Topology Recording() => new(_edges, _leaves, _loads, _limiters, _pools, Duration, true);
+    public Topology Recording() => new(this, records: true);
 
     /// <summary>
     ///     Runs the graph and reports what happened, per edge and per service. Nothing sleeps.
@@ -330,6 +372,18 @@ public sealed class Topology
                 problems.Add($"A limiter is declared for '{limiter.Caller}' calling '{limiter.Callee}', which is not a call this topology makes.");
             else if (!limited.Add((limiter.Caller, limiter.Callee)))
                 problems.Add($"'{limiter.Caller}' calling '{limiter.Callee}' has more than one limiter. One call, one limiter.");
+        }
+
+        var bulkheaded = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var shared in _shared)
+        {
+            if (leaves.Contains(shared.Service))
+                problems.Add($"'{shared.Service}' is a leaf and cannot have a limiter. A leaf makes no calls to bound.");
+            else if (!callers.Contains(shared.Service))
+                problems.Add($"A limiter is declared for '{shared.Service}', which makes no calls. A limiter bounds what a service sends out.");
+            else if (!bulkheaded.Add(shared.Service))
+                problems.Add($"'{shared.Service}' has more than one limiter of its own. One service, one process-wide limiter.");
         }
 
         var pooled = new HashSet<string>(StringComparer.Ordinal);
@@ -493,6 +547,16 @@ public sealed class Topology
                 _probes.Refresh(_clock.Now);
             }
 
+            // One gate per service, handed to every call it makes - which is what makes it a bulkhead
+            // across the process rather than a limiter repeated per call.
+            foreach (var shared in topology._shared)
+            {
+                var gate = new LimiterGate(shared.Build, _clock, $"'{shared.Service}'");
+
+                foreach (var edge in edges.Where(candidate => string.Equals(candidate.CallerName, shared.Service, StringComparison.Ordinal)))
+                    edge.ServiceGate = gate;
+            }
+
             foreach (var limited in topology._limiters)
             {
                 var edge = edges.Single(candidate =>
@@ -522,6 +586,9 @@ public sealed class Topology
 
             foreach (var edge in _edges)
             {
+                if (edge.ServiceGate is { Queued: true })
+                    throw new InvalidOperationException(LimiterGate.QueuedMessage($"'{edge.CallerName}'"));
+
                 if (edge.Gate is { Queued: true })
                     throw new InvalidOperationException(LimiterGate.QueuedMessage($"'{edge.CallerName}' calling '{edge.CalleeName}'"));
             }
@@ -785,10 +852,31 @@ public sealed class Topology
                     cancellationToken.ThrowIfCancellationRequested();
             }
 
-            var lease = edge.Gate is null ? null : await edge.Gate.AcquireAsync(cancellationToken).ConfigureAwait(false);
+            // The service's permit before the call's, so the broader bound is the one a refusal reports
+            // first, and so a call refused by the narrower one has already been counted against the
+            // process it was leaving.
+            RateLimitLease? outer = null;
+            RateLimitLease? inner = null;
 
             try
             {
+                try
+                {
+                    if (edge.ServiceGate is { } service)
+                        outer = await service.AcquireAsync(cancellationToken).ConfigureAwait(false);
+
+                    if (edge.Gate is { } call)
+                        inner = await call.AcquireAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (RateLimitedException) when (!Queueing(edge))
+                {
+                    // Counted against the call that was attempting, whichever limiter refused it: a
+                    // service's gate is shared, so it cannot say which of its calls was turned away.
+                    edge.Refused++;
+
+                    throw;
+                }
+
                 edge.Reached++;
                 edge.BucketAt(_clock.Now).Reached++;
 
@@ -801,9 +889,13 @@ public sealed class Topology
             }
             finally
             {
-                lease?.Dispose();
+                inner?.Dispose();
+                outer?.Dispose();
             }
         }
+
+        /// <summary>Whether either limiter on a call queued, which stops the run rather than counting.</summary>
+        private static bool Queueing(EdgeState edge) => edge.ServiceGate is { Queued: true } || edge.Gate is { Queued: true };
 
         /// <summary>One second of a run, from the caller's side and from the callee's.</summary>
         private sealed class Bucket
@@ -908,8 +1000,14 @@ public sealed class Topology
 
             internal NodeState Callee { get; } = callee;
 
-            /// <summary>This call's limiter, or null when it has none.</summary>
+            /// <summary>This call's own limiter, or null when it has none.</summary>
             internal LimiterGate? Gate { get; set; }
+
+            /// <summary>The caller's process-wide limiter, shared with its other calls, or null.</summary>
+            internal LimiterGate? ServiceGate { get; set; }
+
+            /// <summary>Attempts on this call a limiter refused before they could leave the caller.</summary>
+            internal int Refused;
 
             internal string CalleeName { get; } = calleeName;
 
@@ -960,7 +1058,7 @@ public sealed class Topology
                     _kinds,
                     Offered,
                     Served,
-                    Gate?.Refused ?? 0,
+                    Refused,
                     _timeline is null ? null : [.. _timeline]);
 
             private double Amplification()
@@ -1053,6 +1151,9 @@ public sealed class Topology
 
     /// <summary>One service's modeled thread pool, before the graph is resolved.</summary>
     private readonly record struct Pooled(string Service, Pool Pool);
+
+    /// <summary>One service's process-wide limiter, before the graph is resolved.</summary>
+    private readonly record struct Shared(string Service, Func<TimeProvider, RateLimiter> Build);
 
     /// <summary>One declared entry point and the traffic arriving at it.</summary>
     private readonly record struct Offered(string At, Load Load);

@@ -283,6 +283,9 @@ public sealed record Simulation
         /// <summary>Keeps the policy's saturation reading at what the modeled pool last published.</summary>
         private ProbeDriver? _probes;
 
+        /// <summary>Attempts the limiter refused before they could leave the process.</summary>
+        private int _refused;
+
         /// <summary>The recording, or null when the run was not asked for one.</summary>
         private readonly List<TimelineEntry>? _timeline;
 
@@ -363,7 +366,7 @@ public sealed record Simulation
                 _kinds,
                 _offered,
                 _served,
-                _gate?.Refused ?? 0,
+                _refused,
                 _timeline is null ? null : [.. _timeline]);
         }
 
@@ -526,7 +529,21 @@ public sealed record Simulation
             // callback acquires it: the work item is scheduled, then it runs and asks for a permit,
             // then it sends. The lease is held for the length of the attempt, which is the whole of
             // what makes a concurrency limit a bulkhead.
-            var lease = _gate is null ? null : await _gate.AcquireAsync(cancellationToken).ConfigureAwait(false);
+            RateLimitLease? lease = null;
+
+            if (_gate is not null)
+            {
+                try
+                {
+                    lease = await _gate.AcquireAsync(cancellationToken).ConfigureAwait(false);
+                }
+                catch (RateLimitedException) when (!_gate.Queued)
+                {
+                    _refused++;
+
+                    throw;
+                }
+            }
 
             try
             {

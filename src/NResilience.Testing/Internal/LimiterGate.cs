@@ -33,10 +33,12 @@ internal sealed class LimiterGate
     }
 
     /// <summary>Whether the limiter queued an attempt, which a virtual clock cannot carry.</summary>
+    /// <remarks>
+    ///     A property of the limiter rather than of any one caller, which is why it lives here and the
+    ///     count of refusals does not: one gate can be shared by every call a service makes, and a
+    ///     refusal belongs to the call that was refused.
+    /// </remarks>
     internal bool Queued { get; private set; }
-
-    /// <summary>Attempts refused before they could leave the process.</summary>
-    internal int Refused { get; private set; }
 
     /// <summary>The message a run reports when a limiter queued.</summary>
     internal static string QueuedMessage(string where) =>
@@ -79,7 +81,6 @@ internal sealed class LimiterGate
         var retryAfter = lease.TryGetMetadata(MetadataName.RetryAfter, out var after) ? after : (TimeSpan?)null;
 
         lease.Dispose();
-        Refused++;
 
         throw new RateLimitedException(retryAfter);
     }

@@ -391,7 +391,12 @@ A [thread pool](#model-the-thread-pool) and a [limiter](#bound-what-leaves-the-p
 
 `WithPool(service, pool)` gives a service its own pool. Every attempt that service makes waits in it, on every call it makes, whether or not the policy on that call is configured to notice. A policy that *does* configure `Saturation` reads **its caller's** pool: the work item waiting for a thread is the outbound call, and the process it waits in is the one making it. A call from a service with no pool reads a pool that never queues, exactly as a single-dependency run with no `WithPool` does.
 
-`WithLimiter(caller, callee, limiter)` goes on a call rather than a service, because a limiter guards one outbound call - a checkout's bulkhead for its payment provider is not its bulkhead for its catalog. The same two kinds are refused, and the message names the call.
+`WithLimiter` comes two ways. `WithLimiter(caller, callee, limiter)` guards one outbound call - a checkout's bulkhead for its payment provider is not its bulkhead for its catalog. `WithLimiter(service, limiter)` is the process-wide bulkhead: one pool of permits shared by every call the service makes, so it bounds the **total** it has in flight rather than each call separately, and is a much tighter bound than the same number written per call. Twenty permits shared across two calls refuses several times what twenty permits each does.
+
+A service can have both, which is the two-level bulkhead: the service's permit is acquired first, then the call's. Either refusal is counted against the call that was attempting, because a shared limiter cannot say which of its calls was turned away. The same two kinds of limiter are refused as in a single-dependency run, and the message names the service or the call.
+
+> [!IMPORTANT]
+> **A shared limiter here will not show a slow callee starving the calls to a healthy one.** That failure needs a service whose calls run at the same time, and a service here [makes its calls one after another](#simulate-a-call-graph): a request holds one permit at a time, and a request whose first call is refused never makes its second. The bound is real and the starvation is not modeled, so the graph says so rather than producing a number that looks like it.
 
 > [!TIP]
 > **This is where a pool stall stops being local.** `Saturation` stops a stalled process mistaking itself for a slow dependency. But to everyone *calling* that process, a stall and a slow dependency are still the same thing: in a chain where payments' pool stalls for twenty seconds, the bank answers in its usual time throughout and the checkout's p99 goes from 98 ms to 1.1 s. Payments detects its own episode; the checkout detects nothing, because it has nothing to detect. A graph is the only place that shows.
@@ -402,7 +407,7 @@ A [thread pool](#model-the-thread-pool) and a [limiter](#bound-what-leaves-the-p
 
 - **Cycles are refused.** A run would never finish, and a service that calls itself back is a different simulator.
 - **`peers` is refused.** It exists so a single-dependency run can ask "does my retry budget hold when I am one of fifty" without claiming to have simulated fifty policies - and a topology is the place where the peers *do* have policies, so approximating them away is the one thing it should not offer. Offer load at another entry instead.
-- **One limiter per call.** A process that shares one bulkhead across everything it calls is a real shape and is not this one.
+- **No parallel fan-out, and so no bulkhead starvation.** The shape where one slow callee exhausts a shared bulkhead and starves a service's other calls needs its calls to overlap. Sequential calls cannot produce it.
 
 ## What is fake, and what is not
 

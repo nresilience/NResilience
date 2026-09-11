@@ -210,6 +210,7 @@ NResilience.Testing.Topology.RunAll(params int[]! seeds) -> NResilience.Testing.
 NResilience.Testing.Topology.Under(NResilience.Testing.Load! load, string! at) -> NResilience.Testing.Topology!
 NResilience.Testing.Topology.Validate() -> void
 NResilience.Testing.Topology.WithLimiter(string! caller, string! callee, System.Func<System.TimeProvider!, System.Threading.RateLimiting.RateLimiter!>! limiter) -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.WithLimiter(string! service, System.Func<System.TimeProvider!, System.Threading.RateLimiting.RateLimiter!>! limiter) -> NResilience.Testing.Topology!
 NResilience.Testing.Topology.WithPool(string! service, NResilience.Testing.Pool! pool) -> NResilience.Testing.Topology!
 NResilience.Testing.TopologyBand
 NResilience.Testing.TopologyBand.At(string! service) -> NResilience.Testing.SimulationBand!

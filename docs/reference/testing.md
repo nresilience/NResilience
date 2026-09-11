@@ -226,7 +226,10 @@ A limiter that cannot answer on a virtual clock throws `InvalidOperationExceptio
 | `Under(Load load, string at)` | Offers traffic at one service. Call it more than once for several entry points. `Load.Peers` must be 1. |
 | `For(TimeSpan duration)` | How long to offer load for. Required, and positive. |
 | `WithPool(string service, Pool pool)` | One service's own modeled thread pool. Every attempt it makes waits in it; a policy configuring `Saturation` reads its caller's pool. Refused on a leaf, on a name that makes no calls, or twice for one service. |
-| `WithLimiter(string caller, string callee, Func<TimeProvider, RateLimiter> limiter)` | The limiter one call acquires from, built per run against the virtual clock. Refused for a call the topology does not make, or twice for one call. The same replenishing and queueing limiters `Simulation.WithLimiter` refuses are refused here, and the message names the call. |
+| `WithLimiter(string caller, string callee, Func<TimeProvider, RateLimiter> limiter)` | The limiter one call acquires from, built per run against the virtual clock. Refused for a call the topology does not make, or twice for one call. |
+| `WithLimiter(string service, Func<TimeProvider, RateLimiter> limiter)` | The process-wide bulkhead: one limiter shared by every call the service makes, so it bounds the total in flight rather than each call. Refused on a leaf, on a name that makes no calls, or twice for one service. |
+
+Both kinds of limiter may apply to one call. The service's permit is acquired first, then the call's, and either refusal is counted against the call that was attempting - a shared limiter cannot say which of its calls was turned away. The same replenishing and queueing limiters `Simulation.WithLimiter` refuses are refused here, and the message names the service or the call.
 | `Recording()` | Records a timeline per edge, into each `On(caller, callee).Timeline`. |
 | `Run(int seed)` | Runs the graph and returns a `TopologyReport`. |
 | `RunAll(params int[] seeds)` | Runs it once per seed and returns a `TopologyBand`. No repeats. |
