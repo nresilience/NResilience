@@ -236,7 +236,11 @@ Impairments compose: two overlapping brownouts multiply, and an outage inside a 
 | `Load.Constant(int perSecond, int peers = 1)` | A steady rate for the whole run. Gaps between arrivals are spread rather than even, so the run contains bursts. |
 | `PerSecond` | Calls this process starts per second, on average. |
 | `Peers` | How many other processes offer the same rate to the same dependency. Their load counts against `Capacity`; their own retries, breakers, and budgets are not simulated. |
+| `Mix(Criticality criticality, double fraction)` | Offers a share of the load at one criticality, published through `AmbientCriticality`. `Criticality.Critical` is the remainder and cannot be set - passing it throws `ArgumentOutOfRangeException`. |
+| `ShareOf(Criticality criticality)` | The share offered at one level. `Critical` is whatever the other three leave, so a load with no mix is entirely critical. |
 | `Validate()` / `Validated()` | Throws `ResilienceConfigurationException` listing every problem at once, or returns the load. |
+
+A load with no mix draws nothing from the seed to decide a level, so an unmixed run reproduces exactly as it did before there was a level to name.
 
 ## `Pool`
 
@@ -268,6 +272,8 @@ The baseline is modeled as the rolling median the shipping probe computes, so bo
 | `BreakerOpens` | How many times a breaker tripped. |
 | `TimeToRecover` | How long after the last impairment ended before a full second of calls all succeeded. Null when the dependency was never impaired, or when the run ended first. |
 | `CountOf(CallEventKind kind)` | How many events of one kind the run raised. |
+| `AvailabilityAt(Criticality criticality)` | The fraction of calls at one criticality that ended in success, and zero when none were offered at it. The measurement `Availability` averages away. |
+| `CallsAt(Criticality criticality)`, `SucceededAt(Criticality criticality)` | The counts `AvailabilityAt` comes from. Every call is `Critical` unless the load was mixed. |
 | `Calls`, `Succeeded`, `Failed`, `Reached` | The raw counts the ratios come from. |
 | `Seed`, `Duration` | The seed the run was drawn from, and how long it offered load for. |
 | `Timeline` | Every event the run raised as `TimelineEntry` values, in order. Null unless `Simulation.Recording()` asked for one. |
@@ -293,6 +299,7 @@ The baseline is modeled as the rolling median the shipping probe computes, so bo
 | `Availability`, `LoadMultiplier`, `Amplification`, `BreakerOpens`, `Calls` | The report's ratios and counts as a `Band`. |
 | `Latency(double quantile)`, `TimeToRecover` | The report's durations as a `TimeBand`. `TimeToRecover` is null when no run recovered, and covers only the runs that did. |
 | `CountOf(CallEventKind kind)` | How many events of one kind the runs raised, as a `Band`. |
+| `AvailabilityAt(Criticality criticality)`, `CallsAt(Criticality criticality)` | The per-criticality measurements as a `Band`. |
 | `Recovered` | How many of the runs recovered at all. A count below `Seeds.Count` is the finding. |
 | `Reports`, `Seeds` | The individual reports and the seeds they came from, in the order the seeds were given. |
 | `Duration`, `EngineVersion` | The same for every seed - they are inputs. |

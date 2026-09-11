@@ -62,8 +62,10 @@ NResilience.Testing.EventRecorder.this[int index].get -> NResilience.CallEvent
 NResilience.Testing.Load
 NResilience.Testing.Load.<Clone>$() -> NResilience.Testing.Load!
 NResilience.Testing.Load.Equals(NResilience.Testing.Load? other) -> bool
+NResilience.Testing.Load.Mix(NResilience.Criticality criticality, double fraction) -> NResilience.Testing.Load!
 NResilience.Testing.Load.Peers.get -> int
 NResilience.Testing.Load.PerSecond.get -> int
+NResilience.Testing.Load.ShareOf(NResilience.Criticality criticality) -> double
 NResilience.Testing.Load.Validate() -> void
 NResilience.Testing.Load.Validated() -> NResilience.Testing.Load!
 NResilience.Testing.Pool
@@ -140,8 +142,10 @@ NResilience.Testing.Simulation.WithPool(NResilience.Testing.Pool! pool) -> NResi
 NResilience.Testing.SimulationBand
 NResilience.Testing.SimulationBand.Amplification.get -> NResilience.Testing.Band
 NResilience.Testing.SimulationBand.Availability.get -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.AvailabilityAt(NResilience.Criticality criticality) -> NResilience.Testing.Band
 NResilience.Testing.SimulationBand.BreakerOpens.get -> NResilience.Testing.Band
 NResilience.Testing.SimulationBand.Calls.get -> NResilience.Testing.Band
+NResilience.Testing.SimulationBand.CallsAt(NResilience.Criticality criticality) -> NResilience.Testing.Band
 NResilience.Testing.SimulationBand.CountOf(NResilience.CallEventKind kind) -> NResilience.Testing.Band
 NResilience.Testing.SimulationBand.Duration.get -> System.TimeSpan
 NResilience.Testing.SimulationBand.EngineVersion.get -> string!
@@ -154,8 +158,10 @@ NResilience.Testing.SimulationBand.TimeToRecover.get -> NResilience.Testing.Time
 NResilience.Testing.SimulationReport
 NResilience.Testing.SimulationReport.Amplification.get -> double
 NResilience.Testing.SimulationReport.Availability.get -> double
+NResilience.Testing.SimulationReport.AvailabilityAt(NResilience.Criticality criticality) -> double
 NResilience.Testing.SimulationReport.BreakerOpens.get -> int
 NResilience.Testing.SimulationReport.Calls.get -> int
+NResilience.Testing.SimulationReport.CallsAt(NResilience.Criticality criticality) -> int
 NResilience.Testing.SimulationReport.CountOf(NResilience.CallEventKind kind) -> int
 NResilience.Testing.SimulationReport.Duration.get -> System.TimeSpan
 NResilience.Testing.SimulationReport.EngineVersion.get -> string!
@@ -165,6 +171,7 @@ NResilience.Testing.SimulationReport.LoadMultiplier.get -> double
 NResilience.Testing.SimulationReport.Reached.get -> int
 NResilience.Testing.SimulationReport.Seed.get -> int
 NResilience.Testing.SimulationReport.Succeeded.get -> int
+NResilience.Testing.SimulationReport.SucceededAt(NResilience.Criticality criticality) -> int
 NResilience.Testing.SimulationReport.TimeToRecover.get -> System.TimeSpan?
 NResilience.Testing.SimulationReport.Timeline.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.TimelineEntry>?
 NResilience.Testing.TestPolicy

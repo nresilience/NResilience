@@ -199,6 +199,11 @@ public sealed record Simulation
         /// <summary>Whether each call succeeded, indexed the same way <see cref="_starts" /> is.</summary>
         private readonly List<bool> _ok = [];
 
+        /// <summary>How many calls were offered at each level, and how many of those succeeded.</summary>
+        private readonly int[] _offered = new int[Enum.GetValues<Criticality>().Length];
+
+        private readonly int[] _served = new int[Enum.GetValues<Criticality>().Length];
+
         private readonly Resilience _policy;
 
         private readonly int _seed;
@@ -287,6 +292,8 @@ public sealed record Simulation
                 TimeToRecover(),
                 [.. _latencies],
                 _kinds,
+                _offered,
+                _served,
                 _timeline is null ? null : [.. _timeline]);
         }
 
@@ -358,20 +365,44 @@ public sealed record Simulation
             return (long)(2 * _dice.Next() * mean);
         }
 
-        /// <summary>Starts one caller-level call. Runs inline until it suspends, which is the arrival's whole cost.</summary>
+        /// <summary>
+        ///     Starts one caller-level call. Runs inline until it suspends, which is the arrival's whole
+        ///     cost.
+        /// </summary>
+        /// <remarks>
+        ///     An unmixed load draws nothing here, so every run that predates a mix reproduces from its
+        ///     seed exactly as it did: a draw taken unconditionally would shift the whole stream and
+        ///     silently rewrite every report the simulator has ever produced.
+        /// </remarks>
         private void Start()
         {
             var index = _starts.Count;
+            var criticality = _load.IsMixed ? _load.Draw(_dice) : Criticality.Critical;
 
             _starts.Add(_clock.Now);
             _ok.Add(false);
+            _offered[(int)criticality]++;
             BucketAt(_clock.Now).Calls++;
             _outstanding++;
 
-            _ = Call(index);
+            if (!_load.IsMixed)
+            {
+                _ = Call(index, criticality);
+
+                return;
+            }
+
+            // Published the way a service publishes one, so the executor reads a level that arrived
+            // rather than one the simulator handed it. The scope is disposed once the call has
+            // suspended, by which point the level is already inside its execution context - and the
+            // executor has read it anyway, because it reads it once, synchronously, before the first
+            // attempt.
+            using var scope = AmbientCriticality.Begin(criticality);
+
+            _ = Call(index, criticality);
         }
 
-        private async Task Call(int index)
+        private async Task Call(int index, Criticality criticality)
         {
             var started = _clock.Now;
 
@@ -383,6 +414,7 @@ public sealed record Simulation
                 {
                     _ok[index] = true;
                     _succeeded++;
+                    _served[(int)criticality]++;
                 }
             }
             catch (Exception exception)

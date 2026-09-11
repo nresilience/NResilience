@@ -20,6 +20,10 @@ public sealed class SimulationReport
 
     private readonly long[] _latencies;
 
+    private readonly int[] _offered;
+
+    private readonly int[] _served;
+
     internal SimulationReport(
         int seed,
         TimeSpan duration,
@@ -30,6 +34,8 @@ public sealed class SimulationReport
         TimeSpan? timeToRecover,
         long[] latencies,
         int[] kinds,
+        int[] offered,
+        int[] served,
         TimelineEntry[]? timeline)
     {
         Seed = seed;
@@ -44,6 +50,8 @@ public sealed class SimulationReport
 
         _latencies = latencies;
         _kinds = kinds;
+        _offered = offered;
+        _served = served;
 
         Array.Sort(_latencies);
     }
@@ -136,6 +144,39 @@ public sealed class SimulationReport
     }
 
     /// <summary>
+    ///     How many calls the caller made at one <see cref="Criticality" />. Every call is
+    ///     <see cref="Criticality.Critical" /> unless the load was
+    ///     <see cref="Load.Mix">mixed</see>, which is what a call with no level is.
+    /// </summary>
+    /// <param name="criticality">The level.</param>
+    /// <returns>The count.</returns>
+    public int CallsAt(Criticality criticality) => At(_offered, criticality);
+
+    /// <summary>How many calls at one <see cref="Criticality" /> ended in success.</summary>
+    /// <param name="criticality">The level.</param>
+    /// <returns>The count.</returns>
+    public int SucceededAt(Criticality criticality) => At(_served, criticality);
+
+    /// <summary>
+    ///     The fraction of calls at one <see cref="Criticality" /> that ended in success, from 0 to 1,
+    ///     and zero when none were offered at it.
+    ///     <para>
+    ///         The number the feature exists to move. A policy that reads criticality holds back half
+    ///         its retry budget from sheddable work, so under the same brownout the backfill's
+    ///         availability falls further and the checkout's falls less - and the aggregate
+    ///         <see cref="Availability" /> can hide the whole trade by averaging the two.
+    ///     </para>
+    /// </summary>
+    /// <param name="criticality">The level.</param>
+    /// <returns>The fraction.</returns>
+    public double AvailabilityAt(Criticality criticality)
+    {
+        var calls = CallsAt(criticality);
+
+        return calls == 0 ? 0 : (double)SucceededAt(criticality) / calls;
+    }
+
+    /// <summary>
     ///     Caller-observed latency at a quantile: the whole call, including every retry and every
     ///     backoff it served, which is the number the caller's caller experiences.
     ///     <para>
@@ -157,6 +198,13 @@ public sealed class SimulationReport
         var rank = (int)Math.Ceiling(quantile * _latencies.Length) - 1;
 
         return TimeSpan.FromTicks(_latencies[Math.Clamp(rank, 0, _latencies.Length - 1)]);
+    }
+
+    private static int At(int[] counts, Criticality criticality)
+    {
+        var index = (int)criticality;
+
+        return (uint)index < (uint)counts.Length ? counts[index] : 0;
     }
 
     /// <summary>
@@ -181,6 +229,19 @@ public sealed class SimulationReport
         text.Append(culture, $"  Latency p99      {Latency(0.99)}").AppendLine();
         text.Append(culture, $"  BreakerOpens     {BreakerOpens}").AppendLine();
         text.Append(culture, $"  TimeToRecover    {TimeToRecover?.ToString() ?? "never"}").AppendLine();
+
+        // Only when the load was mixed, so a run that never named a level prints exactly the block it
+        // printed before there was a level to name.
+        if (CallsAt(Criticality.Critical) != Calls)
+        {
+            foreach (var criticality in Enum.GetValues<Criticality>())
+            {
+                var calls = CallsAt(criticality);
+
+                if (calls > 0)
+                    text.Append(culture, $"  {criticality,-16} {calls} calls, {AvailabilityAt(criticality):F4} available").AppendLine();
+            }
+        }
 
         return text.ToString();
     }

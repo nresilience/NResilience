@@ -95,6 +95,20 @@ public sealed class SimulationBand
     /// <returns>The band.</returns>
     public Band CountOf(CallEventKind kind) => Of(report => report.CountOf(kind));
 
+    /// <summary>
+    ///     The fraction of calls at one <see cref="Criticality" /> that ended in success, across the
+    ///     seeds. The measurement a criticality-aware policy is meant to move, and the one the
+    ///     aggregate <see cref="Availability" /> averages away.
+    /// </summary>
+    /// <param name="criticality">The level.</param>
+    /// <returns>The band.</returns>
+    public Band AvailabilityAt(Criticality criticality) => Of(report => report.AvailabilityAt(criticality));
+
+    /// <summary>How many calls the caller made at one <see cref="Criticality" />, across the seeds.</summary>
+    /// <param name="criticality">The level.</param>
+    /// <returns>The band.</returns>
+    public Band CallsAt(Criticality criticality) => Of(report => report.CallsAt(criticality));
+
     /// <summary>Caller-observed latency at a quantile, across the seeds.</summary>
     /// <param name="quantile">The quantile, from 0 to 1.</param>
     /// <returns>The band.</returns>

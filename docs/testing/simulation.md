@@ -67,6 +67,7 @@ Simulation seed 42 over 00:05:00
 | `BreakerOpens` | How many times a breaker tripped. |
 | `TimeToRecover` | How long after the last impairment ended before a full second of calls all succeeded. `null` when the run ended first, and a `null` of that kind is the finding. |
 | `CountOf(kind)` | How many [`CallEvent`](../reference/events.md)s of one kind the run raised, so a claim about suppressed hedges or budget refusals is a number. |
+| `AvailabilityAt(criticality)` | The fraction of calls at one [`Criticality`](#offer-a-mix-of-criticality) that ended in success. `CallsAt` and `SucceededAt` are the counts it comes from. |
 | `Timeline` | Every event the run raised, each with the virtual time it was raised at. `null` unless the run was asked to [record one](#record-a-timeline). |
 | `EngineVersion` | Which build of the library produced the report. Determinism is a promise about one version, so two reports are comparable when this matches. |
 
@@ -116,6 +117,47 @@ Assert.True(condition: report.Amplification > report.LoadMultiplier);
 
 > [!IMPORTANT]
 > Peers are a term in the dependency's arithmetic and nothing more. Their offered load counts against `Capacity`; their own retries, breakers, and budgets are not simulated. That is enough to answer "does my retry budget hold when I am one of fifty" and not enough to claim fifty policies were simulated.
+
+### Offer a mix of criticality
+
+Not all of a service's traffic matters equally, and [`Criticality`](../features/criticality.md) is how the library says so: a policy that opts in holds back half its retry budget from `Sheddable` work and never hedges it. `Mix` offers a share of the load at a level, published the way a service publishes one - through `AmbientCriticality`, so the executor reads a level that arrived rather than one the simulator handed it.
+
+<!-- snippet: simulation-criticality -->
+```csharp
+var api = Resilience.Http with
+{
+    Deadline = TimeSpan.FromSeconds(value: 10),
+    UseAmbientCriticality = true,
+    Name = "api",
+};
+
+// Seven calls in ten are a backfill nobody is waiting on. Critical is the remainder, which is
+// what a call with no level already is - so it is not set, it is what is left.
+var load = Load.Constant(perSecond: 500).Mix(criticality: Criticality.Sheddable, fraction: 0.7);
+
+var report = Simulate.Policy(policy: api)
+    .Against(dependency: Dependency
+        .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200))
+        .Brownout(after: TimeSpan.FromSeconds(value: 30), slower: 8, lasting: TimeSpan.FromMinutes(value: 1)))
+    .Under(load: load)
+    .For(duration: TimeSpan.FromMinutes(value: 5))
+    .Run(seed: 42);
+
+// The measurement the setting exists to move. The aggregate averages the two together and can
+// hide the whole trade.
+Assert.True(condition: report.AvailabilityAt(criticality: Criticality.Critical)
+                       > report.AvailabilityAt(criticality: Criticality.Sheddable));
+```
+<!-- endsnippet -->
+
+`Critical` is the remainder and cannot be set. It is what a call with no level already is, so a load that names shares for the other three has said everything there is to say - and a fourth number that had to agree with the first three would only ever be a way to disagree with them.
+
+The mix is a property of the run, not of the policy: the traffic is what it is whether or not the policy sets `UseAmbientCriticality` to notice. That is the comparison worth running, and it is the same reason `WithPool` is accepted on a policy with no `Saturation`.
+
+> [!IMPORTANT]
+> **Read the availability per level, not the aggregate.** Criticality reallocates rather than creates: what it holds back from the backfill it spends on the checkout, so the dependency serves about as many calls either way and `Availability` barely moves. `AvailabilityAt(criticality)` is the number the setting exists to change, and a run read only for the aggregate will report that it does nothing.
+
+The mix is this process's own traffic. `peers` scales what the dependency is offered without simulating the peers, and it does not label their calls either.
 
 ## Model the thread pool
 

@@ -94,6 +94,37 @@ public sealed class Simulating
     }
 
     [Fact]
+    public void A_backfill_can_be_made_to_hold_back_for_a_checkout()
+    {
+        // <snippet:simulation-criticality>
+        var api = Resilience.Http with
+        {
+            Deadline = TimeSpan.FromSeconds(value: 10),
+            UseAmbientCriticality = true,
+            Name = "api",
+        };
+
+        // Seven calls in ten are a backfill nobody is waiting on. Critical is the remainder, which is
+        // what a call with no level already is - so it is not set, it is what is left.
+        var load = Load.Constant(perSecond: 500).Mix(criticality: Criticality.Sheddable, fraction: 0.7);
+
+        var report = Simulate.Policy(policy: api)
+            .Against(dependency: Dependency
+                .Healthy(p50: TimeSpan.FromMilliseconds(value: 20), p99: TimeSpan.FromMilliseconds(value: 200))
+                .Brownout(after: TimeSpan.FromSeconds(value: 30), slower: 8, lasting: TimeSpan.FromMinutes(value: 1)))
+            .Under(load: load)
+            .For(duration: TimeSpan.FromMinutes(value: 5))
+            .Run(seed: 42);
+
+        // The measurement the setting exists to move. The aggregate averages the two together and can
+        // hide the whole trade.
+        Assert.True(condition: report.AvailabilityAt(criticality: Criticality.Critical)
+                               > report.AvailabilityAt(criticality: Criticality.Sheddable));
+
+        // </snippet:simulation-criticality>
+    }
+
+    [Fact]
     public void A_local_thread_pool_stall_can_be_told_apart_from_a_slow_dependency()
     {
         // <snippet:simulation-pool>
