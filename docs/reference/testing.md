@@ -205,11 +205,14 @@ Chaos applies only to the asynchronous path. This is not a limitation in practic
 | `For(TimeSpan duration)` | How long to offer load for. Required, and positive. Calls in flight when it elapses are allowed to finish. |
 | `WithPool(Pool pool)` | This process's own thread pool, which is what `Saturation` measures. Optional. Accepted on a policy with no `Saturation`, because the delay is spent either way. |
 | `Recording()` | Records every event the run raises into `SimulationReport.Timeline`. Optional, and off by default. |
+| `WithLimiter(Func<TimeProvider, RateLimiter> limiter)` | Builds the limiter each run acquires a permit from, against the run's virtual clock. A factory that provides the clock to adaptive limiters and ensures `RunAll` builds one per seed. The limiter is the caller's and is not disposed by the run. |
 | `Run(int seed)` | Runs the simulation and returns a `SimulationReport`. The same seed produces the same report. |
 | `RunAll(params int[] seeds)` | Runs the simulation once per seed and returns a `SimulationBand`. At least one seed, and no repeats - a repeated seed throws `ArgumentException`, because the second copy would narrow the band rather than widen it. |
-| `Policy`, `Dependency`, `Load`, `Duration`, `Pool`, `Records` | What has been set so far. `Dependency`, `Load` and `Pool` are null until set. |
+| `Policy`, `Dependency`, `Load`, `Duration`, `Pool`, `Records`, `Limiter` | What has been set so far. `Dependency`, `Load`, `Pool` and `Limiter` are null until set. |
 
 `Run` validates the policy, the dependency, the load, and the pool if there is one, throwing `ResilienceConfigurationException`. A simulation missing its dependency, its load, or its duration throws `InvalidOperationException` naming the method that was not called.
+
+A limiter that cannot answer on a virtual clock throws `InvalidOperationException` too: a `ReplenishingRateLimiter` - `Limit.PerSecond`, `Limit.PerWindow` - refills against the wall clock, and a limiter with a `queueLimit` above zero resumes a queued wait on the thread pool. `Limit.Concurrency` and `Limit.Adaptive`, built with `queueLimit: 0`, are what a run can measure.
 
 ## `Dependency`
 
@@ -275,6 +278,7 @@ The baseline is modeled as the rolling median the shipping probe computes, so bo
 | `AvailabilityAt(Criticality criticality)` | The fraction of calls at one criticality that ended in success, and zero when none were offered at it. The measurement `Availability` averages away. |
 | `CallsAt(Criticality criticality)`, `SucceededAt(Criticality criticality)` | The counts `AvailabilityAt` comes from. Every call is `Critical` unless the load was mixed. |
 | `Calls`, `Succeeded`, `Failed`, `Reached` | The raw counts the ratios come from. |
+| `RefusedByLimiter` | Attempts a limiter refused before they could leave the process. Not counted in `Reached`, and charged to neither the breaker nor the retry budget. |
 | `Seed`, `Duration` | The seed the run was drawn from, and how long it offered load for. |
 | `Timeline` | Every event the run raised as `TimelineEntry` values, in order. Null unless `Simulation.Recording()` asked for one. |
 | `EngineVersion` | Which build of the library produced the report. Deliberately absent from `ToString()`, so the block of text a determinism test pins does not change every release. |
@@ -296,7 +300,7 @@ The baseline is modeled as the rolling median the shipping probe computes, so bo
 
 | Member | Description |
 | :--- | :--- |
-| `Availability`, `LoadMultiplier`, `Amplification`, `BreakerOpens`, `Calls` | The report's ratios and counts as a `Band`. |
+| `Availability`, `LoadMultiplier`, `Amplification`, `BreakerOpens`, `Calls`, `RefusedByLimiter` | The report's ratios and counts as a `Band`. |
 | `Latency(double quantile)`, `TimeToRecover` | The report's durations as a `TimeBand`. `TimeToRecover` is null when no run recovered, and covers only the runs that did. |
 | `CountOf(CallEventKind kind)` | How many events of one kind the runs raised, as a `Band`. |
 | `AvailabilityAt(Criticality criticality)`, `CallsAt(Criticality criticality)` | The per-criticality measurements as a `Band`. |

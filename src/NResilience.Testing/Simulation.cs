@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using NResilience.Internal;
 using NResilience.Testing.Internal;
 
@@ -32,6 +33,9 @@ public sealed record Simulation
 
     /// <summary>This process's own thread pool, as the run models it. Set it with <see cref="WithPool" />.</summary>
     public Pool? Pool { get; private init; }
+
+    /// <summary>Builds the limiter each run acquires from. Set it with <see cref="WithLimiter" />.</summary>
+    public Func<TimeProvider, RateLimiter>? Limiter { get; private init; }
 
     /// <summary>The dependency the policy calls.</summary>
     /// <param name="dependency">The dependency.</param>
@@ -104,6 +108,63 @@ public sealed record Simulation
         ArgumentNullException.ThrowIfNull(pool);
 
         return this with { Pool = pool };
+    }
+
+    /// <summary>
+    ///     The limiter every attempt acquires a permit from, built fresh for each run against the
+    ///     virtual clock. A limiter bounds what leaves this process, which is the other half of
+    ///     controlling amplification - a <see cref="Resilience.Budget" /> bounds the share of traffic
+    ///     that is retried, and this bounds the absolute amount that goes out at all.
+    /// </summary>
+    /// <param name="limiter">
+    ///     Builds the limiter. The argument is the run's virtual clock, so a limiter that takes a
+    ///     <see cref="TimeProvider" /> measures simulated time rather than the few milliseconds the run
+    ///     really takes.
+    /// </param>
+    /// <returns>A new simulation. The receiver is unchanged.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="limiter" /> is null.</exception>
+    /// <example>
+    ///     <code>
+    /// // Limit lives in NResilience.Extensions.
+    /// var bulkhead = simulation.WithLimiter(_ => Limit.Concurrency(permits: 50));
+    /// var adaptive = simulation.WithLimiter(clock => Limit.Adaptive(maximum: 200, time: clock));
+    /// </code>
+    /// </example>
+    /// <remarks>
+    ///     <para>
+    ///         <b>A factory rather than a limiter, for two reasons.</b> A limiter that takes a clock
+    ///         needs this run's, and the caller has no way to reach it. And a limiter is stateful:
+    ///         <see cref="RunAll" /> sharing one would let the first seed's discovered limit decide the
+    ///         second seed's run, which would make a band of a scenario a band of the order its seeds
+    ///         happened to be listed in.
+    ///     </para>
+    ///     <para>
+    ///         The permit is acquired <i>inside</i> the attempt - after the modeled pool's queue and
+    ///         before the dependency is reached - because that is where a real callback acquires one,
+    ///         and because a guard a retry bypasses is not a guard. A refused attempt never reaches the
+    ///         dependency, so it is not counted in <see cref="SimulationReport.Reached" /> and the
+    ///         refusal shows up as a load multiplier below one. The lease is held for the length of the
+    ///         attempt, which is what makes a concurrency limit a bulkhead.
+    ///     </para>
+    ///     <para>
+    ///         <b>A replenishing limiter is refused.</b> <c>Limit.PerSecond</c> and
+    ///         <c>Limit.PerWindow</c> return platform limiters that refill against the wall clock, and
+    ///         a simulation has no wall clock - five virtual minutes are a few real milliseconds, so
+    ///         one would hand out a single window's permits and refuse everything afterwards. That is
+    ///         not a limit anybody configured, so the run stops rather than reporting it.
+    ///     </para>
+    ///     <para>
+    ///         The limiter is the caller's, as it is everywhere else in the library, and the run does
+    ///         not dispose it. The two kinds a simulation accepts hold no timer and no unmanaged
+    ///         handle, so a caller who wants to read what an adaptive limiter settled on can close over
+    ///         it and do so after the run.
+    ///     </para>
+    /// </remarks>
+    public Simulation WithLimiter(Func<TimeProvider, RateLimiter> limiter)
+    {
+        ArgumentNullException.ThrowIfNull(limiter);
+
+        return this with { Limiter = limiter };
     }
 
     /// <summary>
@@ -216,6 +277,15 @@ public sealed record Simulation
         /// <summary>The modeled pool, or null when the policy does not measure one.</summary>
         private readonly Pool? _pool;
 
+        /// <summary>This run's limiter, or null when the run has none.</summary>
+        private readonly RateLimiter? _limiter;
+
+        /// <summary>Attempts the limiter refused before they could leave the process.</summary>
+        private int _refused;
+
+        /// <summary>Whether the limiter queued an attempt, which a virtual clock cannot carry.</summary>
+        private bool _queued;
+
         /// <summary>The recording, or null when the run was not asked for one.</summary>
         private readonly List<TimelineEntry>? _timeline;
 
@@ -252,6 +322,26 @@ public sealed record Simulation
             // unconditionally. Only the reading below is conditional.
             _pool = simulation.Pool;
 
+            // Built here rather than by the caller so it gets this run's clock, and built once per run
+            // so a band measures the scenario rather than the order its seeds were listed in.
+            if (simulation.Limiter is { } build)
+            {
+                _limiter = build(_clock)
+                    ?? throw new InvalidOperationException("The limiter factory returned null. WithLimiter must build a limiter.");
+
+                // A token bucket and a sliding window refill against the wall clock, and this run has
+                // none: five virtual minutes are a few real milliseconds, so one would hand out a
+                // single window and refuse everything after it. Refused rather than reported, because
+                // a limit nobody configured is worse than no limit at all.
+                if (_limiter is ReplenishingRateLimiter)
+                {
+                    throw new InvalidOperationException(
+                        "A replenishing limiter cannot run on a virtual clock: it refills against the wall clock, and a "
+                        + "simulation's five minutes are a few real milliseconds, so it would hand out one window of permits "
+                        + "and refuse everything after it. Limit.Concurrency and Limit.Adaptive measure what a run gives them.");
+                }
+            }
+
             // A policy that does not configure Saturation never asks for a reading, and the
             // process-wide probe is never even queued for it. One that does gets a modeled reading
             // whether or not a pool was supplied: the alternative is reading the real pool, which is the
@@ -279,6 +369,16 @@ public sealed record Simulation
 
             Drive();
 
+            if (_queued)
+            {
+                throw new InvalidOperationException(
+                    "The limiter queued an attempt, and a queueing limiter cannot run on a virtual clock: the wait ends "
+                    + "when another caller releases a permit, and the platform resumes it on the thread pool rather than "
+                    + "on the single thread a run drives everything from. Build the limiter with queueLimit 0 - the "
+                    + "default, and the one the library recommends, because a refusal a policy can retry on the "
+                    + "throttled backoff curve beats opaque latency charged against AttemptTimeout.");
+            }
+
             if (_fault is not null)
                 throw new InvalidOperationException("A simulated call failed outside the policy.", _fault);
 
@@ -294,6 +394,7 @@ public sealed record Simulation
                 _kinds,
                 _offered,
                 _served,
+                _refused,
                 _timeline is null ? null : [.. _timeline]);
         }
 
@@ -452,23 +553,70 @@ public sealed record Simulation
                     cancellationToken.ThrowIfCancellationRequested();
             }
 
-            _reached++;
-            BucketAt(_clock.Now).Reached++;
-            _inflight++;
+            // Acquired after the pool's queue and before the dependency, because that is where a real
+            // callback acquires it: the work item is scheduled, then it runs and asks for a permit,
+            // then it sends. The lease is held for the length of the attempt, which is the whole of
+            // what makes a concurrency limit a bulkhead.
+            RateLimitLease? lease = null;
+
+            if (_limiter is not null)
+            {
+                var pending = _limiter.AcquireAsync(1, cancellationToken);
+
+                // A limiter with a queue hands back a task that completes when somebody else's permit
+                // is released, and it completes that task on the thread pool rather than inline. Every
+                // other suspension in a run is on the virtual clock and resumes on this thread, so
+                // awaiting this one would put a second thread inside a single-threaded simulation and
+                // corrupt the tallies it is halfway through writing. It is recorded and the run is
+                // stopped afterwards rather than awaited - see Execute.
+                if (!pending.IsCompleted)
+                {
+                    _queued = true;
+
+                    throw new RateLimitedException();
+                }
+
+                lease = await pending.ConfigureAwait(false);
+            }
+
+            if (lease is { IsAcquired: false })
+            {
+                var retryAfter = lease.TryGetMetadata(MetadataName.RetryAfter, out var after) ? after : (TimeSpan?)null;
+
+                lease.Dispose();
+                _refused++;
+
+                // The one exception the executor reads as local admission control: Verdict.Refused, no
+                // evidence against the breaker, and nothing charged to the retry budget, because the
+                // call never left. That decision is the shipping one - this only throws what a real
+                // callback throws.
+                throw new RateLimitedException(retryAfter);
+            }
 
             try
             {
-                var (latency, fails) = _dependency.Serve(TimeSpan.FromTicks(_clock.Now), _inflight * _load.Peers, _dice);
+                _reached++;
+                BucketAt(_clock.Now).Reached++;
+                _inflight++;
 
-                if (latency > TimeSpan.Zero && !await _clock.Sleep(latency, cancellationToken).ConfigureAwait(false))
-                    cancellationToken.ThrowIfCancellationRequested();
+                try
+                {
+                    var (latency, fails) = _dependency.Serve(TimeSpan.FromTicks(_clock.Now), _inflight * _load.Peers, _dice);
 
-                if (fails)
-                    throw new IOException("The simulated dependency failed.");
+                    if (latency > TimeSpan.Zero && !await _clock.Sleep(latency, cancellationToken).ConfigureAwait(false))
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                    if (fails)
+                        throw new IOException("The simulated dependency failed.");
+                }
+                finally
+                {
+                    _inflight--;
+                }
             }
             finally
             {
-                _inflight--;
+                lease?.Dispose();
             }
         }
 

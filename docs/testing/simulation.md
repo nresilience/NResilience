@@ -68,6 +68,7 @@ Simulation seed 42 over 00:05:00
 | `TimeToRecover` | How long after the last impairment ended before a full second of calls all succeeded. `null` when the run ended first, and a `null` of that kind is the finding. |
 | `CountOf(kind)` | How many [`CallEvent`](../reference/events.md)s of one kind the run raised, so a claim about suppressed hedges or budget refusals is a number. |
 | `AvailabilityAt(criticality)` | The fraction of calls at one [`Criticality`](#offer-a-mix-of-criticality) that ended in success. `CallsAt` and `SucceededAt` are the counts it comes from. |
+| `RefusedByLimiter` | Attempts a [limiter](#bound-what-leaves-the-process) refused before they could leave the process. They are not in `Reached`. |
 | `Timeline` | Every event the run raised, each with the virtual time it was raised at. `null` unless the run was asked to [record one](#record-a-timeline). |
 | `EngineVersion` | Which build of the library produced the report. Determinism is a promise about one version, so two reports are comparable when this matches. |
 
@@ -207,6 +208,53 @@ A pool is a property of the run, not of the policy, so `WithPool` is accepted on
 > - **A long stall stops being detected partway through.** The baseline is a rolling median over the last minute, so a stall that comes to cover more than half of it *becomes* the median. The onset is reported and then the episode goes quiet while the queue is still deep - which is why a count of `SaturationDetected` is a count of onsets rather than of minutes.
 
 Leaving `WithPool` off does not fall back to the real thread pool. A policy that configures `Saturation` then reads a modeled pool that never queues and so is never saturated, which keeps a report reproducible to the last byte on a machine whose own pool happens to be busy.
+
+## Bound what leaves the process
+
+A [limiter](../features/rate-limiting.md) is the other half of controlling amplification. A [retry budget](../features/retry-budget.md) bounds the *share* of traffic that is retried; a limiter bounds how much goes out at all, before anything has gone wrong. `WithLimiter` builds one against the run's virtual clock and acquires a permit inside every attempt:
+
+<!-- snippet: simulation-limiter -->
+```csharp
+var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10), Name = "api" };
+
+// Four hundred calls a second at 50 ms apiece is about twenty in flight, so sixty permits is
+// headroom while the dependency is well - and a wall the moment calls start piling up.
+Simulation Bulkhead(Dependency dependency) =>
+    Simulate.Policy(policy: api)
+        .Against(dependency: dependency)
+        .Under(load: Load.Constant(perSecond: 400))
+        .For(duration: TimeSpan.FromSeconds(value: 20))
+        .WithLimiter(limiter: _ => Limit.Concurrency(permits: 60));
+
+var well = Dependency.Healthy(p50: TimeSpan.FromMilliseconds(value: 50), p99: TimeSpan.FromMilliseconds(value: 300));
+
+var healthy = Bulkhead(dependency: well).Run(seed: 7);
+var brownout = Bulkhead(dependency: well
+    .Brownout(after: TimeSpan.FromSeconds(value: 5), slower: 8, lasting: TimeSpan.FromSeconds(value: 10))).Run(seed: 7);
+
+// A guard that costs nothing while nothing is wrong is the whole argument for setting one.
+Assert.Equal(expected: 0, actual: healthy.RefusedByLimiter);
+
+// And one that bites the moment calls pile up is what stops the pile-up spreading. These
+// attempts never reached the dependency, so they are not in Reached either.
+Assert.True(condition: brownout.RefusedByLimiter > 0);
+Assert.True(condition: brownout.Reached < healthy.Reached);
+```
+<!-- endsnippet -->
+
+Nothing here is modeled. The run builds your limiter and asks it, and the executor's own handling of the refusal is the shipping one: `RateLimitedException` becomes `Verdict.Refused`, which never reaches the classifier, never counts as evidence against the breaker, and is never charged to the retry budget - because the call did not leave. `RefusedByLimiter` counts those attempts, which is what tells a load multiplier below one apart from a breaker or a budget pulling it the same way.
+
+`WithLimiter` takes a **factory** rather than a limiter, for two reasons. A limiter that takes a `TimeProvider` needs this run's clock, and you have no way to reach it. And a limiter is stateful: `RunAll` sharing one would let the first seed's discovered limit decide the second seed's run, which would make a band of a scenario a band of the order its seeds were listed in.
+
+The permit is acquired **inside** the attempt - after the modeled pool's queue, before the dependency - because that is where a real callback acquires one, and because a guard a retry bypasses is not a guard. The lease is held for the length of the attempt, which is what makes a concurrency limit a bulkhead.
+
+> [!IMPORTANT]
+> **Two kinds of limiter are refused, and the run says so rather than reporting a number.**
+>
+> - **A replenishing limiter** - `Limit.PerSecond` and `Limit.PerWindow` - refills against the wall clock, and a simulation has none. Five virtual minutes are a few real milliseconds, so one would hand out a single window of permits and refuse everything afterwards: a limit nobody configured.
+> - **A queueing limiter** - any built with a `queueLimit` above zero - ends its wait when another caller releases a permit, and the platform resumes that wait on the thread pool. Every other suspension in a run is on the virtual clock and resumes on the one thread the run drives everything from. Build it with `queueLimit: 0`, which is the default and what the library recommends anyway.
+>
+> `Limit.Concurrency` and `Limit.Adaptive` are what a simulation can answer for, and they are the two worth asking about: a rate limit caps a number the load already fixes, while a bulkhead and an adaptive limit both *react* to the dependency getting slow. `Limit.Adaptive` runs its whole discovery loop on simulated seconds, so a run reports the limit it settled on.
 
 ## Compare two configurations
 

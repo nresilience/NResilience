@@ -1,3 +1,4 @@
+using NResilience.Extensions;
 using NResilience.Testing;
 
 namespace NResilience.Docs;
@@ -156,6 +157,38 @@ public sealed class Simulating
         Assert.Equal(expected: 1, actual: report.CountOf(kind: CallEventKind.SaturationDetected));
 
         // </snippet:simulation-pool>
+    }
+
+    [Fact]
+    public void A_bulkhead_costs_nothing_until_the_dependency_slows()
+    {
+        // <snippet:simulation-limiter>
+        var api = Resilience.Http with { Deadline = TimeSpan.FromSeconds(value: 10), Name = "api" };
+
+        // Four hundred calls a second at 50 ms apiece is about twenty in flight, so sixty permits is
+        // headroom while the dependency is well - and a wall the moment calls start piling up.
+        Simulation Bulkhead(Dependency dependency) =>
+            Simulate.Policy(policy: api)
+                .Against(dependency: dependency)
+                .Under(load: Load.Constant(perSecond: 400))
+                .For(duration: TimeSpan.FromSeconds(value: 20))
+                .WithLimiter(limiter: _ => Limit.Concurrency(permits: 60));
+
+        var well = Dependency.Healthy(p50: TimeSpan.FromMilliseconds(value: 50), p99: TimeSpan.FromMilliseconds(value: 300));
+
+        var healthy = Bulkhead(dependency: well).Run(seed: 7);
+        var brownout = Bulkhead(dependency: well
+            .Brownout(after: TimeSpan.FromSeconds(value: 5), slower: 8, lasting: TimeSpan.FromSeconds(value: 10))).Run(seed: 7);
+
+        // A guard that costs nothing while nothing is wrong is the whole argument for setting one.
+        Assert.Equal(expected: 0, actual: healthy.RefusedByLimiter);
+
+        // And one that bites the moment calls pile up is what stops the pile-up spreading. These
+        // attempts never reached the dependency, so they are not in Reached either.
+        Assert.True(condition: brownout.RefusedByLimiter > 0);
+        Assert.True(condition: brownout.Reached < healthy.Reached);
+
+        // </snippet:simulation-limiter>
     }
 
     [Fact]

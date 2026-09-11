@@ -32,6 +32,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- For Simulation.WithLimiter, which takes the platform RateLimiter the caller's own callback
+         acquires from. The alternative was referencing NResilience.Extensions, where Limit lives -
+         that would put DI, Options, Http, Hosting and health checks behind a test-time package for
+         the sake of one abstract type that ships beside the framework. -->
+    <PackageReference Include="System.Threading.RateLimiting"/>
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- So the simulator's own models can be asserted on directly: Pool.At is the arithmetic that
          decides whether a modeled stall registers, and pinning it through a whole simulation run
          would be pinning the run instead. -->

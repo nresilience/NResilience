@@ -130,6 +130,7 @@ NResilience.Testing.Simulation.Dependency.get -> NResilience.Testing.Dependency?
 NResilience.Testing.Simulation.Duration.get -> System.TimeSpan
 NResilience.Testing.Simulation.Equals(NResilience.Testing.Simulation? other) -> bool
 NResilience.Testing.Simulation.For(System.TimeSpan duration) -> NResilience.Testing.Simulation!
+NResilience.Testing.Simulation.Limiter.get -> System.Func<System.TimeProvider!, System.Threading.RateLimiting.RateLimiter!>?
 NResilience.Testing.Simulation.Load.get -> NResilience.Testing.Load?
 NResilience.Testing.Simulation.Policy.get -> NResilience.Resilience!
 NResilience.Testing.Simulation.Pool.get -> NResilience.Testing.Pool?
@@ -138,6 +139,7 @@ NResilience.Testing.Simulation.Records.get -> bool
 NResilience.Testing.Simulation.Run(int seed) -> NResilience.Testing.SimulationReport!
 NResilience.Testing.Simulation.RunAll(params int[]! seeds) -> NResilience.Testing.SimulationBand!
 NResilience.Testing.Simulation.Under(NResilience.Testing.Load! load) -> NResilience.Testing.Simulation!
+NResilience.Testing.Simulation.WithLimiter(System.Func<System.TimeProvider!, System.Threading.RateLimiting.RateLimiter!>! limiter) -> NResilience.Testing.Simulation!
 NResilience.Testing.Simulation.WithPool(NResilience.Testing.Pool! pool) -> NResilience.Testing.Simulation!
 NResilience.Testing.SimulationBand
 NResilience.Testing.SimulationBand.Amplification.get -> NResilience.Testing.Band
@@ -152,6 +154,7 @@ NResilience.Testing.SimulationBand.EngineVersion.get -> string!
 NResilience.Testing.SimulationBand.Latency(double quantile) -> NResilience.Testing.TimeBand
 NResilience.Testing.SimulationBand.LoadMultiplier.get -> NResilience.Testing.Band
 NResilience.Testing.SimulationBand.Recovered.get -> int
+NResilience.Testing.SimulationBand.RefusedByLimiter.get -> NResilience.Testing.Band
 NResilience.Testing.SimulationBand.Reports.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.SimulationReport!>!
 NResilience.Testing.SimulationBand.Seeds.get -> System.Collections.Generic.IReadOnlyList<int>!
 NResilience.Testing.SimulationBand.TimeToRecover.get -> NResilience.Testing.TimeBand?
@@ -169,6 +172,7 @@ NResilience.Testing.SimulationReport.Failed.get -> int
 NResilience.Testing.SimulationReport.Latency(double quantile) -> System.TimeSpan
 NResilience.Testing.SimulationReport.LoadMultiplier.get -> double
 NResilience.Testing.SimulationReport.Reached.get -> int
+NResilience.Testing.SimulationReport.RefusedByLimiter.get -> int
 NResilience.Testing.SimulationReport.Seed.get -> int
 NResilience.Testing.SimulationReport.Succeeded.get -> int
 NResilience.Testing.SimulationReport.SucceededAt(NResilience.Criticality criticality) -> int

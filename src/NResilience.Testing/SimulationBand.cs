@@ -57,6 +57,9 @@ public sealed class SimulationBand
     /// <summary>Attempts that reached the dependency per call the caller made, across the seeds.</summary>
     public Band LoadMultiplier => Of(report => report.LoadMultiplier);
 
+    /// <summary>Attempts a limiter refused before they could leave the process, across the seeds.</summary>
+    public Band RefusedByLimiter => Of(report => report.RefusedByLimiter);
+
     /// <summary>
     ///     How many of the runs recovered at all - saw a full second of nothing but successes after the
     ///     last impairment ended. A count below <see cref="Seeds" />.Count is the finding, and the

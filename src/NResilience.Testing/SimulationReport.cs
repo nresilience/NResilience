@@ -36,6 +36,7 @@ public sealed class SimulationReport
         int[] kinds,
         int[] offered,
         int[] served,
+        int refusedByLimiter,
         TimelineEntry[]? timeline)
     {
         Seed = seed;
@@ -46,6 +47,7 @@ public sealed class SimulationReport
         Amplification = amplification;
         TimeToRecover = timeToRecover;
 
+        RefusedByLimiter = refusedByLimiter;
         Timeline = timeline;
 
         _latencies = latencies;
@@ -102,6 +104,19 @@ public sealed class SimulationReport
 
     /// <summary>Attempts that reached the dependency, across every call.</summary>
     public int Reached { get; }
+
+    /// <summary>
+    ///     Attempts a limiter refused before they could leave the process. Zero when the run had no
+    ///     <see cref="Simulation.WithLimiter">limiter</see>.
+    ///     <para>
+    ///         The number that says <i>why</i> <see cref="LoadMultiplier" /> is what it is. A breaker
+    ///         refusing calls, a retry budget refusing retries and a limiter refusing attempts all pull
+    ///         it the same way, and only counting them apart tells you which guard is doing the work.
+    ///         These attempts never contacted the dependency, so they are not in <see cref="Reached" />,
+    ///         and the executor charges them to neither the breaker nor the budget.
+    ///     </para>
+    /// </summary>
+    public int RefusedByLimiter { get; }
 
     /// <summary>The seed the run was drawn from. The same one reproduces this report exactly.</summary>
     public int Seed { get; }
@@ -228,6 +243,12 @@ public sealed class SimulationReport
         text.Append(culture, $"  Latency p50      {Latency(0.50)}").AppendLine();
         text.Append(culture, $"  Latency p99      {Latency(0.99)}").AppendLine();
         text.Append(culture, $"  BreakerOpens     {BreakerOpens}").AppendLine();
+
+        // Only when there was a limiter, so a run without one prints the block it printed before
+        // there was a limiter to refuse anything.
+        if (RefusedByLimiter > 0)
+            text.Append(culture, $"  LimiterRefusals  {RefusedByLimiter}").AppendLine();
+
         text.Append(culture, $"  TimeToRecover    {TimeToRecover?.ToString() ?? "never"}").AppendLine();
 
         // Only when the load was mixed, so a run that never named a level prints exactly the block it
