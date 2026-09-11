@@ -408,7 +408,7 @@ A service can have both, which is the two-level bulkhead: the service's permit i
 ### What a graph will not do
 
 - **Cycles are refused.** A run would never finish, and a service that calls itself back is a different simulator.
-- **`peers` is refused.** It exists so a single-dependency run can ask "does my retry budget hold when I am one of fifty" without claiming to have simulated fifty policies - and a topology is the place where the peers *do* have policies, so approximating them away is the one thing it should not offer. Offer load at another entry instead.
+- **`peers` is refused on a graph.** It exists so a single-dependency run can ask "does my retry budget hold when I am one of fifty" without claiming to have simulated fifty policies - and a graph is the place where the peers *do* have policies, so approximating them away is the one thing it should not offer. Offer load at another entry instead. A topology of one call accepts `peers` and applies it exactly as `Simulate.Policy` does: one call is the single-dependency model written in this shape, not a graph.
 - **No parallel fan-out, and so no bulkhead starvation.** The shape where one slow callee exhausts a shared bulkhead and starves a service's other calls needs its calls to overlap. Sequential calls cannot produce it.
 
 ## What is fake, and what is not

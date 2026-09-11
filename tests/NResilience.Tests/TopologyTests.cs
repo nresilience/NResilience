@@ -53,6 +53,143 @@ public sealed class TopologyTests
         Assert.NotEqual(Chain().Run(seed: 1).ToString(), Chain().Run(seed: 2).ToString());
     }
 
+    /// <summary>
+    ///     A topology of one call is the single-dependency model written in this shape, so it measures
+    ///     what <see cref="Simulate.Policy" /> measures, down to the tick. The whole product leans on
+    ///     this: one runner can build every scenario as a graph without the degenerate case drifting
+    ///     from the numbers anyone already committed a threshold against.
+    /// </summary>
+    [Fact]
+    public void One_call_measures_exactly_what_a_single_dependency_run_measures()
+    {
+        var flat = Simulate
+            .Policy(Retrying)
+            .Against(Sick)
+            .Under(Load.Constant(perSecond: 200))
+            .For(TimeSpan.FromSeconds(40))
+            .Run(seed: 42);
+
+        var graph = Simulate.Topology()
+            .Calls("svc", "dep", Retrying)
+            .Leaf("dep", Sick)
+            .Under(Load.Constant(perSecond: 200), at: "svc")
+            .For(TimeSpan.FromSeconds(40))
+            .Run(seed: 42);
+
+        Same(flat, graph.On("svc", "dep"));
+    }
+
+    /// <summary>
+    ///     And with the process's own pool stalling under a policy that watches for it - the case every
+    ///     real scenario has, and the one where the two paths have the most room to diverge.
+    /// </summary>
+    [Fact]
+    public void One_call_measures_the_same_with_a_stalling_pool_underneath_it()
+    {
+        var aware = Retrying with { Saturation = Saturation.Above(multiple: 5) };
+
+        var pool = Pool
+            .Healthy(TimeSpan.FromMicroseconds(80))
+            .Stall(TimeSpan.FromSeconds(30), TimeSpan.FromMilliseconds(400), TimeSpan.FromSeconds(20));
+
+        var flat = Simulate
+            .Policy(aware)
+            .Against(Sick)
+            .WithPool(pool)
+            .Under(Load.Constant(perSecond: 200))
+            .For(TimeSpan.FromSeconds(60))
+            .Run(seed: 42);
+
+        var graph = Simulate.Topology()
+            .Calls("svc", "dep", aware)
+            .Leaf("dep", Sick)
+            .WithPool("svc", pool)
+            .Under(Load.Constant(perSecond: 200), at: "svc")
+            .For(TimeSpan.FromSeconds(60))
+            .Run(seed: 42);
+
+        Same(flat, graph.On("svc", "dep"));
+    }
+
+    /// <summary>Asserts two reports measured the same run, metric by metric.</summary>
+    /// <param name="flat">What the single-dependency run measured.</param>
+    /// <param name="edge">What the one-call graph measured.</param>
+    private static void Same(SimulationReport flat, SimulationReport edge)
+    {
+        Assert.Equal(flat.Calls, edge.Calls);
+        Assert.Equal(flat.Reached, edge.Reached);
+        Assert.Equal(flat.Availability, edge.Availability);
+        Assert.Equal(flat.Amplification, edge.Amplification);
+        Assert.Equal(flat.LoadMultiplier, edge.LoadMultiplier);
+        Assert.Equal(flat.BreakerOpens, edge.BreakerOpens);
+        Assert.Equal(flat.Latency(0.50), edge.Latency(0.50));
+        Assert.Equal(flat.Latency(0.99), edge.Latency(0.99));
+        Assert.Equal(flat.TimeToRecover, edge.TimeToRecover);
+    }
+
+    /// <summary>
+    ///     Peers are refused on a graph and accepted on a single call - see <see cref="Topology.Under" />.
+    ///     They have to do on one call what they do in a single-dependency run: scale what the dependency
+    ///     is offered. A value that validates and then changes nothing is worse than one that is refused.
+    /// </summary>
+    /// <param name="peers">How many processes offer the same load.</param>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(8)]
+    [InlineData(50)]
+    public void One_call_offers_a_dependency_exactly_what_peers_say_it_does(int peers)
+    {
+        var crowded = Dependency
+            .Healthy(TimeSpan.FromMilliseconds(20), TimeSpan.FromMilliseconds(100))
+            .Capacity(concurrent: 40);
+
+        var load = Load.Constant(perSecond: 100, peers: peers);
+
+        var graph = Simulate.Topology()
+            .Calls("svc", "dep", Once)
+            .Leaf("dep", crowded)
+            .Under(load, at: "svc")
+            .For(TimeSpan.FromSeconds(30))
+            .Run(seed: 42)
+            .On("svc", "dep");
+
+        var flat = Simulate
+            .Policy(Once)
+            .Against(crowded)
+            .Under(load)
+            .For(TimeSpan.FromSeconds(30))
+            .Run(seed: 42);
+
+        Assert.Equal(flat.Availability, graph.Availability);
+        Assert.Equal(flat.Latency(0.50), graph.Latency(0.50));
+        Assert.Equal(flat.Latency(0.99), graph.Latency(0.99));
+    }
+
+    /// <summary>Enough peers overwhelm the dependency's capacity, on a graph as in a flat run.</summary>
+    [Fact]
+    public void Enough_peers_overwhelm_a_bounded_dependency()
+    {
+        var crowded = Dependency
+            .Healthy(TimeSpan.FromMilliseconds(20), TimeSpan.FromMilliseconds(100))
+            .Capacity(concurrent: 40);
+
+        static double Availability(Dependency dependency, int peers) =>
+            Simulate.Topology()
+                .Calls("svc", "dep", Once)
+                .Leaf("dep", dependency)
+                .Under(Load.Constant(perSecond: 100, peers: peers), at: "svc")
+                .For(TimeSpan.FromSeconds(30))
+                .Run(seed: 42)
+                .On("svc", "dep")
+                .Availability;
+
+        var alone = Availability(crowded, peers: 1);
+        var crowdedRun = Availability(crowded, peers: 50);
+
+        Assert.True(alone > 0.95, $"alone the dependency answered {alone:F4}");
+        Assert.True(crowdedRun < 0.5, $"with fifty peers it answered {crowdedRun:F4}");
+    }
+
     [Fact]
     public void Retries_compound_down_the_graph()
     {
@@ -301,7 +438,7 @@ public sealed class TopologyTests
             },
             {
                 Simulate.Topology()
-                    .Calls("a", "b", Retrying).Leaf("b", Quick)
+                    .Calls("a", "b", Retrying).Calls("b", "c", Retrying).Leaf("c", Quick)
                     .Under(Load.Constant(perSecond: 100, peers: 50), at: "a").For(duration),
                 "Peers approximate processes that have no policies"
             },

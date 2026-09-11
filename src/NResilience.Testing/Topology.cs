@@ -139,11 +139,12 @@ public sealed class Topology
     /// <returns>A new topology. The receiver is unchanged.</returns>
     /// <exception cref="ArgumentNullException">An argument is null.</exception>
     /// <remarks>
-    ///     <see cref="Load.Peers" /> is refused here. It exists so a single-dependency run can ask "does
-    ///     my retry budget hold when I am one of fifty" without claiming to have simulated fifty
-    ///     policies - and a topology is the place where the peers <i>do</i> have policies, so
-    ///     approximating them away is the one thing it should not offer. Offer the load at another entry
-    ///     instead, or accept that this graph is one process per service.
+    ///     <see cref="Load.Peers" /> is refused on a graph - a topology of more than one call. It exists
+    ///     so a single-dependency run can ask "does my retry budget hold when I am one of fifty" without
+    ///     claiming to have simulated fifty policies, and a graph is the place where the peers <i>do</i>
+    ///     have policies, so approximating them away is the one thing it should not offer. Offer the load
+    ///     at another entry instead, or accept that this graph is one process per service. A topology of
+    ///     one call accepts peers: it is the single-dependency model in this shape, not a graph.
     /// </remarks>
     public Topology Under(Load load, string at)
     {
@@ -356,11 +357,16 @@ public sealed class Topology
             if (!callers.Contains(offered.At))
                 problems.Add($"Load is offered at '{offered.At}', which makes no calls. Traffic has to arrive somewhere that does something.");
 
-            if (offered.Load.Peers != 1)
+            // Peers approximate processes that have no policies of their own, and a graph is where they
+            // would have them - so a graph refuses them. A one-call topology is not a graph: it is the
+            // single-dependency model written in this shape, it measures exactly what Simulate measures,
+            // and refusing peers there would refuse the one question peers exist to answer.
+            if (offered.Load.Peers != 1 && _edges.Length > 1)
             {
                 problems.Add(
-                    $"Load offered at '{offered.At}' has {offered.Load.Peers} peers. Peers approximate processes that have no policies of "
-                    + "their own, and a topology is where they would have them - offer the load at another entry instead.");
+                    $"Load offered at '{offered.At}' has {offered.Load.Peers} peers, and this topology makes {_edges.Length} calls. "
+                    + "Peers approximate processes that have no policies of their own, and a graph is where they would have them - "
+                    + "offer the load at another entry instead, or reduce the graph to a single call.");
             }
         }
 
@@ -481,6 +487,8 @@ public sealed class Topology
 
         private readonly Dictionary<string, NodeState> _nodes = new(StringComparer.Ordinal);
 
+        private readonly int _peers;
+
         private readonly int _seed;
 
         private Exception? _fault;
@@ -573,6 +581,12 @@ public sealed class Topology
 
             _edges = [.. edges];
             _entries = [.. topology._loads.Select(offered => new EntryState(Node(offered.At), offered.Load))];
+
+            // Peers scale what a dependency is offered without being simulated, exactly as they do in a
+            // single-dependency run - see Simulation's own Serve. Validate() only permits them on a
+            // one-call topology, so there is one entry and one leaf and the factor is unambiguous;
+            // on a graph every entry has Peers of 1 and this is 1.
+            _peers = topology._loads.Length == 1 ? topology._loads[0].Load.Peers : 1;
 
             NodeState Node(string name)
             {
@@ -759,7 +773,7 @@ public sealed class Topology
 
                     try
                     {
-                        var (latency, fails) = dependency.Serve(TimeSpan.FromTicks(_clock.Now), node.InFlight, _dice);
+                        var (latency, fails) = dependency.Serve(TimeSpan.FromTicks(_clock.Now), node.InFlight * _peers, _dice);
 
                         if (latency > TimeSpan.Zero && !await _clock.Sleep(latency, cancellationToken).ConfigureAwait(false))
                             cancellationToken.ThrowIfCancellationRequested();
