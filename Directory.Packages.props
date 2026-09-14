@@ -10,7 +10,7 @@
     <PackageVersion Include="Polly.Core" Version="8.7.0" />
 
     <!-- Trend tracking only. The hard gate below depends on no benchmark harness. -->
-    <PackageVersion Include="NBenchmark" Version="0.48.1" />
+    <PackageVersion Include="NBenchmark" Version="0.50.0" />
 
     <!-- Hard gate. -->
     <PackageVersion Include="xunit.v3" Version="4.0.0" />
