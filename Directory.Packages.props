@@ -42,7 +42,7 @@
       nothing, so any limiter composes with the executor whether or not this package is present.
       Same version as the Microsoft.Extensions family above, decided once.
     -->
-    <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.11" />
+    <PackageVersion Include="System.Threading.RateLimiting" Version="10.0.12" />
 
     <!--
       Health checks. IHealthChecksBuilder and HealthCheckRegistration live here rather than in the
