@@ -68,7 +68,8 @@ public sealed class Topology
     }
 
     private Topology(Topology from, Declared[]? edges = null, Leafed[]? leaves = null, Offered[]? loads = null,
-        Limited[]? limiters = null, Shared[]? shared = null, Pooled[]? pools = null, TimeSpan? duration = null, bool? records = null)
+        Limited[]? limiters = null, Shared[]? shared = null, Pooled[]? pools = null, TimeSpan? duration = null, bool? records = null,
+        int? recordedSeed = null)
     {
         _edges = edges ?? from._edges;
         _leaves = leaves ?? from._leaves;
@@ -78,6 +79,7 @@ public sealed class Topology
         _pools = pools ?? from._pools;
         Duration = duration ?? from.Duration;
         Records = records ?? from.Records;
+        RecordedSeed = recordedSeed ?? from.RecordedSeed;
     }
 
     /// <summary>How long the run offers load for. Set it with <see cref="For" />.</summary>
@@ -86,8 +88,14 @@ public sealed class Topology
     /// <summary>Every call declared, in the order they were declared.</summary>
     public IReadOnlyList<Edge> Edges => [.. _edges.Select(edge => new Edge(edge.Caller, edge.Callee))];
 
-    /// <summary>Whether the run records a timeline per edge. Set it with <see cref="Recording" />.</summary>
+    /// <summary>Whether the run records a timeline per edge. Set it with <see cref="Recording()" />.</summary>
     public bool Records { get; }
+
+    /// <summary>
+    ///     The one seed that records, or null when every seed does. Set it with
+    ///     <see cref="Recording(int)" />, and meaningless unless <see cref="Records" /> is true.
+    /// </summary>
+    public int? RecordedSeed { get; }
 
     /// <summary>
     ///     Declares that one service calls another, under a policy. The policy belongs to the call
@@ -262,10 +270,30 @@ public sealed class Topology
 
     /// <summary>
     ///     Records every event each edge's policy raises, with the virtual time it was raised at, into
-    ///     that edge's <see cref="SimulationReport.Timeline" />.
+    ///     that edge's <see cref="SimulationReport.Timeline" />. Every seed of a band records.
     /// </summary>
     /// <returns>A new topology. The receiver is unchanged.</returns>
     public Topology Recording() => new(this, records: true);
+
+    /// <summary>
+    ///     Records the timeline of one seed only, and of no other seed in a band.
+    ///     <para>
+    ///         A timeline is the narrative of one run, and a band of twenty has no single narrative -
+    ///         interleaving twenty of them describes something no run actually did, so a reader of a
+    ///         band picks one seed and reads that. Recording the other nineteen produces nineteen
+    ///         narratives nobody reads, and they are the most expensive thing a run allocates: a
+    ///         recorded seed of a thirty-second run at 200 rps costs around 5 MB more than an
+    ///         unrecorded one.
+    ///     </para>
+    ///     <para>
+    ///         Recording changes nothing the run measures. Every event is counted either way - what a
+    ///         recording seed does in addition is keep the event, so a band whose seeds record and a
+    ///         band whose seeds do not report the same numbers, which <c>TopologyTests</c> asserts.
+    ///     </para>
+    /// </summary>
+    /// <param name="seed">The seed to record. A seed a band never runs simply records nothing.</param>
+    /// <returns>A new topology. The receiver is unchanged.</returns>
+    public Topology Recording(int seed) => new(this, records: true, recordedSeed: seed);
 
     /// <summary>
     ///     Runs the graph and reports what happened, per edge and per service. Nothing sleeps.
@@ -594,6 +622,11 @@ public sealed class Topology
             _duration = topology.Duration;
             _dice = new ChaosDice(seed);
 
+            // Whether this seed keeps its events or only counts them. A band records one seed by
+            // default because only one seed's timeline is readable - see Recording(int) - and every
+            // count a report carries is taken either way, so this decides allocation and nothing else.
+            var records = topology.Records && (topology.RecordedSeed is not { } only || only == seed);
+
             foreach (var leaf in topology._leaves)
                 _nodes[leaf.Name] = new NodeState(leaf.Name, leaf.Dependency);
 
@@ -607,7 +640,7 @@ public sealed class Topology
             foreach (var declared in topology._edges)
             {
                 var caller = Node(declared.Caller);
-                var edge = new EdgeState(caller, Node(declared.Callee), declared.Caller, declared.Callee, topology.Records);
+                var edge = new EdgeState(caller, Node(declared.Callee), declared.Caller, declared.Callee, records);
 
                 // Every policy in the graph is put on the one clock, and its events are recorded against
                 // the edge that raised them - which is what keeps a graph's telemetry attributable when

@@ -230,7 +230,8 @@ A limiter that cannot answer on a virtual clock throws `InvalidOperationExceptio
 | `WithLimiter(string service, Func<TimeProvider, RateLimiter> limiter)` | The process-wide bulkhead: one limiter shared by every call the service makes, so it bounds the total in flight rather than each call. Refused on a leaf, on a name that makes no calls, or twice for one service. |
 
 Both kinds of limiter may apply to one call. The service's permit is acquired first, then the call's, and either refusal is counted against the call that was attempting - a shared limiter cannot say which of its calls was turned away. The same replenishing and queueing limiters `Simulation.WithLimiter` refuses are refused here, and the message names the service or the call.
-| `Recording()` | Records a timeline per edge, into each `On(caller, callee).Timeline`. |
+| `Recording()` | Records a timeline per edge, into each `On(caller, callee).Timeline`. Every seed of a band records. |
+| `Recording(int seed)` | Records only that seed's timeline, and no other seed's. A band has no single narrative to read, so recording the rest allocates timelines nobody reads - around 5 MB per seed on a thirty-second run at 200 rps. Changes nothing a run measures. |
 | `Run(int seed)` | Runs the graph and returns a `TopologyReport`. |
 | `RunAll(params int[] seeds)` | Runs it once per seed and returns a `TopologyBand`. No repeats. The seeds run at the same time as each other, on the same terms `Simulation.RunAll` does. |
 | `RunAll(int[] seeds, CancellationToken cancellationToken)` | The same, abandoning the band between seeds when the token is signalled. For a caller that may stop wanting the answer. |
@@ -260,6 +261,8 @@ What a graph run measured. The same seed produces the same report.
 ## `TopologyBand`
 
 What a set of seeds measured over a graph. `On(caller, callee)` and `At(service)` each return a `SimulationBand`; `Reports`, `Seeds`, `Edges`, `Entries`, `Services`, `Duration` and `EngineVersion` are as `TopologyReport` has them.
+
+`new TopologyBand(reports)` forms one over reports you already have - seeds you ran in batches, to answer with the first few while the rest are still running. Every number is computed from the reports given, so a band assembled this way is identical to one `RunAll` produced rather than an approximation of it. It refuses a repeated seed, and reports from different graphs.
 
 ## `Dependency`
 

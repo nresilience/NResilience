@@ -203,7 +203,9 @@ NResilience.Testing.Topology.Duration.get -> System.TimeSpan
 NResilience.Testing.Topology.Edges.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.Edge>!
 NResilience.Testing.Topology.For(System.TimeSpan duration) -> NResilience.Testing.Topology!
 NResilience.Testing.Topology.Leaf(string! name, NResilience.Testing.Dependency! dependency) -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.RecordedSeed.get -> int?
 NResilience.Testing.Topology.Recording() -> NResilience.Testing.Topology!
+NResilience.Testing.Topology.Recording(int seed) -> NResilience.Testing.Topology!
 NResilience.Testing.Topology.Records.get -> bool
 NResilience.Testing.Topology.Run(int seed) -> NResilience.Testing.TopologyReport!
 NResilience.Testing.Topology.RunAll(int[]! seeds, System.Threading.CancellationToken cancellationToken) -> NResilience.Testing.TopologyBand!
@@ -214,6 +216,7 @@ NResilience.Testing.Topology.WithLimiter(string! caller, string! callee, System.
 NResilience.Testing.Topology.WithLimiter(string! service, System.Func<System.TimeProvider!, System.Threading.RateLimiting.RateLimiter!>! limiter) -> NResilience.Testing.Topology!
 NResilience.Testing.Topology.WithPool(string! service, NResilience.Testing.Pool! pool) -> NResilience.Testing.Topology!
 NResilience.Testing.TopologyBand
+NResilience.Testing.TopologyBand.TopologyBand(System.Collections.Generic.IEnumerable<NResilience.Testing.TopologyReport!>! reports) -> void
 NResilience.Testing.TopologyBand.At(string! service) -> NResilience.Testing.SimulationBand!
 NResilience.Testing.TopologyBand.Duration.get -> System.TimeSpan
 NResilience.Testing.TopologyBand.Edges.get -> System.Collections.Generic.IReadOnlyList<NResilience.Testing.Edge>!

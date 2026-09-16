@@ -417,6 +417,81 @@ public sealed class TopologyTests
     }
 
     [Fact]
+    public void A_band_assembled_from_reports_equals_the_band_that_ran_them()
+    {
+        // The primitive a caller needs to run a band in batches - a few seeds now, the rest after -
+        // and it has to produce the band RunAll would have, not something close to it.
+        var seeds = new[] { 1, 2, 3, 4, 5, 6 };
+
+        var whole = Chain(seconds: 20).RunAll(seeds);
+
+        var first = Chain(seconds: 20).RunAll(seeds[..2]);
+        var rest = Chain(seconds: 20).RunAll(seeds[2..]);
+        var assembled = new TopologyBand([.. first.Reports, .. rest.Reports]);
+
+        Assert.Equal(whole.Seeds, assembled.Seeds);
+        Assert.Equal(whole.On("payments", "bank").ToString(), assembled.On("payments", "bank").ToString());
+        Assert.Equal(whole.At("checkout").ToString(), assembled.At("checkout").ToString());
+    }
+
+    [Fact]
+    public void A_band_assembled_from_a_repeated_seed_is_refused()
+    {
+        var report = Chain(seconds: 20).Run(seed: 1);
+
+        var thrown = Assert.Throws<ArgumentException>(() => new TopologyBand([report, report]));
+
+        Assert.Contains("same seed twice", thrown.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_band_assembled_from_two_different_graphs_is_refused()
+    {
+        var chain = Chain(seconds: 20).Run(seed: 1);
+
+        var other = Simulate.Topology()
+            .Calls("svc", "dep", Retrying)
+            .Leaf("dep", Sick)
+            .Under(Load.Constant(perSecond: 200), at: "svc")
+            .For(TimeSpan.FromSeconds(20))
+            .Run(seed: 2);
+
+        // On() and At() would answer for some of the reports and not others, so the band could not
+        // report a number for either.
+        var thrown = Assert.Throws<ArgumentException>(() => new TopologyBand([chain, other]));
+
+        Assert.Contains("same graph", thrown.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Recording_one_seed_records_that_seed_and_no_other()
+    {
+        var seeds = new[] { 1, 2, 3 };
+
+        var band = Chain(seconds: 20).Recording(seed: 2).RunAll(seeds);
+
+        Assert.Null(band.Reports[0].On("payments", "bank").Timeline);
+        Assert.NotNull(band.Reports[1].On("payments", "bank").Timeline);
+        Assert.Null(band.Reports[2].On("payments", "bank").Timeline);
+    }
+
+    [Fact]
+    public void Recording_changes_nothing_a_band_measures()
+    {
+        // Recording keeps events that are counted either way, so a seed that records and the same
+        // seed that does not are the same run - which is what lets a band record only the one seed
+        // whose timeline anybody reads.
+        var seeds = new[] { 1, 2, 3 };
+
+        var silent = Chain(seconds: 20).RunAll(seeds);
+        var recorded = Chain(seconds: 20).Recording(seeds[0]).RunAll(seeds);
+
+        Assert.Equal(
+            silent.Reports.Select(report => report.ToString()),
+            recorded.Reports.Select(report => report.ToString()));
+    }
+
+    [Fact]
     public void A_band_abandons_the_run_when_its_token_is_signalled()
     {
         using var cancellation = new CancellationTokenSource();
