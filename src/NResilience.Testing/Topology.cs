@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using System.Threading.RateLimiting;
 using NResilience.Internal;
 using NResilience.Testing.Internal;
@@ -284,12 +285,36 @@ public sealed class Topology
     ///     Runs the graph once per seed and reports the band of what they measured. The same argument
     ///     <see cref="Simulation.RunAll" /> makes, and more of it: a graph has more places for one draw
     ///     to decide an answer.
+    ///     <para>
+    ///         The seeds run at the same time as each other, on as many threads as the machine has,
+    ///         exactly as <see cref="Simulation.RunAll" />'s do and under the same conditions. Each run
+    ///         builds its own clock, its own budget scope and its own copy of every policy in the
+    ///         graph, so the band is identical to running them one at a time - only faster.
+    ///     </para>
     /// </summary>
     /// <param name="seeds">The seeds. At least one, and no repeats.</param>
     /// <returns>The band.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="seeds" /> is null.</exception>
     /// <exception cref="ArgumentException"><paramref name="seeds" /> is empty, or names a seed twice.</exception>
-    public TopologyBand RunAll(params int[] seeds)
+    public TopologyBand RunAll(params int[] seeds) => RunAll(seeds, CancellationToken.None);
+
+    /// <summary>
+    ///     Runs the graph once per seed, abandoning the band when the token is signalled. What
+    ///     <see cref="RunAll(int[])" /> does, for a caller who may stop wanting the answer - an editor
+    ///     re-running on every keystroke, whose last three requests are already stale.
+    /// </summary>
+    /// <param name="seeds">The seeds. At least one, and no repeats.</param>
+    /// <param name="cancellationToken">Abandons the band between seeds.</param>
+    /// <returns>The band.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="seeds" /> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="seeds" /> is empty, or names a seed twice.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken" /> was signalled.</exception>
+    /// <remarks>
+    ///     Between seeds rather than inside one, for the reason a sweep abandons between points: a run
+    ///     is milliseconds and tearing one in half would leave a band whose numbers came from some of
+    ///     its seeds.
+    /// </remarks>
+    public TopologyBand RunAll(int[] seeds, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(seeds);
 
@@ -301,10 +326,75 @@ public sealed class Topology
 
         var reports = new TopologyReport[seeds.Length];
 
-        for (var i = 0; i < seeds.Length; i++)
-            reports[i] = Run(seeds[i]);
+        if (seeds.Length > 1 && SeedsAreIndependent)
+        {
+            RunInParallel(seeds, reports, cancellationToken);
+        }
+        else
+        {
+            for (var i = 0; i < seeds.Length; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                reports[i] = Run(seeds[i]);
+            }
+        }
 
         return new TopologyBand(reports);
+    }
+
+    /// <summary>
+    ///     Whether the seeds of a band can run at the same time as each other. The same question
+    ///     <see cref="Simulation" /> asks, with the same answer for the same reason.
+    ///     <para>
+    ///         A run builds its own clock, its own budget scope, and its own copy of every policy in
+    ///         the graph - <c>WithClock</c> rebuilds a breaker rather than rebasing it, and rebases a
+    ///         retry budget onto the run's own clock - so two runs share nothing and cannot see each
+    ///         other. Each seeds its own thread's jitter stream, and a run happens start to finish on
+    ///         one thread because nothing in it sleeps.
+    ///     </para>
+    ///     <para>
+    ///         Limiters are the exception, and the reason is the caller's rather than the engine's: the
+    ///         factories <see cref="WithLimiter(string,string,Func{TimeProvider,RateLimiter})" /> and
+    ///         <see cref="WithLimiter(string,Func{TimeProvider,RateLimiter})" /> take are someone
+    ///         else's code, they have always been called one seed at a time, and a factory that keeps a
+    ///         list of what it built - a perfectly reasonable thing to do - would quietly lose entries
+    ///         the first time it was called from two threads at once. Speeding a band up is not worth
+    ///         reaching into a caller's code and changing the threading rules under it.
+    ///     </para>
+    /// </summary>
+    private bool SeedsAreIndependent => _limiters.Length == 0 && _shared.Length == 0;
+
+    /// <summary>
+    ///     Runs each seed on its own thread.
+    ///     <para>
+    ///         Safe because nothing sleeps: <c>Drive</c> is a synchronous loop over a manual clock, so
+    ///         one run happens start to finish on one thread and the thread-static jitter stream it
+    ///         seeded stays its own. The reports land by index, so the band is in seed order however
+    ///         the threads interleave, and the numbers are identical to running them one after another.
+    ///     </para>
+    /// </summary>
+    /// <param name="seeds">The seeds.</param>
+    /// <param name="reports">Where to put each seed's report, by index.</param>
+    /// <param name="cancellationToken">Abandons the band between seeds.</param>
+    private void RunInParallel(int[] seeds, TopologyReport[] reports, CancellationToken cancellationToken)
+    {
+        try
+        {
+            Parallel.For(
+                0,
+                seeds.Length,
+                new ParallelOptions { CancellationToken = cancellationToken },
+                i => reports[i] = Run(seeds[i]));
+        }
+
+        // Parallel.For wraps whatever the body threw. A caller asked for a simulation, not a band of
+        // tasks, so it gets the exception Run() documents rather than an AggregateException around it.
+        catch (AggregateException aggregate) when (aggregate.InnerExceptions.Count > 0)
+        {
+            ExceptionDispatchInfo.Capture(aggregate.InnerExceptions[0]).Throw();
+            throw;
+        }
     }
 
     /// <summary>
@@ -738,13 +828,17 @@ public sealed class Topology
         {
             try
             {
-                await Serve(entry.Node, CancellationToken.None).ConfigureAwait(false);
+                // Discarded rather than raised. Nothing stands above an entry, so a failure that gets
+                // this far is the request failing, and Serve has already counted it.
+                _ = await Serve(entry.Node, CancellationToken.None).ConfigureAwait(false);
             }
             catch
             {
-                // Nothing stands above an entry, so a failure that gets this far is the request
-                // failing - Serve has already counted it. A fault in the library would have been
-                // caught around TryRunAsync in Invoke, where a policy is supposed to contain it.
+                // Serve reports the failures the graph models rather than throwing them, so this now
+                // catches only something the simulator did not model - and it is still a catch rather
+                // than nothing, because this task is started and not awaited: an exception escaping it
+                // would go unobserved rather than anywhere a person would see it. A fault in the
+                // library itself is recorded by Invoke, which reports it at the end of the run.
             }
             finally
             {
@@ -756,7 +850,28 @@ public sealed class Topology
         ///     One service serving one request, or one leaf answering one attempt. A service makes its
         ///     own calls in the order they were declared, one after another.
         /// </summary>
-        private async Task Serve(NodeState node, CancellationToken cancellationToken)
+        /// <param name="node">The service or leaf being asked.</param>
+        /// <param name="cancellationToken">The attempt's token.</param>
+        /// <returns>
+        ///     The failure to report, or null when the node served the request.
+        ///     <para>
+        ///         Returned rather than thrown, and this is the difference between a simulation that
+        ///         spends its time measuring policies and one that spends it unwinding stacks. A modeled
+        ///         failure is an <i>outcome</i> here, not an exception: the dependency failing, the
+        ///         attempt being cancelled, the call below refusing. The only place the graph genuinely
+        ///         has to throw is where <see cref="Reach" /> hands an attempt to the real executor,
+        ///         because a callback that failed is how the executor is told - so that is the only
+        ///         place that does. Every frame between here and there passes the failure along as a
+        ///         value.
+        ///     </para>
+        ///     <para>
+        ///         The saving is not one throw. An exception crossing an <c>await</c> is re-thrown at
+        ///         each frame it crosses, so a failure raised at a leaf three services deep used to cost
+        ///         a stack walk per level on the way up. Measured on a one-call graph with a brownout,
+        ///         that was three quarters of the run.
+        ///     </para>
+        /// </returns>
+        private async Task<Exception?> Serve(NodeState node, CancellationToken cancellationToken)
         {
             var started = _clock.Now;
             var criticality = AmbientCriticality.Current;
@@ -767,6 +882,8 @@ public sealed class Topology
 
             try
             {
+                Exception? failure;
+
                 if (node.Dependency is { } dependency)
                 {
                     node.InFlight++;
@@ -775,11 +892,19 @@ public sealed class Topology
                     {
                         var (latency, fails) = dependency.Serve(TimeSpan.FromTicks(_clock.Now), node.InFlight * _peers, _dice);
 
-                        if (latency > TimeSpan.Zero && !await _clock.Sleep(latency, cancellationToken).ConfigureAwait(false))
-                            cancellationToken.ThrowIfCancellationRequested();
-
-                        if (fails)
-                            throw new IOException($"The simulated dependency '{node.Name}' failed.");
+                        // The sleep coming back short means the attempt's token cut it off, which is
+                        // the caller giving up rather than the dependency answering - so nothing below
+                        // is asked whether it failed.
+                        if (latency > TimeSpan.Zero
+                            && !await _clock.Sleep(latency, cancellationToken).ConfigureAwait(false)
+                            && cancellationToken.IsCancellationRequested)
+                        {
+                            failure = new OperationCanceledException(cancellationToken);
+                        }
+                        else
+                        {
+                            failure = fails ? new IOException($"The simulated dependency '{node.Name}' failed.") : null;
+                        }
                     }
                     finally
                     {
@@ -788,20 +913,28 @@ public sealed class Topology
                 }
                 else
                 {
+                    failure = null;
+
                     foreach (var edge in node.Out)
                     {
-                        if (await Invoke(edge, criticality).ConfigureAwait(false) is { } failure)
-                        {
-                            // The downstream's own failure, raised to this caller's caller so that its
-                            // policy classifies what actually happened rather than a wrapper this
-                            // simulator invented.
-                            throw failure;
-                        }
+                        // The downstream's own failure, reported to this caller's caller so that its
+                        // policy classifies what actually happened rather than a wrapper this simulator
+                        // invented. A service stops at its first failed call: it makes them one after
+                        // another, so there is nothing after one that failed.
+                        failure = await Invoke(edge, criticality).ConfigureAwait(false);
+
+                        if (failure is not null)
+                            break;
                     }
                 }
 
-                node.Succeeded++;
-                node.Completed[(int)criticality]++;
+                if (failure is null)
+                {
+                    node.Succeeded++;
+                    node.Completed[(int)criticality]++;
+                }
+
+                return failure;
             }
             finally
             {
@@ -852,11 +985,39 @@ public sealed class Topology
 
         /// <summary>One attempt reaching the callee. This is the callback the real executor drives.</summary>
         /// <remarks>
+        ///     <para>
+        ///         The boundary, and the only frame in the graph that raises a modeled failure as an
+        ///         exception. A callback that threw is how the executor is told an attempt failed, so
+        ///         the failure <see cref="Attempt" /> carried up as a value becomes a throw here and
+        ///         nowhere below - see <see cref="Serve" /> for why that is worth arranging.
+        ///     </para>
+        ///     <para>
+        ///         The throw is left to the compiler's state machine rather than arranged by hand. It
+        ///         faults this task with the same exception, and gives a cancellation the
+        ///         <see cref="TaskStatus.Canceled" /> state an <c>async</c> method always would - which
+        ///         is what the executor is entitled to see, and what completing the task by hand would
+        ///         have to reproduce exactly to be worth the one stack walk it saves.
+        ///     </para>
+        /// </remarks>
+        private async Task Reach(EdgeState edge, CancellationToken cancellationToken)
+        {
+            if (await Attempt(edge, cancellationToken).ConfigureAwait(false) is { } failure)
+                throw failure;
+        }
+
+        /// <summary>
+        ///     What one attempt does, and what it made of it. Never throws for a failure it models: see
+        ///     <see cref="Serve" />.
+        /// </summary>
+        /// <param name="edge">The call being attempted.</param>
+        /// <param name="cancellationToken">The attempt's token.</param>
+        /// <returns>The failure to report to the executor, or null when the attempt succeeded.</returns>
+        /// <remarks>
         ///     The permit is acquired first, so a refused attempt is not counted as having reached the
         ///     callee - it never left the caller. The lease is held for the length of the attempt, which
         ///     is what makes a concurrency limit a bulkhead.
         /// </remarks>
-        private async Task Reach(EdgeState edge, CancellationToken cancellationToken)
+        private async Task<Exception?> Attempt(EdgeState edge, CancellationToken cancellationToken)
         {
             // The caller's own pool, because this attempt is the caller's outbound work item. Waited
             // before the permit and before the attempt counts, and spent inside the measured duration -
@@ -867,8 +1028,12 @@ public sealed class Topology
             {
                 var queued = pool.DelayAt(TimeSpan.FromTicks(_clock.Now));
 
-                if (queued > TimeSpan.Zero && !await _clock.Sleep(queued, cancellationToken).ConfigureAwait(false))
-                    cancellationToken.ThrowIfCancellationRequested();
+                if (queued > TimeSpan.Zero
+                    && !await _clock.Sleep(queued, cancellationToken).ConfigureAwait(false)
+                    && cancellationToken.IsCancellationRequested)
+                {
+                    return new OperationCanceledException(cancellationToken);
+                }
             }
 
             // The service's permit before the call's, so the broader bound is the one a refusal reports
@@ -887,13 +1052,13 @@ public sealed class Topology
                     if (edge.Gate is { } call)
                         inner = await call.AcquireAsync(cancellationToken).ConfigureAwait(false);
                 }
-                catch (RateLimitedException) when (!Queueing(edge))
+                catch (RateLimitedException refused) when (!Queueing(edge))
                 {
                     // Counted against the call that was attempting, whichever limiter refused it: a
                     // service's gate is shared, so it cannot say which of its calls was turned away.
                     edge.Refused++;
 
-                    throw;
+                    return refused;
                 }
 
                 edge.Reached++;
@@ -904,7 +1069,7 @@ public sealed class Topology
                 edge.Caller.Downstream++;
                 edge.Caller.BucketAt(_clock.Now).Reached++;
 
-                await Serve(edge.Callee, cancellationToken).ConfigureAwait(false);
+                return await Serve(edge.Callee, cancellationToken).ConfigureAwait(false);
             }
             finally
             {

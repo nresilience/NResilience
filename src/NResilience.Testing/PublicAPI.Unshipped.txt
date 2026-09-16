@@ -206,6 +206,7 @@ NResilience.Testing.Topology.Leaf(string! name, NResilience.Testing.Dependency! 
 NResilience.Testing.Topology.Recording() -> NResilience.Testing.Topology!
 NResilience.Testing.Topology.Records.get -> bool
 NResilience.Testing.Topology.Run(int seed) -> NResilience.Testing.TopologyReport!
+NResilience.Testing.Topology.RunAll(int[]! seeds, System.Threading.CancellationToken cancellationToken) -> NResilience.Testing.TopologyBand!
 NResilience.Testing.Topology.RunAll(params int[]! seeds) -> NResilience.Testing.TopologyBand!
 NResilience.Testing.Topology.Under(NResilience.Testing.Load! load, string! at) -> NResilience.Testing.Topology!
 NResilience.Testing.Topology.Validate() -> void

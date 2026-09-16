@@ -380,7 +380,7 @@ Everything else is what it already was. The policies are yours and the executors
 | `On(caller, callee)` | What one call measured, as an ordinary [`SimulationReport`](#read-the-report). `Calls` is how often the caller invoked it, `Reached` how many attempts got to the callee, and `LoadMultiplier` between them is what the callee feels. |
 | `At(service)` | What one service measured. `Calls` is the requests it served, `Availability` the fraction it answered, and `Reached` the attempts it sent downstream across every call it makes - so its `LoadMultiplier` is fan-out and retries together. A leaf sends nothing on, so its multiplier is one. |
 | `Edges`, `Entries`, `Services` | What the graph contains. |
-| `RunAll(seeds)` | A `TopologyBand`, with `On` and `At` returning a [`SimulationBand`](#compare-two-configurations) each. |
+| `RunAll(seeds)` | A `TopologyBand`, with `On` and `At` returning a [`SimulationBand`](#compare-two-configurations) each. The seeds run at the same time as each other, exactly as a single-dependency band's do, unless the graph declares a limiter. |
 
 The finding is usually the gap between two of them: every policy behaving exactly as configured while the thing at the bottom feels several times the load anybody asked for.
 

@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using NResilience.Testing;
 
 namespace NResilience.Tests;
@@ -382,6 +383,47 @@ public sealed class TopologyTests
         Assert.Equal(3, band.Reports.Count);
         Assert.True(band.On("payments", "bank").Amplification.Spread > 0, "amplification did not move across three seeds");
         Assert.True(band.At("checkout").Availability.Median > 0);
+    }
+
+    [Fact]
+    public void A_band_equals_the_same_seeds_run_one_at_a_time()
+    {
+        // The claim the parallel band rests on, and the only one worth testing about it: a seed run
+        // beside nineteen others is the seed run alone. Every report, not just the aggregate - a
+        // per-seed difference that the median happened to absorb would be the failure this misses.
+        var seeds = Enumerable.Range(1, 20).ToArray();
+
+        var alone = seeds.Select(seed => Chain(seconds: 20).Run(seed).ToString()).ToArray();
+        var band = Chain(seconds: 20).RunAll(seeds);
+
+        Assert.Equal(alone, band.Reports.Select(report => report.ToString()));
+    }
+
+    [Fact]
+    public void A_band_of_a_graph_that_declares_a_limiter_equals_the_same_seeds_run_one_at_a_time()
+    {
+        // The sequential path, for the same reason Simulation keeps one: the factory is the caller's
+        // code and has always been called one seed at a time. It still has to produce the same band.
+        var seeds = new[] { 1, 2, 3, 4 };
+
+        static Topology Bounded() =>
+            Chain(seconds: 20).WithLimiter("payments", "bank", _ => new ConcurrencyLimiter(
+                new ConcurrencyLimiterOptions { PermitLimit = 8, QueueLimit = 0 }));
+
+        var alone = seeds.Select(seed => Bounded().Run(seed).ToString()).ToArray();
+        var band = Bounded().RunAll(seeds);
+
+        Assert.Equal(alone, band.Reports.Select(report => report.ToString()));
+    }
+
+    [Fact]
+    public void A_band_abandons_the_run_when_its_token_is_signalled()
+    {
+        using var cancellation = new CancellationTokenSource();
+
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(() => Chain(seconds: 20).RunAll([1, 2, 3], cancellation.Token));
     }
 
     [Theory]

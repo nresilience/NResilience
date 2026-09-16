@@ -232,7 +232,8 @@ A limiter that cannot answer on a virtual clock throws `InvalidOperationExceptio
 Both kinds of limiter may apply to one call. The service's permit is acquired first, then the call's, and either refusal is counted against the call that was attempting - a shared limiter cannot say which of its calls was turned away. The same replenishing and queueing limiters `Simulation.WithLimiter` refuses are refused here, and the message names the service or the call.
 | `Recording()` | Records a timeline per edge, into each `On(caller, callee).Timeline`. |
 | `Run(int seed)` | Runs the graph and returns a `TopologyReport`. |
-| `RunAll(params int[] seeds)` | Runs it once per seed and returns a `TopologyBand`. No repeats. |
+| `RunAll(params int[] seeds)` | Runs it once per seed and returns a `TopologyBand`. No repeats. The seeds run at the same time as each other, on the same terms `Simulation.RunAll` does. |
+| `RunAll(int[] seeds, CancellationToken cancellationToken)` | The same, abandoning the band between seeds when the token is signalled. For a caller that may stop wanting the answer. |
 | `Validate()` | Throws `InvalidOperationException` listing every problem at once, then validates each policy, dependency and load. |
 | `Edges`, `Duration`, `Records` | What has been declared so far. |
 

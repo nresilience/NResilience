@@ -10,7 +10,7 @@ namespace NResilience.Testing;
 ///         round the timing differently.
 ///     </para>
 /// </summary>
-/// <seealso cref="Topology.RunAll" />
+/// <seealso cref="Topology.RunAll(int[])" />
 public sealed class TopologyBand
 {
     private readonly TopologyReport[] _reports;
