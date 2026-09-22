@@ -21,6 +21,7 @@ jobs:
   gates:
     name: Tests and allocation gates (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -59,6 +60,7 @@ jobs:
   integration:
     name: Integration tests (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -89,6 +91,7 @@ jobs:
   docs:
     name: Docs gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
@@ -117,6 +120,7 @@ jobs:
   aot:
     name: Native AOT (${{ matrix.os }}, ${{ matrix.tfm }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

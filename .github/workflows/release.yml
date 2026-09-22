@@ -22,6 +22,7 @@ jobs:
   gates:
     name: Gates (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -55,6 +56,7 @@ jobs:
   docs-gate:
     name: Docs gate
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -81,6 +83,7 @@ jobs:
   aot:
     name: Native AOT (${{ matrix.os }}, ${{ matrix.tfm }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -120,6 +123,7 @@ jobs:
     name: Pack
     needs: [gates, docs-gate, aot]
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
         with:
@@ -181,6 +185,7 @@ jobs:
     name: Publish to NuGet
     needs: pack
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       id-token: write
 
@@ -237,6 +242,7 @@ jobs:
     name: Create GitHub Release
     needs: publish-nuget
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write
     steps:
@@ -260,6 +266,7 @@ jobs:
     name: Deploy Documentation
     needs: [pack, create-release]
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
