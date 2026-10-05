@@ -70,7 +70,7 @@
       AddGrpcClient / AddInterceptor DI seam the registration extends, and brings Grpc.Net.Client
       and Microsoft.Extensions.Http transitively.
     -->
-    <PackageVersion Include="Grpc.Core.Api" Version="2.83.0" />
+    <PackageVersion Include="Grpc.Core.Api" Version="2.84.0" />
     <PackageVersion Include="Grpc.Net.Client" Version="2.83.0" />
     <PackageVersion Include="Grpc.Net.ClientFactory" Version="2.83.0" />
 
