@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <!-- Competitive baseline. Pinned: a Polly bump must be a deliberate, re-measured change. -->
-    <PackageVersion Include="Polly.Core" Version="8.7.0" />
+    <PackageVersion Include="Polly.Core" Version="8.8.0" />
 
     <!-- Trend tracking only. The hard gate below depends on no benchmark harness. -->
     <PackageVersion Include="NBenchmark" Version="0.48.1" />
